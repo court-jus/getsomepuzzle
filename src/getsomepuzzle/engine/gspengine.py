@@ -8,12 +8,13 @@ from .constraints import (
     AVAILABLE_RULES,
 )
 from .constants import DOMAIN, MAX_STEPS, DEFAULT_SIZE
-from .utils import show_solution
+from .utils import solution_to_str
 
 
 class Cell:
     def __init__(self):
         self.options = DOMAIN[:]
+        self.backup_options = DOMAIN[:]
         self.value = 0
 
     def __repr__(self):
@@ -97,18 +98,31 @@ class Puzzle:
             raise ValueError("Cannot add rule, it's already there")
         if any(c.conflicts(new_constraint) for c in self.constraints):
             raise ValueError("Cannot add rule, it conflicts with another one")
+        if isinstance(new_constraint, FixedValueConstraint):
+            fixed_cells = [c for c in self.state if c.value]
+            if len(fixed_cells) == (self.width * self.height) - 1:
+                raise ValueError("Cannot add rule, it would fill the puzzle")
         self.constraints.append(new_constraint)
+        # print("Good it's added")
+        self.apply_fixed_constraints()
+            
 
     def apply_fixed_constraints(self):
         for constraint in self.constraints:
             if isinstance(constraint, FixedValueConstraint):
-                print("Apply", constraint)
+                # print("Apply", constraint)
                 idx, val = constraint.parameters["idx"], constraint.parameters["val"]
                 self.state[idx].value = val
                 self.state[idx].options = []
+        # print("fixed values are now", [c.value for c in self.state])
         self.constraints = [
             c for c in self.constraints if not isinstance(c, FixedValueConstraint)
         ]
+
+    def reset_user_input(self):
+        for cell in self.state:
+            if cell.value != 0 and cell.options:
+                cell.value = 0
 
     def simplify(self, solution):
         # Pick a value from the solution
@@ -212,7 +226,8 @@ class Puzzle:
             return True
         for constraint in puzzle.constraints:
             if not constraint.check(puzzle):
-                print("Check failed for", constraint)
+                pass
+                # print("Check failed for", constraint)
         return False
 
     def clone(self):
@@ -253,11 +268,12 @@ class PuzzleGenerator:
                     # print("Cannot add", new_constraint, "it's already too much present")
                     continue
                 self.puzzle.add_constraint(new_constraint)
-            except ValueError:
+            except ValueError as err:
+                # print("Cannot add", new_constraint, err)
                 # The puzzle already has this constraint or there is a conflict
                 continue
             else:
-                # print("Add", new_constraint)
+                # print("Added", new_constraint)
                 return new_constraint
         raise RuntimeError("Max iter reach to add random rule")
 
@@ -294,7 +310,7 @@ class PuzzleGenerator:
 
 
 def main():
-    print("=" * 80)
+    # print("=" * 80)
     size = 5
     puzzle_generated = False
     while not puzzle_generated:
@@ -313,24 +329,24 @@ def main():
         max_simplifications -= 1
         pu.simplify(solution)
         solution, bp = pu.find_solution(pu)
-    print(". . .", bp, ". . .")
-    print(pu)
-    show_solution(pu)
-    print("-" * 80)
+    # print(". . .", bp, ". . .")
+    # print(pu)
+    print(solution_to_str(pu))
+    # print("-" * 80)
     c = False
     failures = 0
     while not c:
         solution = input("Your solution (empty to cancel):").strip()
-        print("you typed", solution)
+        # print("you typed", solution)
         if not solution:
             return
         solution = [int(c) for c in solution]
-        print(solution)
+        # print(solution)
         c = pu.check_solution(solution)
         if c:
-            print("You win")
+            # print("You win")
             return
-        print("Try again", failures)
+        # print("Try again", failures)
         failures += 1
         if failures > 5:
             print("Solutions:")

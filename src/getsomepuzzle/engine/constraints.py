@@ -156,20 +156,26 @@ class ParityConstraint(Constraint):
         # one of its side (or both), the given cell and side are defined
         # in the parameters
         idx, side = self.parameters["idx"], self.parameters["side"]
+        print("will check", idx, side)
         w, h = puzzle.width, puzzle.height
         rows = to_rows(puzzle.state, w, h)
         for row in rows:
+            # FIXME: it does not work at all for rows > 1
+            # print("ROW", row)
             values_and_indices = [(idx, c.value) for idx, c in enumerate(row)]
+            # print("VAI", values_and_indices)
             sides = []
             if side in ("left", "both"):
                 sides.append([v for (i, v) in values_and_indices if i < idx])
             if side in ("right", "both"):
                 sides.append([v for (i, v) in values_and_indices if i > idx])
             for side in sides:
+                # print("SIDE", side)
                 if any(v == 0 for v in side):
                     continue
                 even = len([v for v in side if v % 2 == 0])
                 odd = len([v for v in side if v % 2 != 0])
+                # print(even, odd)
                 if even != odd:
                     return False
         return True
@@ -194,8 +200,11 @@ class ParityConstraint(Constraint):
         possible_indices = [
             i for i in range(size) if min_left <= i <= max_right and i % 2 == 0
         ]
-        idx = random.choice(possible_indices)
-        return {"idx": idx, "side": side}
+        if not possible_indices:
+            raise ValueError("Cannot generate parity constraint")
+        col = random.choice(possible_indices)
+        row = random.randint(0, puzzle.height - 1)
+        return {"idx": col + row * puzzle.width, "side": side}
 
     @staticmethod
     def maximum_presence(puzzle):
@@ -221,9 +230,7 @@ class FixedValueConstraint(Constraint):
     def conflicts(self, other):
         if not isinstance(other, FixedValueConstraint):
             return False
-        if other.parameters["idx"] == self.parameters["idx"]:
-            return other.parameters["val"] != self.parameters["val"]
-        return other.parameters["val"] == self.parameters["val"]
+        return other.parameters["idx"] == self.parameters["idx"]
 
 
 AVAILABLE_RULES = [

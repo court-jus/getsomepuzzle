@@ -1,3 +1,3 @@
-DOMAIN = [1, 2, 3, 4, 5]  # , 6, 7, 8, 9]
-DEFAULT_SIZE = 5  # 5x5
+DOMAIN = [1, 2]  # Like two colors
+DEFAULT_SIZE = 3  # 3x3
 MAX_STEPS = 2000
