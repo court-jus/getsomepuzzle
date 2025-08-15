@@ -238,10 +238,11 @@ class Puzzle:
 
 
 class PuzzleGenerator:
-    def __init__(self, size=DEFAULT_SIZE):
+    def __init__(self, size=DEFAULT_SIZE, callback=None):
         # History of the constraints added
         self.history = []
         self.puzzle = Puzzle(size, size)
+        self.callback = callback if callback is not None else lambda x:x
 
     def add_random_rule(self, banned_constraints):
         max_iter = 100
@@ -284,12 +285,17 @@ class PuzzleGenerator:
         return removed_constraint
 
     def generate(self, *forced_constraints):
+        self.callback(3)
         for forced_constraint in forced_constraints:
             self.puzzle.add_constraint(forced_constraint)
+        self.callback(4)
         previous_version = self.puzzle.clone()
         has_solution = True
         banned_constraints = []
+        progress = 5
         while has_solution:
+            self.callback(progress)
+            progress += 1
             self.add_random_rule(banned_constraints)
 
             # Find solution
@@ -298,11 +304,14 @@ class PuzzleGenerator:
             has_solution = bool(solutions)
             if not solutions:
                 # Remove last constraint
+                progress -= 1
+                self.callback(progress)
                 banned_constraints.append(self.remove_last_rule())
                 has_solution = True
                 continue
             self.puzzle.clear_solutions()
             if len(solutions) == 1:
+                self.callback(100)
                 return self.puzzle
             previous_version = self.puzzle.clone()
             previous_version.clear_solutions()

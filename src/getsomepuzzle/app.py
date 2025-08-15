@@ -15,6 +15,7 @@ class GetSomePuzzle(toga.App):
         self.current_puzzle = None
         main_box = toga.Box(direction=COLUMN)
         buttons_box = toga.Box(direction=ROW)
+        self.progress = toga.ProgressBar(max=100, value=0)
         generate_button = toga.Button(
             "Gen.",
             on_press=self.generate,
@@ -41,7 +42,7 @@ class GetSomePuzzle(toga.App):
         puzzle_box.add(self.puzzle_input)
         self.rules = toga.Label("")
         self.message_label = toga.Label("")
-        main_box.add(buttons_box, self.rules, puzzle_box, self.message_label)
+        main_box.add(buttons_box, self.progress, self.rules, puzzle_box, self.message_label)
 
         self.main_window = toga.MainWindow(title=self.formal_name)
         self.main_window.content = main_box
@@ -51,9 +52,13 @@ class GetSomePuzzle(toga.App):
         self.clear()
         self.message_label.text = "Generating..."
         puzzle_generated = False
+        def change_progress(val):
+            self.progress.value = val
+
         while not puzzle_generated:
+            change_progress(2)
             try:
-                pg = PuzzleGenerator()
+                pg = PuzzleGenerator(callback=change_progress)
                 pu = pg.generate()
                 solution, bp = pu.find_solution(pu)
                 if not bp:
