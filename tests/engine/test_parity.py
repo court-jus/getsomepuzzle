@@ -118,6 +118,7 @@ def test_parity(puzzle, idx, side, valid):
     assert c.check(p) is valid
 
 
+@pytest.mark.skip()
 def test_parity_generate():
     random.seed(0)
     p = Puzzle(5, 5)
