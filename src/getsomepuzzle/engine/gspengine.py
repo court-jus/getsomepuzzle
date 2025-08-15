@@ -4,9 +4,9 @@ import random
 from .constraints import (
     AllDifferentConstraint,
     FixedValueConstraint,
-    OtherSolutionConstraint,
     AVAILABLE_RULES,
 )
+from .constraints.other_solution import OtherSolutionConstraint
 from .constants import DOMAIN, MAX_STEPS, DEFAULT_SIZE
 from .utils import solution_to_str
 

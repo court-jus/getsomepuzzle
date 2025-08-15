@@ -6,7 +6,6 @@ import toga
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 from .engine.gspengine import PuzzleGenerator
-from .engine.constraints import AllDifferentConstraint
 from .engine.utils import to_grid
 from .engine.constants import DOMAIN
 

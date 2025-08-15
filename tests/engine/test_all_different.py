@@ -35,9 +35,16 @@ def test_all_different_valid(puzzle):
 
 @pytest.mark.parametrize(
     "puzzle",
-    [],
+    ["""
+    123
+    231
+    213
+    """,
+    """
+    12
+    13
+    """],
 )
-@pytest.mark.skip()
 def test_all_different_invalid(puzzle):
     p = make_puzzle(puzzle)
     c = AllDifferentConstraint()
