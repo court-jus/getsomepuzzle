@@ -12,38 +12,24 @@ from .engine.constants import DOMAIN
 
 class GetSomePuzzle(toga.App):
     def startup(self):
+        # State
         self.current_puzzle = None
+
+        # UI
         main_box = toga.Box(direction=COLUMN)
         buttons_box = toga.Box(direction=ROW)
         self.progress = toga.ProgressBar(max=100, value=0)
-        generate_button = toga.Button(
-            "Gen.",
-            on_press=self.generate,
-            margin=5,
-        )
-        check_button = toga.Button(
-            "Chk.",
-            on_press=self.check,
-            margin=5
-        )
-        clear_button = toga.Button(
-            "Clr.",
-            on_press=self.clear,
-            margin=5,
-        )
-        reset_button = toga.Button(
-            "Rst.",
-            on_press=self.reset,
-            margin=5,
-        )
+        generate_button = toga.Button("Gen.", on_press=self.generate, margin=5)
+        check_button = toga.Button("Chk.", on_press=self.check, margin=5)
+        clear_button = toga.Button("Clr.", on_press=self.clear, margin=5)
+        reset_button = toga.Button("Rst.", on_press=self.reset, margin=5)
         buttons_box.add(generate_button, check_button, clear_button, reset_button)
-        puzzle_box = toga.Box(direction=ROW)
         self.puzzle_input = toga.Box(direction=COLUMN)
-        puzzle_box.add(self.puzzle_input)
         self.rules = toga.Label("")
         self.message_label = toga.Label("")
-        main_box.add(buttons_box, self.progress, self.rules, puzzle_box, self.message_label)
-
+        main_box.add(
+            buttons_box, self.progress, self.rules, self.puzzle_input, self.message_label
+        )
         self.main_window = toga.MainWindow(title=self.formal_name)
         self.main_window.content = main_box
         self.main_window.show()
@@ -52,6 +38,7 @@ class GetSomePuzzle(toga.App):
         self.clear()
         self.message_label.text = "Generating..."
         puzzle_generated = False
+
         def change_progress(val):
             self.progress.value = val
 
@@ -93,7 +80,7 @@ class GetSomePuzzle(toga.App):
         for ridx, row in enumerate(grid):
             row_box = toga.Box(direction=ROW)
             for cidx, cell in enumerate(row):
-                value = (cell.value if cell.value else None)
+                value = cell.value if cell.value else None
                 readonly = value is not None
                 cell_input = toga.Button(
                     value,
@@ -122,7 +109,9 @@ class GetSomePuzzle(toga.App):
     def check(self, *_a, **_kw):
         if not self.current_puzzle:
             return
-        if self.current_puzzle.check_solution([c.value for c in self.current_puzzle.state]):
+        if self.current_puzzle.check_solution(
+            [c.value for c in self.current_puzzle.state]
+        ):
             self.message_label.text = "You win"
         else:
             self.message_label.text = "Keep going"
@@ -147,6 +136,7 @@ class GetSomePuzzle(toga.App):
         self.current_puzzle.reset_user_input()
         self.clear()
         self.show_puzzle()
+
 
 def main():
     return GetSomePuzzle()

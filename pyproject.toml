@@ -2,7 +2,7 @@
 [tool.briefcase]
 project_name = "Get Some Puzzle"
 bundle = "cc.leveque.getsomepuzzle"
-version = "0.0.2"
+version = "0.0.3"
 url = "https://getsomepuzzle.leveque.cc/"
 license.file = "LICENSE"
 author = "Ghislain Lévêque"
@@ -14,6 +14,7 @@ description = "Generate and play some logic puzzles"
 long_description = """This allows you to generate some logic puzzles
 that can feel a bit similar to Sudoku but with variating rules.
 """
+icon = "icons/getsomepuzzle"
 sources = [
     "src/getsomepuzzle",
 ]
