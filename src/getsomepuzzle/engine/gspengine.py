@@ -8,13 +8,12 @@ from .constraints import (
 )
 from .constraints.other_solution import OtherSolutionConstraint
 from .constants import DOMAIN, MAX_STEPS, DEFAULT_SIZE
-from .utils import solution_to_str
+from .utils import state_to_str
 
 
 class Cell:
     def __init__(self):
         self.options = DOMAIN[:]
-        self.backup_options = DOMAIN[:]
         self.value = 0
 
     def __repr__(self):
@@ -92,8 +91,9 @@ class Puzzle:
             return None, None
         return cells[0]
 
-    def add_constraint(self, new_constraint):
-        # print("Trying to add", new_constraint, "to", [repr(c) for c in self.constraints])
+    def add_constraint(self, new_constraint, debug=False):
+        if debug:
+            print("Trying to add", new_constraint, "to", [repr(c) for c in self.constraints])
         if any(c == new_constraint for c in self.constraints):
             raise ValueError("Cannot add rule, it's already there")
         if any(c.conflicts(new_constraint) for c in self.constraints):
@@ -103,18 +103,21 @@ class Puzzle:
             if len(fixed_cells) == (self.width * self.height) - 1:
                 raise ValueError("Cannot add rule, it would fill the puzzle")
         self.constraints.append(new_constraint)
-        # print("Good it's added")
-        self.apply_fixed_constraints()
+        if debug:
+            print("Good it's added")
+        self.apply_fixed_constraints(debug=debug)
             
 
-    def apply_fixed_constraints(self):
+    def apply_fixed_constraints(self, debug=False):
         for constraint in self.constraints:
             if isinstance(constraint, FixedValueConstraint):
-                # print("Apply", constraint)
+                if debug:
+                    print("Apply", constraint)
                 idx, val = constraint.parameters["idx"], constraint.parameters["val"]
                 self.state[idx].value = val
                 self.state[idx].options = []
-        # print("fixed values are now", [c.value for c in self.state])
+        if debug:
+            print("fixed values are now", [c.value for c in self.state])
         self.constraints = [
             c for c in self.constraints if not isinstance(c, FixedValueConstraint)
         ]
@@ -124,12 +127,13 @@ class Puzzle:
             if cell.value != 0 and cell.options:
                 cell.value = 0
 
-    def simplify(self, solution):
+    def simplify(self, solution, debug=False):
         # Pick a value from the solution
         cell, idx = random.choice(self.free_cells())
         cell.value = solution.state[idx].value
         cell.options = []
-        # print("Set cell", idx, "to", cell.value)
+        if debug:
+            print("Simplify: Set cell", idx, "to", cell.value)
 
     def find_solution(self, starting_state):
         st = starting_state.clone()
@@ -195,9 +199,9 @@ class Puzzle:
             return None, None
         return st, backpropagations
 
-    def find_solutions(self, max_solutions=2):
+    def find_solutions(self, max_solutions=2, debug=False):
         initial_state = self.clone()
-        initial_state.apply_fixed_constraints()
+        initial_state.apply_fixed_constraints(debug=debug)
         max_explorations = max_solutions
         while max_explorations > 0:
             max_explorations -= 1
@@ -217,17 +221,19 @@ class Puzzle:
                 solutions.append(constraint.parameters["solution"])
         return solutions
 
-    def check_solution(self, solution):
+    def check_solution(self, solution, debug=False):
+        if debug:
+            print("Check solution", solution)
         puzzle = self.clone()
         for idx, val in enumerate(solution):
             puzzle.state[idx].value = val
             puzzle.state[idx].options = []
         if puzzle.is_complete():
             return True
-        for constraint in puzzle.constraints:
-            if not constraint.check(puzzle):
-                pass
-                # print("Check failed for", constraint)
+        if debug:
+            for constraint in puzzle.constraints:
+                print("Check constraint", constraint)
+                print("->", constraint.check(puzzle))
         return False
 
     def clone(self):
@@ -244,7 +250,7 @@ class PuzzleGenerator:
         self.puzzle = Puzzle(size, size)
         self.callback = callback if callback is not None else lambda x:x
 
-    def add_random_rule(self, banned_constraints):
+    def add_random_rule(self, banned_constraints, debug=False):
         max_iter = 100
         while max_iter > 0:
             max_iter -= 1
@@ -268,7 +274,7 @@ class PuzzleGenerator:
                 ) and presence >= rule.maximum_presence(self.puzzle):
                     # print("Cannot add", new_constraint, "it's already too much present")
                     continue
-                self.puzzle.add_constraint(new_constraint)
+                self.puzzle.add_constraint(new_constraint, debug=debug)
             except ValueError as err:
                 # print("Cannot add", new_constraint, err)
                 # The puzzle already has this constraint or there is a conflict
@@ -284,10 +290,10 @@ class PuzzleGenerator:
         self.puzzle.constraints = self.puzzle.constraints[:-1]
         return removed_constraint
 
-    def generate(self, *forced_constraints):
+    def generate(self, *forced_constraints, debug=False):
         self.callback(3)
         for forced_constraint in forced_constraints:
-            self.puzzle.add_constraint(forced_constraint)
+            self.puzzle.add_constraint(forced_constraint, debug=debug)
         self.callback(4)
         previous_version = self.puzzle.clone()
         has_solution = True
@@ -296,11 +302,12 @@ class PuzzleGenerator:
         while has_solution:
             self.callback(progress)
             progress += 1
-            self.add_random_rule(banned_constraints)
+            self.add_random_rule(banned_constraints, debug=debug)
 
             # Find solution
             solutions = self.puzzle.find_solutions()
-            # print(" Found", len(solutions), "solutions")
+            if debug:
+                print(" Found", len(solutions), "solutions")
             has_solution = bool(solutions)
             if not solutions:
                 # Remove last constraint
@@ -340,7 +347,7 @@ def main():
         solution, bp = pu.find_solution(pu)
     # print(". . .", bp, ". . .")
     # print(pu)
-    print(solution_to_str(pu))
+    print(state_to_str(pu))
     # print("-" * 80)
     c = False
     failures = 0
