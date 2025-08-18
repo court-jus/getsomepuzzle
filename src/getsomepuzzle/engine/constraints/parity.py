@@ -13,7 +13,7 @@ class ParityConstraint(Constraint):
             f"side{'s' if side == 'both' else ''}"
         )
 
-    def check(self, puzzle):
+    def check(self, puzzle, debug=False):
         # The given cell has the same number of odd and even numbers on
         # one of its side (or both), the given cell and side are defined
         # in the parameters

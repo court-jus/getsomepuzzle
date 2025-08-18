@@ -89,6 +89,15 @@ def test_forbidden_motif_valid(motif, puzzle):
         334421
         """,
         ),
+        (
+            ["11", "22"],
+            """
+        0111
+        1122
+        1221
+        0221
+        """,
+        )
     ],
 )
 def test_forbidden_motif_invalid(motif, puzzle):

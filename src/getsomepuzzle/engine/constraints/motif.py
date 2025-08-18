@@ -11,25 +11,40 @@ class ForbiddenMotif(Constraint):
         motif = self.parameters["motif"]
         return f"Motif {motif} is forbidden"
 
-    def check(self, puzzle):
+    def check(self, puzzle, debug=False):
         motif = self.parameters["motif"]
         grid = to_grid(
             puzzle.state, puzzle.width, puzzle.height, lambda cell: int(cell.value)
         )
         rows = ["".join(map(str, row)) for row in grid]
         findings = {}
+        if debug:
+            print("ROWS", rows)
         for midx, motifline in enumerate(motif):
+            m_re = re.compile(motifline)
             for ridx, row in enumerate(rows):
+                if debug:
+                    print(f"Motif {midx}: {motifline}, check in {ridx}:{row} - Findings: {findings}")
                 matches = [
-                    m.start()
-                    for m in re.finditer(motifline, row)
-                    if midx == 0
-                    or m.start() in findings.get(midx - 1, {}).get(ridx - 1, [])
+                    charidx
+                    for charidx, _ in enumerate(row)
+                    if m_re.match(row[charidx:]) and (
+                        midx == 0
+                        or charidx in findings.get(midx - 1, {}).get(ridx - 1, [])
+                    )
                 ]
                 if matches:
+                    if debug:
+                        print(f"Match ({midx}, {len(motif) - 1})")
                     if midx == len(motif) - 1:
+                        if debug:
+                            print("Check shows that motif is not respected")
                         return False
                     findings.setdefault(midx, {})[ridx] = matches
+                    if debug:
+                        print(f"Add finding. Now: {findings}")
+                elif debug:
+                    print("No match")
 
         return True
 

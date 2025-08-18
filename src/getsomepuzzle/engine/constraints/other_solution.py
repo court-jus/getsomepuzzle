@@ -5,7 +5,7 @@ from .base import Constraint
 
 class OtherSolutionConstraint(Constraint):
 
-    def check(self, puzzle):
+    def check(self, puzzle, debug=False):
         # The final solution should NOT be the one given
         values = [c.value for c in puzzle.state]
         if any(v == 0 for v in values):

@@ -71,16 +71,23 @@ class Puzzle:
             c for c in self.constraints if not isinstance(c, OtherSolutionConstraint)
         ]
 
-    def is_valid(self):
+    def is_valid(self, debug=False):
         if not self.is_possible():
+            if debug:
+                print("Not possible")
             return False
-        return all(constraint.check(self) for constraint in self.constraints)
+        for constraint in self.constraints:
+            if not constraint.check(self):
+                if debug:
+                    print("Constraint", constraint, "is invalid")
+                return False
+        return True        
 
     def is_possible(self):
         return all(c.is_possible() for c in self.state)
 
-    def is_complete(self):
-        return self.is_valid() and not self.free_cells()
+    def is_complete(self, debug=False):
+        return self.is_valid(debug=debug) and not self.free_cells()
 
     def free_cells(self):
         return [(c, idx) for idx, c in enumerate(self.state) if c.free()]
@@ -135,63 +142,128 @@ class Puzzle:
         if debug:
             print("Simplify: Set cell", idx, "to", cell.value)
 
-    def find_solution(self, starting_state):
+    def remove_useless_rules(self, debug=False):
+        solutions = self.find_solutions()
+        if debug:
+            print(f"Initially, we have {len(solutions)} solution:")
+            for sol in solutions:
+                print("SOLUTION", sol)
+        initial_solutions = len(solutions)
+        initial_constraints = self.constraints[:]
+        removed = []
+        for idx, constraint in enumerate(self.constraints):
+            if debug:
+                print("Will try to remove constraint", idx, constraint)
+            new_puzzle = self.clone()
+            new_puzzle.constraints = [
+                c for i, c in enumerate(self.constraints)
+                if i not in removed and i != idx
+            ]
+            solutions = new_puzzle.find_solutions()
+            if solutions and len(solutions) == initial_solutions:
+                if debug:
+                    print("Still valid, move on")
+                removed.append(idx)
+            else:
+                if debug:
+                    print("Nope, we'll keep that one")
+        if removed:
+            self.constraints = [
+                c for i, c in enumerate(self.constraints)
+                if i not in removed
+            ]
+            if debug:
+                print("We removed", removed)
+        else:
+            if debug:
+                print("Nothing can be removed")
+
+    def find_solution(self, starting_state, debug=False):
         st = starting_state.clone()
-        history = [st.clone()]
+        log_history = []
         steps = MAX_STEPS
         backpropagations = 0
         while steps > 0:
             if st.is_complete():
                 break
+            if debug:
+                print(st.state)
             steps -= 1
             cell, idx = st.first_free_cell()
             if cell is None or not st.is_possible():
+                if debug:
+                    print("Not possible anymore")
+                    print("HISTORY:")
+                    print("\n".join([f"Set {l[0] + 1} = {l[1]} (options {l[2]})" for l in log_history]))
                 # Rewind history, until we find a moment where a value was fixed,
                 # change that value and keep looking for solutions.
-                if not history:
+                if not log_history:
+                    if debug:
+                        print("No history left, no solution found")
                     return None, None
                 previous_line = st
-                new_history = []
                 v = 0
                 backpropagations += 1
-                for hidx, line in enumerate(history[::-1]):
-                    previous_choices = [
-                        c.value for c in previous_line.state if c.value != 0
-                    ]
-                    current_choices = [c.value for c in line.state if c.value != 0]
-                    if len(previous_choices) == len(current_choices):
-                        previous_line = line
-                        new_history.append(line)
+                for hidx, line in enumerate(log_history[::-1]):
+                    cell_idx, chosen_value, options_remaining = line
+                    if debug:
+                        print(f"We had chosen {cell_idx+1} = {chosen_value} and still had options {options_remaining}")
+                    if not options_remaining:
                         continue
-                    # Find the index and changed value
-                    for idx, v in enumerate(previous_choices):
-                        if idx >= len(current_choices) or current_choices[idx] != v:
-                            break
-                    else:
-                        # If we are back at the start of history, it means we explored everything
-                        # and the puzzle is impossible.
-                        return None, None
+                    if debug:
+                        print("We could have chosen another option, let's try it")
                     break
-                if not v:
+                else:
+                    if debug:
+                        print("Found nothing changeable in history")
                     return None, None
-                st = previous_line.clone()
-                cell = st.state[idx]
-                cell.value = 0
-                if v not in cell.options:
-                    return None, None
-                cell.options.remove(v)
-                history = history[:-hidx]
-            if cell is not None and cell.options:
+                if debug:
+                    print(f"Found changeable history: {cell_idx + 1} = {chosen_value} ({options_remaining})")
+                st = starting_state.clone()
+                if debug:
+                    print("Replaying history until that moment")
+                new_history = []
+                for hidx, (h_cidx, h_value, h_options) in enumerate(log_history[:-hidx-1]):
+                    if debug:
+                        print(f"H{hidx} : {h_cidx + 1} = {h_value}")
+                    st.state[h_cidx].value = h_value
+                    st.state[h_cidx].options = h_options[:]
+                    new_history.append([h_cidx, h_value, h_options])
+                if debug:
+                    print(f"Now we make a new choice for {cell_idx + 1}")
+                cell = st.state[cell_idx]
+                cell.value = options_remaining[0]
+                cell.options = [o for o in options_remaining if o != cell.value]
+                new_history.append([cell_idx, cell.value, cell.options])
+                log_history = new_history
+                if debug:
+                    print("NEW HISTORY:")
+                    print("\n".join([f"Set {l[0] + 1} = {l[1]} (options {l[2]})" for l in log_history]))
+            elif cell is not None and cell.options:
                 new_value = cell.options[0]
                 cell.value = new_value
-                if st.is_valid():
-                    history.append(st.clone())
+                if debug:
+                    print("try with", idx + 1, "=", cell.value)
+                    print("so now we have")
+                    print(st.state)
+                if st.is_valid(debug=debug):
+                    if debug:
+                        print("that's valid")
+                    log_history.append([idx, new_value, [o for o in cell.options if o != new_value]])
+                    if debug:
+                        print("HISTORY NOW:")
+                        print("\n".join([f"Set {l[0] + 1} = {l[1]} (options {l[2]})" for l in log_history]))
                     continue
+                if debug:
+                    print("invalid, remove this value and set back to 0")
                 st = st.clone()
                 st.state[idx].options = [
                     o for o in st.state[idx].options if o != new_value
                 ]
                 st.state[idx].value = 0
+                if debug:
+                    print("so now we are back with")
+                    print(st.state)
         if not steps:
             raise RuntimeError("Reached MAX_STEPS")
 
@@ -205,7 +277,12 @@ class Puzzle:
         max_explorations = max_solutions
         while max_explorations > 0:
             max_explorations -= 1
-            solution, _ = self.find_solution(initial_state)
+            try:
+                solution, _ = self.find_solution(initial_state, debug=debug)
+            except RuntimeError:
+                break                
+            if debug:
+                print("* Found solution", solution.state if solution is not None else None)
             if solution is None:
                 break
 
@@ -246,12 +323,11 @@ class Puzzle:
 class PuzzleGenerator:
     def __init__(self, size=DEFAULT_SIZE, callback=None):
         # History of the constraints added
-        self.history = []
         self.puzzle = Puzzle(size, size)
         self.callback = callback if callback is not None else lambda x:x
 
     def add_random_rule(self, banned_constraints, debug=False):
-        max_iter = 100
+        max_iter = 1000
         while max_iter > 0:
             max_iter -= 1
             rule = random.choice(AVAILABLE_RULES)
@@ -302,10 +378,13 @@ class PuzzleGenerator:
         while has_solution:
             self.callback(progress)
             progress += 1
-            self.add_random_rule(banned_constraints, debug=debug)
+            try:
+                self.add_random_rule(banned_constraints, debug=debug)
+            except RuntimeError:
+                return None
 
             # Find solution
-            solutions = self.puzzle.find_solutions()
+            solutions = self.puzzle.find_solutions(debug=debug)
             if debug:
                 print(" Found", len(solutions), "solutions")
             has_solution = bool(solutions)

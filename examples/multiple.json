@@ -1,0 +1,61 @@
+{
+    "state": [
+        { "value": 0 },
+        { "value": 0 },
+        { "value": 0 },
+        { "value": 0 },
+        { "value": 2, "options": [] },
+        { "value": 0 },
+        { "value": 0 },
+        { "value": 0 },
+        { "value": 0 },
+        { "value": 1, "options": [] },
+        { "value": 0 },
+        { "value": 0 },
+        { "value": 0 },
+        { "value": 1, "options": [] },
+        { "value": 0 },
+        { "value": 0 }
+    ],
+    "width": 4,
+    "height": 4,
+    "constraints": [
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "1",
+                    "1",
+                    "2"
+                ]
+            }
+        },
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "11",
+                    "21"
+                ]
+            }
+        },
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "12",
+                    "12",
+                    "12"
+                ]
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": { "idx": 10, "side": "left" }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": { "idx": 14, "side": "left" }
+        }
+    ]
+}

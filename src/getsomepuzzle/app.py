@@ -39,14 +39,17 @@ class GetSomePuzzle(toga.App):
         self.message_label.text = "Generating..."
         puzzle_generated = False
 
+        progress = 2
         def change_progress(val):
-            self.progress.value = val
-
+            self.progress.value = min(100, val + progress)
         while not puzzle_generated:
+            progress = (progress + 1) % 100
             change_progress(2)
             try:
                 pg = PuzzleGenerator(callback=change_progress)
                 pu = pg.generate()
+                if pu is None:
+                    continue
                 solution, bp = pu.find_solution(pu)
                 if not bp:
                     continue
@@ -56,6 +59,7 @@ class GetSomePuzzle(toga.App):
                 puzzle_generated = True
         pu.apply_fixed_constraints()
         pu.clear_solutions()
+        pu.remove_useless_rules()
         solution, bp = pu.find_solution(pu)
         pu.clear_solutions()
         if bp is None:

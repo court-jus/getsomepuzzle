@@ -34,5 +34,5 @@ class Constraint:
     def conflicts(self, _other):
         return False
 
-    def check(self, puzzle):
+    def check(self, puzzle, debug=False):
         raise NotImplementedError("Should be implemented by subclass")

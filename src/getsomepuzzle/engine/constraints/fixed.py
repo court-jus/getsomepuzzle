@@ -9,7 +9,7 @@ class FixedValueConstraint(Constraint):
         idx, val = self.parameters["idx"], self.parameters["val"]
         return f"Cell {idx + 1} should equal {val}"
 
-    def check(self, puzzle):
+    def check(self, puzzle, debug=False):
         idx, val = self.parameters["idx"], self.parameters["val"]
         return puzzle.state[idx].value == val or val in puzzle.state[idx].options
 

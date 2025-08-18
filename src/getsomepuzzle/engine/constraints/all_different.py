@@ -7,7 +7,7 @@ class AllDifferentConstraint(Constraint):
     def __repr__(self):
         return "All cells must contain different values (per row and column)"
 
-    def check(self, puzzle):
+    def check(self, puzzle, debug=False):
         # All values should be different
         w, h = puzzle.width, puzzle.height
         rows = to_rows(puzzle.state, w, h)

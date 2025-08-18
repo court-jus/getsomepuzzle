@@ -41,13 +41,15 @@ def export_puzzle(pu):
 
 def import_puzzle(json_data):
     from .gspengine import Puzzle
-    from .constraints import AVAILABLE_RULES
+    from .constraints import AVAILABLE_RULES, DOMAIN
 
     data = json.loads(json_data)
     p = Puzzle(width=data["width"], height=data["height"])
     for idx, cell_data in enumerate(data["state"]):
-        p.state[idx].value = cell_data["value"]
-        p.state[idx].options = cell_data["options"]
+        value = cell_data.get("value", 0)
+        options = DOMAIN[:] if value == 0 else [o for o in DOMAIN if o != value]
+        p.state[idx].value = value
+        p.state[idx].options = options
 
     constraints = {c.__name__: c for c in AVAILABLE_RULES}
     for c in data["constraints"]:
