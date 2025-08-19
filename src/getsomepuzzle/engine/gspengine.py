@@ -52,6 +52,13 @@ class Puzzle:
         self.state = [Cell() for _ in range(width * height)]
         self.constraints = []
 
+    def small_repr(self):
+        result = [
+            f"Puzzle size is {self.width}x{self.height}",
+            f"Possible values: {DOMAIN}",
+        ]
+        return "\n".join(result)
+
     def __repr__(self):
         # valid = self.is_valid()
         # poss = self.is_possible()
@@ -59,7 +66,7 @@ class Puzzle:
             # ("V" if valid else "I") + ("P" if poss else "I") +
             # " - " + ".".join(map(str, self.state)),
             "Rules:",
-            f"Puzzle size is {len(self.state)}",
+            f"Puzzle size is {self.width}x{self.height}",
             f"Possible values: {DOMAIN}",
         ]
         for c in sorted(self.constraints):
