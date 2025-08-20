@@ -37,3 +37,18 @@ class Constraint:
 
     def check(self, puzzle, debug=False):
         raise NotImplementedError("Should be implemented by subclass")
+
+
+class CellCentricConstraint(Constraint):
+
+    def check(self, puzzle, debug=False):
+        result = self._check(puzzle, debug)
+        if self.ui_widget is not None:
+            self.ui_widget.color = "green" if result else "red"
+        return result
+
+    def conflicts(self, other):
+        if not isinstance(other, CellCentricConstraint):
+            return False
+
+        return self.parameters["idx"] == other.parameters["idx"]

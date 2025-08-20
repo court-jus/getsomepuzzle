@@ -13,6 +13,58 @@ def to_columns(line, w):
     return [line[i::w] for i in range(w)]
 
 
+def get_neighbors(strpuzzle, w, h, idx):
+    maxidx = w * h - 1
+    minidx = 0
+    ridx = idx // w
+    abv, bel, lft, rgt = idx - w, idx + w, idx - 1, idx + 1
+    return (
+        abv if abv >= minidx else None,
+        bel if bel <= maxidx else None,
+        lft if lft >= minidx and lft // w == ridx else None,
+        rgt if rgt <= maxidx and rgt // w == ridx else None,
+    )
+
+
+def get_neighbors_same_value(strpuzzle, w, h, idx):
+    return [
+        n for n in get_neighbors(strpuzzle, w, h, idx)
+        if n is not None and strpuzzle[n] == strpuzzle[idx]
+    ] + [idx]
+
+
+def to_groups(strpuzzle, w, h):
+    debug = False
+    same_values = {
+        idx: get_neighbors_same_value(strpuzzle, w, h, idx)
+        for idx in range(len(strpuzzle))
+    }
+    groups = {}
+    group_count = 0
+    for idx, others in same_values.items():
+        existing = {gidx: grp for gidx, grp in groups.items() if any([v in grp for v in others])}
+        if debug:
+            print("A", idx, others, existing, groups)
+        if not existing:
+            group_count += 1
+            groups[group_count] = set(others)
+            continue
+        # Merge the groups
+        new_gidx = list(existing.keys())[0]
+        new_grp = existing[new_gidx].union(others)
+        idx_remove = [i for i in existing.keys() if i != new_gidx]
+        if debug:
+            print("Add", others, "to", new_gidx, new_grp)
+        for idx_to_remove in idx_remove:
+            remove_grp = existing[idx_to_remove]
+            del groups[idx_to_remove]
+            if debug:
+                print("Merge", remove_grp, "into", new_gidx, new_grp)
+            new_grp = new_grp.union(remove_grp)
+        groups[new_gidx] = groups[new_gidx].union(new_grp)
+    return [sorted(list(grp)) for grp in sorted(groups.values())]
+
+
 def state_to_str(pu):
     result = []
     grid = to_grid(pu.state, pu.width, pu.height, lambda x: x.value)

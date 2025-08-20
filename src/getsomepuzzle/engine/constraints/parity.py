@@ -1,11 +1,11 @@
 import random
 
 from ..utils import to_rows
-from .base import Constraint
+from .base import CellCentricConstraint
 from ..constants import CONSTRAST
 
 
-class ParityConstraint(Constraint):
+class ParityConstraint(CellCentricConstraint):
     def __repr__(self):
         idx, side = self.parameters["idx"], self.parameters["side"]
         return (
@@ -13,13 +13,6 @@ class ParityConstraint(Constraint):
             f"of odd and even numbers on its {side} "
             f"side{'s' if side == 'both' else ''}"
         )
-
-    def check(self, puzzle, debug=False):
-        result = self._check(puzzle, debug)
-        if self.ui_widget is not None:
-            self.ui_widget.color = "green" if result else "red"
-        return result
-
 
     def _check(self, puzzle, debug=False):
         # The given cell has the same number of odd and even numbers on
@@ -46,11 +39,6 @@ class ParityConstraint(Constraint):
             if even != odd:
                 return False
         return True
-
-    def conflicts(self, other):
-        if type(other) != type(self):
-            return False
-        return self.parameters["idx"] == other.parameters["idx"]
 
     @staticmethod
     def generate_random_parameters(puzzle):
