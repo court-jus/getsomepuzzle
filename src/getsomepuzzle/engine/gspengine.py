@@ -184,6 +184,44 @@ class Puzzle:
         else:
             if debug:
                 print("Nothing can be removed")
+        self.remove_useless_fixed_values(initial_solutions, debug=debug)
+
+    def remove_useless_fixed_values(self, initial_solutions, debug=False):
+        # Now try to remove some fixed values
+        initial_values = {
+            idx: cell.value
+            for idx, cell in enumerate(self.state)
+            if cell.value != 0
+        }
+        if debug:
+            print("Initial values", initial_values)
+        removed = []
+        for idx, cell in enumerate(self.state):
+            if debug:
+                print(f"Will try to remove {idx+1}={cell.value}")
+            new_puzzle = self.clone()
+            for i, c in enumerate(new_puzzle.state):
+                if i in removed or i == idx:
+                    c.value = 0
+                    c.options = DOMAIN[:]
+            solutions = new_puzzle.find_solutions()
+            if solutions and len(solutions) == initial_solutions:
+                if debug:
+                    print("Still valid, move on")
+                removed.append(idx)
+            else:
+                if debug:
+                    print("Nope, we'll keep that one")
+        if removed:
+            for i, c in enumerate(self.state):
+                if i in removed or i == idx:
+                    c.value = 0
+                    c.options = DOMAIN[:]
+            if debug:
+                print("We removed", removed)
+        else:
+            if debug:
+                print("Nothing can be removed")
 
     def find_solution(self, starting_state, debug=False):
         st = starting_state.clone()
@@ -321,16 +359,16 @@ class Puzzle:
         return False
 
     def clone(self):
-        new_puzzle = Puzzle()
+        new_puzzle = Puzzle(width=self.width, height=self.height)
         new_puzzle.state = [c.clone() for c in self.state]
         new_puzzle.constraints = self.constraints
         return new_puzzle
 
 
 class PuzzleGenerator:
-    def __init__(self, size=DEFAULT_SIZE, callback=None):
+    def __init__(self, width=DEFAULT_SIZE, height=DEFAULT_SIZE, callback=None):
         # History of the constraints added
-        self.puzzle = Puzzle(size, size)
+        self.puzzle = Puzzle(width, height)
         self.callback = callback if callback is not None else lambda x:x
 
     def add_random_rule(self, banned_constraints, debug=False):
@@ -347,7 +385,8 @@ class PuzzleGenerator:
             try:
                 new_constraint = rule(**parameters)
                 if any(c == new_constraint for c in banned_constraints):
-                    # print("Cannot add", new_constraint, "it is banned")
+                    if debug:
+                        print("Cannot add", new_constraint, "it is banned")
                     continue
                 presence = len(
                     list(c for c in self.puzzle.constraints if isinstance(c, rule))
@@ -355,11 +394,13 @@ class PuzzleGenerator:
                 if hasattr(
                     rule, "maximum_presence"
                 ) and presence >= rule.maximum_presence(self.puzzle):
-                    # print("Cannot add", new_constraint, "it's already too much present")
+                    if debug:
+                        print("Cannot add", new_constraint, "it's already too much present")
                     continue
                 self.puzzle.add_constraint(new_constraint, debug=debug)
             except ValueError as err:
-                # print("Cannot add", new_constraint, err)
+                if debug:
+                    print("Cannot add", new_constraint, err)
                 # The puzzle already has this constraint or there is a conflict
                 continue
             else:
@@ -377,6 +418,17 @@ class PuzzleGenerator:
         self.callback(3)
         for forced_constraint in forced_constraints:
             self.puzzle.add_constraint(forced_constraint, debug=debug)
+        max_number_fixed = int(self.puzzle.width * self.puzzle.height * 0.4)
+        number_fixed = random.randint(3, max_number_fixed)
+        while number_fixed > 0:
+            try:
+                parameters = FixedValueConstraint.generate_random_parameters(self.puzzle)
+                self.puzzle.add_constraint(FixedValueConstraint(**parameters), debug=debug)
+            except RuntimeError:
+                pass
+            else:
+                number_fixed -= 1
+        self.puzzle.apply_fixed_constraints(debug=debug)
         self.callback(4)
         previous_version = self.puzzle.clone()
         has_solution = True

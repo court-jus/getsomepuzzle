@@ -1,6 +1,6 @@
 import random
 import pytest
-from getsomepuzzle.engine.constraints import ForbiddenMotif
+from getsomepuzzle.engine.constraints.motif import ForbiddenMotif
 from getsomepuzzle.engine.gspengine import Puzzle
 
 

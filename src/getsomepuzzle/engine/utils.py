@@ -26,17 +26,17 @@ def get_neighbors(strpuzzle, w, h, idx):
     )
 
 
-def get_neighbors_same_value(strpuzzle, w, h, idx):
+def get_neighbors_same_value(strpuzzle, w, h, idx, transformer=lambda x: x):
     return [
         n for n in get_neighbors(strpuzzle, w, h, idx)
-        if n is not None and strpuzzle[n] == strpuzzle[idx]
+        if n is not None and transformer(strpuzzle[n]) == transformer(strpuzzle[idx])
     ] + [idx]
 
 
-def to_groups(strpuzzle, w, h):
+def to_groups(strpuzzle, w, h, transformer=lambda x: x):
     debug = False
     same_values = {
-        idx: get_neighbors_same_value(strpuzzle, w, h, idx)
+        idx: get_neighbors_same_value(strpuzzle, w, h, idx, transformer=transformer)
         for idx in range(len(strpuzzle))
     }
     groups = {}

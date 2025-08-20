@@ -9,6 +9,7 @@ from .engine.gspengine import PuzzleGenerator
 from .engine.utils import to_grid
 from .engine import constants
 from .engine.constraints.parity import ParityConstraint
+from .engine.constraints.groups import GroupSize
 from .engine.constraints.motif import ForbiddenMotif
 from .drawing.constraints import draw_constraint, draw_forbiddenmotif
 
@@ -88,13 +89,17 @@ class GetSomePuzzle(toga.App):
         pu = self.current_puzzle
         grid = to_grid(pu.state, pu.width, pu.height)
         parity_icons = { "left": "<", "right": ">", "both": "≷"}
-        parity_constraints = {
+        cell_constraints = {
             c.parameters["idx"]: {
                 "constraint": c,
-                "text": parity_icons[c.parameters["side"]],
+                "text": (
+                    parity_icons[c.parameters["side"]]
+                    if isinstance(c, ParityConstraint)
+                    else c.parameters["size"]
+                ),
             }
             for c in pu.constraints
-            if isinstance(c, ParityConstraint)
+            if isinstance(c, ParityConstraint) or isinstance(c, GroupSize)
         }
         for ridx, row in enumerate(grid):
             row_box = toga.Box(direction=ROW)
@@ -104,9 +109,9 @@ class GetSomePuzzle(toga.App):
                 fgcolor = constants.VALUE_FGCOLORS[cell.value]
                 readonly = value is not None
                 cell_idx_in_state = cidx + ridx * pu.width
-                parity_constraint = parity_constraints.get(cell_idx_in_state)
+                cell_constraint = cell_constraints.get(cell_idx_in_state)
                 cell_input = toga.Button(
-                    parity_constraint["text"] if parity_constraint else "",
+                    cell_constraint["text"] if cell_constraint else "",
                     id=f"{cidx},{ridx}",
                     enabled=not readonly,
                     on_press=self.user_input,
@@ -116,8 +121,8 @@ class GetSomePuzzle(toga.App):
                     background_color=bgcolor,
                     font_size=constants.FONT_SIZE,
                 )
-                if parity_constraint:
-                    parity_constraint["constraint"].ui_widget = cell_input
+                if cell_constraint:
+                    cell_constraint["constraint"].ui_widget = cell_input
                 row_box.add(cell_input)
             self.puzzle_input.add(row_box)
 

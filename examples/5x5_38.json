@@ -1,0 +1,218 @@
+{
+    "state": [
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        }
+    ],
+    "width": 5,
+    "height": 5,
+    "constraints": [
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "2",
+                    "1",
+                    "2"
+                ]
+            }
+        },
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "2",
+                    "2"
+                ]
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 19,
+                "side": "left"
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 4,
+                "side": "left"
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 7,
+                "side": "left"
+            }
+        },
+        {
+            "cls": "GroupSize",
+            "parameters": {
+                "idx": 24,
+                "size": 1
+            }
+        }
+    ]
+}

@@ -1,0 +1,232 @@
+{
+    "state": [
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        }
+    ],
+    "width": 5,
+    "height": 5,
+    "constraints": [
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 2,
+                "side": "right"
+            }
+        },
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "22",
+                    "12"
+                ]
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 24,
+                "side": "left"
+            }
+        },
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "211"
+                ]
+            }
+        },
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "11",
+                    "12"
+                ]
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 20,
+                "side": "right"
+            }
+        },
+        {
+            "cls": "GroupSize",
+            "parameters": {
+                "idx": 9,
+                "size": 2
+            }
+        },
+        {
+            "cls": "GroupSize",
+            "parameters": {
+                "idx": 0,
+                "size": 1
+            }
+        }
+    ]
+}

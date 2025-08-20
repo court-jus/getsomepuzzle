@@ -1,0 +1,240 @@
+{
+    "state": [
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        }
+    ],
+    "width": 5,
+    "height": 5,
+    "constraints": [
+        {
+            "cls": "GroupSize",
+            "parameters": {
+                "idx": 12,
+                "size": 2
+            }
+        },
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "212",
+                    "121"
+                ]
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 2,
+                "side": "right"
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 0,
+                "side": "right"
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 7,
+                "side": "right"
+            }
+        },
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "212",
+                    "211"
+                ]
+            }
+        },
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "21",
+                    "11"
+                ]
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 4,
+                "side": "left"
+            }
+        },
+        {
+            "cls": "ParityConstraint",
+            "parameters": {
+                "idx": 22,
+                "side": "left"
+            }
+        }
+    ]
+}

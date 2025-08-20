@@ -3,6 +3,7 @@ import argparse
 from .gspengine import PuzzleGenerator
 from .constraints.motif import ForbiddenMotif
 from .utils import state_to_str, export_puzzle, import_puzzle
+from .constants import DEFAULT_SIZE
 
 
 def main():
@@ -12,6 +13,8 @@ def main():
     parser.add_argument("-c", "--check")
     parser.add_argument("-d", "--debug", action="count", default=0)
     parser.add_argument("-m", "--max", type=int, default=10)
+    parser.add_argument("-W", "--width", type=int, default=DEFAULT_SIZE)
+    parser.add_argument("-H", "--height", type=int, default=DEFAULT_SIZE)
     parser.add_argument("-v", "--value")
     args = parser.parse_args()
     print("AR", args)
@@ -25,8 +28,12 @@ def main():
             iterations -= 1
             if args.debug > 0:
                 print("Trying to generate puzzle", iterations)
-            pg = PuzzleGenerator()
+            pg = PuzzleGenerator(width=args.width, height=args.height)
             pu = pg.generate(debug=args.debug > 2)
+            if pu is not None:
+                found_solutions = pu.find_solutions(debug=args.debug > 2)
+                if not found_solutions:
+                    pu = None
     print(pu)
     print(state_to_str(pu))
     pu.remove_useless_rules(debug=args.debug > 1)

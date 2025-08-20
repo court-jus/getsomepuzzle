@@ -1,0 +1,94 @@
+{
+    "state": [
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 0,
+            "options": [
+                1,
+                2
+            ]
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 2,
+            "options": []
+        },
+        {
+            "value": 1,
+            "options": []
+        },
+        {
+            "value": 2,
+            "options": []
+        }
+    ],
+    "width": 4,
+    "height": 4,
+    "constraints": [
+        {
+            "cls": "ForbiddenMotif",
+            "parameters": {
+                "motif": [
+                    "11",
+                    "12"
+                ]
+            }
+        },
+        {
+            "cls": "GroupSize",
+            "parameters": {
+                "idx": 6,
+                "size": 3
+            }
+        }
+    ]
+}

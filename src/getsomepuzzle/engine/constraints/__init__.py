@@ -4,13 +4,15 @@ from .parity import ParityConstraint
 from .all_different import AllDifferentConstraint
 from .motif import ForbiddenMotif
 from .fixed import FixedValueConstraint
+from .groups import GroupSize
 from ..utils import to_rows, to_columns, to_grid
 from ..constants import DOMAIN
 
 
 AVAILABLE_RULES = [
-    AllDifferentConstraint,
-    FixedValueConstraint,
+    # AllDifferentConstraint,
+    # FixedValueConstraint,
     ParityConstraint,
     ForbiddenMotif,
+    GroupSize,
 ]
