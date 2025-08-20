@@ -19,70 +19,83 @@ class GetSomePuzzle(toga.App):
     def startup(self):
         # State
         self.current_puzzle = None
+        self.readonly = set()
+        self.puzzles = []
 
         # UI
-        main_box = toga.Box(direction=COLUMN, background_color="lightgray")
+        self.main_box = toga.Box(direction=COLUMN, background_color="lightgray")
+        self.default_ui()
+        self.main_window = toga.MainWindow(title=self.formal_name)
+        self.main_window.content = self.main_box
+        self.main_window.show()
+
+    async def on_running(self, *_a, **_kw):
+        await self.generate()
+
+    def default_ui(self, *_a, **_kw):
+        self.main_box.clear()
         buttons_box = toga.Box(direction=ROW)
         self.progress = toga.ProgressBar(max=100, value=0)
-        generate_button = toga.Button("Gen.", on_press=self.generate, font_size=constants.FONT_SIZE)
-        check_button = toga.Button("Chk.", on_press=self.check, font_size=constants.FONT_SIZE)
+        self.go_button = toga.Button("Go", on_press=self.get_and_show, font_size=constants.FONT_SIZE, enabled=False)
         clear_button = toga.Button("Clr.", on_press=self.clear, font_size=constants.FONT_SIZE)
         reset_button = toga.Button("Rst.", on_press=self.reset, font_size=constants.FONT_SIZE)
-        buttons_box.add(generate_button, check_button, clear_button, reset_button)
+        buttons_box.add(self.go_button, clear_button, reset_button)
         self.puzzle_input = toga.Box(direction=COLUMN)
         self.rules_canvas = toga.Box(direction=ROW)
         self.message_label = toga.Label("", font_size=constants.FONT_SIZE)
-        main_box.add(
+        self.main_box.add(
             buttons_box, self.progress, self.rules_canvas, self.puzzle_input, self.message_label
         )
-        self.main_window = toga.MainWindow(title=self.formal_name)
-        self.main_window.content = main_box
-        self.main_window.show()
 
-    def on_running(self, *_a, **_kw):
-        self.generate()
+    async def generate(self, *_a, **_kw):
+        self.loop.call_soon(self.generate_one)
 
-    def generate(self, *_a, **_kw):
-        self.clear()
-        self.message_label.text = "Generating..."
-        puzzle_generated = False
-
+    def generate_one(self):
         progress = 2
         def change_progress(val):
             self.progress.value = min(100, val + progress)
-        while not puzzle_generated:
-            progress = (progress + 1) % 100
-            change_progress(2)
-            width = random.randint(3, 6)
-            height = random.randint(3, 6)
-            try:
-                pg = PuzzleGenerator(width=width, height=height, callback=change_progress)
-                pu = pg.generate()
-                if pu is None:
-                    continue
-                solution, bp = pu.find_solution(pu)
-                if not bp:
-                    continue
-            except RuntimeError:
-                continue
-            else:
-                puzzle_generated = True
+        progress = (progress + 1) % 100
+        change_progress(2)
+        width = random.randint(3, 6)
+        height = random.randint(3, 6)
+        try:
+            pg = PuzzleGenerator(width=width, height=height, callback=change_progress)
+            pu = pg.generate()
+            if pu is None:
+                return self.loop.call_soon(self.generate_one)
+            solution, bp = pu.find_solution(pu)
+            if not bp:
+                return self.loop.call_soon(self.generate_one)
+        except RuntimeError:
+            return self.loop.call_soon(self.generate_one)
         pu.apply_fixed_constraints()
         pu.clear_solutions()
         pu.remove_useless_rules()
         solution, bp = pu.find_solution(pu)
         pu.clear_solutions()
         if bp is None:
-            raise RuntimeError("Could not find a puzzle")
+            return self.loop.call_soon(self.generate_one)
         max_simplifications = 30
         while bp and bp > 2 and max_simplifications > 0:
             max_simplifications -= 1
             pu.simplify(solution)
             solution, bp = pu.find_solution(pu)
+        if len(pu.find_solutions()) != 1:
+            return self.loop.call_soon(self.generate_one)
+            
         pu.clear_solutions()
-        c = False
-        failures = 0
-        self.current_puzzle = pu
+        self.puzzles.append(pu)
+        self.go_button.enabled = True
+
+    async def get_and_show(self, *_a, **_kw):
+        self.loop.call_soon(self.generate_one)
+        if not self.puzzles:
+            self.go_button.enabled = False
+            return
+        self.readonly = set()
+        self.clear()
+        self.message_label.text = "Generating..."
+        self.current_puzzle = self.puzzles.pop()
         self.show_puzzle()
         self.message_label.text = "It's up to you now..."
 
@@ -115,20 +128,22 @@ class GetSomePuzzle(toga.App):
             for cidx, cell in enumerate(row):
                 value = cell.value if cell.value else None
                 bgcolor = constants.VALUE_BGCOLORS[cell.value]
-                fgcolor = constants.VALUE_FGCOLORS[cell.value]
-                readonly = value is not None
+                fgcolor = constants.CONSTRAST[bgcolor]
                 cell_idx_in_state = cidx + ridx * pu.width
+                readonly = value is not None
+                if readonly:
+                    self.readonly.add(cell_idx_in_state)
                 cell_constraint = cell_constraints.get(cell_idx_in_state)
                 cell_input = toga.Button(
-                    cell_constraint["text"] if cell_constraint else "",
+                    cell_constraint["text"] if cell_constraint else ("." if readonly else ""),
                     id=f"{cidx},{ridx}",
-                    enabled=not readonly,
                     on_press=self.user_input,
                     width=constants.BTN_SIZE,
                     height=constants.BTN_SIZE,
                     color=fgcolor,
                     background_color=bgcolor,
                     font_size=constants.FONT_SIZE,
+                    font_weight="bold" if readonly else "normal"
                 )
                 if cell_constraint:
                     cell_constraint["constraint"].ui_widget = cell_input
@@ -149,11 +164,13 @@ class GetSomePuzzle(toga.App):
 
         cidx, ridx = map(int, widget_id.split(","))
         idx = ridx * w + cidx
+        if idx in self.readonly:
+            return
         current_value = self.current_puzzle.state[idx].value
 
         new_value = (current_value + 1) % (len(constants.DOMAIN) + 1)
         widget.style.background_color = constants.VALUE_BGCOLORS[new_value]
-        widget.style.color = constants.VALUE_FGCOLORS[new_value]
+        widget.style.color = constants.CONSTRAST[constants.VALUE_BGCOLORS[new_value]]
 
         self.current_puzzle.state[idx].value = new_value
         self.check()
