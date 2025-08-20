@@ -12,6 +12,14 @@ class ForbiddenMotif(Constraint):
         return f"Motif {motif} is forbidden"
 
     def check(self, puzzle, debug=False):
+        result = self._check(puzzle, debug)
+        if self.ui_widget is not None:
+            context = self.ui_widget.context
+            with context.Stroke(color="green" if result else "red", line_width=4) as stroke:
+                stroke.rect(x=2,y=2,width=self.ui_widget.width-4,height=self.ui_widget.height-4)
+        return result
+
+    def _check(self, puzzle, debug=False):
         motif = self.parameters["motif"]
         grid = to_grid(
             puzzle.state, puzzle.width, puzzle.height, lambda cell: int(cell.value)

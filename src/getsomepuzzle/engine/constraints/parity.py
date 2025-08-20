@@ -2,6 +2,7 @@ import random
 
 from ..utils import to_rows
 from .base import Constraint
+from ..constants import CONSTRAST
 
 
 class ParityConstraint(Constraint):
@@ -14,6 +15,13 @@ class ParityConstraint(Constraint):
         )
 
     def check(self, puzzle, debug=False):
+        result = self._check(puzzle, debug)
+        if self.ui_widget is not None:
+            self.ui_widget.color = "green" if result else "red"
+        return result
+
+
+    def _check(self, puzzle, debug=False):
         # The given cell has the same number of odd and even numbers on
         # one of its side (or both), the given cell and side are defined
         # in the parameters

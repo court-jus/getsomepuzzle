@@ -5,6 +5,7 @@ import functools
 class Constraint:
     def __init__(self, **parameters):
         self.parameters = parameters
+        self.ui_widget = None
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.parameters})"
