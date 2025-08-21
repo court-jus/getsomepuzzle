@@ -110,6 +110,98 @@ def make_puzzle(strpuzzle):
             "right",
             True,
         ),
+        (
+            """
+            111
+            222
+            111
+            """,
+            0, "bottom", True,
+        ),
+        (
+            """
+            111
+            222
+            111
+            """,
+            8, "top", True,
+        ),
+        (
+            """
+            11
+            22
+            11
+            22
+            """,
+            2, "bottom", True,
+        ),
+        (
+            """
+            11
+            22
+            11
+            22
+            """,
+            4, "top", True,
+        ),
+        (
+            """
+            11
+            22
+            11
+            22
+            """,
+            0, "bottom", False,
+        ),
+        (
+            """
+            11
+            22
+            11
+            22
+            """,
+            4, "bottom", False,
+        ),
+        (
+            """
+            1
+            2
+            1
+            2
+            1
+            """,
+            4, "vertical", True,
+        ),
+        (
+            """
+            1
+            2
+            1
+            2
+            1
+            """,
+            3, "vertical", False,
+        ),
+        (
+            """
+            1
+            2
+            1
+            2
+            1
+            """,
+            1, "vertical", False,
+        ),
+        (
+            """
+            1
+            2
+            1
+            2
+            1
+            """,
+            2, "vertical", True,
+        ),
     ],
 )
 def test_parity(puzzle, idx, side, valid):

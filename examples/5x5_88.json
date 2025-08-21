@@ -217,7 +217,7 @@
             "cls": "ParityConstraint",
             "parameters": {
                 "idx": 12,
-                "side": "both"
+                "side": "horizontal"
             }
         }
     ]

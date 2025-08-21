@@ -1,6 +1,6 @@
 import random
 
-from ..utils import to_rows
+from ..utils import to_rows, to_columns
 from .base import CellCentricConstraint
 from ..constants import CONSTRAST
 
@@ -11,13 +11,13 @@ class ParityConstraint(CellCentricConstraint):
         return (
             f"Cell {idx + 1} should have the same number "
             f"of odd and even numbers on its {side} "
-            f"side{'s' if side == 'both' else ''}"
+            f"side{'s' if side in ('horizontal', 'vertical') else ''}"
         )
 
     def _check(self, puzzle, debug=False):
         # The given cell has the same number of odd and even numbers on
-        # one of its side (or both), the given cell and side are defined
-        # in the parameters
+        # one of its side (or both, vertically or horizontally),
+        # the given cell and side are defined in the parameters
         idx, side = self.parameters["idx"], self.parameters["side"]
         w, h = puzzle.width, puzzle.height
         # Find the right row for idx
@@ -25,12 +25,19 @@ class ParityConstraint(CellCentricConstraint):
         cidx = idx % w
         rows = to_rows(puzzle.state, w, h)
         row = rows[ridx]
-        values_and_indices = [(idx, c.value) for idx, c in enumerate(row)]
+        columns = to_columns(puzzle.state, w)
+        column = columns[cidx]
+        row_values_and_indices = [(idx, c.value) for idx, c in enumerate(row)]
+        col_values_and_indices = [(idx, c.value) for idx, c in enumerate(column)]
         sides = []
-        if side in ("left", "both"):
-            sides.append([v for (i, v) in values_and_indices if i < cidx])
-        if side in ("right", "both"):
-            sides.append([v for (i, v) in values_and_indices if i > cidx])
+        if side in ("left", "horizontal"):
+            sides.append([v for (i, v) in row_values_and_indices if i < cidx])
+        if side in ("right", "horizontal"):
+            sides.append([v for (i, v) in row_values_and_indices if i > cidx])
+        if side in ("top", "vertical"):
+            sides.append([v for (i, v) in col_values_and_indices if i < ridx])
+        if side in ("bottom", "vertical"):
+            sides.append([v for (i, v) in col_values_and_indices if i > ridx])
         for side in sides:
             if any(v == 0 for v in side):
                 continue
@@ -42,14 +49,14 @@ class ParityConstraint(CellCentricConstraint):
 
     @staticmethod
     def generate_random_parameters(puzzle):
-        # { "idx" : 4, "side" : "left" or "both" or "right" }
+        # { "idx" : 4, "side" : "left" or "horizontal" or "right" }
         choices = ["left", "right"]
         size = puzzle.width
         if size % 2 != 0:
-            choices.append("both")
+            choices.append("horizontal")
         side = random.choice(choices)
-        min_left = 2 if side in ("left", "both") else 0
-        max_right = size - 2 if side in ("right", "both") else size
+        min_left = 2 if side in ("left", "horizontal") else 0
+        max_right = size - 2 if side in ("right", "horizontal") else size
         # the side(s) we pick must have an even number of cells
         # so, because we are zero indexed, the index must be even
         possible_indices = [
