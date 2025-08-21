@@ -15,6 +15,7 @@ def main():
     parser.add_argument("-m", "--max", type=int, default=10)
     parser.add_argument("-W", "--width", type=int, default=DEFAULT_SIZE)
     parser.add_argument("-H", "--height", type=int, default=DEFAULT_SIZE)
+    parser.add_argument("-A", "--alternate", action="store_true", default=False)
     parser.add_argument("-v", "--value")
     args = parser.parse_args()
     print("AR", args)
@@ -29,20 +30,21 @@ def main():
             if args.debug > 0:
                 print("Trying to generate puzzle", iterations)
             pg = PuzzleGenerator(width=args.width, height=args.height)
-            pu = pg.generate(debug=args.debug > 2)
-            if pu is not None:
+            pu = pg.generate(debug=args.debug > 2, alternate_method=args.alternate)
+            if not args.alternate and pu is not None:
                 found_solutions = pu.find_solutions(debug=args.debug > 2)
                 if not found_solutions:
                     pu = None
     print(pu)
     print(state_to_str(pu))
-    pu.remove_useless_rules(debug=args.debug > 1)
-    print(pu)
-    print(state_to_str(pu))
-    found_solutions = pu.find_solutions(debug=args.debug > 2)
-    print("FOUND", len(found_solutions), "solutions")
-    for solution in found_solutions:
-        print("SOLUTION", solution)
+    if not args.alternate:
+        pu.remove_useless_rules(debug=args.debug > 1)
+        print(pu)
+        print(state_to_str(pu))
+        found_solutions = pu.find_solutions(debug=args.debug > 2)
+        print("FOUND", len(found_solutions), "solutions")
+        for solution in found_solutions:
+            print("SOLUTION", solution)
 
     if args.check:
         print(pu.check_solution([int(i) for i in args.check], debug=args.debug))

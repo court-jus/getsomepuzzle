@@ -414,7 +414,9 @@ class PuzzleGenerator:
         self.puzzle.constraints = self.puzzle.constraints[:-1]
         return removed_constraint
 
-    def generate(self, *forced_constraints, debug=False):
+    def generate(self, *forced_constraints, debug=False, alternate_method=False):
+        if alternate_method:
+            return self.alternate_generate(*forced_constraints, debug=debug)
         self.callback(3)
         for forced_constraint in forced_constraints:
             self.puzzle.add_constraint(forced_constraint, debug=debug)
@@ -462,6 +464,65 @@ class PuzzleGenerator:
             previous_version.clear_solutions()
         return None
 
+    def add_random_rule_valid(self, banned_constraints, debug=False):
+        solution = None
+        while solution is None:
+            if debug:
+                print("Add random rule")
+            new_constraint = self.add_random_rule(banned_constraints, debug=debug)
+            if debug:
+                print(" -> ", new_constraint)
+            if debug:
+                print("Check that puzzle is still solvable")
+            try:
+                solution, bp = self.puzzle.find_solution(self.puzzle)
+            except RuntimeError:
+                solution = None
+            if solution is not None:
+                break
+            if debug:
+                print(" -> Failed, remove the new constraint and ban it")
+            self.puzzle.constraints = [c for c in self.puzzle.constraints if c != new_constraint]
+            banned_constraints.append(new_constraint)
+        if debug:
+            print(" -> OK")
+        return new_constraint
+
+    def alternate_generate(self, *forced_constraints, debug=False):
+        if debug:
+            print("Generating with alternate method")
+        self.callback(3)
+        for forced_constraint in forced_constraints:
+            self.puzzle.add_constraint(forced_constraint, debug=debug)
+        self.callback(4)
+        constraints_count = int((self.puzzle.width * self.puzzle.height) / 5)
+        banned_constraints = []
+        while constraints_count > 0:
+            if debug:
+                print(constraints_count, "constraints remaining to add")
+            try:
+                self.add_random_rule_valid(banned_constraints, debug=debug)
+            except RuntimeError:
+                pass
+            else:
+                constraints_count -= 1
+        if debug:
+            print("-=-*-=-" * 3)
+        while True:
+            solutions = self.puzzle.find_solutions()
+            if debug:
+                print("We have", len(solutions), "solutions")
+                for sol in solutions:
+                    print(" -> ", sol)
+            if len(solutions) != 2:
+                break
+            sol1, sol2 = solutions
+            idx, val = [(idx, random.choice([sol1[idx], sol2[idx]])) for idx in range(len(sol1)) if sol1[idx] != sol2[idx]][0]
+            if debug:
+                print(" -> Set", idx, "to", val)
+            self.puzzle.state[idx].value = val
+            self.puzzle.state[idx].options = []
+        return self.puzzle
 
 def main():
     # print("=" * 80)
