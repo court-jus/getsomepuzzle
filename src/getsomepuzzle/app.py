@@ -2,6 +2,7 @@
 Generate and play some logic puzzles
 """
 
+import random
 import toga
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
@@ -53,8 +54,10 @@ class GetSomePuzzle(toga.App):
         while not puzzle_generated:
             progress = (progress + 1) % 100
             change_progress(2)
+            width = random.randint(3, 6)
+            height = random.randint(3, 6)
             try:
-                pg = PuzzleGenerator(callback=change_progress)
+                pg = PuzzleGenerator(width=width, height=height, callback=change_progress)
                 pu = pg.generate()
                 if pu is None:
                     continue
