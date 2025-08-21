@@ -30,7 +30,6 @@ class GetSomePuzzle(toga.App):
         reset_button = toga.Button("Rst.", on_press=self.reset, font_size=constants.FONT_SIZE)
         buttons_box.add(generate_button, check_button, clear_button, reset_button)
         self.puzzle_input = toga.Box(direction=COLUMN)
-        self.rules = toga.Label("")
         self.rules_canvas = toga.Box(direction=ROW)
         self.message_label = toga.Label("", font_size=constants.FONT_SIZE)
         main_box.add(
@@ -137,20 +136,12 @@ class GetSomePuzzle(toga.App):
             self.puzzle_input.add(row_box)
 
         # Draw rules
-        text = []
         for c in pu.constraints:
             if isinstance(c, ForbiddenMotif):
                 canvas = toga.Canvas(flex=1, width=constants.BTN_SIZE, height=constants.BTN_SIZE, background_color="purple")
                 self.rules_canvas.add(canvas)
                 draw_forbiddenmotif(c, canvas)
                 c.ui_widget = canvas
-            elif isinstance(c, ParityConstraint):
-                pass
-            else:
-                print("C", constraint)
-                text.append(str(constraint))
-        if text:
-            self.rules.text = "\n".join(text)
 
     def user_input(self, widget):
         widget_id = widget.id
