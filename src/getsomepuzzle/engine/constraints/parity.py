@@ -50,23 +50,39 @@ class ParityConstraint(CellCentricConstraint):
     @staticmethod
     def generate_random_parameters(puzzle):
         # { "idx" : 4, "side" : "left" or "horizontal" or "right" }
-        choices = ["left", "right"]
-        size = puzzle.width
-        if size % 2 != 0:
+        width = puzzle.width
+        height = puzzle.height
+        choices = ["left", "right", "top", "bottom"]
+        if width % 2 != 0:
             choices.append("horizontal")
+        if height % 2 != 0:
+            choices.append("vertical")
         side = random.choice(choices)
-        min_left = 2 if side in ("left", "horizontal") else 0
-        max_right = size - 2 if side in ("right", "horizontal") else size
-        # the side(s) we pick must have an even number of cells
-        # so, because we are zero indexed, the index must be even
-        possible_indices = [
-            i for i in range(size) if min_left <= i <= max_right and i % 2 == 0
-        ]
-        if not possible_indices:
-            raise ValueError("Cannot generate parity constraint")
-        col = random.choice(possible_indices)
-        row = random.randint(0, puzzle.height - 1)
-        return {"idx": col + row * puzzle.width, "side": side}
+        if side in ("left", "right", "horizontal"):
+            min_left = 2 if side in ("left", "horizontal") else 0
+            max_right = width - 2 if side in ("right", "horizontal") else width
+            # the side(s) we pick must have an even number of cells
+            # so, because we are zero indexed, the index must be even
+            possible_indices = [
+                i for i in range(width) if min_left <= i <= max_right and i % 2 == 0
+            ]
+            if not possible_indices:
+                raise ValueError("Cannot generate parity constraint")
+            col = random.choice(possible_indices)
+            row = random.randint(0, puzzle.height - 1)
+            return {"idx": col + row * puzzle.width, "side": side}
+
+        else:
+            min_top = 2 if side in ("top", "vertical") else 0
+            max_bottom = height - 2 if side in ("bottom", "vertical") else height
+            possible_indices = [
+                i for i in range(height) if min_top <= i <= max_bottom and i % 2 == 0
+            ]
+            if not possible_indices:
+                raise ValueError("Cannot generate parity constraint")
+            col = random.randint(0, puzzle.width - 1)
+            row = random.choice(possible_indices)
+            return {"idx": col + row * puzzle.width, "side": side}
 
     @staticmethod
     def maximum_presence(puzzle):

@@ -103,13 +103,14 @@ class GetSomePuzzle(toga.App):
         self.clear()
         pu = self.current_puzzle
         grid = to_grid(pu.state, pu.width, pu.height)
+        # ⬅ ⮕ ⬆ ⬇ ⬌ ⬍  ⬉ ⬈ ⬊ ⬋
         parity_icons = {
-            "left": "⇦",
-            "right": "⇨",
-            "horizontal": "⬄",
-            "top": "⇧",
-            "bottom": "⇩",
-            "vertical": "⇳",
+            "left": "⬅",
+            "right": "⮕",
+            "horizontal": "⬌",
+            "top": "⬆",
+            "bottom": "⬇",
+            "vertical": "⬍",
         }
         cell_constraints = {
             c.parameters["idx"]: {
