@@ -2,7 +2,7 @@
 [tool.briefcase]
 project_name = "Get Some Puzzle"
 bundle = "cc.leveque.getsomepuzzle"
-version = "0.0.5"
+version = "0.0.6"
 url = "https://getsomepuzzle.leveque.cc/"
 license.file = "LICENSE"
 author = "Ghislain Lévêque"
