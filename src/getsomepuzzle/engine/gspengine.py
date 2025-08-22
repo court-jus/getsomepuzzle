@@ -8,41 +8,8 @@ from .constraints import (
 )
 from .constraints.other_solution import OtherSolutionConstraint
 from .constants import DOMAIN, MAX_STEPS, DEFAULT_SIZE
+from .cell import Cell
 from .utils import state_to_str
-
-
-class Cell:
-    def __init__(self):
-        self.options = DOMAIN[:]
-        self.value = 0
-
-    def __repr__(self):
-        symb = " " if self.value else "_"
-        return "".join(
-            map(
-                str,
-                [
-                    (
-                        v
-                        if (v == self.value or (not self.value and v in self.options))
-                        else symb
-                    )
-                    for v in DOMAIN
-                ],
-            )
-        )
-
-    def free(self):
-        return not self.value and self.options
-
-    def is_possible(self):
-        return self.value or self.options
-
-    def clone(self):
-        c = Cell()
-        c.value = self.value
-        c.options = self.options[:]
-        return c
 
 
 class Puzzle:
@@ -52,19 +19,8 @@ class Puzzle:
         self.state = [Cell() for _ in range(width * height)]
         self.constraints = []
 
-    def small_repr(self):
-        result = [
-            f"Puzzle size is {self.width}x{self.height}",
-            f"Possible values: {DOMAIN}",
-        ]
-        return "\n".join(result)
-
     def __repr__(self):
-        # valid = self.is_valid()
-        # poss = self.is_possible()
         result = [
-            # ("V" if valid else "I") + ("P" if poss else "I") +
-            # " - " + ".".join(map(str, self.state)),
             "Rules:",
             f"Puzzle size is {self.width}x{self.height}",
             f"Possible values: {DOMAIN}",
@@ -121,7 +77,6 @@ class Puzzle:
             print("Good it's added")
         self.apply_fixed_constraints(debug=debug)
             
-
     def apply_fixed_constraints(self, debug=False):
         for constraint in self.constraints:
             if isinstance(constraint, FixedValueConstraint):
@@ -495,7 +450,7 @@ class PuzzleGenerator:
         for forced_constraint in forced_constraints:
             self.puzzle.add_constraint(forced_constraint, debug=debug)
         self.callback(4)
-        constraints_count = int((self.puzzle.width * self.puzzle.height) / 5)
+        constraints_count = max(self.puzzle.width, self.puzzle.height) + random.choice([-1, 0, 1])
         banned_constraints = []
         while constraints_count > 0:
             if debug:
@@ -523,51 +478,3 @@ class PuzzleGenerator:
             self.puzzle.state[idx].value = val
             self.puzzle.state[idx].options = []
         return self.puzzle
-
-def main():
-    # print("=" * 80)
-    size = 5
-    puzzle_generated = False
-    while not puzzle_generated:
-        try:
-            pg = PuzzleGenerator(size)
-            pu = pg.generate(AllDifferentConstraint())
-        except RuntimeError:
-            continue
-        else:
-            puzzle_generated = True
-    pu.clear_solutions()
-    pu.apply_fixed_constraints()
-    solution, bp = pu.find_solution(pu)
-    max_simplifications = 30
-    while bp > 1 and max_simplifications > 0:
-        max_simplifications -= 1
-        pu.simplify(solution)
-        solution, bp = pu.find_solution(pu)
-    # print(". . .", bp, ". . .")
-    # print(pu)
-    print(state_to_str(pu))
-    # print("-" * 80)
-    c = False
-    failures = 0
-    while not c:
-        solution = input("Your solution (empty to cancel):").strip()
-        # print("you typed", solution)
-        if not solution:
-            return
-        solution = [int(c) for c in solution]
-        # print(solution)
-        c = pu.check_solution(solution)
-        if c:
-            # print("You win")
-            return
-        # print("Try again", failures)
-        failures += 1
-        if failures > 5:
-            print("Solutions:")
-            for sol in pu.find_solutions():
-                print(sol)
-
-
-if __name__ == "__main__":
-    main()
