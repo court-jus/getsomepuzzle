@@ -67,7 +67,7 @@ class ForbiddenMotif(Constraint):
         return {"motif": motif}
 
     def conflicts(self, other):
-        if type(self) != type(other):
+        if "motif" not in other.parameters:
             return False
 
         smotif, omotif = self.parameters["motif"], other.parameters["motif"]
@@ -80,3 +80,12 @@ class ForbiddenMotif(Constraint):
     @staticmethod
     def maximum_presence(puzzle):
         return puzzle.width
+
+
+class RequiredMotif(ForbiddenMotif):
+    def __repr__(self):
+        motif = self.parameters["motif"]
+        return f"Motif {motif} is required"
+
+    def _check(self, puzzle, debug=False):
+        return not super()._check(puzzle, debug=debug)

@@ -17,7 +17,7 @@ class BackgroundGenerator:
 
 
 def generate_one(running):
-    width = random.randint(3, 6)
+    width = random.randint(3, 5)
     height = random.randint(3, 6)
     try:
         pg = PuzzleGenerator(width=width, height=height, running=running)

@@ -187,7 +187,7 @@ class Puzzle:
         steps = MAX_STEPS
         backpropagations = 0
         while steps > 0 and self.running.is_set():
-            time.sleep(0.001)
+            time.sleep(0.0001)
             if st.is_complete():
                 break
             if debug:

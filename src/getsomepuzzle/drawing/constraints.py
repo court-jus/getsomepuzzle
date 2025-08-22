@@ -7,10 +7,10 @@ from ..engine import constants
 
 def draw_constraint(constraint, canvas):
     if isinstance(constraint, ForbiddenMotif):
-        return draw_forbiddenmotif(constraint, canvas)
+        return draw_motif(constraint, canvas)
 
 
-def draw_forbiddenmotif(constraint, canvas):
+def draw_motif(constraint, canvas):
     motif = constraint.parameters["motif"]
     context = canvas.context
     square_size = 10

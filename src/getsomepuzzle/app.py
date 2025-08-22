@@ -14,8 +14,8 @@ from .engine.utils import to_grid
 from .engine import constants
 from .engine.constraints.parity import ParityConstraint
 from .engine.constraints.groups import GroupSize
-from .engine.constraints.motif import ForbiddenMotif
-from .drawing.constraints import draw_constraint, draw_forbiddenmotif
+from .engine.constraints.motif import ForbiddenMotif, RequiredMotif
+from .drawing.constraints import draw_constraint, draw_motif
 
 
 MIN_PUZZLES = 5
@@ -168,10 +168,15 @@ class GetSomePuzzle(toga.App):
 
         # Draw rules
         for c in pu.constraints:
-            if isinstance(c, ForbiddenMotif):
+            if isinstance(c, RequiredMotif):
+                canvas = toga.Canvas(flex=1, width=constants.BTN_SIZE, height=constants.BTN_SIZE, background_color="blue")
+                self.rules_canvas.add(canvas)
+                draw_motif(c, canvas)
+                c.ui_widget = canvas
+            elif isinstance(c, ForbiddenMotif):
                 canvas = toga.Canvas(flex=1, width=constants.BTN_SIZE, height=constants.BTN_SIZE, background_color="purple")
                 self.rules_canvas.add(canvas)
-                draw_forbiddenmotif(c, canvas)
+                draw_motif(c, canvas)
                 c.ui_widget = canvas
 
     def user_input(self, widget):
