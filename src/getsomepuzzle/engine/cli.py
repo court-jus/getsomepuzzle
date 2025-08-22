@@ -1,6 +1,9 @@
 import argparse
+import threading
+import queue
+import time
 
-from .gspengine import PuzzleGenerator
+from .generator.background import BackgroundGenerator
 from .constraints.motif import ForbiddenMotif
 from .utils import state_to_str, export_puzzle, import_puzzle
 from .constants import DEFAULT_SIZE
@@ -24,17 +27,29 @@ def main():
             pu = import_puzzle(fp.read())
     else:
         pu = None
-        iterations = args.max
-        while pu is None and iterations > 0:
-            iterations -= 1
-            if args.debug > 0:
-                print("Trying to generate puzzle", iterations)
-            pg = PuzzleGenerator(width=args.width, height=args.height)
-            pu = pg.generate(debug=args.debug > 2, alternate_method=args.alternate)
-            if not args.alternate and pu is not None:
-                found_solutions = pu.find_solutions(debug=args.debug > 2)
-                if not found_solutions:
-                    pu = None
+        request_queue = queue.Queue()
+        response_queue = queue.Queue()
+        gene = BackgroundGenerator("A", request_queue, response_queue)
+        threading.Thread(target=gene.run, daemon=True).start()
+        print("j'ai lancé le thread, j'attends un peu")
+        time.sleep(2)
+        print("allez hop je vais lui demander un truc")
+        request_queue.put({
+            "width": args.width,
+            "height": args.height,
+            "debug": args.debug,
+            "alternate": args.alternate,
+        })
+        print("et j'attends encore")
+        while True:
+            print("voyons si il a répondu")
+            try:
+                pu = response_queue.get(timeout=10)
+            except queue.Empty:
+                print("non pas encore")
+            else:
+                print("ouap", pu)
+                break
     print(pu)
     print(state_to_str(pu))
     if not args.alternate:
