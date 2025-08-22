@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import random
+import asyncio
 from .constraints import (
     AllDifferentConstraint,
     FixedValueConstraint,
@@ -478,3 +479,44 @@ class PuzzleGenerator:
             self.puzzle.state[idx].value = val
             self.puzzle.state[idx].options = []
         return self.puzzle
+
+
+class BackgroundGenerator:
+    def __init__(self, name):
+        self.state = 0
+        self.name = name
+        self.puzzle = None
+
+    def __repr__(self):
+        return f"{self.name}: {self.state}"
+
+    async def run(self):
+        if self.state == -1:
+            return
+
+        if self.state == 0:
+            self.prepare_puzzle()
+
+        if self.state == 1:
+            self.enforce_puzzle()
+
+        if self.state == 2:
+            self.cleanup_puzzle()
+
+    async def prepare_puzzle(self):
+        duration = random.randint(1, 10)
+        for i in range(duration):
+            await asyncio.sleep(i)
+        self.state = 1
+
+    async def enforce_puzzle(self):
+        duration = random.randint(1, 10)
+        for i in range(duration):
+            await asyncio.sleep(i)
+        self.state = 2
+
+    async def cleanup_puzzle(self):
+        duration = random.randint(1, 10)
+        for i in range(duration):
+            await asyncio.sleep(i)
+        self.state = -1
