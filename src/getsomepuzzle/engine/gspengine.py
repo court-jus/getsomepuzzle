@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+
+import time
 import random
 from .constraints import (
     AllDifferentConstraint,
@@ -13,7 +15,8 @@ from .utils import state_to_str
 
 
 class Puzzle:
-    def __init__(self, width=DEFAULT_SIZE, height=DEFAULT_SIZE):
+    def __init__(self, *, running, width=DEFAULT_SIZE, height=DEFAULT_SIZE):
+        self.running = running
         self.width = width
         self.height = height
         self.state = [Cell() for _ in range(width * height)]
@@ -183,7 +186,8 @@ class Puzzle:
         log_history = []
         steps = MAX_STEPS
         backpropagations = 0
-        while steps > 0:
+        while steps > 0 and self.running.is_set():
+            time.sleep(0.001)
             if st.is_complete():
                 break
             if debug:
@@ -275,7 +279,7 @@ class Puzzle:
         initial_state = self.clone()
         initial_state.apply_fixed_constraints(debug=debug)
         max_explorations = max_solutions
-        while max_explorations > 0:
+        while max_explorations > 0 and self.running.is_set():
             max_explorations -= 1
             try:
                 solution, _ = self.find_solution(initial_state, debug=debug)
@@ -314,21 +318,21 @@ class Puzzle:
         return False
 
     def clone(self):
-        new_puzzle = Puzzle(width=self.width, height=self.height)
+        new_puzzle = Puzzle(running=self.running, width=self.width, height=self.height)
         new_puzzle.state = [c.clone() for c in self.state]
         new_puzzle.constraints = self.constraints
         return new_puzzle
 
 
 class PuzzleGenerator:
-    def __init__(self, width=DEFAULT_SIZE, height=DEFAULT_SIZE, callback=None):
+    def __init__(self, *, running, width=DEFAULT_SIZE, height=DEFAULT_SIZE, callback=None):
         # History of the constraints added
-        self.puzzle = Puzzle(width, height)
         self.callback = callback if callback is not None else lambda x:x
-
+        self.running = running
+        self.puzzle = Puzzle(running=self.running, width=width, height=height)
     def add_random_rule(self, banned_constraints, debug=False):
         max_iter = 1000
-        while max_iter > 0:
+        while max_iter > 0 and self.running.is_set():
             max_iter -= 1
             rule = random.choice(AVAILABLE_RULES)
             parameters = {}
@@ -371,13 +375,13 @@ class PuzzleGenerator:
 
     def generate(self, *forced_constraints, debug=False, alternate_method=False):
         if alternate_method:
-            return self.alternate_generate(*forced_constraints, debug=debug)
+            return self.alternate_generate(*forced_constraints, running, debug=debug)
         self.callback(3)
         for forced_constraint in forced_constraints:
             self.puzzle.add_constraint(forced_constraint, debug=debug)
         max_number_fixed = int(self.puzzle.width * self.puzzle.height * 0.4)
         number_fixed = random.randint(3, max_number_fixed)
-        while number_fixed > 0:
+        while number_fixed > 0 and self.running.is_set():
             try:
                 parameters = FixedValueConstraint.generate_random_parameters(self.puzzle)
                 self.puzzle.add_constraint(FixedValueConstraint(**parameters), debug=debug)
@@ -391,7 +395,7 @@ class PuzzleGenerator:
         has_solution = True
         banned_constraints = []
         progress = 5
-        while has_solution:
+        while has_solution and self.running.is_set():
             self.callback(progress)
             progress += 1
             try:
@@ -421,7 +425,7 @@ class PuzzleGenerator:
 
     def add_random_rule_valid(self, banned_constraints, debug=False):
         solution = None
-        while solution is None:
+        while solution is None and self.running.is_set():
             if debug:
                 print("Add random rule")
             new_constraint = self.add_random_rule(banned_constraints, debug=debug)
@@ -452,7 +456,7 @@ class PuzzleGenerator:
         self.callback(4)
         constraints_count = max(self.puzzle.width, self.puzzle.height) + random.choice([-1, 0, 1])
         banned_constraints = []
-        while constraints_count > 0:
+        while constraints_count > 0 and self.running.is_set():
             if debug:
                 print(constraints_count, "constraints remaining to add")
             try:
@@ -463,7 +467,7 @@ class PuzzleGenerator:
                 constraints_count -= 1
         if debug:
             print("-=-*-=-" * 3)
-        while True:
+        while self.running.is_set():
             solutions = self.puzzle.find_solutions()
             if debug:
                 print("We have", len(solutions), "solutions")

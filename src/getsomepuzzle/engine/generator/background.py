@@ -5,36 +5,22 @@ from ..gspengine import PuzzleGenerator
 
 
 class BackgroundGenerator:
-    def __init__(self, name, inqueue, outqueue):
+    def __init__(self, name):
         self.state = 0
         self.name = name
-        self.inqueue = inqueue
-        self.outqueue = outqueue
 
     def __repr__(self):
         return f"{self.name}: {self.state}"
 
-    def run(self):
-        while True:
-            # Give some air to the CPU
-            time.sleep(2)
-            print("voyons si j'ai un truc à faire?")
-            args = self.inqueue.get()
-            while True:
-                print(f"Working on {args}")
-                result = generate_one()
-                print(f" -> {result}")
-                if result is not None:
-                    break
-            print(f"Done working on {args}")
-            self.outqueue.put(result)
+    def work(self, running):
+        return generate_one(running)
 
 
-def generate_one():
+def generate_one(running):
     width = random.randint(3, 6)
     height = random.randint(3, 6)
     try:
-        pg = PuzzleGenerator(width=width, height=height)
+        pg = PuzzleGenerator(width=width, height=height, running=running)
         pu = pg.generate()
         if pu is None:
             return None

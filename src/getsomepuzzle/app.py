@@ -2,10 +2,8 @@
 Generate and play some logic puzzles
 """
 
-import asyncio
-import queue
-import random
 import threading
+import concurrent.futures
 
 import toga
 from toga.style import Pack
@@ -38,38 +36,50 @@ class GetSomePuzzle(toga.App):
         self.main_window.show()
 
         # Concurrency
-        self.request_queue = queue.Queue()
-        self.response_queue = queue.Queue()
-        self.queue_size = 0
-        self.gene = BackgroundGenerator("A", self.request_queue, self.response_queue)
+        self.request_queue = []
+        self.response_queue = []
+        self.gene = BackgroundGenerator("A")
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        self.running = threading.Event()
 
     def on_running(self, *_a, **_kw):
-        threading.Thread(target=self.gene.run, daemon=True).start()
+        self.running.set()
         self.loop.call_soon(self.tick)
 
+    def on_exit(self, *_a, **_kw):
+        self.running.clear()
+        for future in self.response_queue:
+            future.cancel()
+        self.executor.shutdown()
+        return True
+
     def tick(self, *a, **_kw):
-        print("Tick", self.queue_size, len(self.puzzles))
+        if not self.running.is_set():
+            return
         if self.puzzles and not self.current_puzzle:
             self.get_and_show()
         if len(self.puzzles) < MIN_PUZZLES:
-            while self.queue_size + len(self.puzzles) < MAX_PUZZLES:
-                print("ALLEZ HOP ON GENERE")
-                self.request_queue.put("go")
-                self.queue_size += 1
+            while len(self.request_queue) + len(self.response_queue) + len(self.puzzles) < MAX_PUZZLES:
                 self.update_progress()
-        try:
-            print("tick waits for response")
-            response = self.response_queue.get(timeout=0.01)
-            print("tick has a response")
-            self.queue_size -= 1
-            self.update_progress()
-        except queue.Empty:
-            pass
-        else:
-            if response:
-                self.puzzles.append(response)
-                self.update_progress()
-        self.loop.call_later(1, self.tick)
+                self.request_queue.append("go")
+        while len(self.request_queue) > 0:
+            request = self.request_queue.pop()
+            future = self.executor.submit(self.gene.work, self.running)
+            self.response_queue.append(future)
+
+        new_response_queue = []
+        while len(self.response_queue) > 0:
+            future = self.response_queue.pop()
+            if not future.done():
+                new_response_queue.append(future)
+                continue
+            result = future.result()
+            if result is not None:
+                self.puzzles.append(result)
+        self.response_queue = new_response_queue
+
+        self.update_progress()
+        self.loop.call_later(0.2, self.tick)
 
     def default_ui(self, *_a, **_kw):
         self.main_box.clear()
@@ -90,7 +100,7 @@ class GetSomePuzzle(toga.App):
 
     def update_progress(self):
         self.progress.value = len(self.puzzles) / 10 * 100
-        self.queue_progress.value = self.queue_size / 10 * 100
+        self.queue_progress.value = len(self.response_queue) / 10 * 100
         self.go_button.enabled = len(self.puzzles) > 0
 
     def get_and_show(self, *_a, **_kw):
