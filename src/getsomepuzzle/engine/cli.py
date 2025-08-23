@@ -32,12 +32,11 @@ def main():
     elif args.number > 1:
         # Generate a bunch of puzzles
         running = FakeEvent()
-        remaining = args.number
         futures = []
         tasks = [
-            (None, True,
-            args.width if args.width is not None else random.randint(3, 6),
-            args.height if args.height is not None else random.randint(3, 7))
+            (running,
+            args.width if args.width is not None else random.randint(4, 6),
+            args.height if args.height is not None else random.randint(4, 7))
             for _ in range(args.number)
         ]
         with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -48,13 +47,11 @@ def main():
         request_queue = queue.Queue()
         response_queue = queue.Queue()
         running = FakeEvent()
-        pu = generate_one(
+        pu = generate_one((
             running,
-            width=args.width if args.width is not None else random.randint(3, 6),
-            height=args.height if args.height is not None else random.randint(3, 7),
-        )
-    print(pu)
-    print(state_to_str(pu))
+            args.width if args.width is not None else random.randint(3, 6),
+            args.height if args.height is not None else random.randint(3, 7)
+        ))
     if args.number == 1 and not args.alternate:
         pu.remove_useless_rules(debug=args.debug > 1)
         print(pu)

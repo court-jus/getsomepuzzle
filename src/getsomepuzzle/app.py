@@ -6,13 +6,15 @@ import threading
 import random
 import concurrent.futures
 from pathlib import Path
+import time
+import datetime
 
 import toga
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 
 from .engine.generator.puzzle_generator import generate_one
-from .engine.utils import to_grid, line_import
+from .engine.utils import to_grid, line_import, line_export
 from .engine import constants
 from .engine.constraints.parity import ParityConstraint
 from .engine.constraints.groups import GroupSize
@@ -26,9 +28,14 @@ class GetSomePuzzle(toga.App):
     def startup(self):
         # State
         self.current_puzzle = None
-        self.readonly = set()
+        self.current_line = None
+        self.readonly_cells = set()
         self.puzzle_count = 0
+        self.victories = 0
+        self.failures = 0
+        self.readonly = True
         self.puzzles = []
+        self.solving_state = {}
 
         # UI
         self.main_box = toga.Box(direction=COLUMN, background_color="lightgray")
@@ -64,7 +71,7 @@ class GetSomePuzzle(toga.App):
                 self.update_progress()
         while len(self.request_queue) > 0:
             request = self.request_queue.pop()
-            future = self.executor.submit(generate_one, self.running)
+            future = self.executor.submit(generate_one, (self.running, None, None))
             self.response_queue.append(future)
 
         new_response_queue = []
@@ -74,7 +81,8 @@ class GetSomePuzzle(toga.App):
                 new_response_queue.append(future)
                 continue
             result = future.result()
-            self.puzzles.append(result)
+            line = line_export(result)
+            self.puzzles.append((line, result))
         self.response_queue = new_response_queue
 
         self.update_progress()
@@ -88,7 +96,7 @@ class GetSomePuzzle(toga.App):
         for line in data.split("\n"):
             if not line or line.startswith("#"):
                 continue
-            puzzles.append(line_import(line))
+            puzzles.append((line, line_import(line)))
         random.shuffle(puzzles)
         self.puzzle_count = len(puzzles)
         self.puzzles = puzzles
@@ -99,6 +107,7 @@ class GetSomePuzzle(toga.App):
         buttons_box = toga.Box(direction=ROW)
         self.progress = toga.ProgressBar(max=100, value=0)
         self.queue_progress = toga.ProgressBar(max=100, value=0)
+        self.progress_label = toga.Label("")
         self.go_button = toga.Button("Go", on_press=self.get_and_show, font_size=constants.FONT_SIZE, enabled=False)
         clear_button = toga.Button("Clr.", on_press=self.clear, font_size=constants.FONT_SIZE)
         reset_button = toga.Button("Rst.", on_press=self.reset, font_size=constants.FONT_SIZE)
@@ -108,13 +117,17 @@ class GetSomePuzzle(toga.App):
         self.message_label = toga.Label("", font_size=constants.FONT_SIZE)
         self.main_box.add(
             buttons_box, self.queue_progress, self.progress,
+            self.progress_label,
             self.rules_canvas, self.puzzle_input, self.message_label
         )
 
     def update_progress(self):
-        self.progress.value = len(self.puzzles) / self.puzzle_count * 100
+        remaining = len(self.puzzles)
+        done = self.puzzle_count - remaining
+        self.progress.value = remaining / self.puzzle_count * 100
         self.queue_progress.value = len(self.response_queue) / 10 * 100
-        self.go_button.enabled = len(self.puzzles) > 0
+        self.progress_label.text = f"Puz: {done}/{self.puzzle_count}. W: {self.victories}. F: {self.failures}"
+        self.go_button.enabled = remaining > 0
 
     def get_and_show(self, *_a, **_kw):
         self.clear()
@@ -122,7 +135,14 @@ class GetSomePuzzle(toga.App):
             self.message_label.text = "No puzzle to run, please wait"
             return
         self.message_label.text = "Generating..."
-        self.current_puzzle = self.puzzles.pop()
+        self.current_line, self.current_puzzle = self.puzzles.pop()
+        self.solving_state = {
+            "line": self.current_line,
+            "start": time.time(),
+            "failures": 0,
+        }
+        self.log("start", self.current_line)
+        self.readonly = False
         self.update_progress()
         self.show_puzzle()
         self.message_label.text = "It's up to you now..."
@@ -161,7 +181,7 @@ class GetSomePuzzle(toga.App):
                 cell_idx_in_state = cidx + ridx * pu.width
                 readonly = value is not None
                 if readonly:
-                    self.readonly.add(cell_idx_in_state)
+                    self.readonly_cells.add(cell_idx_in_state)
                 cell_constraint = cell_constraints.get(cell_idx_in_state)
                 cell_input = toga.Button(
                     cell_constraint["text"] if cell_constraint else ("." if readonly else ""),
@@ -188,12 +208,14 @@ class GetSomePuzzle(toga.App):
                 c.ui_widget = canvas
 
     def user_input(self, widget):
+        if self.readonly:
+            return
         widget_id = widget.id
         w = self.current_puzzle.width
 
         cidx, ridx = map(int, widget_id.split(","))
         idx = ridx * w + cidx
-        if idx in self.readonly:
+        if idx in self.readonly_cells:
             return
         current_value = self.current_puzzle.state[idx].value
 
@@ -202,27 +224,33 @@ class GetSomePuzzle(toga.App):
         widget.style.color = constants.CONSTRAST[constants.VALUE_BGCOLORS[new_value]]
 
         self.current_puzzle.state[idx].value = new_value
-        self.check()
+        if not self.current_puzzle.free_cells():
+            self.loop.call_later(1, self.check)
 
     def check(self, *_a, **_kw):
-        if not self.current_puzzle:
+        if self.readonly or not self.current_puzzle:
             return
         if self.current_puzzle.check_solution(
             [c.value for c in self.current_puzzle.state]
         ):
+            self.victories += 1
             self.message_label.text = "You win"
+            self.readonly = True
+            self.log("win", self.current_line)
+            duration = int(time.time() - self.solving_state["start"])
+            self.log("stats", self.current_line, log=f"{duration}s - {self.solving_state['failures']}f")
+            self.loop.call_later(1, self.get_and_show)
         else:
-            self.message_label.text = "Keep going"
-        for c in sorted(self.current_puzzle.constraints):
-            result = c.check(self.current_puzzle)
-            result_text = "OK" if result else "KO"
-            print(f"{result_text}: {str(c)}")
+            self.failures += 1
+            self.solving_state["failures"] += 1
+            self.log("fail", self.current_line)
+            self.message_label.text = "Fail!!!"
 
     def clear(self, *_a, **_kw):
         self.rules_canvas.clear()
         self.message_label.text = ""
         self.puzzle_input.clear()
-        self.readonly = set()
+        self.readonly_cells = set()
 
     def reset(self, *_a, **_kw):
         if not self.current_puzzle:
@@ -231,7 +259,14 @@ class GetSomePuzzle(toga.App):
         self.clear()
         self.show_puzzle()
 
-
+    def log(self, evt, line, **kw):
+        now = datetime.datetime.now().replace(microsecond=0).isoformat()
+        print(now, evt, line)
+        if evt == "stats":
+            msg = f"{now} {kw['log']} {line}"
+            path = self.paths.data / "stats.txt"
+            with path.open("a") as stats_file:
+                stats_file.write(msg + "\n")
 
 def main():
     return GetSomePuzzle()

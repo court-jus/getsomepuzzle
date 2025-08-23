@@ -130,14 +130,15 @@ class PuzzleGenerator:
         return new_constraint
 
 
-def generate_one(running, **kw):
-    while running.is_set():
-        result = generate_once(running, **kw)
+def generate_one(args):
+    running, width, height = args
+    while True:
+        result = generate_once(running, width, height)
         if result is not None:
             return result
 
 
-def generate_once(running, width=None, height=None):
+def generate_once(running, width, height):
     w = width if width is not None else random.randint(3, 6)
     h = height if height is not None else random.randint(3, 6)
     try:
