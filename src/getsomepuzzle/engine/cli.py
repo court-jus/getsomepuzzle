@@ -3,8 +3,7 @@ import threading
 import queue
 import time
 
-from .generator.background import BackgroundGenerator
-from .constraints.motif import ForbiddenMotif
+from .generator.puzzle_generator import generate_one
 from .utils import state_to_str, export_puzzle, import_puzzle
 from .constants import DEFAULT_SIZE
 
@@ -29,27 +28,9 @@ def main():
         pu = None
         request_queue = queue.Queue()
         response_queue = queue.Queue()
-        gene = BackgroundGenerator("A", request_queue, response_queue)
-        threading.Thread(target=gene.run, daemon=True).start()
-        print("j'ai lancé le thread, j'attends un peu")
-        time.sleep(2)
-        print("allez hop je vais lui demander un truc")
-        request_queue.put({
-            "width": args.width,
-            "height": args.height,
-            "debug": args.debug,
-            "alternate": args.alternate,
-        })
-        print("et j'attends encore")
-        while True:
-            print("voyons si il a répondu")
-            try:
-                pu = response_queue.get(timeout=10)
-            except queue.Empty:
-                print("non pas encore")
-            else:
-                print("ouap", pu)
-                break
+        running = threading.Event()
+        running.set()
+        pu = generate_one(running, width=args.width, height=args.height)
     print(pu)
     print(state_to_str(pu))
     if not args.alternate:

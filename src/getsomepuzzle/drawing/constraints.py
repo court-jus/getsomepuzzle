@@ -1,12 +1,12 @@
 import toga
 
 from ..engine.constraints.parity import ParityConstraint
-from ..engine.constraints.motif import ForbiddenMotif
+from ..engine.constraints.motif import Motif
 from ..engine import constants
 
 
 def draw_constraint(constraint, canvas):
-    if isinstance(constraint, ForbiddenMotif):
+    if isinstance(constraint, Motif):
         return draw_motif(constraint, canvas)
 
 

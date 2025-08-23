@@ -9,12 +9,12 @@ import toga
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 
-from .engine.generator.background import BackgroundGenerator
+from .engine.generator.puzzle_generator import generate_one
 from .engine.utils import to_grid
 from .engine import constants
 from .engine.constraints.parity import ParityConstraint
 from .engine.constraints.groups import GroupSize
-from .engine.constraints.motif import ForbiddenMotif, RequiredMotif
+from .engine.constraints.motif import Motif
 from .drawing.constraints import draw_constraint, draw_motif
 
 
@@ -38,7 +38,6 @@ class GetSomePuzzle(toga.App):
         # Concurrency
         self.request_queue = []
         self.response_queue = []
-        self.gene = BackgroundGenerator("A")
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.running = threading.Event()
 
@@ -48,9 +47,7 @@ class GetSomePuzzle(toga.App):
 
     def on_exit(self, *_a, **_kw):
         self.running.clear()
-        for future in self.response_queue:
-            future.cancel()
-        self.executor.shutdown()
+        self.executor.shutdown(cancel_futures=True)
         return True
 
     def tick(self, *a, **_kw):
@@ -60,11 +57,11 @@ class GetSomePuzzle(toga.App):
             self.get_and_show()
         if len(self.puzzles) < MIN_PUZZLES:
             while len(self.request_queue) + len(self.response_queue) + len(self.puzzles) < MAX_PUZZLES:
-                self.update_progress()
                 self.request_queue.append("go")
+                self.update_progress()
         while len(self.request_queue) > 0:
             request = self.request_queue.pop()
-            future = self.executor.submit(self.gene.work, self.running)
+            future = self.executor.submit(generate_one, self.running)
             self.response_queue.append(future)
 
         new_response_queue = []
@@ -74,8 +71,7 @@ class GetSomePuzzle(toga.App):
                 new_response_queue.append(future)
                 continue
             result = future.result()
-            if result is not None:
-                self.puzzles.append(result)
+            self.puzzles.append(result)
         self.response_queue = new_response_queue
 
         self.update_progress()
@@ -168,13 +164,8 @@ class GetSomePuzzle(toga.App):
 
         # Draw rules
         for c in pu.constraints:
-            if isinstance(c, RequiredMotif):
-                canvas = toga.Canvas(flex=1, width=constants.BTN_SIZE, height=constants.BTN_SIZE, background_color="blue")
-                self.rules_canvas.add(canvas)
-                draw_motif(c, canvas)
-                c.ui_widget = canvas
-            elif isinstance(c, ForbiddenMotif):
-                canvas = toga.Canvas(flex=1, width=constants.BTN_SIZE, height=constants.BTN_SIZE, background_color="purple")
+            if isinstance(c, Motif):
+                canvas = toga.Canvas(flex=1, width=constants.BTN_SIZE, height=constants.BTN_SIZE, background_color=c.bg_color)
                 self.rules_canvas.add(canvas)
                 draw_motif(c, canvas)
                 c.ui_widget = canvas
