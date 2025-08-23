@@ -1,11 +1,15 @@
 import argparse
-import threading
 import queue
-import time
+import concurrent.futures
+import random
 
 from .generator.puzzle_generator import generate_one
-from .utils import state_to_str, export_puzzle, import_puzzle
-from .constants import DEFAULT_SIZE
+from .utils import state_to_str, export_puzzle, import_puzzle, line_export
+
+class FakeEvent:
+    def is_set(self):
+        return True
+
 
 
 def main():
@@ -15,25 +19,43 @@ def main():
     parser.add_argument("-c", "--check")
     parser.add_argument("-d", "--debug", action="count", default=0)
     parser.add_argument("-m", "--max", type=int, default=10)
-    parser.add_argument("-W", "--width", type=int, default=DEFAULT_SIZE)
-    parser.add_argument("-H", "--height", type=int, default=DEFAULT_SIZE)
+    parser.add_argument("-W", "--width", type=int, default=None)
+    parser.add_argument("-H", "--height", type=int, default=None)
     parser.add_argument("-A", "--alternate", action="store_true", default=False)
     parser.add_argument("-v", "--value")
+    parser.add_argument("-n", "--number", type=int, default = 1)
     args = parser.parse_args()
-    print("AR", args)
+
     if args.load:
         with open(args.load, "r") as fp:
             pu = import_puzzle(fp.read())
+    elif args.number > 1:
+        # Generate a bunch of puzzles
+        running = FakeEvent()
+        remaining = args.number
+        futures = []
+        tasks = [
+            (None, True,
+            args.width if args.width is not None else random.randint(3, 6),
+            args.height if args.height is not None else random.randint(3, 7))
+            for _ in range(args.number)
+        ]
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            for result in executor.map(generate_one, tasks):
+                print(line_export(result))
     else:
         pu = None
         request_queue = queue.Queue()
         response_queue = queue.Queue()
-        running = threading.Event()
-        running.set()
-        pu = generate_one(running, width=args.width, height=args.height)
+        running = FakeEvent()
+        pu = generate_one(
+            running,
+            width=args.width if args.width is not None else random.randint(3, 6),
+            height=args.height if args.height is not None else random.randint(3, 7),
+        )
     print(pu)
     print(state_to_str(pu))
-    if not args.alternate:
+    if args.number == 1 and not args.alternate:
         pu.remove_useless_rules(debug=args.debug > 1)
         print(pu)
         print(state_to_str(pu))
