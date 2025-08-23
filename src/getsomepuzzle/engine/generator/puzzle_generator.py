@@ -5,6 +5,7 @@ from ..constraints import (
 )
 from ..constants import DEFAULT_SIZE
 from ..gspengine import Puzzle
+from ..utils import line_export
 
 
 class PuzzleGenerator:

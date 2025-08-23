@@ -38,6 +38,12 @@ class Constraint:
     def check(self, puzzle, debug=False):
         raise NotImplementedError("Should be implemented by subclass")
 
+    def line_export(self):
+        raise NotImplementedError("Should be implemented by subclass")
+
+    def line_import(self):
+        raise NotImplementedError("Should be implemented by subclass")
+
 
 class CellCentricConstraint(Constraint):
 

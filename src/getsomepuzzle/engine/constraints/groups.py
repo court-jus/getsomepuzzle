@@ -7,6 +7,8 @@ from ..constants import DOMAIN
 
 
 class GroupSize(CellCentricConstraint):
+    slug = "GS"
+
     def __repr__(self):
         idx, size = self.parameters["idx"], self.parameters["size"]
         return f"Group at {idx + 1} should be of size {size}"
@@ -38,3 +40,12 @@ class GroupSize(CellCentricConstraint):
     @staticmethod
     def maximum_presence(puzzle):
         return puzzle.width
+
+    def line_export(self):
+        idx, size = self.parameters["idx"], self.parameters["size"]
+        return f"{self.slug}:{idx}.{size}"
+
+    @staticmethod
+    def line_import(line):
+        idx, size = line.split(".")
+        return {"idx": int(idx), "size": int(size)}

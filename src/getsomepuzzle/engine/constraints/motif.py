@@ -84,8 +84,21 @@ class Motif(Constraint):
 
         return True
 
+    def line_export(self):
+        motif = ".".join("".join(row) for row in self.parameters["motif"])
+        return f"{self.slug}:{motif}"
+
+    @staticmethod
+    def line_import(line):
+        lines = line.split(".")
+        motif = [
+            "".join([v for v in row])
+            for row in lines
+        ]
+        return {"motif": motif}
 
 class ForbiddenMotif(Motif):
+    slug = "FM"
     bg_color = "purple"
 
     def __repr__(self):
@@ -101,6 +114,7 @@ class ForbiddenMotif(Motif):
 
 
 class RequiredMotif(Motif):
+    slug = "RM"
     bg_color = "blue"
 
     def __repr__(self):

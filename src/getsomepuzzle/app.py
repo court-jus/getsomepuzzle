@@ -3,20 +3,21 @@ Generate and play some logic puzzles
 """
 
 import threading
+import random
 import concurrent.futures
+from pathlib import Path
 
 import toga
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW
 
 from .engine.generator.puzzle_generator import generate_one
-from .engine.utils import to_grid
+from .engine.utils import to_grid, line_import
 from .engine import constants
 from .engine.constraints.parity import ParityConstraint
 from .engine.constraints.groups import GroupSize
 from .engine.constraints.motif import Motif
 from .drawing.constraints import draw_constraint, draw_motif
-
 
 MIN_PUZZLES = 5
 MAX_PUZZLES = 10
@@ -26,6 +27,7 @@ class GetSomePuzzle(toga.App):
         # State
         self.current_puzzle = None
         self.readonly = set()
+        self.puzzle_count = 0
         self.puzzles = []
 
         # UI
@@ -42,6 +44,7 @@ class GetSomePuzzle(toga.App):
         self.running = threading.Event()
 
     def on_running(self, *_a, **_kw):
+        self.load_puzzles()
         self.running.set()
         self.loop.call_soon(self.tick)
 
@@ -77,6 +80,20 @@ class GetSomePuzzle(toga.App):
         self.update_progress()
         self.loop.call_later(0.2, self.tick)
 
+    def load_puzzles(self):
+        path = Path(__file__).parent / Path("resources/puzzles.txt")
+        print(path)
+        data = path.read_text(encoding="utf-8")
+        puzzles = []
+        for line in data.split("\n"):
+            if not line or line.startswith("#"):
+                continue
+            puzzles.append(line_import(line))
+        random.shuffle(puzzles)
+        self.puzzle_count = len(puzzles)
+        self.puzzles = puzzles
+        self.update_progress()
+
     def default_ui(self, *_a, **_kw):
         self.main_box.clear()
         buttons_box = toga.Box(direction=ROW)
@@ -95,7 +112,7 @@ class GetSomePuzzle(toga.App):
         )
 
     def update_progress(self):
-        self.progress.value = len(self.puzzles) / 10 * 100
+        self.progress.value = len(self.puzzles) / self.puzzle_count * 100
         self.queue_progress.value = len(self.response_queue) / 10 * 100
         self.go_button.enabled = len(self.puzzles) > 0
 

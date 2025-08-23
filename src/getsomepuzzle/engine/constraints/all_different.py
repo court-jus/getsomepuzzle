@@ -3,6 +3,7 @@ from .base import Constraint
 
 
 class AllDifferentConstraint(Constraint):
+    slug = "AD"
 
     def __repr__(self):
         return "All cells must contain different values (per row and column)"
@@ -21,3 +22,10 @@ class AllDifferentConstraint(Constraint):
     @staticmethod
     def maximum_presence(*_a):
         return 1
+
+    def line_export(self):
+        return self.slug
+
+    @staticmethod
+    def line_import(line):
+        return {}

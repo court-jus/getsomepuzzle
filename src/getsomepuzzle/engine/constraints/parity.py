@@ -6,6 +6,8 @@ from ..constants import CONSTRAST
 
 
 class ParityConstraint(CellCentricConstraint):
+    slug = "PA"
+
     def __repr__(self):
         idx, side = self.parameters["idx"], self.parameters["side"]
         return (
@@ -87,3 +89,12 @@ class ParityConstraint(CellCentricConstraint):
     @staticmethod
     def maximum_presence(puzzle):
         return puzzle.width
+
+    def line_export(self):
+        idx, side = self.parameters["idx"], self.parameters["side"]
+        return f"{self.slug}:{idx}.{side}"
+
+    @staticmethod
+    def line_import(line):
+        idx, side = line.split(".")
+        return {"idx": int(idx), "side": side}

@@ -109,3 +109,38 @@ def import_puzzle(json_data):
             constraints[c["cls"]](**c["parameters"])
         )
     return p
+
+def line_export(pu):
+    w, h = pu.width, pu.height
+    values = "".join(str(c.value) for c in pu.state)
+    constraints = ";".join(c.line_export() for c in pu.constraints)
+    found_solutions = pu.find_solutions()
+    count = len(found_solutions)
+    solutions = ";".join("".join(str(v) for v in sol) for sol in found_solutions)
+    return f"{w}x{h}_{values}_{constraints}_{count}:{solutions}"
+
+
+def line_import(line):
+    from .gspengine import Puzzle
+    from .constants import DOMAIN
+    from .constraints import AVAILABLE_RULES
+
+    size, values, constraints, solutions = line.split("_")
+    w, h = size.split("x")
+    values = [int(v) for v in values]
+    constraints = constraints.split(";")
+    count, solutions = solutions.split(":")
+    pu = Puzzle(running=None, width=int(w), height=int(h))
+    for idx, cell in enumerate(pu.state):
+        cell.value = values[idx]
+        cell.options = DOMAIN[:] if cell.value is 0 else []
+    slugs = {
+        kls.slug: kls
+        for kls in AVAILABLE_RULES
+    }
+    for c in constraints:
+        slug, parameters = c.split(":")
+        kls = slugs[slug]
+        parameters = kls.line_import(parameters)
+        pu.add_constraint(kls(**parameters))
+    return pu

@@ -5,6 +5,8 @@ from ..constants import DOMAIN
 
 
 class FixedValueConstraint(Constraint):
+    slug = "FX"
+
     def __repr__(self):
         idx, val = self.parameters["idx"], self.parameters["val"]
         return f"Cell {idx + 1} should equal {val}"
@@ -24,3 +26,12 @@ class FixedValueConstraint(Constraint):
         if not isinstance(other, FixedValueConstraint):
             return False
         return other.parameters["idx"] == self.parameters["idx"]
+
+    def line_export(self):
+        idx, val = self.parameters["idx"], self.parameters["val"]
+        return f"{self.slug}:{idx}.{val}"
+
+    @staticmethod
+    def line_import(line):
+        idx, val = line.split(".")
+        return {"idx": int(idx), "val": int(val)}
