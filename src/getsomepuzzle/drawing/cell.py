@@ -3,13 +3,11 @@ import toga
 from ..engine import constants
 
 
-def draw_cell(canvas, cell, cell_constraint):
-    value = cell.value if cell.value else None
-    readonly = value is not None
+def draw_cell(canvas, cell, cell_constraint, readonly):
     context = canvas.context
 
     with context.Stroke(
-        color="gray" if readonly else "darkgray", line_width=4
+        color="darkgray", line_width=4
     ) as stroke:
         stroke.rect(
             x=2,
@@ -25,6 +23,16 @@ def draw_cell(canvas, cell, cell_constraint):
             width=canvas.width - 8,
             height=canvas.height - 8,
         )
+    if readonly:
+        with context.Stroke(
+            color="gray", line_width=2
+        ) as stroke:
+            stroke.rect(
+                x=6,
+                y=6,
+                width=canvas.width - 12,
+                height=canvas.height - 12,
+            )
     if not cell_constraint:
         return
     cell_font = toga.Font("sans-serif", constants.FONT_SIZE)

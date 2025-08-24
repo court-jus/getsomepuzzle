@@ -133,7 +133,7 @@ class GetSomePuzzle(toga.App):
         self.go_button = toga.Button("Go", on_press=self.get_and_show, font_size=constants.FONT_SIZE, enabled=False)
         clear_button = toga.Button("Clr.", on_press=self.clear, font_size=constants.FONT_SIZE)
         reset_button = toga.Button("Rst.", on_press=self.reset, font_size=constants.FONT_SIZE)
-        self.pause_button = toga.Button("⏸", on_press=self.toggle_pause, font_size=constants.FONT_SIZE)
+        self.pause_button = toga.Button("🏃" if self.paused else "⏸", on_press=self.toggle_pause, font_size=constants.FONT_SIZE)
         menu_button = toga.Button("Menu", on_press=self.menu_ui, font_size=constants.FONT_SIZE)
         buttons_box.add(self.go_button, clear_button, reset_button, self.pause_button, menu_button)
         self.puzzle_input = toga.Box(direction=COLUMN)
@@ -144,6 +144,8 @@ class GetSomePuzzle(toga.App):
             self.progress_label,
             self.rules_canvas, self.puzzle_input, self.message_label
         )
+        if self.current_puzzle:
+            self.show_puzzle()
 
     def menu_ui(self, *_a, **_kw):
         if not self.paused:
@@ -160,7 +162,7 @@ class GetSomePuzzle(toga.App):
         path = self.paths.data / "stats.txt"
         stats = path.read_text()
         self.main_box.clear()
-        stats_text = toga.MultilineTextInput(value=stats, height=400)
+        stats_text = toga.MultilineTextInput(value=stats, height=400, readonly=True)
         back_button = toga.Button("Back", on_press=self.menu_ui, font_size=constants.FONT_SIZE)
         self.main_box.add(
             stats_text,
@@ -180,6 +182,8 @@ class GetSomePuzzle(toga.App):
                 if self.idle_time > 0:
                     duration -= self.idle_time
                 self.message_label.text = str(int(duration))
+        if self.paused:
+            self.message_label.text = "Paused"
         self.go_button.enabled = remaining > 0
 
     def get_and_show(self, *_a, **_kw):
@@ -188,6 +192,7 @@ class GetSomePuzzle(toga.App):
             self.message_label.text = "No puzzle to run, please wait"
             return
         self.current_line, self.current_puzzle = self.puzzles.pop()
+        self.readonly_cells = set()
         self.solving_state = {
             "line": self.current_line,
             "start": time.time(),
@@ -199,6 +204,9 @@ class GetSomePuzzle(toga.App):
             self.toggle_pause()
         self.log("start", self.current_line)
         self.readonly = False
+        for idx, cell in enumerate(self.current_puzzle.state):
+            if cell.value != 0:
+                self.readonly_cells.add(idx)
         self.update_progress()
         self.show_puzzle()
         self.message_label.text = "It's up to you now..."
@@ -212,9 +220,6 @@ class GetSomePuzzle(toga.App):
             for cidx, cell in enumerate(row):
                 value = cell.value if cell.value else None
                 cell_idx_in_state = cidx + ridx * pu.width
-                readonly = value is not None
-                if readonly:
-                    self.readonly_cells.add(cell_idx_in_state)
                 cell_constraint = self.current_puzzle.get_cell_constraint(cell_idx_in_state)
                 cell_input = toga.Canvas(
                     flex=1,
@@ -223,7 +228,7 @@ class GetSomePuzzle(toga.App):
                     width=constants.BTN_SIZE,
                     height=constants.BTN_SIZE,
                 )
-                draw_cell(cell_input, cell, cell_constraint)
+                draw_cell(cell_input, cell, cell_constraint, cell_idx_in_state in self.readonly_cells)
                 if cell_constraint:
                     cell_constraint["constraint"].ui_widget = cell_input
                 row_box.add(cell_input)
@@ -253,7 +258,7 @@ class GetSomePuzzle(toga.App):
 
         self.current_puzzle.state[idx].value = new_value
         cell_constraint = self.current_puzzle.get_cell_constraint(idx)
-        draw_cell(widget, cell, cell_constraint)
+        draw_cell(widget, cell, cell_constraint, idx in self.readonly_cells)
 
         if not self.current_puzzle.free_cells():
             self.loop.call_later(1, self.check)
@@ -284,7 +289,6 @@ class GetSomePuzzle(toga.App):
         self.rules_canvas.clear()
         self.message_label.text = ""
         self.puzzle_input.clear()
-        self.readonly_cells = set()
 
     def reset(self, *_a, **_kw):
         if not self.current_puzzle:
