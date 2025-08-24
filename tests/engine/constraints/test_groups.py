@@ -1,12 +1,16 @@
 import pytest
 from getsomepuzzle.engine.constraints.groups import GroupSize
 from getsomepuzzle.engine.gspengine import Puzzle
+from getsomepuzzle.engine.utils import FakeEvent
+
+running = FakeEvent()
+
 
 def make_puzzle(strpuzzle):
     strp = strpuzzle.strip()
     rows = strp.split("\n")
     values = [int(v) for v in strpuzzle.strip().replace("\n", "").replace(" ", "")]
-    p = Puzzle(width=len(rows[0]), height=len(rows))
+    p = Puzzle(running=running, width=len(rows[0]), height=len(rows))
     for idx, val in enumerate(values):
         if val == 0:
             continue

@@ -7,12 +7,7 @@ import pprint
 
 from .generator.puzzle_generator import generate_one
 from .solver.puzzle_solver import find_solutions
-from .utils import state_to_str, export_puzzle, import_puzzle, line_export, compute_level
-
-class FakeEvent:
-    def is_set(self):
-        return True
-
+from .utils import FakeEvent, state_to_str, export_puzzle, import_puzzle, line_export, compute_level
 
 
 def main():

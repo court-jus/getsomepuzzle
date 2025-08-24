@@ -97,7 +97,7 @@ def import_puzzle(json_data):
     from .constraints import AVAILABLE_RULES, DOMAIN
 
     data = json.loads(json_data)
-    p = Puzzle(width=data["width"], height=data["height"])
+    p = Puzzle(running=running, width=data["width"], height=data["height"])
     for idx, cell_data in enumerate(data["state"]):
         value = cell_data.get("value", 0)
         options = DOMAIN[:] if value == 0 else [o for o in DOMAIN if o != value]
@@ -163,3 +163,7 @@ def timing(f):
           (f.__name__, te-ts))
         return result
     return wrap
+
+class FakeEvent:
+    def is_set(self):
+        return True
