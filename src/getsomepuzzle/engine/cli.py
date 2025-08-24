@@ -6,6 +6,7 @@ from pathlib import Path
 import pprint
 
 from .generator.puzzle_generator import generate_one
+from .solver.puzzle_solver import find_solutions
 from .utils import state_to_str, export_puzzle, import_puzzle, line_export, compute_level
 
 class FakeEvent:
@@ -88,7 +89,7 @@ def main():
         pu.remove_useless_rules(debug=args.debug > 1)
         print(pu)
         print(state_to_str(pu))
-        found_solutions = pu.find_solutions(debug=args.debug > 2)
+        found_solutions = find_solutions(pu, FakeEvent(), debug=args.debug > 2)
         print("FOUND", len(found_solutions), "solutions")
         for solution in found_solutions:
             print("SOLUTION", solution)

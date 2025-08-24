@@ -5,6 +5,7 @@ from ..constraints import (
 )
 from ..constants import DEFAULT_SIZE
 from ..gspengine import Puzzle
+from ..solver.puzzle_solver import find_solutions, find_solution
 from ..utils import line_export
 
 
@@ -86,7 +87,7 @@ class PuzzleGenerator:
                 return None
 
             # Find solution
-            solutions = self.puzzle.find_solutions(debug=debug)
+            solutions = find_solutions(self.puzzle, self.running, debug=debug)
             if debug:
                 print(" Found", len(solutions), "solutions")
             has_solution = bool(solutions)
@@ -116,7 +117,7 @@ class PuzzleGenerator:
             if debug:
                 print("Check that puzzle is still solvable")
             try:
-                solution, bp = self.puzzle.find_solution(self.puzzle)
+                solution, bp = find_solution(self.running, self.puzzle)
             except RuntimeError:
                 solution = None
             if solution is not None:
@@ -146,7 +147,7 @@ def generate_once(running, width, height):
         pu = pg.generate()
         if pu is None:
             return None
-        solution, bp = pu.find_solution(pu)
+        solution, bp = find_solution(running, pu)
         if not bp:
             return None
     except RuntimeError:
@@ -154,7 +155,7 @@ def generate_once(running, width, height):
     pu.apply_fixed_constraints()
     pu.clear_solutions()
     pu.remove_useless_rules()
-    solution, bp = pu.find_solution(pu)
+    solution, bp = find_solution(running, pu)
     pu.clear_solutions()
     if bp is None:
         return None
@@ -162,8 +163,8 @@ def generate_once(running, width, height):
     while bp and bp > 5 and max_simplifications > 0:
         max_simplifications -= 1
         pu.simplify(solution)
-        solution, bp = pu.find_solution(pu)
-    if len(pu.find_solutions()) != 1:
+        solution, bp = find_solution(running, pu)
+    if len(find_solutions(pu, running)) != 1:
         return None
 
     pu.clear_solutions()
