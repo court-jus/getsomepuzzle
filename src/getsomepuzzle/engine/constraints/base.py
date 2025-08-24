@@ -58,3 +58,6 @@ class CellCentricConstraint(Constraint):
             return False
 
         return self.parameters["idx"] == other.parameters["idx"]
+
+    def get_cell_text(self):
+        raise NotImplementedError("Should be implemented by subclass")

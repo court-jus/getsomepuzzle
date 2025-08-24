@@ -1,5 +1,6 @@
 import random
 from .constraints import FixedValueConstraint
+from .constraints.base import CellCentricConstraint
 from .constants import DOMAIN, DEFAULT_SIZE
 from .cell import Cell
 from .solver.puzzle_solver import find_solutions
@@ -21,6 +22,12 @@ class Puzzle:
         for c in sorted(self.constraints):
             result.append(str(c))
         return "\n".join(result)
+
+    def get_cell_constraint(self, idx):
+        for c in self.constraints:
+            if isinstance(c, CellCentricConstraint) and c.parameters["idx"] == idx:
+                return { "constraint": c, "text": c.get_cell_text() }
+        return None
 
     def clear_solutions(self):
         self.constraints = [c for c in self.constraints if c.slug != "OS"]

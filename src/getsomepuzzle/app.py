@@ -20,6 +20,7 @@ from .engine.constraints.parity import ParityConstraint
 from .engine.constraints.groups import GroupSize
 from .engine.constraints.motif import Motif
 from .drawing.constraints import draw_constraint, draw_motif
+from .drawing.cell import draw_cell
 
 MIN_PUZZLES = 5
 MAX_PUZZLES = 10
@@ -36,6 +37,7 @@ class GetSomePuzzle(toga.App):
         self.readonly = True
         self.puzzles = []
         self.solving_state = {}
+        self.paused = True
         self.idle_start = None
         self.idle_time = 0
 
@@ -44,7 +46,6 @@ class GetSomePuzzle(toga.App):
         self.default_ui()
         self.main_window = toga.MainWindow(title=self.formal_name)
         self.main_window.content = self.main_box
-        self.main_window.on_show = self.on_show
         self.main_window.on_hide = self.on_hide
         self.main_window.show()
 
@@ -54,12 +55,23 @@ class GetSomePuzzle(toga.App):
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.running = threading.Event()
 
-    def on_show(self, *_a, **_kw):
+    def on_hide(self, *_a, **_kw):
         if self.idle_start is not None:
             self.idle_time += time.time() - self.idle_start
+        if not self.paused:
+            self.toggle_pause()
 
-    def on_hide(self, *_a, **_kw):
-        self.idle_start = time.time()
+    def toggle_pause(self, *_a, **_kw):
+        if self.idle_start is not None:
+            self.idle_time += time.time() - self.idle_start
+            self.idle_start = None
+        if self.paused:
+            self.paused = False
+            self.pause_button.text = "⏸"
+        else:
+            self.paused = True
+            self.pause_button.text = "🏃"
+            self.idle_start = time.time()
 
     def on_running(self, *_a, **_kw):
         self.load_puzzles()
@@ -120,7 +132,8 @@ class GetSomePuzzle(toga.App):
         self.go_button = toga.Button("Go", on_press=self.get_and_show, font_size=constants.FONT_SIZE, enabled=False)
         clear_button = toga.Button("Clr.", on_press=self.clear, font_size=constants.FONT_SIZE)
         reset_button = toga.Button("Rst.", on_press=self.reset, font_size=constants.FONT_SIZE)
-        buttons_box.add(self.go_button, clear_button, reset_button)
+        self.pause_button = toga.Button("⏸", on_press=self.toggle_pause, font_size=constants.FONT_SIZE)
+        buttons_box.add(self.go_button, clear_button, reset_button, self.pause_button)
         self.puzzle_input = toga.Box(direction=COLUMN)
         self.rules_canvas = toga.Box(direction=ROW)
         self.message_label = toga.Label("", font_size=constants.FONT_SIZE)
@@ -136,7 +149,7 @@ class GetSomePuzzle(toga.App):
         self.progress.value = remaining / self.puzzle_count * 100
         self.queue_progress.value = len(self.response_queue) / 10 * 100
         self.progress_label.text = f"Puz: {done}/{self.puzzle_count}. W: {self.victories}. F: {self.failures}"
-        if not self.readonly:
+        if not self.readonly and not self.paused:
             start = self.solving_state.get("start")
             if start is not None:
                 duration = time.time() - start
@@ -159,6 +172,8 @@ class GetSomePuzzle(toga.App):
         }
         self.idle_time = 0
         self.idle_start = None
+        if self.paused:
+            self.toggle_pause()
         self.log("start", self.current_line)
         self.readonly = False
         self.update_progress()
@@ -169,49 +184,23 @@ class GetSomePuzzle(toga.App):
         self.clear()
         pu = self.current_puzzle
         grid = to_grid(pu.state, pu.width, pu.height)
-        # ⬅ ⮕ ⬆ ⬇ ⬌ ⬍  ⬉ ⬈ ⬊ ⬋
-        parity_icons = {
-            "left": "⬅",
-            "right": "⮕",
-            "horizontal": "⬌",
-            "top": "⬆",
-            "bottom": "⬇",
-            "vertical": "⬍",
-        }
-        cell_constraints = {
-            c.parameters["idx"]: {
-                "constraint": c,
-                "text": (
-                    parity_icons[c.parameters["side"]]
-                    if isinstance(c, ParityConstraint)
-                    else c.parameters["size"]
-                ),
-            }
-            for c in pu.constraints
-            if isinstance(c, ParityConstraint) or isinstance(c, GroupSize)
-        }
         for ridx, row in enumerate(grid):
             row_box = toga.Box(direction=ROW)
             for cidx, cell in enumerate(row):
                 value = cell.value if cell.value else None
-                bgcolor = constants.VALUE_BGCOLORS[cell.value]
-                fgcolor = constants.CONSTRAST[bgcolor]
                 cell_idx_in_state = cidx + ridx * pu.width
                 readonly = value is not None
                 if readonly:
                     self.readonly_cells.add(cell_idx_in_state)
-                cell_constraint = cell_constraints.get(cell_idx_in_state)
-                cell_input = toga.Button(
-                    cell_constraint["text"] if cell_constraint else ("." if readonly else ""),
+                cell_constraint = self.current_puzzle.get_cell_constraint(cell_idx_in_state)
+                cell_input = toga.Canvas(
+                    flex=1,
                     id=f"{cidx},{ridx}",
                     on_press=self.user_input,
                     width=constants.BTN_SIZE,
                     height=constants.BTN_SIZE,
-                    color=fgcolor,
-                    background_color=bgcolor,
-                    font_size=constants.FONT_SIZE,
-                    font_weight="bold" if readonly else "normal"
                 )
+                draw_cell(cell_input, cell, cell_constraint)
                 if cell_constraint:
                     cell_constraint["constraint"].ui_widget = cell_input
                 row_box.add(cell_input)
@@ -225,8 +214,8 @@ class GetSomePuzzle(toga.App):
                 draw_motif(c, canvas)
                 c.ui_widget = canvas
 
-    def user_input(self, widget):
-        if self.readonly:
+    def user_input(self, widget, *_a, **_kw):
+        if self.readonly or self.paused:
             return
         widget_id = widget.id
         w = self.current_puzzle.width
@@ -235,13 +224,14 @@ class GetSomePuzzle(toga.App):
         idx = ridx * w + cidx
         if idx in self.readonly_cells:
             return
-        current_value = self.current_puzzle.state[idx].value
-
+        cell = self.current_puzzle.state[idx]
+        current_value = cell.value
         new_value = (current_value + 1) % (len(constants.DOMAIN) + 1)
-        widget.style.background_color = constants.VALUE_BGCOLORS[new_value]
-        widget.style.color = constants.CONSTRAST[constants.VALUE_BGCOLORS[new_value]]
 
         self.current_puzzle.state[idx].value = new_value
+        cell_constraint = self.current_puzzle.get_cell_constraint(idx)
+        draw_cell(widget, cell, cell_constraint)
+
         if not self.current_puzzle.free_cells():
             self.loop.call_later(1, self.check)
 

@@ -13,6 +13,9 @@ class GroupSize(CellCentricConstraint):
         idx, size = self.parameters["idx"], self.parameters["size"]
         return f"Group at {idx + 1} should be of size {size}"
 
+    def get_cell_text(self):
+        return self.parameters["size"]
+
     def check(self, puzzle, debug=False):
         result = self._check(puzzle, debug)
         if self.ui_widget is not None:

@@ -1,5 +1,3 @@
-import toga
-
 from ..engine.constraints.parity import ParityConstraint
 from ..engine.constraints.motif import Motif
 from ..engine import constants
