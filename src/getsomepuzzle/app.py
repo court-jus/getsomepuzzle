@@ -48,6 +48,11 @@ class GetSomePuzzle(toga.App):
         self.main_window.content = self.main_box
         self.main_window.on_hide = self.on_hide
         self.main_window.show()
+        self.current_lang = "en"
+        self.langs = [
+            ("en", "🇬🇧"),
+            ("fr", "🇫🇷"),
+        ]
 
         # Concurrency
         self.request_queue = []
@@ -160,21 +165,33 @@ class GetSomePuzzle(toga.App):
             self.show_puzzle()
 
     def show_help(self, *_a, **_kw):
-        print(self.main_window.size)
         if not self.paused:
             self.toggle_pause()
-        path = Path(__file__).parent / Path("resources/help.txt")
+        path = Path(__file__).parent / Path(f"resources/help.{self.current_lang}.txt")
         help_content = path.read_text()
         self.main_box.clear()
         buttons_box = toga.Box(direction=ROW)
         back_button = toga.Button("🔙", on_press=self.default_ui, font_size=constants.FONT_SIZE)
         save_stats_button = toga.Button("📃", on_press=self.show_stats, font_size=constants.FONT_SIZE)
-        buttons_box.add(back_button, save_stats_button)
+        for idx, lang in enumerate(self.langs):
+            if lang[0] == self.current_lang:
+                break
+        idx = (idx + 1) % len(self.langs)
+        language_button = toga.Button(self.langs[idx][1], on_press=self.cycle_lang, font_size=constants.FONT_SIZE)
+        buttons_box.add(back_button, save_stats_button, language_button)
         help_text = toga.MultilineTextInput(value=help_content, flex=1, readonly=True)
         self.main_box.add(
             buttons_box,
             help_text,
         )
+    
+    def cycle_lang(self, *_a, **_kw):
+        for idx, lang in enumerate(self.langs):
+            if lang[0] == self.current_lang:
+                break
+        idx = (idx + 1) % len(self.langs)
+        self.current_lang = self.langs[idx][0]
+        self.show_help()
 
     def show_stats(self, *_a, **_kw):
         path = self.paths.data / "stats.txt"

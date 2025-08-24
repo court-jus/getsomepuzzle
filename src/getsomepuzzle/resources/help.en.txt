@@ -6,6 +6,8 @@ In this game, your aim is to color the cells of the grid in black or white.
 To know which cell has to be which color, you have to follow some constraints (rules are
 explained bellow).
 
+Click (or touch on mobile) a cell to change its color.
+
 Some cells can be already filled and you won't be able to change them, they
 are indicated by a thin inside border.
 
