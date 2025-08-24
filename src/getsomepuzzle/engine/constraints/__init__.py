@@ -14,6 +14,6 @@ AVAILABLE_RULES = [
     # FixedValueConstraint,
     ParityConstraint,
     ForbiddenMotif,
-    RequiredMotif,
+    # RequiredMotif,
     GroupSize,
 ]
