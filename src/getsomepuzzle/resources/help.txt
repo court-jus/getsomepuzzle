@@ -25,7 +25,8 @@ If needed, the game can be paused and resumed.
 There are about 2k puzzles bundled within the app
 (represented by the second progress bar bellow the
 buttons). Each time you run the app, the collection
-is shuffled and you can through them all. You'll see
+is shuffled and you get random puzzles. The puzzles
+you already solved won't show up anymore, you'll see
 the progress bar diminish as you "consume" puzzles.
 
 If you solve them all, the app can

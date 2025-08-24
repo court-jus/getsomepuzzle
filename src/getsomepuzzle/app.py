@@ -114,14 +114,27 @@ class GetSomePuzzle(toga.App):
     def load_puzzles(self):
         path = Path(__file__).parent / Path("resources/puzzles.txt")
         data = path.read_text(encoding="utf-8")
-        puzzles = []
+        puzzles = {}
         for line in data.split("\n"):
             if not line or line.startswith("#"):
                 continue
-            puzzles.append((line, line_import(line)))
-        random.shuffle(puzzles)
-        self.puzzle_count = len(puzzles)
-        self.puzzles = puzzles
+            puzzles[line] = line_import(line)
+        self.puzzle_count = len(puzzles.keys())
+        path = self.paths.data / "stats.txt"
+        stats = path.read_text()
+        solved_puzzles = set()
+        for line in stats.split("\n"):
+            if not line:
+                continue
+            _, _, _, _, puzzle = line.split(" ")
+            solved_puzzles.add(puzzle)
+        
+        self.puzzles = [
+            (line, puzzle)
+            for line, puzzle in puzzles.items()
+            if line not in solved_puzzles
+        ]
+        random.shuffle(self.puzzles)
         self.update_progress()
 
     def default_ui(self, *_a, **_kw):
