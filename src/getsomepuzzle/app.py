@@ -72,7 +72,7 @@ class GetSomePuzzle(toga.App):
             self.pause_button.text = "⏸"
         else:
             self.paused = True
-            self.pause_button.text = "🏃"
+            self.pause_button.text = "🏃‍➡️"
             self.idle_start = time.time()
 
     def on_running(self, *_a, **_kw):
@@ -130,12 +130,11 @@ class GetSomePuzzle(toga.App):
         self.progress = toga.ProgressBar(max=100, value=0)
         self.queue_progress = toga.ProgressBar(max=100, value=0)
         self.progress_label = toga.Label("")
-        self.go_button = toga.Button("Go", on_press=self.get_and_show, font_size=constants.FONT_SIZE, enabled=False)
-        clear_button = toga.Button("Clr.", on_press=self.clear, font_size=constants.FONT_SIZE)
-        reset_button = toga.Button("Rst.", on_press=self.reset, font_size=constants.FONT_SIZE)
-        self.pause_button = toga.Button("🏃" if self.paused else "⏸", on_press=self.toggle_pause, font_size=constants.FONT_SIZE)
-        menu_button = toga.Button("Menu", on_press=self.menu_ui, font_size=constants.FONT_SIZE)
-        buttons_box.add(self.go_button, clear_button, reset_button, self.pause_button, menu_button)
+        self.go_button = toga.Button("🆕", on_press=self.get_and_show, font_size=constants.FONT_SIZE, enabled=False)
+        reset_button = toga.Button("🗑", on_press=self.reset, font_size=constants.FONT_SIZE)
+        self.pause_button = toga.Button("🏃‍➡️" if self.paused else "⏸", on_press=self.toggle_pause, font_size=constants.FONT_SIZE)
+        menu_button = toga.Button("❓", on_press=self.show_help, font_size=constants.FONT_SIZE)
+        buttons_box.add(self.go_button, reset_button, self.pause_button, menu_button)
         self.puzzle_input = toga.Box(direction=COLUMN)
         self.rules_canvas = toga.Box(direction=ROW)
         self.message_label = toga.Label("", font_size=constants.FONT_SIZE)
@@ -147,26 +146,34 @@ class GetSomePuzzle(toga.App):
         if self.current_puzzle:
             self.show_puzzle()
 
-    def menu_ui(self, *_a, **_kw):
+    def show_help(self, *_a, **_kw):
+        print(self.main_window.size)
         if not self.paused:
             self.toggle_pause()
+        path = Path(__file__).parent / Path("resources/help.txt")
+        help_content = path.read_text()
         self.main_box.clear()
-        save_stats_button = toga.Button("Stats", on_press=self.save_stats, font_size=constants.FONT_SIZE)
-        back_button = toga.Button("Back", on_press=self.default_ui, font_size=constants.FONT_SIZE)
+        buttons_box = toga.Box(direction=ROW)
+        back_button = toga.Button("🔙", on_press=self.default_ui, font_size=constants.FONT_SIZE)
+        save_stats_button = toga.Button("📃", on_press=self.show_stats, font_size=constants.FONT_SIZE)
+        buttons_box.add(back_button, save_stats_button)
+        help_text = toga.MultilineTextInput(value=help_content, flex=1, readonly=True)
         self.main_box.add(
-            save_stats_button,
-            back_button,
+            buttons_box,
+            help_text,
         )
 
-    def save_stats(self, *_a, **_kw):
+    def show_stats(self, *_a, **_kw):
         path = self.paths.data / "stats.txt"
         stats = path.read_text()
         self.main_box.clear()
-        stats_text = toga.MultilineTextInput(value=stats, height=400, readonly=True)
-        back_button = toga.Button("Back", on_press=self.menu_ui, font_size=constants.FONT_SIZE)
+        back_button = toga.Button("🔙", on_press=self.default_ui, font_size=constants.FONT_SIZE)
+        help_msg = toga.Label("Send this content to me,\nit helps to tune the puzzles difficulty.")
+        stats_text = toga.MultilineTextInput(value=stats, flex=1)
         self.main_box.add(
-            stats_text,
             back_button,
+            help_msg,
+            stats_text,
         )
 
     def update_progress(self):
