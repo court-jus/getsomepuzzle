@@ -1,4 +1,5 @@
 import json
+from functools import wraps
 
 
 def to_grid(strpuzzle, w, h, transformer=lambda x: x):
@@ -151,3 +152,14 @@ def compute_level(*, duration, failures, total, **_):
     avg_duration = duration / total
     avg_failures = failures / total
     return int(avg_duration + 30 * avg_failures)
+
+def timing(f):
+    @wraps(f)
+    def wrap(*args, **kw):
+        ts = time.time()
+        result = f(*args, **kw)
+        te = time.time()
+        print('func:%r took: %2.4f sec' % \
+          (f.__name__, te-ts))
+        return result
+    return wrap
