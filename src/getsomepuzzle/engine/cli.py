@@ -72,9 +72,14 @@ def main():
             args.height if args.height is not None else random.randint(4, 7))
             for _ in range(args.number)
         ]
+        path = Path("getsomepuzzle") / "resources" / "puzzles3.txt"
+        print("Will write to", path)
         with concurrent.futures.ProcessPoolExecutor() as executor:
+            print("executor ready")
             for result in executor.map(generate_one, tasks):
-                print(line_export(result))
+                line = line_export(result)
+                with open(path, "a") as fp:
+                    fp.write(line + "\n")
     else:
         pu = None
         request_queue = queue.Queue()
