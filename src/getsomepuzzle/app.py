@@ -55,6 +55,8 @@ class GetSomePuzzle(toga.App):
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.running = threading.Event()
 
+        self.paths.data.mkdir(exist_ok=True)
+
     def on_hide(self, *_a, **_kw):
         if self.idle_start is not None:
             self.idle_time += time.time() - self.idle_start
@@ -111,7 +113,6 @@ class GetSomePuzzle(toga.App):
 
     def load_puzzles(self):
         path = Path(__file__).parent / Path("resources/puzzles.txt")
-        print(path)
         data = path.read_text(encoding="utf-8")
         puzzles = []
         for line in data.split("\n"):
@@ -133,7 +134,8 @@ class GetSomePuzzle(toga.App):
         clear_button = toga.Button("Clr.", on_press=self.clear, font_size=constants.FONT_SIZE)
         reset_button = toga.Button("Rst.", on_press=self.reset, font_size=constants.FONT_SIZE)
         self.pause_button = toga.Button("⏸", on_press=self.toggle_pause, font_size=constants.FONT_SIZE)
-        buttons_box.add(self.go_button, clear_button, reset_button, self.pause_button)
+        menu_button = toga.Button("Menu", on_press=self.menu_ui, font_size=constants.FONT_SIZE)
+        buttons_box.add(self.go_button, clear_button, reset_button, self.pause_button, menu_button)
         self.puzzle_input = toga.Box(direction=COLUMN)
         self.rules_canvas = toga.Box(direction=ROW)
         self.message_label = toga.Label("", font_size=constants.FONT_SIZE)
@@ -141,6 +143,28 @@ class GetSomePuzzle(toga.App):
             buttons_box, self.queue_progress, self.progress,
             self.progress_label,
             self.rules_canvas, self.puzzle_input, self.message_label
+        )
+
+    def menu_ui(self, *_a, **_kw):
+        if not self.paused:
+            self.toggle_pause()
+        self.main_box.clear()
+        save_stats_button = toga.Button("Stats", on_press=self.save_stats, font_size=constants.FONT_SIZE)
+        back_button = toga.Button("Back", on_press=self.default_ui, font_size=constants.FONT_SIZE)
+        self.main_box.add(
+            save_stats_button,
+            back_button,
+        )
+
+    def save_stats(self, *_a, **_kw):
+        path = self.paths.data / "stats.txt"
+        stats = path.read_text()
+        self.main_box.clear()
+        stats_text = toga.MultilineTextInput(value=stats, height=400)
+        back_button = toga.Button("Back", on_press=self.menu_ui, font_size=constants.FONT_SIZE)
+        self.main_box.add(
+            stats_text,
+            back_button,
         )
 
     def update_progress(self):
@@ -163,7 +187,6 @@ class GetSomePuzzle(toga.App):
         if not self.puzzles:
             self.message_label.text = "No puzzle to run, please wait"
             return
-        self.message_label.text = "Generating..."
         self.current_line, self.current_puzzle = self.puzzles.pop()
         self.solving_state = {
             "line": self.current_line,
