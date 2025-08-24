@@ -36,12 +36,16 @@ class GetSomePuzzle(toga.App):
         self.readonly = True
         self.puzzles = []
         self.solving_state = {}
+        self.idle_start = None
+        self.idle_time = 0
 
         # UI
         self.main_box = toga.Box(direction=COLUMN, background_color="lightgray")
         self.default_ui()
         self.main_window = toga.MainWindow(title=self.formal_name)
         self.main_window.content = self.main_box
+        self.main_window.on_show = self.on_show
+        self.main_window.on_hide = self.on_hide
         self.main_window.show()
 
         # Concurrency
@@ -49,6 +53,13 @@ class GetSomePuzzle(toga.App):
         self.response_queue = []
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.running = threading.Event()
+
+    def on_show(self, *_a, **_kw):
+        if self.idle_start is not None:
+            self.idle_time += time.time() - self.idle_start
+
+    def on_hide(self, *_a, **_kw):
+        self.idle_start = time.time()
 
     def on_running(self, *_a, **_kw):
         self.load_puzzles()
@@ -61,15 +72,13 @@ class GetSomePuzzle(toga.App):
         return True
 
     def tick(self, *a, **_kw):
-        if not self.running.is_set():
-            return
         if self.puzzles and not self.current_puzzle:
             self.get_and_show()
-        if len(self.puzzles) < MIN_PUZZLES:
+        if len(self.puzzles) < MIN_PUZZLES and self.running.is_set():
             while len(self.request_queue) + len(self.response_queue) + len(self.puzzles) < MAX_PUZZLES:
                 self.request_queue.append("go")
                 self.update_progress()
-        while len(self.request_queue) > 0:
+        while len(self.request_queue) > 0 and self.running.is_set():
             request = self.request_queue.pop()
             future = self.executor.submit(generate_one, (self.running, None, None))
             self.response_queue.append(future)
@@ -127,6 +136,13 @@ class GetSomePuzzle(toga.App):
         self.progress.value = remaining / self.puzzle_count * 100
         self.queue_progress.value = len(self.response_queue) / 10 * 100
         self.progress_label.text = f"Puz: {done}/{self.puzzle_count}. W: {self.victories}. F: {self.failures}"
+        if not self.readonly:
+            start = self.solving_state.get("start")
+            if start is not None:
+                duration = time.time() - start
+                if self.idle_time > 0:
+                    duration -= self.idle_time
+                self.message_label.text = str(int(duration))
         self.go_button.enabled = remaining > 0
 
     def get_and_show(self, *_a, **_kw):
@@ -141,6 +157,8 @@ class GetSomePuzzle(toga.App):
             "start": time.time(),
             "failures": 0,
         }
+        self.idle_time = 0
+        self.idle_start = None
         self.log("start", self.current_line)
         self.readonly = False
         self.update_progress()
@@ -237,7 +255,10 @@ class GetSomePuzzle(toga.App):
             self.message_label.text = "You win"
             self.readonly = True
             self.log("win", self.current_line)
-            duration = int(time.time() - self.solving_state["start"])
+            duration = time.time() - self.solving_state["start"]
+            if self.idle_time:
+                duration -= self.idle_time
+            duration = int(duration)
             self.log("stats", self.current_line, log=f"{duration}s - {self.solving_state['failures']}f")
             self.loop.call_later(1, self.get_and_show)
         else:
