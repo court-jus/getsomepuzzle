@@ -2,9 +2,11 @@ import argparse
 import queue
 import concurrent.futures
 import random
+from pathlib import Path
+import pprint
 
 from .generator.puzzle_generator import generate_one
-from .utils import state_to_str, export_puzzle, import_puzzle, line_export
+from .utils import state_to_str, export_puzzle, import_puzzle, line_export, compute_level
 
 class FakeEvent:
     def is_set(self):
@@ -24,7 +26,37 @@ def main():
     parser.add_argument("-A", "--alternate", action="store_true", default=False)
     parser.add_argument("-v", "--value")
     parser.add_argument("-n", "--number", type=int, default = 1)
+    parser.add_argument("--read-stats")
     args = parser.parse_args()
+
+    if args.read_stats:
+        path = Path(args.read_stats)
+        result = {}
+        for file in path.iterdir():
+            if file.is_dir():
+                continue
+            if file.name == "sorted_puzzles.txt":
+                continue
+            data = file.read_text()
+            for line in data.split("\n"):
+                if not line:
+                    continue
+                timestamp, duration, _, failures, puzzle = line.split(" ")
+                duration = int(duration.replace("s", ""))
+                failures = int(failures.replace("f", ""))
+                if puzzle not in result:
+                    result[puzzle] = { "total": 0, "duration": 0, "failures": 0, "level": 0, "puzzle": puzzle }
+                result[puzzle]["total"] += 1
+                result[puzzle]["duration"] += duration
+                result[puzzle]["failures"] += failures
+                result[puzzle]["level"] = compute_level(**result[puzzle])
+        data = sorted(
+            result.values(),
+            key=lambda stat: stat["level"]
+        )
+        result_path = path / "sorted_puzzles.txt"
+        result_path.write_text("\n".join(stat["puzzle"] for stat in data))
+        return
 
     if args.load:
         with open(args.load, "r") as fp:

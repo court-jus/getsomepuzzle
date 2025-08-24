@@ -133,7 +133,7 @@ def line_import(line):
     pu = Puzzle(running=None, width=int(w), height=int(h))
     for idx, cell in enumerate(pu.state):
         cell.value = values[idx]
-        cell.options = DOMAIN[:] if cell.value is 0 else []
+        cell.options = DOMAIN[:] if cell.value == 0 else []
     slugs = {
         kls.slug: kls
         for kls in AVAILABLE_RULES
@@ -144,3 +144,8 @@ def line_import(line):
         parameters = kls.line_import(parameters)
         pu.add_constraint(kls(**parameters))
     return pu
+
+def compute_level(*, duration, failures, total, **_):
+    avg_duration = duration / total
+    avg_failures = failures / total
+    return int(avg_duration + 30 * avg_failures)
