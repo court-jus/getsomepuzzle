@@ -60,7 +60,9 @@ class GetSomePuzzle(toga.App):
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.running = threading.Event()
 
+        # Files and folders
         self.paths.data.mkdir(exist_ok=True)
+        (self.paths.data / "stats.txt").touch(exist_ok=True)
 
     def on_hide(self, *_a, **_kw):
         if self.idle_start is not None:
