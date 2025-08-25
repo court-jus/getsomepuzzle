@@ -98,7 +98,7 @@ jobs:
         if: matrix.target != 'iOS'
         uses: actions/upload-artifact@v4
         with:
-          name: App-${{ matrix.target }}
+          name: GetSomePuzzle-${{ matrix.target }}
           path: dist
           if-no-files-found: error
 

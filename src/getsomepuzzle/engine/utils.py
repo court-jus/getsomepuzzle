@@ -116,12 +116,13 @@ def line_export(pu):
     from .solver.puzzle_solver import find_solutions
 
     w, h = pu.width, pu.height
+    domain = "".join(str(v) for v in pu.domain)
     values = "".join(str(c.value) for c in pu.state)
     constraints = ";".join(c.line_export() for c in pu.constraints)
     found_solutions = find_solutions(pu, pu.running)
     count = len(found_solutions)
     solutions = ";".join("".join(str(v) for v in sol) for sol in found_solutions)
-    return f"{w}x{h}_{values}_{constraints}_{count}:{solutions}"
+    return f"{domain}_{w}x{h}_{values}_{constraints}_{count}:{solutions}"
 
 
 def line_import(line):
