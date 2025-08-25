@@ -1,9 +1,7 @@
-from .constants import DOMAIN
-
-
 class Cell:
-    def __init__(self):
-        self.options = DOMAIN[:]
+    def __init__(self, domain):
+        self.domain = domain
+        self.options = domain[:]
         self.value = 0
 
     def __repr__(self):
@@ -17,7 +15,7 @@ class Cell:
                         if (v == self.value or (not self.value and v in self.options))
                         else symb
                     )
-                    for v in DOMAIN
+                    for v in self.domain
                 ],
             )
         )
@@ -29,7 +27,7 @@ class Cell:
         return self.value or self.options
 
     def clone(self):
-        c = Cell()
+        c = Cell(self.domain)
         c.value = self.value
         c.options = self.options[:]
         return c

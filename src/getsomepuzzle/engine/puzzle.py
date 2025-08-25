@@ -6,18 +6,19 @@ from .cell import Cell
 from .solver.puzzle_solver import find_solutions
 
 class Puzzle:
-    def __init__(self, *, running, width=DEFAULT_SIZE, height=DEFAULT_SIZE):
+    def __init__(self, *, running, width=DEFAULT_SIZE, height=DEFAULT_SIZE, domain=None):
         self.running = running
         self.width = width
         self.height = height
-        self.state = [Cell() for _ in range(width * height)]
+        self.domain = domain if domain is not None else DOMAIN
+        self.state = [Cell(self.domain) for _ in range(width * height)]
         self.constraints = []
 
     def __repr__(self):
         result = [
             "Rules:",
             f"Puzzle size is {self.width}x{self.height}",
-            f"Possible values: {DOMAIN}",
+            f"Possible values: {self.domain}",
         ]
         for c in sorted(self.constraints):
             result.append(str(c))
@@ -156,7 +157,7 @@ class Puzzle:
             for i, c in enumerate(new_puzzle.state):
                 if i in removed or i == idx:
                     c.value = 0
-                    c.options = DOMAIN[:]
+                    c.options = self.domain[:]
             solutions = find_solutions(new_puzzle, self.running)
             if solutions and len(solutions) == initial_solutions:
                 if debug:
@@ -169,7 +170,7 @@ class Puzzle:
             for i, c in enumerate(self.state):
                 if i in removed or i == idx:
                     c.value = 0
-                    c.options = DOMAIN[:]
+                    c.options = self.domain[:]
             if debug:
                 print("We removed", removed)
         else:
@@ -192,7 +193,7 @@ class Puzzle:
         return False
 
     def clone(self):
-        new_puzzle = Puzzle(running=self.running, width=self.width, height=self.height)
+        new_puzzle = Puzzle(running=self.running, width=self.width, height=self.height, domain=self.domain)
         new_puzzle.state = [c.clone() for c in self.state]
         new_puzzle.constraints = self.constraints
         return new_puzzle

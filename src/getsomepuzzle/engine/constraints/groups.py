@@ -3,7 +3,6 @@ import re
 
 from ..utils import to_grid, to_groups
 from .base import CellCentricConstraint
-from ..constants import DOMAIN
 
 
 class GroupSize(CellCentricConstraint):

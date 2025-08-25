@@ -1,7 +1,6 @@
 import random
 
 from .base import Constraint
-from ..constants import DOMAIN
 
 
 class FixedValueConstraint(Constraint):
@@ -19,7 +18,7 @@ class FixedValueConstraint(Constraint):
     def generate_random_parameters(puzzle):
         return {
             "idx": random.randint(0, len(puzzle.state) - 1),
-            "val": random.choice(DOMAIN),
+            "val": random.choice(puzzle.domain),
         }
 
     def conflicts(self, other):

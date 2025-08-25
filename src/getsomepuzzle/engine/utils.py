@@ -93,14 +93,15 @@ def export_puzzle(pu):
     return json.dumps(result, indent=4)
 
 def import_puzzle(json_data):
-    from .gspengine import Puzzle
-    from .constraints import AVAILABLE_RULES, DOMAIN
+    from .puzzle import Puzzle
+    from .constraints import AVAILABLE_RULES
 
     data = json.loads(json_data)
-    p = Puzzle(running=running, width=data["width"], height=data["height"])
+    domain = data.get("domain")
+    p = Puzzle(running=running, width=data["width"], height=data["height"], domain=domain)
     for idx, cell_data in enumerate(data["state"]):
         value = cell_data.get("value", 0)
-        options = DOMAIN[:] if value == 0 else [o for o in DOMAIN if o != value]
+        options = p.domain[:] if value == 0 else [o for o in p.domain if o != value]
         p.state[idx].value = value
         p.state[idx].options = options
 
@@ -124,19 +125,24 @@ def line_export(pu):
 
 
 def line_import(line):
-    from .gspengine import Puzzle
-    from .constants import DOMAIN
+    from .puzzle import Puzzle
     from .constraints import AVAILABLE_RULES
 
-    size, values, constraints, solutions = line.split("_")
+    line_format = line.count("_")
+    if line_format == 3:
+        size, values, constraints, solutions = line.split("_")
+        domain = None
+    elif line_format == 4:
+        domain, size, values, constraints, solutions = line.split("_")
+        domain = [int(d) for d in domain]
     w, h = size.split("x")
     values = [int(v) for v in values]
     constraints = constraints.split(";")
     count, solutions = solutions.split(":")
-    pu = Puzzle(running=None, width=int(w), height=int(h))
+    pu = Puzzle(running=None, width=int(w), height=int(h), domain=domain)
     for idx, cell in enumerate(pu.state):
         cell.value = values[idx]
-        cell.options = DOMAIN[:] if cell.value == 0 else []
+        cell.options = pu.domain[:] if cell.value == 0 else []
     slugs = {
         kls.slug: kls
         for kls in AVAILABLE_RULES

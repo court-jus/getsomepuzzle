@@ -4,7 +4,7 @@ from ..constraints import (
     AVAILABLE_RULES,
 )
 from ..constants import DEFAULT_SIZE
-from ..gspengine import Puzzle
+from ..puzzle import Puzzle
 from ..solver.puzzle_solver import find_solutions, find_solution
 from ..utils import line_export
 

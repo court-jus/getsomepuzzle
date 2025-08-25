@@ -293,7 +293,7 @@ class GetSomePuzzle(toga.App):
             return
         cell = self.current_puzzle.state[idx]
         current_value = cell.value
-        new_value = (current_value + 1) % (len(constants.DOMAIN) + 1)
+        new_value = (current_value + 1) % (len(cell.domain) + 1)
 
         self.current_puzzle.state[idx].value = new_value
         cell_constraint = self.current_puzzle.get_cell_constraint(idx)

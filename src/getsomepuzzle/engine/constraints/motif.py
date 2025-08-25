@@ -3,7 +3,6 @@ import re
 
 from ..utils import to_grid
 from .base import Constraint
-from ..constants import DOMAIN
 
 
 class Motif(Constraint):
@@ -28,7 +27,7 @@ class Motif(Constraint):
         motifw = random.randint(1, min(3, puzzle.width))
         motifh = random.randint(1 if motifw > 1 else 2, min(3, puzzle.height))
         motif = [
-            "".join([str(random.choice(DOMAIN)) for i in range(motifw)])
+            "".join([str(random.choice(puzzle.domain)) for i in range(motifw)])
             for j in range(motifh)
         ]
         return {"motif": motif}

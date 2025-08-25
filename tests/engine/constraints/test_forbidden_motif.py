@@ -1,7 +1,7 @@
 import random
 import pytest
 from getsomepuzzle.engine.constraints.motif import ForbiddenMotif
-from getsomepuzzle.engine.gspengine import Puzzle
+from getsomepuzzle.engine.puzzle import Puzzle
 from getsomepuzzle.engine.utils import FakeEvent
 
 running = FakeEvent()

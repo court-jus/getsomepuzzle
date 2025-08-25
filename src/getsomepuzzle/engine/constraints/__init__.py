@@ -6,7 +6,6 @@ from .motif import ForbiddenMotif, RequiredMotif
 from .fixed import FixedValueConstraint
 from .groups import GroupSize
 from ..utils import to_rows, to_columns, to_grid
-from ..constants import DOMAIN
 
 
 AVAILABLE_RULES = [

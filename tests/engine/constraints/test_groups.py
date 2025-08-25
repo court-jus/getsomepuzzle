@@ -1,6 +1,6 @@
 import pytest
 from getsomepuzzle.engine.constraints.groups import GroupSize
-from getsomepuzzle.engine.gspengine import Puzzle
+from getsomepuzzle.engine.puzzle import Puzzle
 from getsomepuzzle.engine.utils import FakeEvent
 
 running = FakeEvent()
