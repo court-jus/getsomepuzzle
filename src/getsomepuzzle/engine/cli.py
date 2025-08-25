@@ -77,8 +77,6 @@ def main():
                     fp.write(line + "\n")
     else:
         pu = None
-        request_queue = queue.Queue()
-        response_queue = queue.Queue()
         running = FakeEvent()
         pu = generate_one((
             running,
