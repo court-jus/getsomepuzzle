@@ -3,7 +3,7 @@ import toga
 from ..engine import constants
 
 
-def draw_cell(canvas, cell, cell_constraint, readonly):
+def draw_cell(canvas, cell, cell_constraint, readonly, user_note):
     context = canvas.context
 
     with context.Stroke(
@@ -32,6 +32,17 @@ def draw_cell(canvas, cell, cell_constraint, readonly):
                 y=6,
                 width=canvas.width - 12,
                 height=canvas.height - 12,
+            )
+    if user_note:
+        cell_font = toga.Font("sans-serif", 12)
+        tw, th = canvas.measure_text(user_note, cell_font)
+        fgcolor = constants.CONSTRAST[bgcolor]
+        with context.Fill(color=fgcolor) as fill:
+            fill.write_text(
+                user_note,
+                x=4, y=4,
+                baseline=toga.constants.Baseline.TOP,
+                font=cell_font,
             )
     if not cell_constraint:
         return

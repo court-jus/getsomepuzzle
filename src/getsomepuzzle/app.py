@@ -41,6 +41,9 @@ class GetSomePuzzle(toga.App):
         self.idle_start = None
         self.idle_time = 0
 
+        # User's "notebook"
+        self.user_notes = {}
+
         # UI
         self.main_box = toga.Box(direction=COLUMN, background_color="lightgray")
         self.default_ui()
@@ -267,7 +270,7 @@ class GetSomePuzzle(toga.App):
                     width=constants.BTN_SIZE,
                     height=constants.BTN_SIZE,
                 )
-                draw_cell(cell_input, cell, cell_constraint, cell_idx_in_state in self.readonly_cells)
+                draw_cell(cell_input, cell, cell_constraint, cell_idx_in_state in self.readonly_cells, self.user_notes.get(cell_idx_in_state))
                 if cell_constraint:
                     cell_constraint["constraint"].ui_widget = cell_input
                 row_box.add(cell_input)
@@ -294,10 +297,26 @@ class GetSomePuzzle(toga.App):
         cell = self.current_puzzle.state[idx]
         current_value = cell.value
         new_value = (current_value + 1) % (len(cell.domain) + 1)
+        current_note = self.user_notes.get(idx, 0)
+        new_note = current_note
+
+        if len(cell.domain) > 2:
+            # If the current value is the last value is the domain, start taking notes
+            if new_value == 0 and current_note == 0:
+                # Start taking notes, the new values are good
+                new_note = (current_note + 1) % (len(cell.domain) + 1)
+            elif current_note != 0:
+                # We are currently taking notes, rollback new_value to 0
+                new_note = (current_note + 1) % (len(cell.domain) + 1)
+                new_value = 0
+            else:
+                # Do not take notes
+                new_note = 0
+            self.user_notes[idx] = new_note
 
         self.current_puzzle.state[idx].value = new_value
         cell_constraint = self.current_puzzle.get_cell_constraint(idx)
-        draw_cell(widget, cell, cell_constraint, idx in self.readonly_cells)
+        draw_cell(widget, cell, cell_constraint, idx in self.readonly_cells, new_note)
 
         if not self.current_puzzle.free_cells():
             self.loop.call_later(1, self.check)
