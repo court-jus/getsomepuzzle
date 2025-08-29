@@ -1,0 +1,11 @@
+Metadata-Version: 2.1
+Briefcase-Version: 0.3.24
+Name: getsomepuzzle
+Formal-Name: Get Some Puzzle
+App-ID: cc.leveque.getsomepuzzle.getsomepuzzle
+Version: 0.0.2
+Home-page: https://getsomepuzzle.leveque.cc/
+Download-URL: https://getsomepuzzle.leveque.cc/
+Author: Ghislain Lévêque
+Author-email: ghislain@leveque.cc
+Summary: Generate and play some logic puzzles
