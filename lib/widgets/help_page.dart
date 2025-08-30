@@ -41,43 +41,58 @@ class _HelpPageState extends State<HelpPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Help')),
-      body: Column(
-        children: [
-          TextButton.icon(
-            onPressed: handleButtonClick,
-            label: Text("Change language"),
-            icon: Icon(Icons.language),
-          ),
-          Container(
-            margin: EdgeInsets.all(8),
-            child: MarkdownTheme(
-              data: MarkdownThemeData(
-                textStyle: TextStyle(fontSize: 16.0, color: Colors.black87),
-                h1Style: TextStyle(
-                  fontSize: 24.0,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+      body: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints viewportConstraints) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: viewportConstraints.maxHeight),
+              child: Container(
+                margin: EdgeInsets.all(8),
+                child: Column(
+                  children: [
+                    TextButton.icon(
+                      onPressed: handleButtonClick,
+                      label: Text("Change language"),
+                      icon: Icon(Icons.language),
+                    ),
+                    MarkdownTheme(
+                      data: MarkdownThemeData(
+                        textStyle: TextStyle(
+                          fontSize: 16.0,
+                          color: Colors.black87,
+                        ),
+                        h1Style: TextStyle(
+                          fontSize: 24.0,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                        h2Style: TextStyle(
+                          fontSize: 22.0,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey,
+                        ),
+                        quoteStyle: TextStyle(
+                          fontSize: 14.0,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey[600],
+                        ),
+                        // Handle link taps
+                        onLinkTap: (title, url) {
+                          print('Tapped link: $title -> $url');
+                          // Launch URL or navigate
+                        },
+                      ),
+                      child: MarkdownWidget(
+                        markdown: (locale == "en" ? helpEn : helpFr),
+                      ),
+                    ),
+                  ],
                 ),
-                h2Style: TextStyle(
-                  fontSize: 22.0,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blueGrey,
-                ),
-                quoteStyle: TextStyle(
-                  fontSize: 14.0,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.grey[600],
-                ),
-                // Handle link taps
-                onLinkTap: (title, url) {
-                  print('Tapped link: $title -> $url');
-                  // Launch URL or navigate
-                },
               ),
-              child: MarkdownWidget(markdown: (locale == "en" ? helpEn : helpFr)),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

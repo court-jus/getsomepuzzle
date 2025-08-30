@@ -36,6 +36,6 @@ Si une case contient une flèche, il doit y avoir le même nombre de cases noire
 
 Le jeu enregistre le temps passé à résoudre un puzzle ainsi que le nombre d'erreurs. Ces données ne sont pas collectés automatiquement mais j'apprécierai que vous me les envoyiez, j'ai l'intention de m'en servir pour calculer la difficulté des puzzles.
 
-Pour m'envoyer les stats, cliquez sur l'icône de "journal" au dessus de cette aide, copiez le contenu et envoyez le moi.
+Pour m'envoyer les stats, cliquez sur l'icône de "journal" à gauche de l'icône d'aide, sur la page principale, copiez le contenu et envoyez le moi.
 
 > Merci beaucoup.

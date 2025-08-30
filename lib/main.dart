@@ -1,7 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle_ng/widgets/help.dart';
 import 'package:getsomepuzzle_ng/widgets/puzzle.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:getsomepuzzle_ng/widgets/stats_btn.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 import 'getsomepuzzle/puzzle.dart';
 
@@ -42,10 +47,12 @@ class _MyHomePageState extends State<MyHomePage> {
   List<String> unsolvedPuzzles = [];
   int puzzleCount = 0;
   bool shouldCheck = false;
+  List<String> stats = [];
 
   @override
   void initState() {
     super.initState();
+    loadStats();
     loadPuzzle();
   }
 
@@ -61,6 +68,21 @@ class _MyHomePageState extends State<MyHomePage> {
     unsolvedPuzzles.shuffle();
     puzzleCount = unsolvedPuzzles.length;
     return unsolvedPuzzles;
+  }
+
+  Future<void> loadStats() async {
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final path = p.join(documentsDirectory.path, "getsomepuzzle");
+    await Directory(path).create(recursive: true);
+    final filePath = p.join(path, "stats.txt");
+    final file = File(filePath);
+    if (!(await file.exists())) {
+      file.createSync();
+    }
+    final content = await file.readAsString();
+    setState(() {
+      stats = content.split("\n");
+    });    
   }
 
   void loadPuzzle() async {
@@ -109,6 +131,8 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void handleStatsButtonClick() {}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,6 +150,7 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: "Restart",
             onPressed: restartPuzzle,
           ),
+          StatsBtn(stats: stats),
           Help(),
         ],
       ),
