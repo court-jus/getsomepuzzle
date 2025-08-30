@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle_ng/widgets/help.dart';
 import 'package:getsomepuzzle_ng/widgets/puzzle.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 import 'getsomepuzzle/puzzle.dart';
 
@@ -34,29 +36,77 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
-  String something =
-      "FM:211;PA:16.left;PA:41.top;PA:40.top;pa:28.left;FM:112;FM:2.2;PA:26.top;PA:38:left;PA:46.left;PA:25.top";
+  String topMessage = "";
   // Puzzle currentPuzzle = Puzzle("12_4x5_00020210200022001201_FM:1.2;PA:10.top;PA:19.top_1:22222212221122111211");
-  Puzzle currentPuzzle = Puzzle(
-    "12_6x8_102102111011000120110111021202101010021210012020_FM:211;PA:16.left;PA:41.top;PA:40.top;PA:28.left;FM:112;FM:2.2;PA:26.top;PA:38.left;PA:46.left;PA:25.top",
-  );
+  Puzzle? currentPuzzle;
+  List<String> unsolvedPuzzles = [];
+  int puzzleCount = 0;
+  bool shouldCheck = false;
 
-  void _showHelp() {
+  @override
+  void initState() {
+    super.initState();
+    loadPuzzle();
+  }
+
+  String get bottomMessage {
+    final int played = puzzleCount - unsolvedPuzzles.length;
+    return "$played/$puzzleCount";
+  }
+
+  Future<List<String>> loadPuzzles() async {
+    if (unsolvedPuzzles.isNotEmpty) return unsolvedPuzzles;
+    final assetContent = await rootBundle.loadString('assets/puzzles.txt');
+    unsolvedPuzzles = assetContent.split("\n");
+    unsolvedPuzzles.shuffle();
+    puzzleCount = unsolvedPuzzles.length;
+    return unsolvedPuzzles;
+  }
+
+  void loadPuzzle() async {
+    try {
+      final unsolved = await loadPuzzles();
+
+      final randomPuzzle = unsolved.removeAt(0);
+      print("puzzle $randomPuzzle");
+      setState(() {
+        currentPuzzle = Puzzle(randomPuzzle);
+      });
+    } catch (e) {
+      // If encountering an error, return 0
+      print(e);
+      return;
+    }
+  }
+
+  void restartPuzzle() {
+    if (currentPuzzle == null) return;
     setState(() {
-      helpVisible = true;
+      currentPuzzle!.restart();
     });
   }
 
-  void _handlePuzzleTap(int idx) {
+  void handlePuzzleTap(int idx) {
+    if (currentPuzzle == null) return;
     setState(() {
-      currentPuzzle.incrValue(idx);
+      currentPuzzle!.incrValue(idx);
+      shouldCheck = currentPuzzle!.complete;
+      if (shouldCheck) Future.delayed(Duration(seconds: 2), autoCheck);
     });
   }
 
-  void _handleCheck() {
-    setState(() {
-      something = currentPuzzle.check().map((c) => c.toString()).join(", ");
-    });
+  void autoCheck() {
+    if (!shouldCheck) return;
+    shouldCheck = false;
+    if (currentPuzzle == null) return;
+    final failedConstraints = currentPuzzle!.check();
+    if (failedConstraints.isEmpty) {
+      if (currentPuzzle!.complete) loadPuzzle();
+    } else {
+      setState(() {
+        topMessage = "Some constraints are not valid.";
+      });
+    }
   }
 
   @override
@@ -65,31 +115,49 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.fiber_new),
+            tooltip: "New",
+            onPressed: loadPuzzle,
+          ),
+          IconButton(
+            icon: Icon(Icons.restart_alt_rounded),
+            tooltip: "Restart",
+            onPressed: restartPuzzle,
+          ),
+          Help(),
+        ],
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          spacing: 2,
           children: <Widget>[
-            Text(something),
-            PuzzleWidget(
-              currentPuzzle: currentPuzzle,
-              onCellTap: _handlePuzzleTap,
-            ),
+            Text(topMessage),
+            (currentPuzzle != null)
+                ? PuzzleWidget(
+                    currentPuzzle: currentPuzzle!,
+                    onCellTap: handlePuzzleTap,
+                  )
+                : Text("No puzzle loaded."),
+
             DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.amber
+              decoration: BoxDecoration(color: Colors.amber),
+              child: Row(
+                spacing: 2,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    margin: EdgeInsets.all(4),
+                    child: Text(bottomMessage),
+                  ),
+                ],
               ),
-              child: IconButton(
-                onPressed: _handleCheck, icon: Icon(Icons.check)
-                ),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showHelp,
-        tooltip: 'Help',
-        child: const Icon(Icons.help),
       ),
     );
   }

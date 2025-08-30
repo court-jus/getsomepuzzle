@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:getsomepuzzle_ng/getsomepuzzle/puzzle.dart';
 
 class Constraint {
@@ -18,16 +19,57 @@ class Constraint {
   }
 }
 
-class Motif extends Constraint {}
-
-class ForbiddenMotif extends Motif {
+class Motif extends Constraint {
   List<List<int>> motif = [];
 
+  bool isPresent(Puzzle puzzle) {
+    final Map<int, Map<int, List<int>>> findings = {};
+    final rows = puzzle.getRows();
+    for (var (midx, motifline) in motif.indexed) {
+      final motiflineStr = motifline.map((e) => e.toString()).join("");
+      final motifRe = RegExp(motiflineStr);
+      for (var (ridx, row) in rows.indexed) {
+        final List<int> rowFindings = findings
+            .putIfAbsent(midx - 1, () => {})
+            .putIfAbsent(ridx - 1, () => []);
+        final rowStr = row.map((e) => e.value.toString()).join("");
+        final List<int> matchingIdx = [
+          for (var idx in Iterable.generate(rowStr.length))
+            if (motifRe.matchAsPrefix(rowStr, idx) != null &&
+                (midx == 0 || rowFindings.contains(idx)))
+              idx,
+        ];
+        if (matchingIdx.isNotEmpty) {
+          if (midx == motif.length - 1) {
+            return true;
+          }
+          findings.putIfAbsent(midx, () => {})[ridx] = matchingIdx;
+        }
+      }
+    }
+    return false;
+  }
+}
+
+class ForbiddenMotif extends Motif {
   ForbiddenMotif(String strMotif) {
     final strRows = strMotif.split(".");
     motif = strRows
         .map((row) => row.split("").map((cel) => int.parse(cel)).toList())
         .toList();
+  }
+
+  @override
+  String toString() {
+    final strMotif = motif
+        .map((row) => row.map((v) => v.toString()).join(""))
+        .join(".");
+    return strMotif;
+  }
+
+  @override
+  bool verify(Puzzle puzzle) {
+    return !isPresent(puzzle);
   }
 }
 
@@ -45,13 +87,12 @@ class ParityConstraint extends CellCentricConstraint {
 
   @override
   String toString() {
-    final flag = isValid ? "V" : "X";
-    if (side == "left") return "$flag $idx ⬅";
-    if (side == "right") return "$flag $idx ⮕";
-    if (side == "horizontal") return "$flag $idx ⬌";
-    if (side == "vertical") return "$flag $idx ⬍";
-    if (side == "top") return "$flag $idx ⬆";
-    if (side == "bottom") return "$flag $idx ⬇";
+    if (side == "left") return "⬅";
+    if (side == "right") return "⮕";
+    if (side == "horizontal") return "⬌";
+    if (side == "vertical") return "⬍";
+    if (side == "top") return "⬆";
+    if (side == "bottom") return "⬇";
     return "";
   }
 
@@ -64,10 +105,6 @@ class ParityConstraint extends CellCentricConstraint {
     final row = rows[ridx];
     final columns = puzzle.getColumns();
     final column = columns[cidx];
-    print("$isValid Check $idx $side $ridx $cidx");
-    final rowStr = row.map((cell) => cell.value.toString()).join("");
-    final colStr = column.map((cell) => cell.value.toString()).join("");
-    print("Row $rowStr col $colStr");
     final rowValuesAndIndices = row.indexed.map((e) => (e.$1, e.$2.value));
     final colValuesAndIndices = column.indexed.map((e) => (e.$1, e.$2.value));
     final List<Iterable<int>> sides = [];
@@ -89,11 +126,32 @@ class ParityConstraint extends CellCentricConstraint {
       }
       final int even = side.where((v) => v % 2 == 0).length;
       final int odd = side.where((v) => v % 2 != 0).length;
-      print("$side $even $odd");
       if (even != odd) {
         return false;
       }
     }
     return true;
+  }
+}
+
+class GroupSize extends CellCentricConstraint {
+  int size = 0;
+
+  GroupSize(String strParams) {
+    idx = int.parse(strParams.split(".")[0]);
+    size = int.parse(strParams.split(".")[1]);
+  }
+
+  @override
+  String toString() {
+    return size.toString();
+  }
+
+  @override
+  bool verify(Puzzle puzzle) {
+    final groups = puzzle.getGroups();
+    final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
+    if (myGroup == null) return false;
+    return myGroup.length == size;
   }
 }

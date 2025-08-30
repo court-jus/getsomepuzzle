@@ -1,0 +1,4 @@
+[submodule "build/web"]
+	path = build/web
+	url = git@github.com:court-jus/getsomepuzzle.git
+	branch = gh-pages

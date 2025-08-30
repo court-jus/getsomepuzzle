@@ -22,7 +22,6 @@ class CellWidget extends StatelessWidget {
 
   // Methods
   void _handleTap() {
-    print("taped");
     onTap();
   }
 
@@ -30,7 +29,9 @@ class CellWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = bgColors[value];
-    final fgcolor = constraint != null ? (constraint!.isValid ? fgColors[value] : Colors.redAccent) : Colors.green;
+    final fgcolor = constraint != null
+        ? (constraint!.isValid ? fgColors[value] : Colors.redAccent)
+        : Colors.green;
     final label = constraint == null ? " " : constraint.toString();
     return GestureDetector(
       onTap: _handleTap,

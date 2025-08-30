@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle_ng/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle_ng/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle_ng/widgets/cell.dart';
+import 'package:getsomepuzzle_ng/widgets/motif.dart';
+
+const forbiddenColor = Color.fromARGB(255, 185, 86, 202);
+const mandatoryColor = Colors.lightBlue;
 
 class PuzzleWidget extends StatelessWidget {
   const PuzzleWidget({
@@ -13,16 +18,33 @@ class PuzzleWidget extends StatelessWidget {
   final ValueChanged<int> onCellTap;
 
   void _handleCellTap(int idx) {
-    print("_handle cell tap $idx");
     onCellTap(idx);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(color: Color.fromARGB(255, 235, 235, 235)),
-      child: Center(
-        child: Table(
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      spacing: 2,
+      children: [
+        Wrap(
+          direction: Axis.horizontal,
+          alignment: WrapAlignment.center,
+          spacing: 2,
+          runSpacing: 2,
+          children: [
+            for (var constraint in currentPuzzle.constraints)
+              if (constraint is Motif)
+                MotifWidget(
+                  motif: constraint.motif,
+                  bgColor: constraint is ForbiddenMotif
+                      ? forbiddenColor
+                      : mandatoryColor,
+                  borderColor: constraint.isValid ? Colors.green : Colors.red,
+                ),
+          ],
+        ),
+        Table(
           border: TableBorder.all(),
           defaultColumnWidth: FixedColumnWidth(64),
           children: [
@@ -45,7 +67,7 @@ class PuzzleWidget extends StatelessWidget {
               ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
