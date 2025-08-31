@@ -1,4 +1,4 @@
-package com.example.getsomepuzzle_ng
+package com.example.getsomepuzzle
 
 import io.flutter.embedding.android.FlutterActivity
 

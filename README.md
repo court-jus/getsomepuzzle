@@ -1,4 +1,4 @@
-# getsomepuzzle_ng
+# getsomepuzzle
 
 A new Flutter project.
 
