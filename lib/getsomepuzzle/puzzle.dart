@@ -1,7 +1,45 @@
-// ignore_for_file: avoid_print
 import 'package:collection/collection.dart';
-import 'package:getsomepuzzle_ng/getsomepuzzle/cell.dart';
-import 'package:getsomepuzzle_ng/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:intl/intl.dart';
+
+
+class Stats {
+  int failures = 0;
+  int duration = 0;
+  Stopwatch timer = Stopwatch();
+
+  @override
+  String toString() {
+    // 2025-08-23T22:59:42 8s - 0f 3x3_000001020_GS:5.1;PA:6.top;PA:0.right;PA:2.left;FM:222_1:212121122
+    return "${(timer.elapsedMilliseconds / 1000).round()}s - ${failures}f";
+  }
+
+  void begin() {
+    timer.start();
+    failures = 0;
+  }
+
+  void pause() {
+    timer.stop();
+  }
+
+  void resume() {
+    timer.start();
+  }
+
+  String stop(String puzzleRepresentation) {
+    timer.stop();
+    duration = (timer.elapsedMilliseconds / 1000).round();
+    timer.reset();
+
+    final now = DateTime.now();
+    final DateFormat formatter = DateFormat('yyyy-MM-ddTHH:mm:ss');
+    final String dateForLog = formatter.format(now);
+    return "$dateForLog ${duration}s - ${failures}f $puzzleRepresentation";
+  }
+
+}
 
 class Puzzle {
   String lineRepresentation;
@@ -10,6 +48,7 @@ class Puzzle {
   int height = 0;
   List<Cell> cells = [];
   List<Constraint> constraints = [];
+  Stats stats = Stats();
 
   Puzzle(this.lineRepresentation) {
     var attributesStr = lineRepresentation.split("_");

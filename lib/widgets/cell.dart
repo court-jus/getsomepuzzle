@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle_ng/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 
 const bgColors = {0: Colors.cyan, 1: Colors.black, 2: Colors.white};
 const fgColors = {0: Colors.black, 1: Colors.white, 2: Colors.black};
@@ -29,10 +29,8 @@ class CellWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = bgColors[value];
-    final fgcolor = constraint != null
-        ? (constraint!.isValid ? fgColors[value] : Colors.redAccent)
-        : Colors.green;
-    final label = constraint == null ? " " : constraint.toString();
+
+    final Widget label = constraint == null ? Text(" ") : constraint!.toWidget(fgColors[value] ?? Colors.black);
     return GestureDetector(
       onTap: _handleTap,
       child: DecoratedBox(
@@ -46,14 +44,7 @@ class CellWidget extends StatelessWidget {
         child: SizedBox(
           width: 64,
           height: 64,
-          child: Center(
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall!.copyWith(color: fgcolor),
-            ),
-          ),
+          child: Center(child: label),
         ),
       ),
     );

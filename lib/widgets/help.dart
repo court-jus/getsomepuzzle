@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle_ng/widgets/help_page.dart';
+import 'package:getsomepuzzle/widgets/help_page.dart';
 
 class Help extends StatefulWidget {
   const Help({super.key});

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle_ng/getsomepuzzle/constraint.dart';
-import 'package:getsomepuzzle_ng/getsomepuzzle/puzzle.dart';
-import 'package:getsomepuzzle_ng/widgets/cell.dart';
-import 'package:getsomepuzzle_ng/widgets/motif.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/motif.dart';
 
 const forbiddenColor = Color.fromARGB(255, 185, 86, 202);
 const mandatoryColor = Colors.lightBlue;

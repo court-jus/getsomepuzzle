@@ -77,11 +77,6 @@ class _HelpPageState extends State<HelpPage> {
                           fontStyle: FontStyle.italic,
                           color: Colors.grey[600],
                         ),
-                        // Handle link taps
-                        onLinkTap: (title, url) {
-                          print('Tapped link: $title -> $url');
-                          // Launch URL or navigate
-                        },
                       ),
                       child: MarkdownWidget(
                         markdown: (locale == "en" ? helpEn : helpFr),

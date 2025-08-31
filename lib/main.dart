@@ -1,10 +1,13 @@
+// ignore_for_file: avoid_print
+
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle_ng/widgets/help.dart';
-import 'package:getsomepuzzle_ng/widgets/puzzle.dart';
+import 'package:getsomepuzzle/widgets/help.dart';
+import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:getsomepuzzle_ng/widgets/stats_btn.dart';
+import 'package:getsomepuzzle/widgets/stats_btn.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
@@ -42,6 +45,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
   String topMessage = "";
+  String bottomMessage = "";
   // Puzzle currentPuzzle = Puzzle("12_4x5_00020210200022001201_FM:1.2;PA:10.top;PA:19.top_1:22222212221122111211");
   Puzzle? currentPuzzle;
   List<String> unsolvedPuzzles = [];
@@ -53,22 +57,15 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     loadStats();
-    loadPuzzle();
+    Timer.periodic(Duration(seconds: 1), (tmr) {
+      setState(() {
+        int played = puzzleCount - unsolvedPuzzles.length;
+        String statsText = currentPuzzle == null ? "" : currentPuzzle!.stats.toString();
+        bottomMessage = "$played/$puzzleCount - $statsText";
+      });
+    });
   }
 
-  String get bottomMessage {
-    final int played = puzzleCount - unsolvedPuzzles.length;
-    return "$played/$puzzleCount";
-  }
-
-  Future<List<String>> loadPuzzles() async {
-    if (unsolvedPuzzles.isNotEmpty) return unsolvedPuzzles;
-    final assetContent = await rootBundle.loadString('assets/puzzles.txt');
-    unsolvedPuzzles = assetContent.split("\n");
-    unsolvedPuzzles.shuffle();
-    puzzleCount = unsolvedPuzzles.length;
-    return unsolvedPuzzles;
-  }
 
   Future<void> loadStats() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
@@ -82,22 +79,42 @@ class _MyHomePageState extends State<MyHomePage> {
     final content = await file.readAsString();
     setState(() {
       stats = content.split("\n");
-    });    
+    });
+    await loadPuzzles();
+    loadPuzzle();
+  }
+
+  Future<List<String>> loadPuzzles() async {
+    if (unsolvedPuzzles.isNotEmpty) return unsolvedPuzzles;
+    final assetContent = await rootBundle.loadString('assets/puzzles.txt');
+    final allPuzzles = assetContent.split("\n");
+    puzzleCount = allPuzzles.length;
+    final Set<String> solvedPuzzles = {};
+    for (final stat in stats) {
+      final List<String> statFields = stat.split(" ");
+      if (statFields.length != 5) continue;
+      solvedPuzzles.add(statFields[4]);
+    }
+    for (final puz in allPuzzles) {
+      if (solvedPuzzles.contains(puz)) continue;
+      unsolvedPuzzles.add(puz);
+    }
+
+    unsolvedPuzzles.shuffle();
+    return unsolvedPuzzles;
   }
 
   void loadPuzzle() async {
     try {
-      final unsolved = await loadPuzzles();
+      final randomPuzzle = unsolvedPuzzles.removeAt(0);
 
-      final randomPuzzle = unsolved.removeAt(0);
-      print("puzzle $randomPuzzle");
       setState(() {
         currentPuzzle = Puzzle(randomPuzzle);
+        currentPuzzle!.stats.begin();
       });
+
     } catch (e) {
-      // If encountering an error, return 0
-      print(e);
-      return;
+      currentPuzzle = null;
     }
   }
 
@@ -113,8 +130,22 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       currentPuzzle!.incrValue(idx);
       shouldCheck = currentPuzzle!.complete;
-      if (shouldCheck) Future.delayed(Duration(seconds: 2), autoCheck);
+      if (shouldCheck) Future.delayed(Duration(seconds: 1), autoCheck);
     });
+  }
+
+  Future<void> writeStat(String text) async {
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final path = p.join(documentsDirectory.path, "getsomepuzzle");
+    await Directory(path).create(recursive: true);
+    final filePath = p.join(path, "stats.txt");
+    final file = File(filePath);
+
+    file.writeAsStringSync(
+      text,
+      mode: FileMode.append,
+      flush: true,
+    );
   }
 
   void autoCheck() {
@@ -123,15 +154,19 @@ class _MyHomePageState extends State<MyHomePage> {
     if (currentPuzzle == null) return;
     final failedConstraints = currentPuzzle!.check();
     if (failedConstraints.isEmpty) {
-      if (currentPuzzle!.complete) loadPuzzle();
+      if (currentPuzzle!.complete) {
+        final stat = currentPuzzle!.stats.stop(currentPuzzle!.lineRepresentation);
+        stats.add(stat);
+        writeStat(stat);
+        loadPuzzle();
+      }
     } else {
-      setState(() {
-        topMessage = "Some constraints are not valid.";
-      });
+      currentPuzzle!.stats.failures += 1;
     }
+    setState(() {
+      topMessage = failedConstraints.isNotEmpty ? "Some constraints are not valid." : "";
+    });
   }
-
-  void handleStatsButtonClick() {}
 
   @override
   Widget build(BuildContext context) {

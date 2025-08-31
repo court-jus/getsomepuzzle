@@ -1,5 +1,7 @@
 import 'package:collection/collection.dart';
-import 'package:getsomepuzzle_ng/getsomepuzzle/puzzle.dart';
+import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+
 
 class Constraint {
   bool isValid = true;
@@ -7,6 +9,10 @@ class Constraint {
   @override
   String toString() {
     return "";
+  }
+
+  Widget toWidget(Color defaultColor) {
+    return Text(toString());
   }
 
   bool verify(Puzzle puzzle) {
@@ -97,6 +103,27 @@ class ParityConstraint extends CellCentricConstraint {
   }
 
   @override
+  Widget toWidget(Color defaultColor) {
+    final Map<String, IconData> icons = {
+      "left": Icons.arrow_circle_left_outlined,
+      "right": Icons.arrow_circle_right_outlined,
+      "horizontal": Icons.swap_horizontal_circle_outlined,
+      "vertical": Icons.swap_vert_circle_outlined,
+      "top": Icons.arrow_circle_up_outlined,
+      "bottom": Icons.arrow_circle_down_outlined,
+    };
+    final fgcolor = isValid ? defaultColor : Colors.redAccent;
+    if (icons.containsKey(side)) {
+      return Icon(
+        icons[side],
+        size: 40,
+        color: fgcolor,
+      );
+    }
+    return Text("");
+  }
+
+  @override
   bool verify(Puzzle puzzle) {
     final w = puzzle.width;
     final ridx = idx ~/ w;
@@ -145,6 +172,12 @@ class GroupSize extends CellCentricConstraint {
   @override
   String toString() {
     return size.toString();
+  }
+
+  @override
+  Widget toWidget(Color defaultColor) {
+    final fgcolor = isValid ? defaultColor : Colors.redAccent;
+    return Text(toString(), style: TextStyle(fontSize: 36, color: fgcolor));
   }
 
   @override
