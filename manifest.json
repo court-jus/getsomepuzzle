@@ -1,6 +1,6 @@
 {
-    "name": "getsomepuzzle_ng",
-    "short_name": "getsomepuzzle_ng",
+    "name": "getsomepuzzle",
+    "short_name": "getsomepuzzle",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -14,9 +14,7 @@ Si vous êtes bloqué, le bouton "corbeille" réinitialise le puzzle à son éta
 
 Pendant que vous jouez, votre temps est enregistré (voir la section Stats ci-dessous). Le jeu peut être mis en pause si besoin.
 
-Il y a environ 3000 puzzles fournis avec l'application. Chaque fois que vous lancez l'application, la collection est mélangée et vous obtenez des puzzles aléatoires. Ceux que vous avez déjà résolu n'apparaîtront plus. Vous pouvez voir la deuxième barre de progression diminuer en haut de l'écran au fur et à mesure.
-
-Si vous terminez tous les puzzles, l'application peut générer de nouveaux puzzles automatiquement mais attention, c'est plutôt long. La première barre de progression en haut de l'écran vous indiquera le nombre de puzzles en cours de génération.
+Il y a environ 5000 puzzles fournis avec l'application. Chaque fois que vous lancez l'application, la collection est mélangée et vous obtenez des puzzles aléatoires. Ceux que vous avez déjà résolu n'apparaîtront plus. Vous pouvez voir votre progression sous le puzzle.
 
 ## Constraintes
 
@@ -32,10 +30,14 @@ Si une case contient un nombre, elle doit faire partie d'un groupe de cases de l
 
 Si une case contient une flèche, il doit y avoir le même nombre de cases noires et de cases blanches devant la flèche. Si c'est une double flèche, cette règle vaut pour les deux côtés.
 
+### Groupes avec des letters
+
+Les lettres identiques doivent faire partie du même groupe. Un groupe ne doit pas contenir de lettres différentes.
+
 ## Stats
 
 Le jeu enregistre le temps passé à résoudre un puzzle ainsi que le nombre d'erreurs. Ces données ne sont pas collectés automatiquement mais j'apprécierai que vous me les envoyiez, j'ai l'intention de m'en servir pour calculer la difficulté des puzzles.
 
-Pour m'envoyer les stats, cliquez sur l'icône de "journal" au dessus de cette aide, copiez le contenu et envoyez le moi.
+Pour m'envoyer les stats, cliquez sur l'icône de "journal" à gauche de l'icône d'aide, sur la page principale, copiez le contenu et envoyez le moi.
 
 > Merci beaucoup.
