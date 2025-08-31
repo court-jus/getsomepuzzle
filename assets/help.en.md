@@ -14,9 +14,7 @@ If you are stuck, the trashcan icon resets the puzzle to its initial state.
 
 While playing, your timing is recorded (see the Stats section below). If needed, the game can be paused and resumed.
 
-There are about 4k puzzles bundled within the app (represented by the second progress bar bellow the buttons). Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see the progress bar diminish as you "consume" puzzles.
-
-If you solve them all, the app can generate new puzzles but be warned that this can take a long time. You'll see the top progress bar showing how many puzzles are being generated.
+There are about 5k puzzles bundled within the app. Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see the your progress bellow the puzzle.
 
 ## Constraints
 

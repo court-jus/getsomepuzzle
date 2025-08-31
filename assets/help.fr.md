@@ -14,9 +14,7 @@ Si vous êtes bloqué, le bouton "corbeille" réinitialise le puzzle à son éta
 
 Pendant que vous jouez, votre temps est enregistré (voir la section Stats ci-dessous). Le jeu peut être mis en pause si besoin.
 
-Il y a environ 3000 puzzles fournis avec l'application. Chaque fois que vous lancez l'application, la collection est mélangée et vous obtenez des puzzles aléatoires. Ceux que vous avez déjà résolu n'apparaîtront plus. Vous pouvez voir la deuxième barre de progression diminuer en haut de l'écran au fur et à mesure.
-
-Si vous terminez tous les puzzles, l'application peut générer de nouveaux puzzles automatiquement mais attention, c'est plutôt long. La première barre de progression en haut de l'écran vous indiquera le nombre de puzzles en cours de génération.
+Il y a environ 5000 puzzles fournis avec l'application. Chaque fois que vous lancez l'application, la collection est mélangée et vous obtenez des puzzles aléatoires. Ceux que vous avez déjà résolu n'apparaîtront plus. Vous pouvez voir votre progression sous le puzzle.
 
 ## Constraintes
 
