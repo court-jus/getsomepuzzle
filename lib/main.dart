@@ -46,12 +46,12 @@ class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
   String topMessage = "";
   String bottomMessage = "";
-  // Puzzle currentPuzzle = Puzzle("12_4x5_00020210200022001201_FM:1.2;PA:10.top;PA:19.top_1:22222212221122111211");
   Puzzle? currentPuzzle;
   List<String> unsolvedPuzzles = [];
   int puzzleCount = 0;
   bool shouldCheck = false;
   List<String> stats = [];
+  List<int> history = [];
 
   @override
   void initState() {
@@ -60,12 +60,13 @@ class _MyHomePageState extends State<MyHomePage> {
     Timer.periodic(Duration(seconds: 1), (tmr) {
       setState(() {
         int played = puzzleCount - unsolvedPuzzles.length;
-        String statsText = currentPuzzle == null ? "" : currentPuzzle!.stats.toString();
+        String statsText = currentPuzzle == null
+            ? ""
+            : currentPuzzle!.stats.toString();
         bottomMessage = "$played/$puzzleCount - $statsText";
       });
     });
   }
-
 
   Future<void> loadStats() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
@@ -107,12 +108,11 @@ class _MyHomePageState extends State<MyHomePage> {
   void loadPuzzle() async {
     try {
       final randomPuzzle = unsolvedPuzzles.removeAt(0);
-
+      print(randomPuzzle);
       setState(() {
         currentPuzzle = Puzzle(randomPuzzle);
         currentPuzzle!.stats.begin();
       });
-
     } catch (e) {
       currentPuzzle = null;
     }
@@ -121,7 +121,19 @@ class _MyHomePageState extends State<MyHomePage> {
   void restartPuzzle() {
     if (currentPuzzle == null) return;
     setState(() {
+      topMessage = "";
+      history = [];
       currentPuzzle!.restart();
+      currentPuzzle!.check();
+    });
+  }
+
+  void undo() {
+    if (currentPuzzle == null || history.isEmpty) return;
+    setState(() {
+      currentPuzzle!.resetCell(history.removeLast());
+      final message = currentPuzzle.toString();
+      print("did reset so now $message");
     });
   }
 
@@ -129,6 +141,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (currentPuzzle == null) return;
     setState(() {
       currentPuzzle!.incrValue(idx);
+      if (history.isEmpty || history.last != idx) history.add(idx);
       shouldCheck = currentPuzzle!.complete;
       if (shouldCheck) Future.delayed(Duration(seconds: 1), autoCheck);
     });
@@ -141,11 +154,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final filePath = p.join(path, "stats.txt");
     final file = File(filePath);
 
-    file.writeAsStringSync(
-      text,
-      mode: FileMode.append,
-      flush: true,
-    );
+    file.writeAsStringSync("$text\n", mode: FileMode.append, flush: true);
   }
 
   void autoCheck() {
@@ -155,7 +164,9 @@ class _MyHomePageState extends State<MyHomePage> {
     final failedConstraints = currentPuzzle!.check();
     if (failedConstraints.isEmpty) {
       if (currentPuzzle!.complete) {
-        final stat = currentPuzzle!.stats.stop(currentPuzzle!.lineRepresentation);
+        final stat = currentPuzzle!.stats.stop(
+          currentPuzzle!.lineRepresentation,
+        );
         stats.add(stat);
         writeStat(stat);
         loadPuzzle();
@@ -164,7 +175,9 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle!.stats.failures += 1;
     }
     setState(() {
-      topMessage = failedConstraints.isNotEmpty ? "Some constraints are not valid." : "";
+      topMessage = failedConstraints.isNotEmpty
+          ? "Some constraints are not valid."
+          : "";
     });
   }
 
@@ -175,6 +188,11 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         actions: [
+          IconButton(
+            icon: Icon(Icons.undo_outlined),
+            tooltip: "Undo",
+            onPressed: undo,
+          ),
           IconButton(
             icon: Icon(Icons.fiber_new),
             tooltip: "New",

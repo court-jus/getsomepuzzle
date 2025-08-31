@@ -13,4 +13,9 @@ class Cell {
     value = newValue;
     return value;
   }
+
+  void reset() {
+    value = 0;
+    options = domain.toList();
+  }
 }

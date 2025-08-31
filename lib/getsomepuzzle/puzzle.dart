@@ -184,6 +184,11 @@ class Puzzle {
     return cell.setValue(value);
   }
 
+  void resetCell(int idx) {
+    final cell = cells[idx];
+    cell.reset();
+  }
+
   int incrValue(int idx) {
     final currentValue = cellValues[idx];
     return setValue(idx, (currentValue + 1) % (domain.length + 1));
