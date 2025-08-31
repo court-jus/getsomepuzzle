@@ -10,7 +10,7 @@ def find_solution(running, starting_state, debug=False):
     backpropagations = 0
     while steps > 0 and running.is_set():
         time.sleep(0.0001)
-        if st.is_complete():
+        if st.is_complete(debug=debug):
             break
         if debug:
             print(st.state)
@@ -93,7 +93,7 @@ def find_solution(running, starting_state, debug=False):
     if not steps:
         raise RuntimeError("Reached MAX_STEPS")
 
-    if not st.is_complete():
+    if not st.is_complete(debug=debug):
         return None, None
     return st, backpropagations
 

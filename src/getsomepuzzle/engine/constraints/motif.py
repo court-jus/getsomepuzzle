@@ -8,7 +8,7 @@ from .base import Constraint
 class Motif(Constraint):
 
     def check(self, puzzle, debug=False):
-        result = self._check(puzzle, debug)
+        result = self._check(puzzle, debug=debug)
         if self.ui_widget is not None:
             context = self.ui_widget.context
             with context.Stroke(

@@ -152,7 +152,7 @@ def line_import(line):
         slug, parameters = c.split(":")
         kls = slugs[slug]
         parameters = kls.line_import(parameters)
-        pu.add_constraint(kls(**parameters))
+        pu.constraints.append(kls(**parameters))
     return pu
 
 def compute_level(*, duration, failures, total, **_):

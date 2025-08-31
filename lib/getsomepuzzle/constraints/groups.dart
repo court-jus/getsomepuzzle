@@ -49,6 +49,9 @@ class LetterGroup extends CellsCentricConstraint {
 
   @override
   bool verify(Puzzle puzzle) {
+    // If any of my cells are not filled yet, there's no need to check further
+    final myCellValues = puzzle.cellValues.indexed.where((elem) => indices.contains(elem.$1)).map((elem) => elem.$2);
+    if (myCellValues.contains(0)) return true;
     final groups = puzzle.getGroups();
     final List<List<int>> myGroups = [];
     for (final group in groups) {

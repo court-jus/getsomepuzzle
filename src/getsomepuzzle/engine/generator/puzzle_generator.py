@@ -1,6 +1,7 @@
 import random
 from ..constraints import (
     FixedValueConstraint,
+    LetterGroup,
     AVAILABLE_RULES,
 )
 from ..constants import DEFAULT_SIZE
@@ -15,6 +16,7 @@ class PuzzleGenerator:
         self.callback = callback if callback is not None else lambda x:x
         self.running = running
         self.puzzle = Puzzle(running=self.running, width=width, height=height)
+
     def add_random_rule(self, banned_constraints, debug=False):
         max_iter = 1000
         while max_iter > 0 and self.running.is_set():
@@ -68,7 +70,7 @@ class PuzzleGenerator:
             try:
                 parameters = FixedValueConstraint.generate_random_parameters(self.puzzle)
                 self.puzzle.add_constraint(FixedValueConstraint(**parameters), debug=debug)
-            except RuntimeError:
+            except (RuntimeError, ValueError):
                 pass
             else:
                 number_fixed -= 1
@@ -106,30 +108,6 @@ class PuzzleGenerator:
             previous_version.clear_solutions()
         return None
 
-    def add_random_rule_valid(self, banned_constraints, debug=False):
-        solution = None
-        while solution is None and self.running.is_set():
-            if debug:
-                print("Add random rule")
-            new_constraint = self.add_random_rule(banned_constraints, debug=debug)
-            if debug:
-                print(" -> ", new_constraint)
-            if debug:
-                print("Check that puzzle is still solvable")
-            try:
-                solution, bp = find_solution(self.running, self.puzzle)
-            except RuntimeError:
-                solution = None
-            if solution is not None:
-                break
-            if debug:
-                print(" -> Failed, remove the new constraint and ban it")
-            self.puzzle.constraints = [c for c in self.puzzle.constraints if c != new_constraint]
-            banned_constraints.append(new_constraint)
-        if debug:
-            print(" -> OK")
-        return new_constraint
-
 
 def generate_one(args):
     running, width, height = args
@@ -142,29 +120,31 @@ def generate_one(args):
 def generate_once(running, width, height):
     w = width if width is not None else random.randint(3, 6)
     h = height if height is not None else random.randint(3, 6)
+    debug=True
     try:
         pg = PuzzleGenerator(width=w, height=h, running=running)
-        pu = pg.generate()
+        params = LetterGroup.generate_random_parameters(pg.puzzle)
+        pu = pg.generate(LetterGroup(**params), debug=debug)
         if pu is None:
             return None
-        solution, bp = find_solution(running, pu)
+        solution, bp = find_solution(running, pu, debug=debug)
         if not bp:
             return None
     except RuntimeError:
         return None
-    pu.apply_fixed_constraints()
+    pu.apply_fixed_constraints(debug=debug)
     pu.clear_solutions()
-    pu.remove_useless_rules()
-    solution, bp = find_solution(running, pu)
+    pu.remove_useless_rules(debug=debug)
+    solution, bp = find_solution(running, pu, debug=debug)
     pu.clear_solutions()
     if bp is None:
         return None
     max_simplifications = 30
     while bp and bp > 5 and max_simplifications > 0:
         max_simplifications -= 1
-        pu.simplify(solution)
-        solution, bp = find_solution(running, pu)
-    if len(find_solutions(pu, running)) != 1:
+        pu.simplify(solution, debug=debug)
+        solution, bp = find_solution(running, pu, debug=debug)
+    if len(find_solutions(pu, running, debug=debug)) != 1:
         return None
 
     pu.clear_solutions()

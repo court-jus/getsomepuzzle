@@ -9,7 +9,8 @@ class ParityConstraint(CellCentricConstraint):
     slug = "PA"
 
     def __repr__(self):
-        idx, side = self.parameters["idx"], self.parameters["side"]
+        indices, side = self.parameters["indices"], self.parameters["side"]
+        idx = indices[0]
         return (
             f"Cell {idx + 1} should have the same number "
             f"of odd and even numbers on its {side} "
@@ -32,7 +33,8 @@ class ParityConstraint(CellCentricConstraint):
         # The given cell has the same number of odd and even numbers on
         # one of its side (or both, vertically or horizontally),
         # the given cell and side are defined in the parameters
-        idx, side = self.parameters["idx"], self.parameters["side"]
+        indices, side = self.parameters["indices"], self.parameters["side"]
+        idx = indices[0]
         w, h = puzzle.width, puzzle.height
         # Find the right row for idx
         ridx = idx // w
@@ -63,7 +65,7 @@ class ParityConstraint(CellCentricConstraint):
 
     @staticmethod
     def generate_random_parameters(puzzle):
-        # { "idx" : 4, "side" : "left" or "horizontal" or "right" }
+        # { "indices" : [4], "side" : "left" or "horizontal" or "right" }
         width = puzzle.width
         height = puzzle.height
         choices = ["left", "right", "top", "bottom"]
@@ -84,7 +86,7 @@ class ParityConstraint(CellCentricConstraint):
                 raise ValueError("Cannot generate parity constraint")
             col = random.choice(possible_indices)
             row = random.randint(0, puzzle.height - 1)
-            return {"idx": col + row * puzzle.width, "side": side}
+            return {"indices": [col + row * puzzle.width], "side": side}
 
         else:
             min_top = 2 if side in ("top", "vertical") else 0
@@ -96,17 +98,18 @@ class ParityConstraint(CellCentricConstraint):
                 raise ValueError("Cannot generate parity constraint")
             col = random.randint(0, puzzle.width - 1)
             row = random.choice(possible_indices)
-            return {"idx": col + row * puzzle.width, "side": side}
+            return {"indices": [col + row * puzzle.width], "side": side}
 
     @staticmethod
     def maximum_presence(puzzle):
         return puzzle.width
 
     def line_export(self):
-        idx, side = self.parameters["idx"], self.parameters["side"]
+        indices, side = self.parameters["indices"], self.parameters["side"]
+        idx = indices[0]
         return f"{self.slug}:{idx}.{side}"
 
     @staticmethod
     def line_import(line):
         idx, side = line.split(".")
-        return {"idx": int(idx), "side": side}
+        return {"indices": [int(idx)], "side": side}

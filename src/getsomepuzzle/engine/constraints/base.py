@@ -19,11 +19,11 @@ class Constraint:
         if type(self) != type(other):
             return type(self).__name__ < type(other).__name__
         if (
-            "idx" in self.parameters
-            and "idx" in other.parameters
-            and self.parameters["idx"] != other.parameters["idx"]
+            "indices" in self.parameters
+            and "indices" in other.parameters
+            and self.parameters["indices"] != other.parameters["indices"]
         ):
-            return self.parameters["idx"] < other.parameters["idx"]
+            return self.parameters["indices"] < other.parameters["indices"]
         if (
             "val" in self.parameters
             and "val" in other.parameters
@@ -48,7 +48,7 @@ class Constraint:
 class CellCentricConstraint(Constraint):
 
     def check(self, puzzle, debug=False):
-        result = self._check(puzzle, debug)
+        result = self._check(puzzle, debug=debug)
         if self.ui_widget is not None:
             self.ui_widget.color = "green" if result else "red"
         return result
@@ -57,7 +57,7 @@ class CellCentricConstraint(Constraint):
         if not isinstance(other, CellCentricConstraint):
             return False
 
-        return self.parameters["idx"] == other.parameters["idx"]
+        return any(idx in other.parameters["indices"] for idx in self.parameters["indices"])
 
     def get_cell_text(self):
         raise NotImplementedError("Should be implemented by subclass")

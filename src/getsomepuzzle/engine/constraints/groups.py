@@ -9,20 +9,22 @@ class GroupSize(CellCentricConstraint):
     slug = "GS"
 
     def __repr__(self):
-        idx, size = self.parameters["idx"], self.parameters["size"]
+        indices, size = self.parameters["indices"], self.parameters["size"]
+        idx = indices[0]
         return f"Group at {idx + 1} should be of size {size}"
 
     def get_cell_text(self):
         return self.parameters["size"]
 
     def check(self, puzzle, debug=False):
-        result = self._check(puzzle, debug)
+        result = self._check(puzzle, debug=debug)
         if self.ui_widget is not None:
             self.ui_widget.color = "green" if result else "red"
         return result
 
     def _check(self, puzzle, debug=False):
-        idx, size = self.parameters["idx"], self.parameters["size"]
+        indices, size = self.parameters["indices"], self.parameters["size"]
+        idx = indices[0]
         groups = to_groups(puzzle.state, puzzle.width, puzzle.height, lambda cell: cell.value)
         my_group = [grp for grp in groups if idx in grp]
         if len(my_group) != 1:
@@ -37,17 +39,18 @@ class GroupSize(CellCentricConstraint):
         maximum_group_size = min(10, max(1, int(puzzle.width * puzzle.height * 0.2)))
         idx = random.randint(0, len(puzzle.state) - 1)
         size = random.randint(1, maximum_group_size)
-        return {"idx": idx, "size": size}
+        return {"indices": [idx], "size": size}
 
     @staticmethod
     def maximum_presence(puzzle):
         return puzzle.width
 
     def line_export(self):
-        idx, size = self.parameters["idx"], self.parameters["size"]
+        indices, size = self.parameters["indices"], self.parameters["size"]
+        idx = indices[0]
         return f"{self.slug}:{idx}.{size}"
 
     @staticmethod
     def line_import(line):
         idx, size = line.split(".")
-        return {"idx": int(idx), "size": int(size)}
+        return {"indices": [int(idx)], "size": int(size)}
