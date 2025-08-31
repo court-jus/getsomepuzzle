@@ -32,6 +32,10 @@ If a cell contains a number, it must be part of a group of orthogonally adjacent
 
 If you see an arrow in a cell, there must be the same number of black and white cells in the direction face by the arrow. A cell can contain a double-headed arrow, this means that both sides of the cell must respect the parity rule.
 
+### Letter group
+
+Cells containing the same letter should be part of the same group. A group must not contain different letters.
+
 ## Stats
 
 The game records how many time has passed before a puzzle is solve and how many failures were made. This data is NOT collected automatically but if you solve a bunch of puzzles I hope you will send me your stats, I intend to sort the puzzles by difficulty and this would help a lot.

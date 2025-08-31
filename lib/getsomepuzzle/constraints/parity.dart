@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
-class ParityConstraint extends CellCentricConstraint {
+class ParityConstraint extends CellsCentricConstraint {
   String side = "";
 
   ParityConstraint(String strParams) {
-    idx = int.parse(strParams.split(".")[0]);
+    indices.add(int.parse(strParams.split(".")[0]));
     side = strParams.split(".")[1];
   }
 
@@ -45,6 +45,7 @@ class ParityConstraint extends CellCentricConstraint {
   @override
   bool verify(Puzzle puzzle) {
     final w = puzzle.width;
+    final idx = indices[0];
     final ridx = idx ~/ w;
     final cidx = idx % w;
     final rows = puzzle.getRows();

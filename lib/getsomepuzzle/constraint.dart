@@ -56,6 +56,6 @@ class Motif extends Constraint {
   }
 }
 
-class CellCentricConstraint extends Constraint {
-  int idx = 0;
+class CellsCentricConstraint extends Constraint {
+  List<int> indices = [];
 }

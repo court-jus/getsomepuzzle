@@ -32,6 +32,10 @@ Si une case contient un nombre, elle doit faire partie d'un groupe de cases de l
 
 Si une case contient une flèche, il doit y avoir le même nombre de cases noires et de cases blanches devant la flèche. Si c'est une double flèche, cette règle vaut pour les deux côtés.
 
+### Groupes avec des letters
+
+Les lettres identiques doivent faire partie du même groupe. Un groupe ne doit pas contenir de lettres différentes.
+
 ## Stats
 
 Le jeu enregistre le temps passé à résoudre un puzzle ainsi que le nombre d'erreurs. Ces données ne sont pas collectés automatiquement mais j'apprécierai que vous me les envoyiez, j'ai l'intention de m'en servir pour calculer la difficulté des puzzles.

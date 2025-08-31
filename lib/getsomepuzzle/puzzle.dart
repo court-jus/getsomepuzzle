@@ -77,6 +77,8 @@ class Puzzle {
         constraints.add(ParityConstraint(constraintAttr[1]));
       } else if (constraintAttr[0] == "GS") {
         constraints.add(GroupSize(constraintAttr[1]));
+      } else if (constraintAttr[0] == "LT") {
+        constraints.add(LetterGroup(constraintAttr[1]));
       }
     }
   }
@@ -90,9 +92,11 @@ class Puzzle {
     }
   }
 
-  List<int> get cellValues => cells.map((e) => e.value).toList();
+  List<int> get cellValues => cells.map((cell) => cell.value).toList();
   Map<int, Constraint> get cellConstraints => {
-    for (var e in constraints.whereType<CellCentricConstraint>()) e.idx: e,
+    for (var constraint in constraints.whereType<CellsCentricConstraint>())
+    for (var idx in constraint.indices)
+    idx: constraint,
   };
 
   List<List<Cell>> getRows() {
