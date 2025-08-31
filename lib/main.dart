@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/widgets/help.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
@@ -69,18 +70,20 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> loadStats() async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final path = p.join(documentsDirectory.path, "getsomepuzzle");
-    await Directory(path).create(recursive: true);
-    final filePath = p.join(path, "stats.txt");
-    final file = File(filePath);
-    if (!(await file.exists())) {
-      file.createSync();
+    if (!kIsWeb) {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final path = p.join(documentsDirectory.path, "getsomepuzzle");
+      await Directory(path).create(recursive: true);
+      final filePath = p.join(path, "stats.txt");
+      final file = File(filePath);
+      if (!(await file.exists())) {
+        file.createSync();
+      }
+      final content = await file.readAsString();
+      setState(() {
+        stats = content.split("\n");
+      });
     }
-    final content = await file.readAsString();
-    setState(() {
-      stats = content.split("\n");
-    });
     await loadPuzzles();
     loadPuzzle();
   }
@@ -148,6 +151,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> writeStat(String text) async {
+    if (kIsWeb) return;
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = p.join(documentsDirectory.path, "getsomepuzzle");
     await Directory(path).create(recursive: true);
