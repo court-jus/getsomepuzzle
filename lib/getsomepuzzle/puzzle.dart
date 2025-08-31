@@ -1,6 +1,9 @@
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:intl/intl.dart';
 
 
