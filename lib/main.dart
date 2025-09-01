@@ -147,8 +147,8 @@ class _MyHomePageState extends State<MyHomePage> {
     if (currentPuzzle == null || history.isEmpty) return;
     setState(() {
       currentPuzzle!.resetCell(history.removeLast());
-      final message = currentPuzzle.toString();
-      print("did reset so now $message");
+      currentPuzzle!.check();
+      topMessage = "";
     });
   }
 

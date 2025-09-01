@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OpenPage extends StatefulWidget {
   final List<String> puzzles;
@@ -19,12 +20,17 @@ class OpenPage extends StatefulWidget {
 
 class _OpenPageState extends State<OpenPage> {
   List<List<String>> shownPuzzles = [];
-  RangeValues widthSlider = RangeValues(3, 7);
+  RangeValues widthSlider = RangeValues(3, 6);
   RangeValues heightSlider = RangeValues(3, 8);
+  RangeValues prefilledSlider = RangeValues(0, 100);
+  List<String> wantedRules = [];
+  List<String> bannedRules = [];
+  String manualLoad = "";
 
   @override
   void initState() {
     super.initState();
+    loadFilters();
     setState(() {
       shownPuzzles = widget.puzzles.where((puz) => puz.isNotEmpty).take(10).map((puz) {
         final pu = Puzzle(puz);
@@ -33,7 +39,48 @@ class _OpenPageState extends State<OpenPage> {
     });
   }
 
-  void applyFilter({RangeValues? newWidth, RangeValues? newHeight}) {
+  void loadFilters() async {
+    final prefs = await SharedPreferences.getInstance();
+    final newWidth = RangeValues(
+      prefs.getDouble("minWidthFilter") ?? 3,
+      prefs.getDouble("maxWidthFilter") ?? 6,
+    );
+    final newHeight = RangeValues(
+      prefs.getDouble("minHeightFilter") ?? 3,
+      prefs.getDouble("maxHeightFilter") ?? 8,
+    );
+    final newPrefilled = RangeValues(
+      prefs.getDouble("minPrefilledFilter") ?? 0,
+      prefs.getDouble("maxPrefilledFilter") ?? 100,
+    );
+    applyFilter(
+      newWidth: newWidth,
+      newHeight: newHeight,
+      newPrefilled: newPrefilled,
+      newWRules: prefs.getStringList("wantedRulesFilter") ?? [],
+      newBRules: prefs.getStringList("bannedRulesFilter") ?? [],
+    );
+  }
+
+  void saveFilters() async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setDouble("minWidthFilter", widthSlider.start);
+    prefs.setDouble("maxWidthFilter", widthSlider.end);
+    prefs.setDouble("minHeightFilter", heightSlider.start);
+    prefs.setDouble("maxHeightFilter", heightSlider.end);
+    prefs.setDouble("minPrefilledFilter", prefilledSlider.start);
+    prefs.setDouble("maxPrefilledFilter", prefilledSlider.end);
+    prefs.setStringList("wantedRulesFilter", wantedRules);
+    prefs.setStringList("bannedRulesFilter", bannedRules);
+  }
+
+  void applyFilter({
+    RangeValues? newWidth,
+    RangeValues? newHeight,
+    RangeValues? newPrefilled,
+    List<String>? newWRules,
+    List<String>? newBRules,
+  }) {
     setState(() {
       bool changed = false;
       if (newWidth != null) {
@@ -44,15 +91,43 @@ class _OpenPageState extends State<OpenPage> {
         heightSlider = newHeight;
         changed = true;
       }
+      if (newPrefilled != null) {
+        prefilledSlider = newPrefilled;
+        changed = true;
+      }
+      if (newWRules != null) {
+        wantedRules = newWRules;
+        changed = true;
+      }
+      if (newBRules != null) {
+        bannedRules = newBRules;
+        changed = true;
+      }
       if (changed) {
         shownPuzzles = widget.puzzles.where((puz) => puz.isNotEmpty).map((puz) => Puzzle(puz)).where((puz) {
+          final double pref = (puz.cellValues.where((v) => v == 0).length / puz.cellValues.length) * 100;
+          if (wantedRules.isNotEmpty || bannedRules.isNotEmpty) {
+            final lineAttr = puz.lineRepresentation.split("_");
+            final rules = ((lineAttr.length == 5) ? lineAttr[3] : lineAttr[2]).split(";").map((r) => r.split(":")[0]).toSet();
+            final wanted = wantedRules.toSet();
+            final banned = bannedRules.toSet();
+            if (wanted.isNotEmpty && wanted.intersection(rules).isEmpty) return false;
+            if (banned.isNotEmpty && banned.intersection(rules).isNotEmpty) return false;
+          }
           return (
             puz.width >= widthSlider.start &&
             puz.width <= widthSlider.end &&
             puz.height >= heightSlider.start &&
-            puz.height <= heightSlider.end
+            puz.height <= heightSlider.end &&
+            pref >= prefilledSlider.start &&
+            pref <= prefilledSlider.end
           );
-        }).take(10).map((puz) => ["${puz.width}x${puz.height}", puz.lineRepresentation]).toList();
+        }).take(30).map((puz) {
+            final lineAttr = puz.lineRepresentation.split("_");
+            final rules = ((lineAttr.length == 5) ? lineAttr[3] : lineAttr[2]).split(";").map((r) => r.split(":")[0]).toSet().join(" ");
+          return ["${puz.width}x${puz.height}\n$rules", puz.lineRepresentation];
+        }).toList();
+        saveFilters();
       }
     });
   }
@@ -83,7 +158,7 @@ class _OpenPageState extends State<OpenPage> {
                       values: widthSlider,
                       onChanged: (value) => applyFilter(newWidth: value),
                       min: 3,
-                      max: 7,
+                      max: 6,
                       labels: RangeLabels(
                         widthSlider.start.round().toString(),
                         widthSlider.end.round().toString(),
@@ -99,6 +174,28 @@ class _OpenPageState extends State<OpenPage> {
                         heightSlider.start.round().toString(),
                         heightSlider.end.round().toString(),
                       ),
+                    ),
+                    RangeSlider(
+                      values: prefilledSlider,
+                      onChanged: (value) => applyFilter(newPrefilled: value),
+                      min: 0,
+                      max: 100,
+                      labels: RangeLabels(
+                        prefilledSlider.start.round().toString(),
+                        prefilledSlider.end.round().toString(),
+                      ),
+                    ),
+                    TextField(
+                      onChanged: (value) => applyFilter(newWRules: value.split(" ")),
+                    ),
+                    TextField(
+                      onChanged: (value) => applyFilter(newBRules: value.split(" ")),
+                    ),
+                    TextField(
+                      onChanged: (value) {
+                        manualLoad = value;
+                        selectPuzzle(value, context);
+                      }
                     ),
                     Wrap(
                       direction: Axis.horizontal,
