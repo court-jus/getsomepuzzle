@@ -16,34 +16,60 @@ def check_a_puzzle(lineRepr, to_check=[]):
 
     pu = line_import(lineRepr)
     for prop in to_check:
-        print("Check", prop)
-        print(pu.check_solution(prop))
+        print(prop, "is", "valid" if pu.check_solution(prop) else "not valid")
 
     pu.running = running
-    pu.constraints.append(OtherSolutionConstraint(solution=[2,2,2,1,1,1,2,2,2,2,1,2,1,2,1]))
-    print("Now:")
-    print(pu.constraints)
-    solutions = find_solutions(pu, running, max_solutions=10, debug=True)
+    solutions = find_solutions(pu, running, debug=False)
     print(len(solutions), "solutions found")
     print(line_export(pu))
     for sol in solutions:
-        print(sol)
+        print("".join(str(c) for c in sol))
 
 
-def main():
-    """
-    2025-09-01T15:38:52 32s - 0f 3x5_220000000000020_FM:1.1;GS:0.3;GS:13.1_1:222111222212121
-    """
-
-    check_a_puzzle(
-        "3x5_220000000000020_FM:1.1;GS:0.3;GS:13.1_1:222111222212121",
-        to_check=[
-            "222111222212121",
-            "221212121212121",
-            "221212122212121",
-        ]
-    )
+def hpu(line):
+    data = line.split("_")
+    if len(data) == 5:
+        dimensions, state, rules = data[1:4]
+    elif len(data) == 4:
+        dimensions, state, rules = data[0:3]
+    else:
+        raise RuntimeError(str(data) + "is bad")
+    return "_".join([dimensions, state, rules])
 
 
-if __name__ == "__main__":
-    main()
+def recheck_puzzles():
+    raw_already_done = (Path("..") / "assets" / "rechecked.txt").read_text().split("\n")
+    already_done = [
+        hpu(line)
+        for line in raw_already_done
+        if line.strip()
+    ]
+    print(len(already_done), "already done")
+    asset = Path("..") / "assets" / "puzzles.txt"
+    puzzles = [
+        line
+        for line in asset.read_text().split("\n")
+        if line and hpu(line) not in already_done
+    ]
+    total = len(puzzles)
+    print(f"{total} puzzles to recheck")
+    with open(Path("..") / "assets" / "rechecked.txt", "a") as fp:
+        done = 0
+        for puzzle in puzzles:
+            pu = line_import(puzzle)
+            pu.running = FakeEvent()
+            fp.write(line_export(pu) + "\n")
+            done += 1
+            if done % 10 == 0:
+                print(f"{done}/{total}")
+
+
+# check_a_puzzle(
+#     "12_6x7_000000000000000000000000100000000000000010_LT:A.36.31;FM:2.1;PA:10.left;PA:17.top;PA:26.bottom_1:111111121212121212121212121212221212222212",
+#     to_check=[
+#         [int(c) for c in "121211121212121212121212121212221212222212"],
+#         [int(c) for c in "111211121212121212121212121212221212222212"],
+#     ]
+# )
+
+recheck_puzzles()

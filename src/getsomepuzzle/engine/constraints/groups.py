@@ -32,7 +32,12 @@ class GroupSize(CellCentricConstraint):
         my_group = my_group[0]
         if debug:
             print(f"Does GRP@{idx+1}={size} ?", my_group)
-        return len(my_group) == size
+        if len(my_group) == size:
+            return True
+        if len(my_group) > size:
+            return False
+        # If my group is too small but there are still free cells, consider it ok
+        return any(c.free() for c in puzzle.state)
 
     @staticmethod
     def generate_random_parameters(puzzle):
