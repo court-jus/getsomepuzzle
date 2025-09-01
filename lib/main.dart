@@ -12,6 +12,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:getsomepuzzle/widgets/stats_btn.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'getsomepuzzle/puzzle.dart';
 
@@ -71,7 +72,10 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> loadStats() async {
-    if (!kIsWeb) {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      stats = prefs.getStringList('stats') ?? [];
+    } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
       final path = p.join(documentsDirectory.path, "getsomepuzzle");
       await Directory(path).create(recursive: true);
@@ -159,7 +163,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> writeStat(String text) async {
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('stats', stats);
+      return;
+    }
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = p.join(documentsDirectory.path, "getsomepuzzle");
     await Directory(path).create(recursive: true);

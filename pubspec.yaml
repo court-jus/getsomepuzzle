@@ -39,6 +39,7 @@ dependencies:
   flutter_md: ^0.0.5
   path: ^1.9.1
   intl: ^0.20.2
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
