@@ -15,10 +15,10 @@ def generate_a_puzzle(load=None):
 
     if load is None:
         width = random.randint(3, 6)
-        height = random.randint(3, 8)
+        height = random.randint(3, 7)
         pg = PuzzleGenerator(running=running, width=width, height=height)
-        params = LetterGroup.generate_random_parameters(pg.puzzle)
-        pg.puzzle.add_constraint(LetterGroup(**params))
+        # params = LetterGroup.generate_random_parameters(pg.puzzle)
+        # pg.puzzle.add_constraint(LetterGroup(**params))
 
         while True:
             try:
@@ -29,27 +29,31 @@ def generate_a_puzzle(load=None):
     else:
         pu = line_import(load)
         pu.running = running
-
-    continue_looking = True
-    while continue_looking:
-        solutions = find_solutions(pu, running, max_solutions=10)
-        continue_looking = (len(solutions) == 10)
-        if len(solutions) == 1:
-            break
-        random.shuffle(solutions)
-        sol1 = solutions[0]
-        other = solutions[1:]
-        while other:
-            diff_values_per_idx = {
-                idx: len([sol for sol in other if sol[idx] != sol1[idx]])
-                for idx in range(len(sol1))
-                if [sol for sol in other if sol[idx] != sol1[idx]]
-            }
-            indices = sorted(diff_values_per_idx.items(), key=lambda i: i[1], reverse=True)
-            idx = indices[0][0]
-            val = sol1[idx]
-            pu.add_constraint(FixedValueConstraint(idx=idx, val=val))
-            other = [sol for sol in other if sol[idx] == val]
+    try:
+        continue_looking = True
+        while continue_looking:
+            solutions = find_solutions(pu, running, max_solutions=10)
+            continue_looking = (len(solutions) == 10)
+            if len(solutions) == 1:
+                break
+            random.shuffle(solutions)
+            sol1 = solutions[0]
+            other = solutions[1:]
+            while other:
+                diff_values_per_idx = {
+                    idx: len([sol for sol in other if sol[idx] != sol1[idx]])
+                    for idx in range(len(sol1))
+                    if [sol for sol in other if sol[idx] != sol1[idx]]
+                }
+                indices = sorted(diff_values_per_idx.items(), key=lambda i: i[1], reverse=True)
+                idx = indices[0][0]
+                val = sol1[idx]
+                pu.add_constraint(FixedValueConstraint(idx=idx, val=val))
+                other = [sol for sol in other if sol[idx] == val]
+    except ValueError:
+        # This probably means that adding a fixed value constraint would fill the puzzle
+        # The puzzle is probably boring as fuck
+        return
 
     solutions = find_solutions(pu, running, max_solutions=10)
     if len(solutions) == 1:
