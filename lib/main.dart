@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/widgets/help.dart';
+import 'package:getsomepuzzle/widgets/open.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:getsomepuzzle/widgets/stats_btn.dart';
@@ -121,6 +122,13 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void openPuzzle(String puz) {
+    setState(() {
+      currentPuzzle = Puzzle(puz);
+      currentPuzzle!.stats.begin();
+    });
+  }
+
   void restartPuzzle() {
     if (currentPuzzle == null) return;
     setState(() {
@@ -201,6 +209,11 @@ class _MyHomePageState extends State<MyHomePage> {
             icon: Icon(Icons.fiber_new),
             tooltip: "New",
             onPressed: loadPuzzle,
+          ),
+          Open(
+            puzzles: unsolvedPuzzles,
+            solvedPuzzles: [],
+            onPuzzleSelected: (puz) => openPuzzle(puz),
           ),
           IconButton(
             icon: Icon(Icons.restart_alt_rounded),
