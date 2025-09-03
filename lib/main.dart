@@ -5,10 +5,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/widgets/help.dart';
 import 'package:getsomepuzzle/widgets/open.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:getsomepuzzle/widgets/stats_btn.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -49,32 +49,36 @@ class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
   String topMessage = "";
   String bottomMessage = "";
+  PuzzleData? currentMeta;
   Puzzle? currentPuzzle;
-  List<String> unsolvedPuzzles = [];
-  int puzzleCount = 0;
+  Database? database;
   bool shouldCheck = false;
-  List<String> stats = [];
   List<int> history = [];
+  int dbSize = 0;
+  int playedCount = 0;
 
   @override
   void initState() {
     super.initState();
     loadStats();
     Timer.periodic(Duration(seconds: 1), (tmr) {
+      if (database == null) return;
+      if (currentPuzzle == null) return;
       setState(() {
-        int played = puzzleCount - unsolvedPuzzles.length;
-        String statsText = currentPuzzle == null
-            ? ""
-            : currentPuzzle!.stats.toString();
-        bottomMessage = "$played/$puzzleCount - $statsText";
+        String statsText = currentPuzzle!.stats.toString();
+        bottomMessage = "$playedCount/$dbSize - $statsText";
       });
     });
   }
 
   Future<void> loadStats() async {
+    final db = Database();
+    await db.loadPuzzlesFile();
+    await db.currentFilters.load();
+    final List<String> stats = [];
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      stats = prefs.getStringList('stats') ?? [];
+      stats.addAll(prefs.getStringList('stats') ?? []);
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
       final path = p.join(documentsDirectory.path, "getsomepuzzle");
@@ -85,50 +89,30 @@ class _MyHomePageState extends State<MyHomePage> {
         file.createSync();
       }
       final content = await file.readAsString();
-      setState(() {
-        stats = content.split("\n");
-      });
+      stats.addAll(content.split("\n"));
     }
-    await loadPuzzles();
-    loadPuzzle();
-  }
-
-  Future<List<String>> loadPuzzles() async {
-    if (unsolvedPuzzles.isNotEmpty) return unsolvedPuzzles;
-    final assetContent = await rootBundle.loadString('assets/puzzles.txt');
-    final allPuzzles = assetContent.split("\n");
-    puzzleCount = allPuzzles.length;
-    final Set<String> solvedPuzzles = {};
-    for (final stat in stats) {
-      final List<String> statFields = stat.split(" ");
-      if (statFields.length != 5) continue;
-      solvedPuzzles.add(statFields[4]);
-    }
-    for (final puz in allPuzzles) {
-      if (solvedPuzzles.contains(puz)) continue;
-      unsolvedPuzzles.add(puz);
-    }
-
-    unsolvedPuzzles.shuffle();
-    return unsolvedPuzzles;
+    db.loadStats(stats);
+    setState(() {
+      database = db;
+      loadPuzzle();
+    });
   }
 
   void loadPuzzle() async {
-    try {
-      final randomPuzzle = unsolvedPuzzles.removeAt(0);
-      print(randomPuzzle);
-      setState(() {
-        currentPuzzle = Puzzle(randomPuzzle);
-        currentPuzzle!.stats.begin();
-      });
-    } catch (e) {
-      currentPuzzle = null;
+    if (database == null) return;
+    final randomPuzzle = database!.next();
+    if (randomPuzzle != null) {
+      openPuzzle(randomPuzzle);
     }
   }
 
-  void openPuzzle(String puz) {
+  void openPuzzle(PuzzleData puz) {
     setState(() {
-      currentPuzzle = Puzzle(puz);
+      currentMeta = puz;
+      Iterable<PuzzleData> db = database!.filter();
+      playedCount = db.where((puz) => puz.played).length;
+      dbSize = db.length;
+      currentPuzzle = currentMeta!.getPuzzle();
       currentPuzzle!.stats.begin();
     });
   }
@@ -164,8 +148,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> writeStat(String text) async {
     if (kIsWeb) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('stats', stats);
+      // final prefs = await SharedPreferences.getInstance();
+      // await prefs.setStringList('stats', stats);
       return;
     }
     final documentsDirectory = await getApplicationDocumentsDirectory();
@@ -187,11 +171,16 @@ class _MyHomePageState extends State<MyHomePage> {
         final stat = currentPuzzle!.stats.stop(
           currentPuzzle!.lineRepresentation,
         );
-        stats.add(stat);
+        currentMeta!.played = true;
+        currentMeta!.duration = currentPuzzle!.stats.duration;
+        currentMeta!.failures = currentPuzzle!.stats.failures;
+
+        // stats.add(stat);
         writeStat(stat);
         loadPuzzle();
       }
     } else {
+      currentMeta!.failures += 1;
       currentPuzzle!.stats.failures += 1;
     }
     setState(() {
@@ -218,9 +207,9 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: "New",
             onPressed: loadPuzzle,
           ),
+          if (database != null)
           Open(
-            puzzles: unsolvedPuzzles,
-            solvedPuzzles: [],
+            database: database!,
             onPuzzleSelected: (puz) => openPuzzle(puz),
           ),
           IconButton(
@@ -228,7 +217,7 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: "Restart",
             onPressed: restartPuzzle,
           ),
-          StatsBtn(stats: stats),
+          // StatsBtn(stats: stats),
           Help(),
         ],
       ),

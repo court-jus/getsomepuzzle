@@ -55,10 +55,6 @@ class Puzzle {
 
   Puzzle(this.lineRepresentation) {
     var attributesStr = lineRepresentation.split("_");
-    if (attributesStr.length == 4) {
-      // Default domain
-      attributesStr.insert(0, "12");
-    }
     final dimensions = attributesStr[1].split("x");
     domain = attributesStr[0].split("").map((e) => int.parse(e)).toList();
     width = int.parse(dimensions[0]);

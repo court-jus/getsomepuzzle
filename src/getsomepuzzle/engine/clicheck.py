@@ -28,12 +28,7 @@ def check_a_puzzle(lineRepr, to_check=[]):
 
 def hpu(line):
     data = line.split("_")
-    if len(data) == 5:
-        dimensions, state, rules = data[1:4]
-    elif len(data) == 4:
-        dimensions, state, rules = data[0:3]
-    else:
-        raise RuntimeError(str(data) + "is bad")
+    dimensions, state, rules = data[1:4]
     return "_".join([dimensions, state, rules])
 
 

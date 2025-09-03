@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
 
 class Open extends StatefulWidget {
-  final List<String> puzzles;
-  final List<String> solvedPuzzles;
-  final dynamic Function(String puz) onPuzzleSelected;
+  final Database database;
+  final dynamic Function(PuzzleData puz) onPuzzleSelected;
 
   const Open({
     super.key,
-    required this.puzzles,
-    required this.solvedPuzzles,
+    required this.database,
     required this.onPuzzleSelected,
   });
 
@@ -28,8 +27,7 @@ class _OpenState extends State<Open> {
           context,
           MaterialPageRoute<void>(
             builder: (context) => OpenPage(
-              puzzles: widget.puzzles,
-              solvedPuzzles: widget.solvedPuzzles,
+              database: widget.database,
               onPuzzleSelected: widget.onPuzzleSelected,
             ),
           ),

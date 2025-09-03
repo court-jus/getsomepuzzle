@@ -130,12 +130,8 @@ def line_import(line):
     from .constraints import AVAILABLE_RULES
 
     line_format = line.count("_")
-    if line_format == 3:
-        size, values, constraints, solutions = line.split("_")
-        domain = None
-    elif line_format == 4:
-        domain, size, values, constraints, solutions = line.split("_")
-        domain = [int(d) for d in domain]
+    domain, size, values, constraints, solutions = line.split("_")
+    domain = [int(d) for d in domain]
     w, h = size.split("x")
     values = [int(v) for v in values]
     constraints = constraints.split(";")
