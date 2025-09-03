@@ -57,14 +57,20 @@ class Filters {
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    minWidth = prefs.getInt("minWidthFilter") ?? 3;
-    maxWidth = prefs.getInt("maxWidthFilter") ?? 6;
-    minHeight = prefs.getInt("minHeightFilter") ?? 3;
-    maxHeight = prefs.getInt("maxHeightFilter") ?? 8;
-    minFilled = prefs.getInt("minPrefilledFilter") ?? 0;
-    maxFilled = prefs.getInt("maxPrefilledFilter") ?? 100;
-    wantedRules = (prefs.getStringList("wantedRulesFilter") ?? []).toSet();
-    bannedRules = (prefs.getStringList("bannedRulesFilter") ?? []).toSet();
+    try {
+      minWidth = prefs.getInt("minWidthFilter") ?? 3;
+      maxWidth = prefs.getInt("maxWidthFilter") ?? 6;
+      minHeight = prefs.getInt("minHeightFilter") ?? 3;
+      maxHeight = prefs.getInt("maxHeightFilter") ?? 8;
+      minFilled = prefs.getInt("minPrefilledFilter") ?? 0;
+      maxFilled = prefs.getInt("maxPrefilledFilter") ?? 100;
+      wantedRules = (prefs.getStringList("wantedRulesFilter") ?? []).toSet();
+      bannedRules = (prefs.getStringList("bannedRulesFilter") ?? []).toSet();
+    } on TypeError {
+      save();
+    } catch (e) {
+      print("Error $e");
+    }
   }
 
   Future<void> save() async {
