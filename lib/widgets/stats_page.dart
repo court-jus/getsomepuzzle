@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 
-class StatsPage extends StatelessWidget {
-  const StatsPage({super.key, required this.stats});
+class StatsPage extends StatefulWidget {
+  const StatsPage({super.key, required this.database});
 
-  final List<String> stats;
+  final Database database;
+
+  @override
+  State<StatsPage> createState() => _StatsPageState();
+}
+
+class _StatsPageState extends State<StatsPage> {
+  List<String> stats = [];
+
+@override
+  void initState() {
+    super.initState();
+    stats = widget.database.getStats();
+  }
 
 Future<void> setData() async {
   await SystemChannels.platform.invokeMethod<void>('Clipboard.setData', <String, dynamic>{

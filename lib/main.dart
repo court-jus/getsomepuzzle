@@ -217,7 +217,8 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: "Restart",
             onPressed: restartPuzzle,
           ),
-          // StatsBtn(stats: stats),
+          if (database != null)
+          StatsBtn(database: database!),
           Help(),
         ],
       ),

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
 
 class StatsBtn extends StatelessWidget {
-  const StatsBtn({super.key, required this.stats});
+  const StatsBtn({super.key, required this.database});
 
-  final List<String> stats;
+  final Database database;
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +17,7 @@ class StatsBtn extends StatelessWidget {
           context,
           MaterialPageRoute<void>(
            builder: (context) => StatsPage(
-            stats: stats,
+            database: database,
            ),
           ),
         );

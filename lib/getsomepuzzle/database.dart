@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PuzzleData {
@@ -136,6 +137,13 @@ class Database {
 
   PuzzleData? next() {
     return filter().whereNot((puz) => puz.played).firstOrNull;
+  }
+
+  List<String> getStats() {
+    final now = DateTime.now();
+    final DateFormat formatter = DateFormat('yyyy-MM-ddTHH:mm:ss');
+    final String dateForLog = formatter.format(now);
+    return filter().where((puz) => puz.played).map((puz) => "$dateForLog ${puz.duration}s - ${puz.failures}f ${puz.lineRepresentation}").toList();
   }
 
 }
