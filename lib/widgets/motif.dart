@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-const bgColors = {0: Colors.cyan, 1: Colors.black, 2: Colors.white};
+const bgColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
 const motifCellSize = 10.0;
 const motifSize = 64.0;
 

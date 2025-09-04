@@ -30,6 +30,17 @@ class Motif(Constraint):
             "".join([str(random.choice(puzzle.domain)) for i in range(motifw)])
             for j in range(motifh)
         ]
+        for v in puzzle.domain:
+            sv = str(v)
+            allhave = all(sv in motifline for motifline in motif)
+            start = any(motifline[0] == sv for motifline in motif)
+            end = any(motifline[-1] == sv for motifline in motif)
+            if allhave and start and end:
+                for other in [o for o in puzzle.domain if o != v]:
+                    so = str(other)
+                    motif = [mline.replace(so, "0") for mline in motif]
+                break
+
         return {"motif": motif}
 
     def conflicts(self, other):
@@ -45,43 +56,26 @@ class Motif(Constraint):
 
     def is_present(self, puzzle, debug=False):
         motif = self.parameters["motif"]
-        grid = to_grid(
-            puzzle.state, puzzle.width, puzzle.height, lambda cell: int(cell.value)
-        )
-        rows = ["".join(map(str, row)) for row in grid]
-        findings = {}
+        pu = "".join(str(c.value) for c in puzzle.state)
         if debug:
-            print("ROWS", rows)
-        for midx, motifline in enumerate(motif):
-            m_re = re.compile(motifline)
-            for ridx, row in enumerate(rows):
+            print("Find", motif, "in", pu)
+        mow = len(motif[0])
+        pta = puzzle.width - mow
+        more = (pta * ".").join(motif).replace("0", ".")
+        more = re.compile(more)
+        for idx in range(len(pu)):
+            if (puzzle.width - (idx % puzzle.width)) < mow:
+                continue
+            subst = pu[idx:]
+            m = more.match(subst)
+            if m:
                 if debug:
-                    print(
-                        f"Motif {midx}: {motifline}, check in {ridx}:{row} - Findings: {findings}"
-                    )
-                matches = [
-                    charidx
-                    for charidx, _ in enumerate(row)
-                    if m_re.match(row[charidx:])
-                    and (
-                        midx == 0
-                        or charidx in findings.get(midx - 1, {}).get(ridx - 1, [])
-                    )
-                ]
-                if matches:
-                    if debug:
-                        print(f"Match ({midx}, {len(motif) - 1})")
-                    if midx == len(motif) - 1:
-                        if debug:
-                            print("Check shows that motif is not respected")
-                        return False
-                    findings.setdefault(midx, {})[ridx] = matches
-                    if debug:
-                        print(f"Add finding. Now: {findings}")
-                elif debug:
-                    print("No match")
+                    print("found at", m.start())
+                return True
+        if debug:
+            print("not found")
+        return False
 
-        return True
 
     def line_export(self):
         motif = ".".join("".join(row) for row in self.parameters["motif"])
@@ -105,7 +99,7 @@ class ForbiddenMotif(Motif):
         return f"Motif {motif} is forbidden"
 
     def _check(self, puzzle, debug=False):
-        return super().is_present(puzzle, debug=debug)
+        return not super().is_present(puzzle, debug=debug)
 
     @staticmethod
     def maximum_presence(puzzle):
@@ -121,7 +115,7 @@ class RequiredMotif(Motif):
         return f"Motif {motif} is required"
 
     def _check(self, puzzle, debug=False):
-        return not super().is_present(puzzle, debug=debug)
+        return super().is_present(puzzle, debug=debug)
 
     @staticmethod
     def maximum_presence(puzzle):

@@ -95,6 +95,7 @@ class _OpenPageState extends State<OpenPage> {
                 margin: EdgeInsets.all(8),
                 child: Column(
                   children: [
+                    TextField(onChanged: (value) => selectPuzzle(PuzzleData(value), context)),
                     RangeSlider(
                       divisions: 4,
                       values: RangeValues(

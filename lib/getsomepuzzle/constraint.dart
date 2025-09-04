@@ -28,28 +28,16 @@ class Motif extends Constraint {
   List<List<int>> motif = [];
 
   bool isPresent(Puzzle puzzle) {
-    final Map<int, Map<int, List<int>>> findings = {};
-    final rows = puzzle.getRows();
-    for (var (midx, motifline) in motif.indexed) {
-      final motiflineStr = motifline.map((e) => e.toString()).join("");
-      final motifRe = RegExp(motiflineStr);
-      for (var (ridx, row) in rows.indexed) {
-        final List<int> rowFindings = findings
-            .putIfAbsent(midx - 1, () => {})
-            .putIfAbsent(ridx - 1, () => []);
-        final rowStr = row.map((e) => e.value.toString()).join("");
-        final List<int> matchingIdx = [
-          for (var idx in Iterable.generate(rowStr.length))
-            if (motifRe.matchAsPrefix(rowStr, idx) != null &&
-                (midx == 0 || rowFindings.contains(idx)))
-              idx,
-        ];
-        if (matchingIdx.isNotEmpty) {
-          if (midx == motif.length - 1) {
-            return true;
-          }
-          findings.putIfAbsent(midx, () => {})[ridx] = matchingIdx;
-        }
+    final int mow = motif[0].length;
+    final int pta = puzzle.width - mow;
+    final RegExp motifRe = RegExp(motif.map((line) => line.map((c) => c.toString()).join("").replaceAll("0", ".")).join("." * pta));
+    final puzzleStr = puzzle.cellValues.map((c) => c.toString()).join("");
+    for (var idx = 0 ; idx < puzzleStr.length; idx++) {
+      if ((puzzle.width - (idx % puzzle.width)) < mow) {
+        continue;
+      }
+      if (motifRe.matchAsPrefix(puzzleStr, idx) != null) {
+        return true;
       }
     }
     return false;
