@@ -123,7 +123,7 @@ class _MyHomePageState extends State<MyHomePage> {
       topMessage = "";
       history = [];
       currentPuzzle!.restart();
-      currentPuzzle!.check();
+      currentPuzzle!.clearConstraintsValidity();
     });
   }
 
@@ -131,7 +131,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (currentPuzzle == null || history.isEmpty) return;
     setState(() {
       currentPuzzle!.resetCell(history.removeLast());
-      currentPuzzle!.check();
+      currentPuzzle!.clearConstraintsValidity();
       topMessage = "";
     });
   }

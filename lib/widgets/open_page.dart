@@ -54,6 +54,7 @@ class _OpenPageState extends State<OpenPage> {
       }
       if (changed) {
         widget.database.currentFilters.save();
+        widget.database.preparePlaylist();
         shownPuzzles = widget.database
             .filter()
             .take(10)

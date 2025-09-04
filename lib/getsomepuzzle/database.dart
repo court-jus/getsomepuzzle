@@ -90,6 +90,7 @@ class Filters {
 class Database {
   List<PuzzleData> puzzles = [];
   Filters currentFilters = Filters();
+  List<PuzzleData> playlist = [];
 
   void load(List<String> lines) {
     puzzles = lines.where((e) => e.isNotEmpty).map((e) => PuzzleData(e)).toList();
@@ -141,8 +142,18 @@ class Database {
     load(assetContent.split("\n"));
   }
 
+  void preparePlaylist() {
+    playlist = filter().whereNot((puz) => puz.played).toList();
+  }
+
   PuzzleData? next() {
-    return filter().whereNot((puz) => puz.played).firstOrNull;
+    if (playlist.isEmpty) {
+      preparePlaylist();
+    }
+    if (playlist.isEmpty) return null;
+    final selection = playlist.removeAt(0);
+    playlist.add(selection);
+    return selection;
   }
 
   List<String> getStats() {

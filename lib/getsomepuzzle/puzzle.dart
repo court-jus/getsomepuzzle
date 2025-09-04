@@ -203,4 +203,10 @@ class Puzzle {
     }
     return result;
   }
+
+  void clearConstraintsValidity() {
+    for (var constraint in constraints) {
+      constraint.isValid = true;
+    }
+  }
 }
