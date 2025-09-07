@@ -89,11 +89,18 @@ class Puzzle {
   }
 
   List<int> get cellValues => cells.map((cell) => cell.value).toList();
-  Map<int, Constraint> get cellConstraints => {
-    for (var constraint in constraints.whereType<CellsCentricConstraint>())
-    for (var idx in constraint.indices)
-    idx: constraint,
-  };
+  Map<int, List<Constraint>> get cellConstraints {
+    final Map<int, List<Constraint>> result = {};
+    for (var constraint in constraints.whereType<CellsCentricConstraint>()) {
+      for (var idx in constraint.indices) {
+        if (!result.keys.contains(idx)) {
+          result[idx] = [];
+        }
+        result[idx]!.add(constraint);
+      }
+    }
+    return result;
+  }
 
   List<List<Cell>> getRows() {
     // 12_4x5_00020210200022001201_FM:1.2;PA:10.top;PA:19.top_1:22222212221122111211

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 
@@ -11,13 +13,13 @@ class CellWidget extends StatelessWidget {
     required this.value,
     required this.readonly,
     required this.onTap,
-    this.constraint,
+    this.constraints,
   });
 
   // Attributes
   final int value;
   final bool readonly;
-  final Constraint? constraint;
+  final List<Constraint>? constraints;
   final VoidCallback onTap;
 
   // Methods
@@ -30,7 +32,21 @@ class CellWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = bgColors[value];
 
-    final Widget label = constraint == null ? Text(" ") : constraint!.toWidget(fgColors[value] ?? Colors.black);
+    int widgetScale = 1;
+    if (constraints != null) {
+      // 1: 1, 2: 2, 3: 2, 4: 2, 5: 3
+      widgetScale = sqrt(constraints!.length).ceil();
+    }
+    final Widget label = constraints == null ? Text(" ") : Wrap(
+      alignment: WrapAlignment.center,
+      children: [
+        for (final constraint in constraints!)
+        constraint.toWidget(
+          fgColors[value] ?? Colors.black,
+          count: widgetScale,
+        )
+      ],
+    );
     return GestureDetector(
       onTap: _handleTap,
       child: DecoratedBox(

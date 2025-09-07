@@ -17,6 +17,13 @@ class ParityConstraint(CellCentricConstraint):
             f"side{'s' if side in ('horizontal', 'vertical') else ''}"
         )
 
+    def conflicts(self, other):
+        if not isinstance(other, ParityConstraint):
+            return False
+
+        # Parity only have one index
+        return self.parameters["indices"][0] == other.parameters["indices"][0]
+
     def get_cell_text(self):
         # ⬅ ⮕ ⬆ ⬇ ⬌ ⬍  ⬉ ⬈ ⬊ ⬋
         parity_icons = {

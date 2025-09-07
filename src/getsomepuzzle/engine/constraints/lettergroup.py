@@ -71,6 +71,7 @@ class LetterGroup(CellCentricConstraint):
 
     @staticmethod
     def generate_random_parameters(puzzle):
+        # TODO allow reusing an existing letter but with some sort of poundering
         used_letters = [ord(c.parameters["letter"]) for c in puzzle.constraints if isinstance(c, LetterGroup)]
         if used_letters:
             max_letter = max(used_letters)

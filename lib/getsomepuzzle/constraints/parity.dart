@@ -22,7 +22,7 @@ class ParityConstraint extends CellsCentricConstraint {
   }
 
   @override
-  Widget toWidget(Color defaultColor) {
+  Widget toWidget(Color defaultColor, {int count = 1}) {
     final Map<String, IconData> icons = {
       "left": Icons.arrow_circle_left_outlined,
       "right": Icons.arrow_circle_right_outlined,
@@ -33,10 +33,12 @@ class ParityConstraint extends CellsCentricConstraint {
     };
     final fgcolor = isValid ? defaultColor : Colors.redAccent;
     if (icons.containsKey(side)) {
-      return Icon(
-        icons[side],
-        size: 40,
-        color: fgcolor,
+      return SizedBox(
+        width: 64 / count,
+        height: 64 / count,
+        child: Center(
+          child: Icon(icons[side], size: 40 / count, color: fgcolor),
+        ),
       );
     }
     return Text("");

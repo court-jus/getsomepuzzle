@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
-
 class Constraint {
   bool isValid = true;
 
@@ -10,8 +9,14 @@ class Constraint {
     return "";
   }
 
-  Widget toWidget(Color defaultColor) {
-    return Text(toString());
+  Widget toWidget(Color defaultColor, {int count = 1}) {
+    return SizedBox(
+      width: 64 / count,
+      height: 64 / count,
+      child: Center(
+        child: Text(toString(), style: TextStyle(fontSize: 36 / count)),
+      ),
+    );
   }
 
   bool verify(Puzzle puzzle) {
@@ -30,9 +35,16 @@ class Motif extends Constraint {
   bool isPresent(Puzzle puzzle) {
     final int mow = motif[0].length;
     final int pta = puzzle.width - mow;
-    final RegExp motifRe = RegExp(motif.map((line) => line.map((c) => c.toString()).join("").replaceAll("0", ".")).join("." * pta));
+    final RegExp motifRe = RegExp(
+      motif
+          .map(
+            (line) =>
+                line.map((c) => c.toString()).join("").replaceAll("0", "."),
+          )
+          .join("." * pta),
+    );
     final puzzleStr = puzzle.cellValues.map((c) => c.toString()).join("");
-    for (var idx = 0 ; idx < puzzleStr.length; idx++) {
+    for (var idx = 0; idx < puzzleStr.length; idx++) {
       if ((puzzle.width - (idx % puzzle.width)) < mow) {
         continue;
       }

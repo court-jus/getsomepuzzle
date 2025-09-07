@@ -56,7 +56,7 @@ class PuzzleWidget extends StatelessWidget {
                     CellWidget(
                       value: cell.value,
                       readonly: cell.readonly,
-                      constraint:
+                      constraints:
                           currentPuzzle.cellConstraints[rowidx *
                                   currentPuzzle.width +
                               cellidx],

@@ -17,9 +17,18 @@ class GroupSize extends CellsCentricConstraint {
   }
 
   @override
-  Widget toWidget(Color defaultColor) {
+  Widget toWidget(Color defaultColor, {int count = 1}) {
     final fgcolor = isValid ? defaultColor : Colors.redAccent;
-    return Text(toString(), style: TextStyle(fontSize: 36, color: fgcolor));
+    return SizedBox(
+      width: 64 / count,
+      height: 64 / count,
+      child: Center(
+        child: Text(
+          toString(),
+          style: TextStyle(fontSize: 36 / count, color: fgcolor),
+        ),
+      ),
+    );
   }
 
   @override
@@ -42,15 +51,26 @@ class LetterGroup extends CellsCentricConstraint {
   }
 
   @override
-  Widget toWidget(Color defaultColor) {
+  Widget toWidget(Color defaultColor, {int count = 1}) {
     final fgcolor = isValid ? defaultColor : Colors.redAccent;
-    return Text(letter, style: TextStyle(fontSize: 36, color: fgcolor));
+    return SizedBox(
+      width: 64 / count,
+      height: 64 / count,
+      child: Center(
+        child: Text(
+          letter,
+          style: TextStyle(fontSize: 36 / count, color: fgcolor),
+        ),
+      ),
+    );
   }
 
   @override
   bool verify(Puzzle puzzle) {
     // If any of my cells are not filled yet, there's no need to check further
-    final myCellValues = puzzle.cellValues.indexed.where((elem) => indices.contains(elem.$1)).map((elem) => elem.$2);
+    final myCellValues = puzzle.cellValues.indexed
+        .where((elem) => indices.contains(elem.$1))
+        .map((elem) => elem.$2);
     if (myCellValues.contains(0)) return true;
     final groups = puzzle.getGroups();
     final List<List<int>> myGroups = [];
@@ -64,12 +84,15 @@ class LetterGroup extends CellsCentricConstraint {
     if (myGroups.length != 1) return false;
     // There should be no other letter in mygroup
     final myGroup = myGroups[0];
-    final lettersInMyGroup = myGroup.where((idx) {
-      final constraintAtIdx = puzzle.cellConstraints[idx];
-      if (constraintAtIdx == null) return false;
-      if (constraintAtIdx is! LetterGroup) return false;
-      return true;
-    }).map((idx) => (puzzle.cellConstraints[idx] as LetterGroup).letter).toSet();
+    final Set<String> lettersInMyGroup = {};
+    for (final idx in myGroup) {
+      final constraintsAtIdx = puzzle.cellConstraints[idx];
+      if (constraintsAtIdx == null) continue;
+      for (final constraint in constraintsAtIdx) {
+        if (constraint is! LetterGroup) continue;
+        lettersInMyGroup.add(constraint.letter);
+      }
+    }
     if (lettersInMyGroup.length != 1) return false;
     return true;
   }

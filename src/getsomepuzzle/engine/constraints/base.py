@@ -53,11 +53,5 @@ class CellCentricConstraint(Constraint):
             self.ui_widget.color = "green" if result else "red"
         return result
 
-    def conflicts(self, other):
-        if not isinstance(other, CellCentricConstraint):
-            return False
-
-        return any(idx in other.parameters["indices"] for idx in self.parameters["indices"])
-
     def get_cell_text(self):
         raise NotImplementedError("Should be implemented by subclass")

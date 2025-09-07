@@ -13,6 +13,13 @@ class GroupSize(CellCentricConstraint):
         idx = indices[0]
         return f"Group at {idx + 1} should be of size {size}"
 
+    def conflicts(self, other):
+        if not isinstance(other, CellCentricConstraint):
+            return False
+
+        # Parity only have one index
+        return self.parameters["indices"][0] == other.parameters["indices"][0]
+
     def get_cell_text(self):
         return self.parameters["size"]
 
