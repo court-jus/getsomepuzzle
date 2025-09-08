@@ -6,10 +6,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
-import 'package:getsomepuzzle/widgets/help.dart';
-import 'package:getsomepuzzle/widgets/open.dart';
+import 'package:getsomepuzzle/widgets/more_menu.dart';
+import 'package:getsomepuzzle/widgets/pause_menu.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
-import 'package:getsomepuzzle/widgets/stats_btn.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -56,6 +55,7 @@ class _MyHomePageState extends State<MyHomePage> {
   List<int> history = [];
   int dbSize = 0;
   int playedCount = 0;
+  bool paused = false;
 
   @override
   void initState() {
@@ -114,6 +114,7 @@ class _MyHomePageState extends State<MyHomePage> {
       dbSize = db.length;
       currentPuzzle = currentMeta!.getPuzzle();
       currentPuzzle!.stats.begin();
+      paused = false;
     });
   }
 
@@ -190,6 +191,32 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  void onPause() {
+    setState(() {
+      paused = true;
+      if (currentPuzzle != null) {
+        currentPuzzle!.stats.pause();
+      }
+    });
+  }
+
+  void onResume() {
+    setState(() {
+      paused = false;
+      if (currentPuzzle != null) {
+        currentPuzzle!.stats.resume();
+      }
+    });
+  }
+
+  void togglePause() {
+    if (paused) {
+      onResume();
+    } else {
+      onPause();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,24 +229,16 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: "Undo",
             onPressed: undo,
           ),
-          IconButton(
-            icon: Icon(Icons.fiber_new),
-            tooltip: "New",
-            onPressed: loadPuzzle,
-          ),
           if (database != null)
-          Open(
-            database: database!,
-            onPuzzleSelected: (puz) => openPuzzle(puz),
-          ),
-          IconButton(
-            icon: Icon(Icons.restart_alt_rounded),
-            tooltip: "Restart",
-            onPressed: restartPuzzle,
-          ),
+            MenuAnchorPause(
+              database: database!,
+              togglePause: togglePause,
+              newPuzzle: loadPuzzle,
+              selectPuzzle: openPuzzle,
+              restartPuzzle: restartPuzzle,
+            ),
           if (database != null)
-          StatsBtn(database: database!),
-          Help(),
+            MenuAnchorMore(database: database!, togglePause: togglePause),
         ],
       ),
       body: Center(
@@ -228,29 +247,47 @@ class _MyHomePageState extends State<MyHomePage> {
           spacing: 2,
           children: <Widget>[
             Text(topMessage),
-            (currentPuzzle != null)
-                ? PuzzleWidget(
-                    currentPuzzle: currentPuzzle!,
-                    onCellTap: handlePuzzleTap,
-                  )
-                : Text("No puzzle loaded."),
-
-            DecoratedBox(
-              decoration: BoxDecoration(color: Colors.amber),
-              child: Row(
-                spacing: 2,
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    margin: EdgeInsets.all(4),
-                    child: Text(bottomMessage),
+            Stack(
+              alignment: AlignmentGeometry.center,
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    (currentPuzzle != null)
+                        ? PuzzleWidget(
+                            currentPuzzle: currentPuzzle!,
+                            onCellTap: handlePuzzleTap,
+                          )
+                        : Text("No puzzle loaded."),
+                  ],
+                ),
+                if (paused)
+                  TextButton(
+                    onPressed: onResume,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.teal,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: SizedBox(
+                        width: 64 * 6,
+                        height: 64 * 8,
+                        child: Center(
+                          child: Text("Paused", style: TextStyle(fontSize: 92)),
+                        ),
+                      ),
+                    ),
                   ),
-                ],
-              ),
+              ],
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomAppBar(
+        height: 40,
+        color: Colors.amber,
+        child: Center(child: Text(bottomMessage)),
       ),
     );
   }
