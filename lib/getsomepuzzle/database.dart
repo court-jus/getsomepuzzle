@@ -66,6 +66,8 @@ class Filters {
   int maxFilled;
   Set<String> wantedRules;
   Set<String> bannedRules;
+  Set<String> wantedFlags;
+  Set<String> bannedFlags;
 
   Filters({
     this.minWidth = 3,
@@ -76,6 +78,8 @@ class Filters {
     this.maxFilled = 100,
     this.wantedRules = const {},
     this.bannedRules = const {},
+    this.wantedFlags = const {},
+    this.bannedFlags = const {"played", "skipped", "disliked"},
   });
 
   Future<void> load() async {
@@ -142,6 +146,16 @@ class Database {
 
   Iterable<PuzzleData> filter() {
     return puzzles.where((puz) {
+      if (puz.played && currentFilters.bannedFlags.contains("played")) return false;
+      if (puz.skipped != null && currentFilters.bannedFlags.contains("skipped")) return false;
+      if (puz.liked != null && currentFilters.bannedFlags.contains("liked")) return false;
+      if (puz.disliked != null && currentFilters.bannedFlags.contains("disliked")) return false;
+
+      if (!puz.played && currentFilters.wantedFlags.contains("played")) return false;
+      if (puz.skipped == null && currentFilters.wantedFlags.contains("skipped")) return false;
+      if (puz.liked == null && currentFilters.wantedFlags.contains("liked")) return false;
+      if (puz.disliked == null && currentFilters.wantedFlags.contains("disliked")) return false;
+
       if (puz.filled > currentFilters.maxFilled) return false;
       if (puz.filled < currentFilters.minFilled) return false;
       if (puz.width > currentFilters.maxWidth) return false;
