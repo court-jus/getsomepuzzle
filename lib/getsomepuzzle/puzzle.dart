@@ -52,7 +52,6 @@ class Puzzle {
   int height = 0;
   List<Cell> cells = [];
   List<Constraint> constraints = [];
-  Stats stats = Stats();
 
   Puzzle(this.lineRepresentation) {
     var attributesStr = lineRepresentation.split("_");

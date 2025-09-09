@@ -14,6 +14,12 @@ class PuzzleData {
   bool played = false;
   int duration = 0;
   int failures = 0;
+  Stats? stats;
+  DateTime? started;
+  DateTime? finished;
+  DateTime? skipped;
+  DateTime? liked;
+  DateTime? disliked;
 
   PuzzleData(this.lineRepresentation) {
     var attributesStr = lineRepresentation.split("_");
@@ -31,6 +37,23 @@ class PuzzleData {
 
   Puzzle getPuzzle() {
     return Puzzle(lineRepresentation);
+  }
+
+  Puzzle begin() {
+    stats = Stats();
+    stats!.begin();
+    started = DateTime.now();
+    return getPuzzle();
+  }
+
+  String stop() {
+    if (stats == null) throw UnimplementedError("Should never stop the time before having started it.");
+    final stat = stats!.stop(lineRepresentation);
+    played = true;
+    finished = DateTime.now();
+    duration = stats!.duration;
+    failures = stats!.failures;
+    return stat;
   }
 }
 

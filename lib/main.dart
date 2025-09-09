@@ -65,7 +65,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (database == null) return;
       if (currentPuzzle == null) return;
       setState(() {
-        String statsText = currentPuzzle!.stats.toString();
+        String statsText = currentMeta!.stats.toString();
         bottomMessage = "$playedCount/$dbSize - $statsText";
       });
     });
@@ -108,12 +108,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void openPuzzle(PuzzleData puz) {
     setState(() {
-      currentMeta = puz;
       Iterable<PuzzleData> db = database!.filter();
       playedCount = db.where((puz) => puz.played).length;
       dbSize = db.length;
-      currentPuzzle = currentMeta!.getPuzzle();
-      currentPuzzle!.stats.begin();
+
+      currentMeta = puz;
+      currentPuzzle = currentMeta!.begin();
       paused = false;
     });
   }
@@ -149,8 +149,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> writeStat(String text) async {
     if (kIsWeb) {
-      // final prefs = await SharedPreferences.getInstance();
-      // await prefs.setStringList('stats', stats);
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getStringList("stats") ?? [];
+      data.add(text);
+      await prefs.setStringList('stats', data);
       return;
     }
     final documentsDirectory = await getApplicationDocumentsDirectory();
@@ -169,12 +171,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final failedConstraints = currentPuzzle!.check();
     if (failedConstraints.isEmpty) {
       if (currentPuzzle!.complete) {
-        final stat = currentPuzzle!.stats.stop(
-          currentPuzzle!.lineRepresentation,
-        );
-        currentMeta!.played = true;
-        currentMeta!.duration = currentPuzzle!.stats.duration;
-        currentMeta!.failures = currentPuzzle!.stats.failures;
+        final stat = currentMeta!.stop();
 
         // stats.add(stat);
         writeStat(stat);
@@ -182,7 +179,7 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     } else {
       currentMeta!.failures += 1;
-      currentPuzzle!.stats.failures += 1;
+      currentMeta!.stats?.failures += 1;
     }
     setState(() {
       topMessage = failedConstraints.isNotEmpty
@@ -195,7 +192,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       paused = true;
       if (currentPuzzle != null) {
-        currentPuzzle!.stats.pause();
+        currentMeta!.stats?.pause();
       }
     });
   }
@@ -204,7 +201,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       paused = false;
       if (currentPuzzle != null) {
-        currentPuzzle!.stats.resume();
+        currentMeta!.stats?.resume();
       }
     });
   }

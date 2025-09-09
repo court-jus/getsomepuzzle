@@ -18,7 +18,7 @@ class OpenPage extends StatefulWidget {
 class _OpenPageState extends State<OpenPage> {
   List<(String, PuzzleData)> shownPuzzles = [];
 
-  static const List<String> existingRules = ["LT", "GS", "FM", "PA"];
+  static const List<(String, String)> existingRules = [("LT", "Letter"), ("GS", "Group size"), ("FM", "Forbidden motif"), ("PA", "Parity")];
 
   void applyFilter({
     RangeValues? newWidth,
@@ -96,35 +96,55 @@ class _OpenPageState extends State<OpenPage> {
                 margin: EdgeInsets.all(8),
                 child: Column(
                   children: [
-                    TextField(onChanged: (value) => selectPuzzle(PuzzleData(value), context)),
-                    RangeSlider(
-                      divisions: 4,
-                      values: RangeValues(
-                        widget.database.currentFilters.minWidth.toDouble(),
-                        widget.database.currentFilters.maxWidth.toDouble(),
-                      ),
-                      onChanged: (value) => applyFilter(newWidth: value),
-                      min: 3,
-                      max: 6,
-                      labels: RangeLabels(
-                        widget.database.currentFilters.minWidth.toString(),
-                        widget.database.currentFilters.maxWidth.toString(),
-                      ),
+                    Text("You can filter to find the kind of puzzle you like."),
+                    Divider(),
+                    // TextField(onChanged: (value) => selectPuzzle(PuzzleData(value), context)),
+                    Text("Dimensions"),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Width"),
+                        Expanded(
+                          child: RangeSlider(
+                            divisions: 4,
+                            values: RangeValues(
+                              widget.database.currentFilters.minWidth.toDouble(),
+                              widget.database.currentFilters.maxWidth.toDouble(),
+                            ),
+                            onChanged: (value) => applyFilter(newWidth: value),
+                            min: 3,
+                            max: 6,
+                            labels: RangeLabels(
+                              widget.database.currentFilters.minWidth.toString(),
+                              widget.database.currentFilters.maxWidth.toString(),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    RangeSlider(
-                      divisions: 5,
-                      values: RangeValues(
-                        widget.database.currentFilters.minHeight.toDouble(),
-                        widget.database.currentFilters.maxHeight.toDouble(),
-                      ),
-                      onChanged: (value) => applyFilter(newHeight: value),
-                      min: 3,
-                      max: 8,
-                      labels: RangeLabels(
-                        widget.database.currentFilters.minHeight.toString(),
-                        widget.database.currentFilters.maxHeight.toString(),
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Height"),
+                        Expanded(
+                          child: RangeSlider(
+                            divisions: 5,
+                            values: RangeValues(
+                              widget.database.currentFilters.minHeight.toDouble(),
+                              widget.database.currentFilters.maxHeight.toDouble(),
+                            ),
+                            onChanged: (value) => applyFilter(newHeight: value),
+                            min: 3,
+                            max: 8,
+                            labels: RangeLabels(
+                              widget.database.currentFilters.minHeight.toString(),
+                              widget.database.currentFilters.maxHeight.toString(),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    Text("Fill ratio"),
                     RangeSlider(
                       values: RangeValues(
                         widget.database.currentFilters.minFilled.toDouble(),
@@ -149,7 +169,7 @@ class _OpenPageState extends State<OpenPage> {
                       segments: existingRules
                           .map(
                             (slug) =>
-                                ButtonSegment(value: slug, label: Text(slug)),
+                                ButtonSegment(value: slug.$1, label: Text(slug.$2)),
                           )
                           .toList(),
                     ),
@@ -165,7 +185,7 @@ class _OpenPageState extends State<OpenPage> {
                       segments: existingRules
                           .map(
                             (slug) =>
-                                ButtonSegment(value: slug, label: Text(slug)),
+                                ButtonSegment(value: slug.$1, label: Text(slug.$2)),
                           )
                           .toList(),
                     ),
