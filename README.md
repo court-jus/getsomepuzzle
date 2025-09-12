@@ -32,9 +32,9 @@ There are about 5k puzzles bundled within the app and there are some python scri
 
 ## Constraints
 
-### Forbidden motif
+### Forbidden pattern
 
-If you see a motif above the puzzles that has a purple background, you must fill your grid so that this motif does NOT appear anywhere.
+If you see a pattern above the puzzles that has a purple background, you must fill your grid so that this pattern does NOT appear anywhere.
 
 ### Group size
 
@@ -47,3 +47,8 @@ If you see an arrow in a cell, there must be the same number of black and white 
 ### Letter group
 
 Cells containing the same letter should be part of the same group. A group must not contain different letters.
+
+### Quantity
+
+A black or white number over the puzzle, on a blue background indicates that the
+total number of cells of that color should match that number.

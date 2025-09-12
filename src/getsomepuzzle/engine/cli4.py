@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 
 from getsomepuzzle.engine.puzzle import Puzzle
-from getsomepuzzle.engine.constraints import FixedValueConstraint, ForbiddenMotif
+from getsomepuzzle.engine.constraints import FixedValueConstraint, ForbiddenMotif, QuantityAllConstraint
 from getsomepuzzle.engine.utils import FakeEvent, state_to_str, line_export, line_import
 from getsomepuzzle.engine.solver.puzzle_solver import find_solution, find_solutions
 from getsomepuzzle.engine.generator.puzzle_generator import PuzzleGenerator
@@ -17,8 +17,8 @@ def generate_a_puzzle(load=None):
         width = random.randint(4, 6)
         height = random.randint(4, 7)
         pg = PuzzleGenerator(running=running, width=width, height=height)
-        params = ForbiddenMotif.generate_random_parameters(pg.puzzle)
-        pg.puzzle.add_constraint(ForbiddenMotif(**params))
+        params = QuantityAllConstraint.generate_random_parameters(pg.puzzle)
+        pg.puzzle.add_constraint(QuantityAllConstraint(**params))
 
         while True:
             try:

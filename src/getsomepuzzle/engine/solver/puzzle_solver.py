@@ -9,7 +9,6 @@ def find_solution(running, starting_state, debug=False):
     steps = MAX_STEPS
     backpropagations = 0
     while steps > 0 and running.is_set():
-        time.sleep(0.0001)
         if st.is_complete(debug=debug):
             break
         if debug:

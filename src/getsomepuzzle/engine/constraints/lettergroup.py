@@ -60,15 +60,6 @@ class LetterGroup(CellCentricConstraint):
             return False
         return True
 
-        idx = indices[0]
-        my_group = [grp for grp in groups if idx in grp]
-        if len(my_group) != 1:
-            raise RuntimeError("My group should exist")
-        my_group = my_group[0]
-        if debug:
-            print(f"Does GRP@{idx+1}={letter} ?", my_group)
-        return len(my_group) == letter
-
     @staticmethod
     def generate_random_parameters(puzzle):
         # TODO allow reusing an existing letter but with some sort of poundering

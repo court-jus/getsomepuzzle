@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
+import 'package:getsomepuzzle/widgets/quantity.dart';
 
 const forbiddenColor = Color.fromARGB(255, 185, 86, 202);
 const mandatoryColor = Colors.lightBlue;
@@ -41,6 +43,13 @@ class PuzzleWidget extends StatelessWidget {
                   bgColor: constraint is ForbiddenMotif
                       ? forbiddenColor
                       : mandatoryColor,
+                  borderColor: constraint.isValid ? Colors.green : Colors.red,
+                )
+              else if (constraint is QuantityConstraint)
+                QuantityWidget(
+                  value: constraint.value,
+                  count: constraint.count,
+                  bgColor: mandatoryColor,
                   borderColor: constraint.isValid ? Colors.green : Colors.red,
                 ),
           ],

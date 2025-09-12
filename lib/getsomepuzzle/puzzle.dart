@@ -4,6 +4,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:intl/intl.dart';
 
 
@@ -75,6 +76,8 @@ class Puzzle {
         constraints.add(GroupSize(constraintAttr[1]));
       } else if (constraintAttr[0] == "LT") {
         constraints.add(LetterGroup(constraintAttr[1]));
+      } else if (constraintAttr[0] == "QA") {
+        constraints.add(QuantityConstraint(constraintAttr[1]));
       }
     }
   }
