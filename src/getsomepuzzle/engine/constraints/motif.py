@@ -48,7 +48,14 @@ class Motif(Constraint):
             return False
 
         smotif, omotif = self.parameters["motif"], other.parameters["motif"]
+        if smotif == omotif[::-1]:
+            return True
         if len(smotif) == len(omotif):
+            if len(smotif) == 1:
+                smo = smotif[0]
+                omo = omotif[0]
+                if smo == omo[::-1]:
+                    return True
             return omotif == smotif
         if len(smotif) > len(omotif):
             return omotif in smotif

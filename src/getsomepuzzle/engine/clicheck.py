@@ -53,11 +53,22 @@ def recheck_puzzles():
         for puzzle in puzzles:
             pu = line_import(puzzle)
             pu.running = FakeEvent()
-            fp.write(line_export(pu) + "\n")
+            if check_constraints(puzzle):
+                fp.write(line_export(pu) + "\n")
             done += 1
             if done % 10 == 0:
                 print(f"{done}/{total}")
 
+
+def check_constraints(puz):
+    pu = line_import(puz)
+    for c in pu.constraints:
+        for o in pu.constraints:
+            if c == o:
+                continue
+            if c.conflicts(o):
+                return False
+    return True
 
 # check_a_puzzle(
 #     "12_6x7_000000000000000000000000100000000000000010_LT:A.36.31;FM:2.1;PA:10.left;PA:17.top;PA:26.bottom_1:111111121212121212121212121212221212222212",
@@ -66,5 +77,7 @@ def recheck_puzzles():
 #         [int(c) for c in "111211121212121212121212121212221212222212"],
 #     ]
 # )
+
+# print(check_constraints("12_3x3_010000200_FM:21;FM:12_1:212212212"))
 
 recheck_puzzles()
