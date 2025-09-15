@@ -48,15 +48,15 @@ class Motif(Constraint):
             return False
 
         smotif, omotif = self.parameters["motif"], other.parameters["motif"]
-        if smotif == omotif[::-1]:
+        basic_patterns = [
+            ["11"], ["22"], ["1", "1"], ["2", "2"],
+        ]
+        if smotif in basic_patterns and omotif in basic_patterns:
             return True
-        if len(smotif) == len(omotif):
-            if len(smotif) == 1:
-                smo = smotif[0]
-                omo = omotif[0]
-                if smo == omo[::-1]:
-                    return True
-            return omotif == smotif
+        novice_patterns = [["12"], ["21"], ["1", "2"], ["2", "1"]]
+        if (smotif in novice_patterns and omotif in basic_patterns) or (smotif in basic_patterns and omotif in novice_patterns):
+            return True
+
         if len(smotif) > len(omotif):
             return omotif in smotif
         return smotif in omotif
