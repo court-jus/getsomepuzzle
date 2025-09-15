@@ -44,6 +44,9 @@ class Constraint:
     def line_import(self):
         raise NotImplementedError("Should be implemented by subclass")
 
+    def signature(self):
+        return self.line_export()
+
 
 class CellCentricConstraint(Constraint):
 

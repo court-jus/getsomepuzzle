@@ -51,4 +51,8 @@ class QuantityAllConstraint(Constraint):
     @staticmethod
     def line_import(line):
         value, count = line.split(".")
-        return {"value": int(value), "conut": int(count)}
+        return {"value": int(value), "count": int(count)}
+
+    def signature(self):
+        count = self.parameters["count"]
+        return f"{self.slug}:X.{count}"

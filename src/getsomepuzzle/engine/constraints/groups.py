@@ -66,3 +66,7 @@ class GroupSize(CellCentricConstraint):
     def line_import(line):
         idx, size = line.split(".")
         return {"indices": [int(idx)], "size": int(size)}
+
+    def signature(self):
+        size = self.parameters["size"]
+        return f"{self.slug}:X.{size}"

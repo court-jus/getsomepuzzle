@@ -83,7 +83,6 @@ class Motif(Constraint):
             print("not found")
         return False
 
-
     def line_export(self):
         motif = ".".join("".join(row) for row in self.parameters["motif"])
         return f"{self.slug}:{motif}"
@@ -96,6 +95,18 @@ class Motif(Constraint):
             for row in lines
         ]
         return {"motif": motif}
+
+    def signature(self):
+        motif = ".".join("".join(row) for row in self.parameters["motif"])
+        if "2" in motif and not "1" in motif:
+            motif = motif.replace("2", "1")
+        elif "2" in motif and "1" in motif:
+            idx_1, idx_2 = motif.index("1"), motif.index("2")
+            repl_1 = "A" if idx_1 < idx_2 else "B"
+            repl_2 = "B" if idx_1 < idx_2 else "A"
+            motif = motif.replace("1", repl_1).replace("2", repl_2)
+        return f"{self.slug}:{motif}"
+
 
 class ForbiddenMotif(Motif):
     slug = "FM"

@@ -92,3 +92,7 @@ class LetterGroup(CellCentricConstraint):
         indices = indices.split(".")
         indices = [int(idx) for idx in indices]
         return {"indices": indices, "letter": letter}
+
+    def signature(self):
+        letter = self.parameters["letter"]
+        return f"{self.slug}:{letter}"
