@@ -22,7 +22,16 @@ class ParityConstraint(CellCentricConstraint):
             return False
 
         # Parity only have one index
-        return self.parameters["indices"][0] == other.parameters["indices"][0]
+        if self.parameters["indices"][0] != other.parameters["indices"][0]:
+            return False
+
+        conflicting = {
+            "left": ["horizontal", "right"],
+            "right": ["horizontal", "left"],
+            "top": ["vertical", "bottom"],
+            "bottom": ["vertical", "top"],
+        }
+        return other.parameters["side"] in conflicting[self.parameters["side"]]
 
     def get_cell_text(self):
         # ⬅ ⮕ ⬆ ⬇ ⬌ ⬍  ⬉ ⬈ ⬊ ⬋

@@ -14,7 +14,7 @@ class GroupSize(CellCentricConstraint):
         return f"Group at {idx + 1} should be of size {size}"
 
     def conflicts(self, other):
-        if not isinstance(other, CellCentricConstraint):
+        if not isinstance(other, GroupSize):
             return False
 
         # Parity only have one index
