@@ -32,15 +32,10 @@ class Stats {
     timer.start();
   }
 
-  String stop(String puzzleRepresentation) {
+  void stop(String puzzleRepresentation) {
     timer.stop();
     duration = (timer.elapsedMilliseconds / 1000).round();
     timer.reset();
-
-    final now = DateTime.now();
-    final DateFormat formatter = DateFormat('yyyy-MM-ddTHH:mm:ss');
-    final String dateForLog = formatter.format(now);
-    return "$dateForLog ${duration}s - ${failures}f $puzzleRepresentation";
   }
 
 }

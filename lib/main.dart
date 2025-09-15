@@ -56,6 +56,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int dbSize = 0;
   int playedCount = 0;
   bool paused = false;
+  bool betweenPuzzles = false;
 
   @override
   void initState() {
@@ -68,6 +69,11 @@ class _MyHomePageState extends State<MyHomePage> {
         String statsText = currentMeta!.stats.toString();
         bottomMessage = "$playedCount/$dbSize - $statsText";
       });
+    });
+    Timer.periodic(Duration(minutes: 1), (tmr) {
+      if (database == null) return;
+      final List<String> stats = database!.getStats();
+      writeStats(stats);
     });
   }
 
@@ -115,6 +121,8 @@ class _MyHomePageState extends State<MyHomePage> {
       currentMeta = puz;
       currentPuzzle = currentMeta!.begin();
       paused = false;
+      betweenPuzzles = false;
+      topMessage = "";
     });
   }
 
@@ -147,12 +155,10 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Future<void> writeStat(String text) async {
+  Future<void> writeStats(List<String> stats) async {
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getStringList("stats") ?? [];
-      data.add(text);
-      await prefs.setStringList('stats', data);
+      await prefs.setStringList('stats', stats);
       return;
     }
     final documentsDirectory = await getApplicationDocumentsDirectory();
@@ -161,7 +167,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final filePath = p.join(path, "stats.txt");
     final file = File(filePath);
 
-    file.writeAsStringSync("$text\n", mode: FileMode.append, flush: true);
+    file.writeAsStringSync(stats.join("\n"), mode: FileMode.writeOnly, flush: true);
   }
 
   void autoCheck() {
@@ -171,11 +177,10 @@ class _MyHomePageState extends State<MyHomePage> {
     final failedConstraints = currentPuzzle!.check();
     if (failedConstraints.isEmpty) {
       if (currentPuzzle!.complete) {
-        final stat = currentMeta!.stop();
-
-        // stats.add(stat);
-        writeStat(stat);
-        loadPuzzle();
+        currentMeta!.stop();
+        setState(() {
+          betweenPuzzles = true;
+        });
       }
     } else {
       currentMeta!.failures += 1;
@@ -188,7 +193,7 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void onPause() {
+  void pause() {
     setState(() {
       paused = true;
       if (currentPuzzle != null) {
@@ -197,10 +202,12 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void onResume() {
+  void resume() {
     setState(() {
       paused = false;
-      if (currentPuzzle != null) {
+      if (currentPuzzle == null) {
+        loadPuzzle();
+      } else {
         currentMeta!.stats?.resume();
       }
     });
@@ -208,10 +215,20 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void togglePause() {
     if (paused) {
-      onResume();
+      resume();
     } else {
-      onPause();
+      pause();
     }
+  }
+
+  void like(bool liked) {
+    if (currentMeta == null) return;
+    if (liked) {
+      currentMeta!.liked = DateTime.now();
+    } else {
+      currentMeta!.disliked = DateTime.now();
+    }
+    loadPuzzle();
   }
 
   @override
@@ -251,17 +268,70 @@ class _MyHomePageState extends State<MyHomePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    (currentPuzzle != null)
-                        ? PuzzleWidget(
-                            currentPuzzle: currentPuzzle!,
-                            onCellTap: handlePuzzleTap,
-                          )
-                        : Text("No puzzle loaded."),
+                    if (currentPuzzle != null)
+                      PuzzleWidget(
+                        currentPuzzle: currentPuzzle!,
+                        onCellTap: handlePuzzleTap,
+                      ),
                   ],
                 ),
-                if (paused)
+                if (betweenPuzzles)
+                  Column(
+                    spacing: 16,
+                    children: [
+                      Text("Puzzle solved!", style: TextStyle(fontSize: 48)),
+                      Text(
+                        "Was it fun to play?",
+                        style: TextStyle(fontSize: 24),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        spacing: 16,
+                        children: [
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.greenAccent,
+                              minimumSize: Size(64 * 3, 64 * 4),
+                              maximumSize: Size(64 * 3, 64 * 4),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(16)),
+                            ),
+                            onPressed: () => like(true),
+                            child: const Icon(Icons.thumb_up, size: 96),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent[100],
+                              minimumSize: Size(64 * 3, 64 * 4),
+                              maximumSize: Size(64 * 3, 64 * 4),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(16)),
+                            ),
+                            onPressed: () => like(false),
+                            child: const Icon(Icons.thumb_down, size: 96),
+                          ),
+                        ],
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.lightBlueAccent[100],
+                          minimumSize: Size(64 * 6, 64 * 4),
+                          maximumSize: Size(64 * 6, 64 * 4),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(16)),
+                        ),
+                        onPressed: loadPuzzle,
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text("Next", style: TextStyle(fontSize: 40)),
+                            Icon(Icons.skip_next, size: 96),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                else if (paused)
                   TextButton(
-                    onPressed: onResume,
+                    onPressed: resume,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         color: Colors.teal,

@@ -22,6 +22,7 @@ class PuzzleData {
   DateTime? disliked;
 
   PuzzleData(this.lineRepresentation) {
+    lineRepresentation = lineRepresentation.trim();
     var attributesStr = lineRepresentation.split("_");
     final dimensions = attributesStr[1].split("x");
     domain = attributesStr[0].split("").map((e) => int.parse(e)).toList();
@@ -39,6 +40,22 @@ class PuzzleData {
     return Puzzle(lineRepresentation);
   }
 
+  String getStat() {
+    final DateFormat formatter = DateFormat('yyyy-MM-ddTHH:mm:ss');
+    final sld = [
+      skipped != null ? "S" : "_",
+      liked != null ? "L" : "_",
+      disliked != null ? "D" : "_",
+    ].join("");
+    final String finishedForLog = finished == null ? "unfinished" : formatter.format(finished!);
+    final dates = [
+      skipped != null ? formatter.format(skipped!) : "",
+      liked != null ? formatter.format(liked!) : "",
+      disliked != null ? formatter.format(disliked!) : "",
+    ].join(" - ");
+    return "$finishedForLog ${duration}s ${failures}f $lineRepresentation - $sld - $dates";
+  }
+
   Puzzle begin() {
     stats = Stats();
     stats!.begin();
@@ -46,14 +63,14 @@ class PuzzleData {
     return getPuzzle();
   }
 
-  String stop() {
+  void stop() {
     if (stats == null) throw UnimplementedError("Should never stop the time before having started it.");
-    final stat = stats!.stop(lineRepresentation);
+    stats!.stop(lineRepresentation);
+
     played = true;
     finished = DateTime.now();
     duration = stats!.duration;
     failures = stats!.failures;
-    return stat;
   }
 }
 
@@ -134,7 +151,8 @@ class Database {
       if (!solvedPuzzles.containsKey(puz.lineRepresentation)) continue;
       puz.played = true;
       final puzzleData = solvedPuzzles[puz.lineRepresentation];
-      // 0: date, 1: duration, 2: " - ", 3: failures, 4: lineRepr
+      // unfinished 6s 0f 12_3x3_000201000_PA:8.left;GS:5.1;GS:0.1;PA:1.bottom_1:122221212 - ___ -  -  - 
+      // 2025-09-15T18:58:22 4s 0f 12_3x3_000201020_LT:A.3.2;GS:7.1_1:222211121 - ___ -  -  - 
       puz.duration = int.parse(
         puzzleData![1].replaceAll("s", ""),
       );
@@ -194,10 +212,7 @@ class Database {
   }
 
   List<String> getStats() {
-    final now = DateTime.now();
-    final DateFormat formatter = DateFormat('yyyy-MM-ddTHH:mm:ss');
-    final String dateForLog = formatter.format(now);
-    return filter().where((puz) => puz.played).map((puz) => "$dateForLog ${puz.duration}s - ${puz.failures}f ${puz.lineRepresentation}").toList();
+    return puzzles.where((puz) => puz.played).map((puz) => puz.getStat()).toList();
   }
 
 }
