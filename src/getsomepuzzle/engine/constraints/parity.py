@@ -120,3 +120,7 @@ class ParityConstraint(CellCentricConstraint):
     def line_import(line):
         idx, side = line.split(".")
         return {"indices": [int(idx)], "side": side}
+
+    def signature(self):
+        bilateral = "bi" if self.parameters["side"] in ("horizontal", "vertical") else "mo"
+        return f"{self.slug}:{bilateral}"
