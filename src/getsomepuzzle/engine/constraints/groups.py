@@ -49,7 +49,6 @@ class GroupSize(CellCentricConstraint):
         # If my group is too small but there are still free cells, consider it ok
         return any(c.free() for c in puzzle.state)
 
-
     def apply(self, puzzle):
         indices, size = self.parameters["indices"], self.parameters["size"]
         idx = indices[0]

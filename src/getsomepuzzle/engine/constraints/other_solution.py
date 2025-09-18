@@ -13,6 +13,9 @@ class OtherSolutionConstraint(Constraint):
             return True
         return not all(a == b for a, b in zip(values, self.parameters["solution"]))
 
+    def apply(self, puzzle):
+        return False
+
     def line_export(self):
         sol = "".join(str(v) for v in self.parameters["solution"])
         return f"{self.slug}:{sol}"

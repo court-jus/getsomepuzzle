@@ -27,7 +27,7 @@ def test_groupsize_valid():
     """)
     sizes = [2, 5, 2, 2, 5, 2, 5, 5, 5]
     for idx, size in enumerate(sizes):
-        assert GroupSize(idx=idx, size=size).check(p, debug=True) is True
+        assert GroupSize(indices=[idx], size=size).check(p, debug=True) is True
 
 
 def test_groupsize_invalid():
@@ -38,5 +38,5 @@ def test_groupsize_invalid():
     """)
     sizes = [1, 2, 3, 4, 4, 3, 2, 1, 0]
     for idx, size in enumerate(sizes):
-        assert GroupSize(idx=idx, size=size).check(p, debug=True) is False
+        assert GroupSize(indices=[idx], size=size).check(p, debug=True) is False
 

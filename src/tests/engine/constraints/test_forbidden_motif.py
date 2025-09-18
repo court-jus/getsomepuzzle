@@ -1,4 +1,4 @@
-import random
+    import random
 import pytest
 from getsomepuzzle.engine.constraints.motif import ForbiddenMotif
 from getsomepuzzle.engine.puzzle import Puzzle

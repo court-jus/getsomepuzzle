@@ -87,8 +87,8 @@ class Puzzle:
 
         self.apply_constraints()
 
-        if isinstance(new_constraint, FixedValueConstraint):
-            self.apply_fixed_constraints(debug=debug)
+        # if isinstance(new_constraint, FixedValueConstraint):
+        #     self.apply_fixed_constraints(debug=debug)
             
     def apply_fixed_constraints(self, debug=False):
         for constraint in self.constraints:
@@ -110,7 +110,11 @@ class Puzzle:
             changed = False
             for constraint in self.constraints:
                 if hasattr(constraint, "apply"):
+                    # ICILA
                     changed |= constraint.apply(self)
+                else:
+                    #print("Pas d'apply pour", constraint)
+                    pass
 
 
     def reset_user_input(self):

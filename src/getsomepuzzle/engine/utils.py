@@ -184,3 +184,6 @@ def timing(f):
 class FakeEvent:
     def is_set(self):
         return True
+
+def replace_char_at_idx(line, idx, replacement):
+    return line[:idx] + replacement + line[idx + 1:]

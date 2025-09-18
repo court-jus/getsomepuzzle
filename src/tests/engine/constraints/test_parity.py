@@ -208,7 +208,7 @@ def make_puzzle(strpuzzle):
 )
 def test_parity(puzzle, idx, side, valid):
     p = make_puzzle(puzzle)
-    c = ParityConstraint(idx=idx, side=side)
+    c = ParityConstraint(indices=[idx], side=side)
     assert c.check(p) is valid
 
 
@@ -217,5 +217,5 @@ def test_parity_generate():
     random.seed(0)
     p = Puzzle(running=running, width=5, height=5)
     generated = ParityConstraint.generate_random_parameters(p)
-    assert generated["idx"] == 2
+    assert generated["indices"] == [2]
     assert generated["side"] == "right"
