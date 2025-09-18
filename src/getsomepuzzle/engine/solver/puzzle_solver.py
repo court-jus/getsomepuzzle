@@ -6,14 +6,14 @@ from ..constants import MAX_STEPS
 def find_solution(running, starting_state, debug=False):
     st = starting_state.clone()
     log_history = []
-    steps = MAX_STEPS
+    steps = 0
     backpropagations = 0
-    while steps > 0 and running.is_set():
+    while steps <= MAX_STEPS and running.is_set():
         if st.is_complete(debug=debug):
             break
         if debug:
             print(st.state)
-        steps -= 1
+        steps += 1
         cell, idx = st.first_free_cell()
         if cell is None or not st.is_possible():
             if debug:
@@ -25,7 +25,7 @@ def find_solution(running, starting_state, debug=False):
             if not log_history:
                 if debug:
                     print("No history left, no solution found")
-                return None, None
+                return None, None, steps
             previous_line = st
             v = 0
             backpropagations += 1
@@ -41,7 +41,7 @@ def find_solution(running, starting_state, debug=False):
             else:
                 if debug:
                     print("Found nothing changeable in history")
-                return None, None
+                return None, None, steps
             if debug:
                 print(f"Found changeable history: {cell_idx + 1} = {chosen_value} ({options_remaining})")
             st = starting_state.clone()
@@ -89,12 +89,12 @@ def find_solution(running, starting_state, debug=False):
             if debug:
                 print("so now we are back with")
                 print(st.state)
-    if not steps:
+    if steps >= MAX_STEPS:
         raise RuntimeError("Reached MAX_STEPS")
 
     if not st.is_complete(debug=debug):
-        return None, None
-    return st, backpropagations
+        return None, None, steps
+    return st, backpropagations, steps
 
 def find_solutions(puzzle, running, max_solutions=2, debug=False):
     initial_state = puzzle.clone()
@@ -103,7 +103,7 @@ def find_solutions(puzzle, running, max_solutions=2, debug=False):
     while max_explorations > 0 and running.is_set():
         max_explorations -= 1
         try:
-            solution, _ = find_solution(running, initial_state, debug=debug)
+            solution, _, _ = find_solution(running, initial_state, debug=debug)
         except RuntimeError:
             break                
         if debug:

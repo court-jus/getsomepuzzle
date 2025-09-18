@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 
 from getsomepuzzle.engine.puzzle import Puzzle
-from getsomepuzzle.engine.constraints import FixedValueConstraint, ForbiddenMotif, QuantityAllConstraint
+from getsomepuzzle.engine.constraints import FixedValueConstraint, ForbiddenMotif, QuantityAllConstraint, GroupSize, LetterGroup
 from getsomepuzzle.engine.utils import FakeEvent, state_to_str, line_export, line_import
 from getsomepuzzle.engine.solver.puzzle_solver import find_solution, find_solutions
 from getsomepuzzle.engine.generator.puzzle_generator import PuzzleGenerator
@@ -50,9 +50,14 @@ def generate_a_puzzle(load=None):
                 val = sol1[idx]
                 pu.add_constraint(FixedValueConstraint(idx=idx, val=val))
                 other = [sol for sol in other if sol[idx] == val]
+                values = [c.value for c in pu.state]
+                ratio = values.count(0) / len(values)
+                if ratio < 0.7:
+                    print("# The puzzle has lost its interest")
+                    raise ValueError
     except ValueError:
         # This probably means that adding a fixed value constraint would fill the puzzle
-        # The puzzle is probably boring as fuck
+        print("# The puzzle is probably boring as fuck")
         return
 
     solutions = find_solutions(pu, running, max_solutions=10)
@@ -70,6 +75,32 @@ def generate_a_puzzle(load=None):
             print(sol)
 
 
+def playground_contstraints_apply():
+    running = FakeEvent()
+    pu = Puzzle(running=running, width=3, height=3)
+    pu.state[2].value = 1
+    pu.state[2].options = []
+    pu.add_constraint(LetterGroup(indices=[2, 8], letter="A"))
+    sol, bp, steps = find_solution(running, pu)
+    print(pu)
+    print(state_to_str(pu))
+    print(pu.state)
+    print("Solution can be found in", steps, "steps")
+    pu.add_constraint(LetterGroup(indices=[1, 6], letter="B"), debug=True)
+    sol, bp, steps = find_solution(running, pu)
+    print(pu)
+    print(state_to_str(pu))
+    print("Solution can be found in", steps, "steps")
+    print("=" * 80)
+    changed = True
+    while changed:
+        changed = False
+        for cons in pu.constraints:#(co, co2):
+            print(state_to_str(pu))
+            changed |= cons.apply(pu)
+            sol, bp, steps = find_solution(running, pu)
+            print("Solution can be found in", steps, "steps")
+
 def main():
     for i in range(100):
         generate_a_puzzle()
@@ -77,4 +108,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    playground_contstraints_apply()

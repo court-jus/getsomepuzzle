@@ -1,4 +1,4 @@
-from getsomepuzzle.engine.utils import to_grid, to_groups
+from getsomepuzzle.engine.utils import to_grid, to_groups, find_matching_group_neighbors
 
 
 def test_to_grid1():
@@ -47,3 +47,7 @@ def test_to_groups3():
         [0, 2, 3, 5, 6, 7, 8],
         [1, 4],
     ]
+
+
+def test_find_matching_group_neighbors():
+    assert set(find_matching_group_neighbors("220010000", 3, 3, [0, 1], "0")) == {2, 3}

@@ -18,7 +18,8 @@ class PuzzleGenerator:
         self.puzzle = Puzzle(running=self.running, width=width, height=height)
 
     def add_random_rule(self, banned_constraints, debug=False):
-        max_iter = 1000
+        max_iter = 1000000
+        banned = banned_constraints[:]
         while max_iter > 0 and self.running.is_set():
             max_iter -= 1
             rule = random.choice(AVAILABLE_RULES)
@@ -30,7 +31,7 @@ class PuzzleGenerator:
                     continue
             try:
                 new_constraint = rule(**parameters)
-                if any(c == new_constraint for c in banned_constraints):
+                if any(c == new_constraint for c in banned):
                     if debug:
                         print("Cannot add", new_constraint, "it is banned")
                     continue
@@ -47,6 +48,7 @@ class PuzzleGenerator:
             except ValueError as err:
                 if debug:
                     print("Cannot add", new_constraint, err)
+                    banned.append(new_constraint)
                 # The puzzle already has this constraint or there is a conflict
                 continue
             else:
@@ -127,7 +129,7 @@ def generate_once(running, width, height):
         pu = pg.generate(LetterGroup(**params), debug=debug)
         if pu is None:
             return None
-        solution, bp = find_solution(running, pu, debug=debug)
+        solution, bp, _ = find_solution(running, pu, debug=debug)
         if not bp:
             return None
     except RuntimeError:
@@ -135,7 +137,7 @@ def generate_once(running, width, height):
     pu.apply_fixed_constraints(debug=debug)
     pu.clear_solutions()
     pu.remove_useless_rules(debug=debug)
-    solution, bp = find_solution(running, pu, debug=debug)
+    solution, bp, _ = find_solution(running, pu, debug=debug)
     pu.clear_solutions()
     if bp is None:
         return None
@@ -143,7 +145,7 @@ def generate_once(running, width, height):
     while bp and bp > 5 and max_simplifications > 0:
         max_simplifications -= 1
         pu.simplify(solution, debug=debug)
-        solution, bp = find_solution(running, pu, debug=debug)
+        solution, bp, _ = find_solution(running, pu, debug=debug)
     if len(find_solutions(pu, running, debug=debug)) != 1:
         return None
 
