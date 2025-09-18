@@ -30,6 +30,8 @@ class ParityConstraint(CellCentricConstraint):
             "right": ["horizontal", "left"],
             "top": ["vertical", "bottom"],
             "bottom": ["vertical", "top"],
+            "horizontal": ["right", "left"],
+            "vertical": ["bottom", "top"],
         }
         return other.parameters["side"] in conflicting[self.parameters["side"]]
 
@@ -118,7 +120,7 @@ class ParityConstraint(CellCentricConstraint):
 
     @staticmethod
     def maximum_presence(puzzle):
-        return puzzle.width
+        return int((puzzle.width * puzzle.height) / 5)
 
     def line_export(self):
         indices, side = self.parameters["indices"], self.parameters["side"]

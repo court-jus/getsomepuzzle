@@ -1,7 +1,7 @@
 import random
 import re
 
-from ..utils import to_grid, to_groups
+from ..utils import to_grid, to_groups, find_matching_group_neighbors
 from .base import CellCentricConstraint
 
 
@@ -32,6 +32,9 @@ class GroupSize(CellCentricConstraint):
     def _check(self, puzzle, debug=False):
         indices, size = self.parameters["indices"], self.parameters["size"]
         idx = indices[0]
+        my_color = puzzle.state[idx].value
+        if my_color == 0:
+            return True
         groups = to_groups(puzzle.state, puzzle.width, puzzle.height, lambda cell: cell.value)
         my_group = [grp for grp in groups if idx in grp]
         if len(my_group) != 1:
@@ -46,6 +49,45 @@ class GroupSize(CellCentricConstraint):
         # If my group is too small but there are still free cells, consider it ok
         return any(c.free() for c in puzzle.state)
 
+
+    def apply(self, puzzle):
+        indices, size = self.parameters["indices"], self.parameters["size"]
+        idx = indices[0]
+        # If my color is not known yet, return False
+        my_color = puzzle.state[idx].value
+        my_opposite = [v for v in puzzle.domain if v != my_color][0]
+        if my_color == 0:
+            return False
+
+        groups = to_groups(puzzle.state, puzzle.width, puzzle.height, lambda cell: cell.value)
+        my_group = [grp for grp in groups if idx in grp]
+        if len(my_group) != 1:
+            raise RuntimeError("My group should exist")
+        my_group = my_group[0]
+        boundaries = find_matching_group_neighbors(puzzle.state, puzzle.width, puzzle.height, my_group, 0, lambda cell: cell.value)
+        changed = False
+        if len(my_group) == size:
+            # If my group already has the correct size, check my boundaries and set them to opposite color
+            for boundary in boundaries:
+                if puzzle.state[boundary].value != my_opposite or puzzle.state[boundary].options != []:
+                    puzzle.state[boundary].value = my_opposite
+                    puzzle.state[boundary].options = []
+                    changed = True
+        elif len(my_group) < size:
+            # If my group is not big enough yet but only has one exit, set it to my color
+            if len(boundaries) == 1:
+                boundary = boundaries[0]
+                if puzzle.state[boundary].value != my_color or puzzle.state[boundary].options != []:
+                    puzzle.state[boundary].value = my_color
+                    puzzle.state[boundary].options = []
+                    changed = True
+            # TODO:
+            # If extending in a direction would merge me with another group and create a "too big group",
+            #   then add a boundary in that direction, it is forbidden to grow there
+        else:
+            raise RuntimeError("My group is bigger than size")
+        return changed
+
     @staticmethod
     def generate_random_parameters(puzzle):
         maximum_group_size = min(10, max(1, int(puzzle.width * puzzle.height * 0.2)))
@@ -55,7 +97,7 @@ class GroupSize(CellCentricConstraint):
 
     @staticmethod
     def maximum_presence(puzzle):
-        return puzzle.width
+        return int((puzzle.width * puzzle.height) / 5)
 
     def line_export(self):
         indices, size = self.parameters["indices"], self.parameters["size"]

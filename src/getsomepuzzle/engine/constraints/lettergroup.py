@@ -1,7 +1,7 @@
 import random
 import re
 
-from ..utils import to_grid, to_groups
+from ..utils import to_grid, to_groups, get_neighbors
 from .base import CellCentricConstraint
 
 
@@ -45,9 +45,6 @@ class LetterGroup(CellCentricConstraint):
             intersect = set(group).intersection(set(indices))
             if intersect:
                 my_groups.append(group)
-        # There should be only one group that covers all my indices
-        if len(my_groups) != 1:
-            return False
         # There should be no other letter in mygroup
         my_group = my_groups[0]
         letters_in_my_group = []
@@ -58,7 +55,37 @@ class LetterGroup(CellCentricConstraint):
             ])
         if len(set(letters_in_my_group)) != 1:
             return False
-        return True
+
+        # If the puzzle is incomplete, that's all we can check
+        if any(c.free() for c in puzzle.state):
+            return True
+
+        # Else, there should be only one group that covers all my indices
+        return len(my_groups) == 1
+
+    def apply(self, puzzle):
+        changed = False
+        indices, letter = self.parameters["indices"], self.parameters["letter"]
+
+        my_colors = [puzzle.state[idx].value for idx in indices if puzzle.state[idx].value != 0]
+        my_color = my_colors[0] if my_colors else 0
+        other_letters = [idx for c in puzzle.constraints if c != self for idx in c.parameters["indices"]]
+        neighbors_with_letters = [nei for idx in indices for nei in get_neighbors(puzzle.state, puzzle.width, puzzle.height, idx) if nei is not None and nei in other_letters]
+        if my_color:
+            # Apply opposite color to neighbors_with_letters
+            my_opposite = [v for v in puzzle.domain if v != my_color][0]
+            for nei in neighbors_with_letters:
+                if puzzle.state[nei].value != my_opposite or puzzle.state[nei].options != []:
+                    puzzle.state[nei].value = my_opposite
+                    puzzle.state[nei].options = []
+                    changed = True
+            # Apply color to other members of the letter group
+            for member in indices:
+                if puzzle.state[member].value != my_color or puzzle.state[member].options != []:
+                    puzzle.state[member].value = my_color
+                    puzzle.state[member].options = []
+                    changed = True
+        return changed
 
     @staticmethod
     def generate_random_parameters(puzzle):
@@ -79,7 +106,7 @@ class LetterGroup(CellCentricConstraint):
 
     @staticmethod
     def maximum_presence(puzzle):
-        return puzzle.width
+        return int((puzzle.width * puzzle.height) / 5)
 
     def line_export(self):
         indices, letter = self.parameters["indices"], self.parameters["letter"]

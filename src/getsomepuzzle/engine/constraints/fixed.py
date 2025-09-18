@@ -14,6 +14,15 @@ class FixedValueConstraint(Constraint):
         idx, val = self.parameters["idx"], self.parameters["val"]
         return puzzle.state[idx].value == val or val in puzzle.state[idx].options
 
+    def apply(self, puzzle):
+        idx, val = self.parameters["idx"], self.parameters["val"]
+        if puzzle.state[idx].value == val and puzzle.state[idx].options == []:
+            # Already applied
+            return False
+        puzzle.state[idx].value = val
+        puzzle.state[idx].options = []
+        return True
+
     @staticmethod
     def generate_random_parameters(puzzle):
         return {

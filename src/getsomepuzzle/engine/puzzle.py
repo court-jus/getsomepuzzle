@@ -78,12 +78,20 @@ class Puzzle:
         # Try to solve
         tmp = self.clone()
         tmp.constraints.append(new_constraint)
-        sol, bp = find_solution(self.running, tmp, debug=debug)
+        sol, bp, _ = find_solution(self.running, tmp, debug=debug)
         if not sol:
             raise ValueError("Cannot add rule, it makes the puzzle unsolvable")
         self.constraints.append(new_constraint)
         if debug:
-            print("Good it's added")
+            print("Good it's added, let's apply it")
+
+        changed = True
+        while changed:
+            changed = False
+            for constraint in self.constraints:
+                if hasattr(constraint, "apply"):
+                    changed |= constraint.apply(self)
+
         if isinstance(new_constraint, FixedValueConstraint):
             self.apply_fixed_constraints(debug=debug)
             

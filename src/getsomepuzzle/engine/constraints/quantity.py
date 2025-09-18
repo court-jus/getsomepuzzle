@@ -42,7 +42,7 @@ class QuantityAllConstraint(Constraint):
 
     @staticmethod
     def maximum_presence(puzzle):
-        return len(puzzle.domain)
+        return 1
 
     def line_export(self):
         value, count = self.parameters["value"], self.parameters["count"]

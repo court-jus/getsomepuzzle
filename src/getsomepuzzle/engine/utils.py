@@ -19,6 +19,7 @@ def get_neighbors(strpuzzle, w, h, idx):
     minidx = 0
     ridx = idx // w
     abv, bel, lft, rgt = idx - w, idx + w, idx - 1, idx + 1
+    # print("IDX", idx, idx // w, abv, abv >= minidx, bel, bel <= maxidx,  lft, lft >= minidx,  lft // w == ridx, rgt, rgt <= maxidx,  rgt // w == ridx)
     return (
         abv if abv >= minidx else None,
         bel if bel <= maxidx else None,
@@ -64,6 +65,19 @@ def to_groups(strpuzzle, w, h, transformer=lambda x: x):
             new_grp = new_grp.union(remove_grp)
         groups[new_gidx] = groups[new_gidx].union(new_grp)
     return [sorted(list(grp)) for grp in sorted(groups.values())]
+
+
+def find_matching_group_neighbors(strpuzzle, w, h, grp, match, transformer=lambda x: x):
+    result = []
+    for idx in grp:
+        for neighbor in get_neighbors(strpuzzle, w, h, idx):
+            if neighbor is None:
+                continue
+            if neighbor in grp:
+                continue
+            if transformer(strpuzzle[neighbor]) == match:
+                result.append(neighbor)
+    return result
 
 
 def state_to_str(pu):
