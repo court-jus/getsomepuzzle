@@ -1,7 +1,7 @@
 import random
 import re
 
-from ..utils import to_grid
+from ..utils import to_grid, replace_char_at_idx
 from .base import Constraint
 
 
@@ -61,8 +61,8 @@ class Motif(Constraint):
             return omotif in smotif
         return smotif in omotif
 
-    def is_present(self, puzzle, debug=False):
-        motif = self.parameters["motif"]
+    @staticmethod
+    def _is_present(motif, puzzle, debug=False):
         pu = "".join(str(c.value) for c in puzzle.state)
         if debug:
             print("Find", motif, "in", pu)
@@ -78,10 +78,15 @@ class Motif(Constraint):
             if m:
                 if debug:
                     print("found at", m.start())
-                return True
+                return True, idx
         if debug:
             print("not found")
-        return False
+        return False, None
+
+    def is_present(self, puzzle, debug=False):
+        motif = self.parameters["motif"]
+        present, _ = Motif._is_present(motif, puzzle, debug=debug)
+        return present
 
     def line_export(self):
         motif = ".".join("".join(row) for row in self.parameters["motif"])
@@ -107,6 +112,35 @@ class Motif(Constraint):
             motif = motif.replace("1", repl_1).replace("2", repl_2)
         return f"{self.slug}:{motif}"
 
+    @staticmethod
+    def find_submotif(strmotif, puzzle):
+        for idx, car, submotif in [
+            (idx, strmotif[idx], replace_char_at_idx(strmotif, idx, "0"))
+            for idx, car in enumerate(strmotif)
+            if car not in "0."
+        ]:
+            present, where = Motif._is_present(submotif.split("."), puzzle)
+            if present:
+                return where, idx, car, submotif
+
+    def apply(self, puzzle):
+        motif = self.parameters["motif"]
+        strmotif = ".".join(motif)
+        mow = len(motif[0])
+
+        submotif = Motif.find_submotif(strmotif, puzzle)
+        if submotif is None:
+            return False
+
+        where, idx, car, submotif = submotif
+        row_count = (idx // (mow + 1))
+        idx += where + row_count
+        if puzzle.state[idx].value == 0 or puzzle.state[idx].options != []:
+            opposite = [v for v in puzzle.domain if v != int(car)][0]
+            puzzle.state[idx].value = opposite
+            puzzle.state[idx].options = []
+            return True
+        return False
 
 class ForbiddenMotif(Motif):
     slug = "FM"

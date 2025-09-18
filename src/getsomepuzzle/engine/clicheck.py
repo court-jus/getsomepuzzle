@@ -4,7 +4,6 @@ from pathlib import Path
 
 from getsomepuzzle.engine.puzzle import Puzzle
 from getsomepuzzle.engine.constraints import LetterGroup, FixedValueConstraint
-from getsomepuzzle.engine.constraints.other_solution import OtherSolutionConstraint
 from getsomepuzzle.engine.utils import FakeEvent, state_to_str, line_export, line_import
 from getsomepuzzle.engine.solver.puzzle_solver import find_solution, find_solutions
 from getsomepuzzle.engine.generator.puzzle_generator import PuzzleGenerator

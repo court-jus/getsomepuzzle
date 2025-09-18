@@ -23,9 +23,10 @@ def generate_a_puzzle(load=None):
         while True:
             try:
                 print("A?")
-                added = pg.add_random_rule([])
+                added = pg.add_random_rule([], debug=False)
                 print("A", line_export(pg.puzzle))
-            except RuntimeError:
+            except RuntimeError as exc:
+                print("RTE while adding rule", exc)
                 break
         pu = pg.puzzle
     else:
@@ -57,10 +58,11 @@ def generate_a_puzzle(load=None):
                 values = [c.value for c in pu.state]
                 ratio = values.count(0) / len(values)
                 if ratio < 0.7:
-                    print("# The puzzle has lost its interest")
+                    print("# The puzzle has lost its interest", ratio)
                     raise ValueError
     except ValueError:
         # This probably means that adding a fixed value constraint would fill the puzzle
+        print("F", line_export(pu))
         print("# The puzzle is probably boring as fuck")
         return
 
@@ -105,18 +107,18 @@ def playground_contstraints_apply():
 
 def playground_find_solution():
     running = FakeEvent()
-    pu = line_import("12_4x4_0000000000000000_LT:A.3.8;FM:10.11.01;LT:B.9.1;FM:11.11;LT:C.15.6_1:zef")
+    pu = line_import("xxxxx")
     sol, bp, steps = find_solution(running, pu, debug=False)
     print(pu)
     print(state_to_str(pu))
     print(pu.state)
     print("Solution can be found in", steps, "steps")
-    # pu.apply_constraints()
-    # sol, bp, steps = find_solution(running, pu)
-    # print(pu)
-    # print(state_to_str(pu))
-    # print(pu.state)
-    # print("Solution can be found in", steps, "steps")
+    pu.apply_constraints()
+    sol, bp, steps = find_solution(running, pu)
+    print(pu)
+    print(state_to_str(pu))
+    print(pu.state)
+    print("Solution can be found in", steps, "steps")
 
 
 def main():
@@ -126,6 +128,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
+    main()
     # playground_contstraints_apply()
-    playground_find_solution()
+    # playground_find_solution()

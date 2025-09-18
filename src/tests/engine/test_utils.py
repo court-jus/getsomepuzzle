@@ -1,4 +1,4 @@
-from getsomepuzzle.engine.utils import to_grid, to_groups, find_matching_group_neighbors
+from getsomepuzzle.engine.utils import to_grid, to_groups, find_matching_group_neighbors, replace_char_at_idx
 
 
 def test_to_grid1():
@@ -51,3 +51,7 @@ def test_to_groups3():
 
 def test_find_matching_group_neighbors():
     assert set(find_matching_group_neighbors("220010000", 3, 3, [0, 1], "0")) == {2, 3}
+
+
+def test_replace_char_at_idx():
+    assert replace_char_at_idx("11.01.21", 4, "a") == "11.0a.21"

@@ -106,7 +106,6 @@ def old_find_solution(running, starting_state, debug=False):
 
 def find_solution(running, puzzle, level=0, debug=False):
     start = time.time()
-    print(line_export(puzzle))
     if debug:
         print(" " * level, "find_solution for", line_export(puzzle))
     st = puzzle.clone()
@@ -114,6 +113,7 @@ def find_solution(running, puzzle, level=0, debug=False):
     log_history = []
     steps = 0
     while steps <= MAX_STEPS and running.is_set():
+        # time.sleep(1)
         if st.is_complete(debug=False):
             break
         steps += 1
@@ -135,6 +135,8 @@ def find_solution(running, puzzle, level=0, debug=False):
                 if debug:
                     print(" " * level, f"Nope, we should remove {option} from options for {idx+1}")
                 st.state[idx].options.remove(option)
+                if not st.state[idx].options:
+                    return None, None, steps
 
     if not st.is_complete(debug=False):
         if debug:
