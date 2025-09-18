@@ -18,7 +18,7 @@ class PuzzleGenerator:
         self.puzzle = Puzzle(running=self.running, width=width, height=height)
 
     def add_random_rule(self, banned_constraints, debug=False):
-        max_iter = 1000000
+        max_iter = 1000
         banned = banned_constraints[:]
         while max_iter > 0 and self.running.is_set():
             max_iter -= 1

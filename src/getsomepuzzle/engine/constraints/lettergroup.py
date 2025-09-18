@@ -69,7 +69,7 @@ class LetterGroup(CellCentricConstraint):
 
         my_colors = [puzzle.state[idx].value for idx in indices if puzzle.state[idx].value != 0]
         my_color = my_colors[0] if my_colors else 0
-        other_letters = [idx for c in puzzle.constraints if c != self for idx in c.parameters["indices"]]
+        other_letters = [idx for c in puzzle.constraints if isinstance(c, LetterGroup) and c != self for idx in c.parameters["indices"]]
         neighbors_with_letters = [nei for idx in indices for nei in get_neighbors(puzzle.state, puzzle.width, puzzle.height, idx) if nei is not None and nei in other_letters]
         if my_color:
             # Apply opposite color to neighbors_with_letters

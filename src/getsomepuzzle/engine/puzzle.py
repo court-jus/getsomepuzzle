@@ -85,12 +85,7 @@ class Puzzle:
         if debug:
             print("Good it's added, let's apply it")
 
-        changed = True
-        while changed:
-            changed = False
-            for constraint in self.constraints:
-                if hasattr(constraint, "apply"):
-                    changed |= constraint.apply(self)
+        self.apply_constraints()
 
         if isinstance(new_constraint, FixedValueConstraint):
             self.apply_fixed_constraints(debug=debug)
@@ -108,6 +103,15 @@ class Puzzle:
         self.constraints = [
             c for c in self.constraints if not isinstance(c, FixedValueConstraint)
         ]
+
+    def apply_constraints(self):
+        changed = True
+        while changed:
+            changed = False
+            for constraint in self.constraints:
+                if hasattr(constraint, "apply"):
+                    changed |= constraint.apply(self)
+
 
     def reset_user_input(self):
         for cell in self.state:
