@@ -1,9 +1,12 @@
 import time
 from ..constraints.other_solution import OtherSolutionConstraint
 from ..constants import MAX_STEPS
+from ..utils import line_export
 
    
-def find_solution(running, starting_state, debug=False):
+def old_find_solution(running, starting_state, debug=False):
+    start = time.time()
+    print("find_solution for", line_export(starting_state))
     st = starting_state.clone()
     log_history = []
     steps = 0
@@ -25,6 +28,7 @@ def find_solution(running, starting_state, debug=False):
             if not log_history:
                 if debug:
                     print("No history left, no solution found")
+                print(int((time.time() - start) * 1000), "  done")
                 return None, None, steps
             previous_line = st
             v = 0
@@ -41,6 +45,7 @@ def find_solution(running, starting_state, debug=False):
             else:
                 if debug:
                     print("Found nothing changeable in history")
+                print(int((time.time() - start) * 1000), "  done")
                 return None, None, steps
             if debug:
                 print(f"Found changeable history: {cell_idx + 1} = {chosen_value} ({options_remaining})")
@@ -93,8 +98,51 @@ def find_solution(running, starting_state, debug=False):
         raise RuntimeError("Reached MAX_STEPS")
 
     if not st.is_complete(debug=debug):
+        print(int((time.time() - start) * 1000), "  done")
         return None, None, steps
+    print(int((time.time() - start) * 1000), "  done")
     return st, backpropagations, steps
+
+
+def find_solution(running, puzzle, level=0, debug=False):
+    start = time.time()
+    print(line_export(puzzle))
+    if debug:
+        print(" " * level, "find_solution for", line_export(puzzle))
+    st = puzzle.clone()
+    st.apply_constraints()
+    log_history = []
+    steps = 0
+    while steps <= MAX_STEPS and running.is_set():
+        if st.is_complete(debug=False):
+            break
+        steps += 1
+        cell, idx = st.first_free_cell()
+        if cell is None:
+            if debug:
+                print(" " * level, int((time.time() - start) * 1000), "  done NOPE(a)")
+            return None, None, steps
+        for option in cell.options:
+            # time.sleep(0.5)
+            if debug:
+                print(" " * level, f"Will try to set {idx + 1} = {option} ({cell.options}) and recurse into that")
+            clone = st.clone()
+            clone.state[idx].set_value(option)
+            sub_st, sub_level, sub_steps = find_solution(running, clone, level=level+1, debug=debug)
+            if sub_st is not None:
+                return sub_st, sub_level, (sub_steps + steps)
+            else:
+                if debug:
+                    print(" " * level, f"Nope, we should remove {option} from options for {idx+1}")
+                st.state[idx].options.remove(option)
+
+    if not st.is_complete(debug=False):
+        if debug:
+            print(" " * level, int((time.time() - start) * 1000), "  done NOPE(b)")
+        return None, None, steps
+    if debug:
+        print(" " * level, int((time.time() - start) * 1000), "  done YAY")
+    return st, level, steps
 
 def find_solutions(puzzle, running, max_solutions=2, debug=False):
     initial_state = puzzle.clone()

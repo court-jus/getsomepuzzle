@@ -14,15 +14,17 @@ def generate_a_puzzle(load=None):
     running = FakeEvent()
 
     if load is None:
-        width = random.randint(4, 6)
-        height = random.randint(4, 7)
+        width = random.randint(4, 4)
+        height = random.randint(4, 4)
         pg = PuzzleGenerator(running=running, width=width, height=height)
-        params = QuantityAllConstraint.generate_random_parameters(pg.puzzle)
-        pg.puzzle.add_constraint(QuantityAllConstraint(**params))
+        # params = QuantityAllConstraint.generate_random_parameters(pg.puzzle)
+        # pg.puzzle.add_constraint(QuantityAllConstraint(**params))
 
         while True:
             try:
+                print("A?")
                 added = pg.add_random_rule([])
+                print("A", line_export(pg.puzzle))
             except RuntimeError:
                 break
         pu = pg.puzzle
@@ -32,6 +34,7 @@ def generate_a_puzzle(load=None):
     try:
         continue_looking = True
         while continue_looking:
+            print("B", line_export(pu))
             solutions = find_solutions(pu, running, max_solutions=10)
             continue_looking = (len(solutions) == 10)
             if len(solutions) == 1:
@@ -49,6 +52,7 @@ def generate_a_puzzle(load=None):
                 idx = indices[0][0]
                 val = sol1[idx]
                 pu.add_constraint(FixedValueConstraint(idx=idx, val=val))
+                print("C", line_export(pu))
                 other = [sol for sol in other if sol[idx] == val]
                 values = [c.value for c in pu.state]
                 ratio = values.count(0) / len(values)
@@ -60,6 +64,7 @@ def generate_a_puzzle(load=None):
         print("# The puzzle is probably boring as fuck")
         return
 
+    print("D", line_export(pu))
     solutions = find_solutions(pu, running, max_solutions=10)
     if len(solutions) == 1:
         pu.remove_useless_rules()
@@ -70,7 +75,7 @@ def generate_a_puzzle(load=None):
             fp.write(line + "\n")
         print(time.time() - start, " - ", line)
     else:
-        print(line_export(pu))
+        print("E", line_export(pu))
         for sol in solutions:
             print(sol)
 
@@ -92,21 +97,35 @@ def playground_contstraints_apply():
     print(state_to_str(pu))
     print("Solution can be found in", steps, "steps")
     print("=" * 80)
-    changed = True
-    while changed:
-        changed = False
-        for cons in pu.constraints:#(co, co2):
-            print(state_to_str(pu))
-            changed |= cons.apply(pu)
-            sol, bp, steps = find_solution(running, pu)
-            print("Solution can be found in", steps, "steps")
+
+    pu.apply_constraints()
+    sol, bp, steps = find_solution(running, pu)
+    print("Solution can be found in", steps, "steps")
+
+
+def playground_find_solution():
+    running = FakeEvent()
+    pu = line_import("12_4x4_0000000000000000_LT:A.3.8;FM:10.11.01;LT:B.9.1;FM:11.11;LT:C.15.6_1:zef")
+    sol, bp, steps = find_solution(running, pu, debug=False)
+    print(pu)
+    print(state_to_str(pu))
+    print(pu.state)
+    print("Solution can be found in", steps, "steps")
+    # pu.apply_constraints()
+    # sol, bp, steps = find_solution(running, pu)
+    # print(pu)
+    # print(state_to_str(pu))
+    # print(pu.state)
+    # print("Solution can be found in", steps, "steps")
+
 
 def main():
-    for i in range(100):
+    for i in range(1):
         generate_a_puzzle()
 
 
 
 if __name__ == "__main__":
     # main()
-    playground_contstraints_apply()
+    # playground_contstraints_apply()
+    playground_find_solution()

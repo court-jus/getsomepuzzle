@@ -31,3 +31,10 @@ class Cell:
         c.value = self.value
         c.options = self.options[:]
         return c
+
+    def set_value(self, val):
+        if self.value == val and self.options == []:
+            return False
+        self.value = val
+        self.options = []
+        return True
