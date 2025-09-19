@@ -1,9 +1,10 @@
 import random
 from .constraints import FixedValueConstraint
 from .constraints.base import CellCentricConstraint
-from .constants import DOMAIN, DEFAULT_SIZE
+from .constants import DOMAIN, DEFAULT_SIZE, EMPTY, MAX_FORCABLE
 from .cell import Cell
 from .solver.puzzle_solver import find_solution, find_solutions
+from .utils import line_export
 
 class Puzzle:
     def __init__(self, *, running, width=DEFAULT_SIZE, height=DEFAULT_SIZE, domain=None):
@@ -51,6 +52,11 @@ class Puzzle:
     def is_complete(self, debug=False):
         return self.is_valid(debug=debug) and not self.free_cells()
 
+    def is_forcable(self):
+        # We consider that if we have 16 or less empty cells, we can
+        # brute force the puzzle
+        return len(self.free_cells()) <= MAX_FORCABLE
+
     def free_cells(self):
         return [(c, idx) for idx, c in enumerate(self.state) if c.free()]
 
@@ -60,7 +66,7 @@ class Puzzle:
             return None, None
         return cells[0]
 
-    def add_constraint(self, new_constraint, debug=False):
+    def add_constraint(self, new_constraint, debug=False, auto_apply=True, auto_check=True):
         if debug:
             print("Trying to add", new_constraint, "to", [repr(c) for c in self.constraints])
         if any(c == new_constraint for c in self.constraints):
@@ -75,17 +81,18 @@ class Puzzle:
             fixed_cells = [c for c in self.state if c.value]
             if len(fixed_cells) == (self.width * self.height) - 1:
                 raise ValueError("Cannot add rule, it would fill the puzzle")
-        # Try to solve
-        tmp = self.clone()
-        tmp.constraints.append(new_constraint)
-        sol, bp, _ = find_solution(self.running, tmp, debug=debug)
-        if not sol:
-            raise ValueError("Cannot add rule, it makes the puzzle unsolvable")
+        if auto_check:
+            # Try to solve
+            tmp = self.clone()
+            tmp.constraints.append(new_constraint)
+            sol, bp, _ = find_solution(self.running, tmp, debug=debug)
+            if not sol:
+                raise ValueError("Cannot add rule, it makes the puzzle unsolvable")
         self.constraints.append(new_constraint)
         if debug:
             print("Good it's added, let's apply it")
-
-        self.apply_constraints()
+        if auto_apply:
+            self.apply_constraints()
 
         # if isinstance(new_constraint, FixedValueConstraint):
         #     self.apply_fixed_constraints(debug=debug)
@@ -110,10 +117,12 @@ class Puzzle:
             changed = False
             for constraint in self.constraints:
                 if hasattr(constraint, "apply"):
-                    # ICILA
-                    changed |= constraint.apply(self)
+                    if constraint.apply(self):
+                        # print("Constraint", constraint, "did change:")
+                        # print(line_export(self))
+                        changed = True
                 else:
-                    #print("Pas d'apply pour", constraint)
+                    # print("Pas d'apply pour", constraint)
                     pass
 
 

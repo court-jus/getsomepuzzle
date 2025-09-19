@@ -146,7 +146,11 @@ def line_import(line):
     from .constraints import AVAILABLE_RULES
 
     line_format = line.count("_")
-    domain, size, values, constraints, solutions = line.split("_")
+    if line_format == 3:
+        domain, size, values, constraints = line.split("_")
+        solutions = []
+    else:
+        domain, size, values, constraints, solutions = line.split("_")
     domain = [int(d) for d in domain]
     w, h = size.split("x")
     values = [int(v) for v in values]
@@ -189,3 +193,19 @@ class FakeEvent:
 
 def replace_char_at_idx(line, idx, replacement):
     return line[:idx] + replacement + line[idx + 1:]
+
+def generate_positions(line):
+    result = []
+    for idx, val in enumerate(line):
+        if val == EMPTY:
+            clone1 = line[:]
+            clone2 = line[:]
+            clone1[idx] = 1
+            clone2[idx] = 2
+            result.extend(generate_positions(clone1))
+            result.extend(generate_positions(clone2))
+            break
+    else:
+        # No empty cell found
+        result.append(line)
+    return result
