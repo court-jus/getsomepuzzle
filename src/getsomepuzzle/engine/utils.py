@@ -1,6 +1,8 @@
 import json
 from functools import wraps
 
+from .constants import EMPTY
+
 
 def to_grid(strpuzzle, w, h, transformer=lambda x: x):
     return [[transformer(v) for v in strpuzzle[i * w : i * w + w]] for i in range(h)]
@@ -86,7 +88,7 @@ def state_to_str(pu):
     result.append("-" * (len(grid[0]) * 4 + 1))
     for row in grid:
         result.append("= " + " | ".join([" " for c in row]) + " =")
-        result.append("= " + " | ".join([str(c) if c > 0 else " " for c in row]) + " =")
+        result.append("= " + " | ".join([str(c) if c != EMPTY else " " for c in row]) + " =")
         result.append("= " + " | ".join([" " for c in row]) + " =")
         result.append("-" * (len(grid[0]) * 4 + 1))
     return "\n".join(result)
@@ -114,8 +116,8 @@ def import_puzzle(json_data):
     domain = data.get("domain")
     p = Puzzle(running=running, width=data["width"], height=data["height"], domain=domain)
     for idx, cell_data in enumerate(data["state"]):
-        value = cell_data.get("value", 0)
-        options = p.domain[:] if value == 0 else [o for o in p.domain if o != value]
+        value = cell_data.get("value", EMPTY)
+        options = p.domain[:] if value == EMPTY else [o for o in p.domain if o != value]
         p.state[idx].value = value
         p.state[idx].options = options
 
@@ -153,7 +155,7 @@ def line_import(line):
     pu = Puzzle(running=None, width=int(w), height=int(h), domain=domain)
     for idx, cell in enumerate(pu.state):
         cell.value = values[idx]
-        cell.options = pu.domain[:] if cell.value == 0 else []
+        cell.options = pu.domain[:] if cell.value == EMPTY else []
     slugs = {
         kls.slug: kls
         for kls in AVAILABLE_RULES

@@ -119,8 +119,8 @@ class Puzzle:
 
     def reset_user_input(self):
         for cell in self.state:
-            if cell.value != 0 and cell.options:
-                cell.value = 0
+            if cell.value != EMPTY and cell.options:
+                cell.value = EMPTY
 
     def simplify(self, solution, debug=False):
         # Pick a value from the solution
@@ -164,7 +164,7 @@ class Puzzle:
         initial_values = [
             (idx, cell.value)
             for idx, cell in enumerate(self.state)
-            if cell.value != 0
+            if cell.value != EMPTY
         ]
         if debug:
             print("Initial values", initial_values)
@@ -173,7 +173,7 @@ class Puzzle:
             idx, value = initial_values.pop()
             if debug:
                 print(f"Will try to remove {idx+1}={value}")
-            self.state[idx].value = 0
+            self.state[idx].value = EMPTY
             self.state[idx].options = self.domain[:]
             solutions = find_solutions(self, self.running, debug=debug)
             if debug:

@@ -2,7 +2,7 @@ import random
 
 from ..utils import to_rows, to_columns
 from .base import CellCentricConstraint
-from ..constants import CONSTRAST
+from ..constants import CONSTRAST, EMPTY
 
 
 class ParityConstraint(CellCentricConstraint):
@@ -73,13 +73,61 @@ class ParityConstraint(CellCentricConstraint):
         if side in ("bottom", "vertical"):
             sides.append([v for (i, v) in col_values_and_indices if i > ridx])
         for side in sides:
-            if any(v == 0 for v in side):
+            if any(v == EMPTY for v in side):
                 continue
             even = len([v for v in side if v % 2 == 0])
             odd = len([v for v in side if v % 2 != 0])
             if even != odd:
                 return False
         return True
+
+    def apply(self, puzzle):
+        changed = False
+        indices, side = self.parameters["indices"], self.parameters["side"]
+        idx = indices[0]
+        w, h = puzzle.width, puzzle.height
+        ridx = idx // w
+        cidx = idx % w
+        if side in ("left", "right", "horizontal"):
+            rows = to_rows(puzzle.state, w, h)
+            row = rows[ridx]
+            values_and_indices = [(idx, ridx, c.value) for idx, c in enumerate(row)]
+        else:
+            columns = to_columns(puzzle.state, w)
+            column = columns[cidx]
+            values_and_indices = [(cidx, idx, c.value) for idx, c in enumerate(column)]
+
+        sides = []
+        if side in ("left", "horizontal"):
+            sides.append([(c, r, v) for (c, r, v) in values_and_indices if c < cidx])
+        if side in ("right", "horizontal"):
+            sides.append([(c, r, v) for (c, r, v) in values_and_indices if c > cidx])
+        if side in ("top", "vertical"):
+            sides.append([(c, r, v) for (c, r, v) in values_and_indices if r < ridx])
+        if side in ("bottom", "vertical"):
+            sides.append([(c, r, v) for (c, r, v) in values_and_indices if r > ridx])
+        for side in sides:
+            empty_cells = [v == EMPTY for (c, r, v) in side]
+            if not any(empty_cells):
+                continue
+            if all(empty_cells):
+                continue
+            even = len([v for (c, r, v) in side if v != EMPTY and v % 2 == 0])
+            odd = len([v for (c, r, v) in side if v!= EMPTY and v % 2 != 0])
+            empty = empty_cells.count(True)
+            size_per_parity = int(len(side) / 2)
+            value = None
+            if size_per_parity - even == empty:
+                value = [v for v in puzzle.domain if v % 2 == 0][0]
+            elif size_per_parity - odd == empty:
+                value = [v for v in puzzle.domain if v % 2 != 0][0]
+            if value is not None:
+                for (c, r, v) in side:
+                    if v != EMPTY:
+                        continue
+                    idx = r * w + c
+                    changed |= puzzle.state[idx].set_value(value)
+        return changed
 
     @staticmethod
     def generate_random_parameters(puzzle):

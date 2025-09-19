@@ -1,6 +1,8 @@
 import random
 
 from .base import Constraint
+from ..constants import EMPTY
+from ..errors import CannotApplyConstraint
 
 
 class FixedValueConstraint(Constraint):
@@ -16,12 +18,9 @@ class FixedValueConstraint(Constraint):
 
     def apply(self, puzzle):
         idx, val = self.parameters["idx"], self.parameters["val"]
-        if puzzle.state[idx].value == val and puzzle.state[idx].options == []:
-            # Already applied
-            return False
-        puzzle.state[idx].value = val
-        puzzle.state[idx].options = []
-        return True
+        if puzzle.state[idx].value != val and puzzle.state[idx].value != EMPTY:
+            raise CannotApplyConstraint
+        return puzzle.state[idx].set_value(val)
 
     @staticmethod
     def generate_random_parameters(puzzle):
