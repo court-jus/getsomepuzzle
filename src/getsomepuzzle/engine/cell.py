@@ -1,8 +1,10 @@
+from .constants import EMPTY
+
 class Cell:
     def __init__(self, domain):
         self.domain = domain
         self.options = domain[:]
-        self.value = 0
+        self.value = EMPTY
 
     def __repr__(self):
         symb = " " if self.value else "_"
@@ -33,6 +35,8 @@ class Cell:
         return c
 
     def set_value(self, val):
+        # Set the cell value if needed.
+        # Return a boolean indicating if some change have been made.
         if self.value == val and self.options == []:
             return False
         self.value = val

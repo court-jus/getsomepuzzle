@@ -5,6 +5,7 @@ from ..constraints import (
     AVAILABLE_RULES,
 )
 from ..constants import DEFAULT_SIZE
+from ..errors import MaxIterRandomRule
 from ..puzzle import Puzzle
 from ..solver.puzzle_solver import find_solutions, find_solution
 from ..utils import line_export
@@ -54,7 +55,7 @@ class PuzzleGenerator:
             else:
                 # print("Added", new_constraint)
                 return new_constraint
-        raise RuntimeError("Max iter reach to add random rule")
+        raise MaxIterRandomRule("Max iter reach to add random rule")
 
     def remove_last_rule(self):
         removed_constraint = self.puzzle.constraints[-1]

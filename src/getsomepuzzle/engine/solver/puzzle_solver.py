@@ -85,12 +85,12 @@ def old_find_solution(running, starting_state, debug=False):
                     print("\n".join([f"Set {l[0] + 1} = {l[1]} (options {l[2]})" for l in log_history]))
                 continue
             if debug:
-                print("invalid, remove this value and set back to 0")
+                print("invalid, remove this value and set back to EMPTY")
             st = st.clone()
             st.state[idx].options = [
                 o for o in st.state[idx].options if o != new_value
             ]
-            st.state[idx].value = 0
+            st.state[idx].value = EMPTY
             if debug:
                 print("so now we are back with")
                 print(st.state)

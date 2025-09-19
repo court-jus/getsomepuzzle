@@ -1,7 +1,9 @@
 import random
 import re
 
+from ..constants import EMPTY
 from ..utils import to_grid, to_groups, find_matching_group_neighbors
+from ..errors import CannotApplyConstraint
 from .base import CellCentricConstraint
 
 
@@ -33,7 +35,7 @@ class GroupSize(CellCentricConstraint):
         indices, size = self.parameters["indices"], self.parameters["size"]
         idx = indices[0]
         my_color = puzzle.state[idx].value
-        if my_color == 0:
+        if my_color == EMPTY:
             return True
         groups = to_groups(puzzle.state, puzzle.width, puzzle.height, lambda cell: cell.value)
         my_group = [grp for grp in groups if idx in grp]
@@ -55,36 +57,30 @@ class GroupSize(CellCentricConstraint):
         # If my color is not known yet, return False
         my_color = puzzle.state[idx].value
         my_opposite = [v for v in puzzle.domain if v != my_color][0]
-        if my_color == 0:
+        if my_color == EMPTY:
             return False
 
         groups = to_groups(puzzle.state, puzzle.width, puzzle.height, lambda cell: cell.value)
         my_group = [grp for grp in groups if idx in grp]
         if len(my_group) != 1:
-            raise RuntimeError("My group should exist")
+            raise CannotApplyConstraint("My group should exist")
         my_group = my_group[0]
-        boundaries = find_matching_group_neighbors(puzzle.state, puzzle.width, puzzle.height, my_group, 0, lambda cell: cell.value)
+        boundaries = find_matching_group_neighbors(puzzle.state, puzzle.width, puzzle.height, my_group, EMPTY, lambda cell: cell.value)
         changed = False
         if len(my_group) == size:
             # If my group already has the correct size, check my boundaries and set them to opposite color
             for boundary in boundaries:
-                if puzzle.state[boundary].value != my_opposite or puzzle.state[boundary].options != []:
-                    puzzle.state[boundary].value = my_opposite
-                    puzzle.state[boundary].options = []
-                    changed = True
+                changed |= puzzle.state[boundary].set_value(my_opposite)
         elif len(my_group) < size:
             # If my group is not big enough yet but only has one exit, set it to my color
             if len(boundaries) == 1:
                 boundary = boundaries[0]
-                if puzzle.state[boundary].value != my_color or puzzle.state[boundary].options != []:
-                    puzzle.state[boundary].value = my_color
-                    puzzle.state[boundary].options = []
-                    changed = True
+                changed |= puzzle.state[boundary].set_value(my_color)
             # TODO:
             # If extending in a direction would merge me with another group and create a "too big group",
             #   then add a boundary in that direction, it is forbidden to grow there
         else:
-            raise RuntimeError("My group is bigger than size")
+            raise CannotApplyConstraint("My group is bigger than size")
         return changed
 
     @staticmethod

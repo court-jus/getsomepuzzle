@@ -56,7 +56,7 @@ def generate_a_puzzle(load=None):
                 print("C", line_export(pu))
                 other = [sol for sol in other if sol[idx] == val]
                 values = [c.value for c in pu.state]
-                ratio = values.count(0) / len(values)
+                ratio = values.count(EMPTY) / len(values)
                 if ratio < 0.7:
                     print("# The puzzle has lost its interest", ratio)
                     raise ValueError

@@ -1,5 +1,6 @@
 from ..utils import to_rows, to_columns
 from .base import Constraint
+from ..constants import EMPTY
 
 
 class AllDifferentConstraint(Constraint):
@@ -14,7 +15,7 @@ class AllDifferentConstraint(Constraint):
         rows = to_rows(puzzle.state, w, h)
         columns = to_columns(puzzle.state, w)
         for zone in rows + columns:
-            zone_values = [c.value for c in zone if c.value != 0]
+            zone_values = [c.value for c in zone if c.value != EMPTY]
             if len(zone_values) != len(set(zone_values)):
                 return False
         return True

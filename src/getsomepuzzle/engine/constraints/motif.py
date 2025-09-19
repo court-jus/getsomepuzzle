@@ -1,7 +1,9 @@
 import random
 import re
 
+from ..constants import EMPTY
 from ..utils import to_grid, replace_char_at_idx
+from ..errors import CannotApplyConstraint
 from .base import Constraint
 
 
@@ -38,7 +40,7 @@ class Motif(Constraint):
             if allhave and start and end:
                 for other in [o for o in puzzle.domain if o != v]:
                     so = str(other)
-                    motif = [mline.replace(so, "0") for mline in motif]
+                    motif = [mline.replace(so, str(EMPTY)) for mline in motif]
                 break
 
         return {"motif": motif}
@@ -68,7 +70,7 @@ class Motif(Constraint):
             print("Find", motif, "in", pu)
         mow = len(motif[0])
         pta = puzzle.width - mow
-        more = (pta * ".").join(motif).replace("0", ".")
+        more = (pta * ".").join(motif).replace(str(EMPTY), ".")
         more = re.compile(more)
         for idx in range(len(pu)):
             if (puzzle.width - (idx % puzzle.width)) < mow:
@@ -115,9 +117,9 @@ class Motif(Constraint):
     @staticmethod
     def find_submotif(strmotif, puzzle):
         for idx, car, submotif in [
-            (idx, strmotif[idx], replace_char_at_idx(strmotif, idx, "0"))
+            (idx, strmotif[idx], replace_char_at_idx(strmotif, idx, str(EMPTY)))
             for idx, car in enumerate(strmotif)
-            if car not in "0."
+            if car not in (str(EMPTY), ".")
         ]:
             present, where = Motif._is_present(submotif.split("."), puzzle)
             if present:
@@ -134,13 +136,11 @@ class Motif(Constraint):
 
         where, idx, car, submotif = submotif
         row_count = (idx // (mow + 1))
-        idx += where + row_count
-        if puzzle.state[idx].value == 0 or puzzle.state[idx].options != []:
-            opposite = [v for v in puzzle.domain if v != int(car)][0]
-            puzzle.state[idx].value = opposite
-            puzzle.state[idx].options = []
-            return True
-        return False
+        idx += where - row_count
+        if puzzle.state[idx].value == int(car):
+            raise CannotApplyConstraint()
+        opposite = [v for v in puzzle.domain if v != int(car)][0]
+        return puzzle.state[idx].set_value(opposite)
 
 class ForbiddenMotif(Motif):
     slug = "FM"
