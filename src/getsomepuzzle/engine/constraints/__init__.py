@@ -12,7 +12,7 @@ from ..utils import to_rows, to_columns, to_grid
 
 AVAILABLE_RULES = [
     # AllDifferentConstraint,
-    # FixedValueConstraint,
+    FixedValueConstraint,
     ParityConstraint,
     ForbiddenMotif,
     # RequiredMotif,

@@ -18,7 +18,7 @@ class PuzzleGenerator:
         self.running = running
         self.puzzle = Puzzle(running=self.running, width=width, height=height)
 
-    def add_random_rule(self, banned_constraints, debug=False):
+    def add_random_rule(self, banned_constraints, debug=False, auto_apply=True, auto_check=True):
         max_iter = 100000
         banned = banned_constraints[:]
         while max_iter > 0 and self.running.is_set():
@@ -45,7 +45,7 @@ class PuzzleGenerator:
                     if debug:
                         print("Cannot add", new_constraint, "it's already too much present")
                     continue
-                self.puzzle.add_constraint(new_constraint, debug=debug)
+                self.puzzle.add_constraint(new_constraint, debug=debug, auto_apply=auto_apply, auto_check=auto_check)
             except ValueError as err:
                 if debug:
                     print("Cannot add", new_constraint, err)

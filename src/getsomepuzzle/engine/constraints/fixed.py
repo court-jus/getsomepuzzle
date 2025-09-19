@@ -42,3 +42,8 @@ class FixedValueConstraint(Constraint):
     def line_import(line):
         idx, val = line.split(".")
         return {"idx": int(idx), "val": int(val)}
+
+    @staticmethod
+    def maximum_presence(puzzle):
+        return max(puzzle.width, puzzle.height)
+

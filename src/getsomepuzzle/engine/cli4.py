@@ -3,9 +3,11 @@ import time
 from pathlib import Path
 
 from getsomepuzzle.engine.puzzle import Puzzle
-from getsomepuzzle.engine.constraints import FixedValueConstraint, ForbiddenMotif, QuantityAllConstraint, GroupSize, LetterGroup
+from getsomepuzzle.engine.constraints import FixedValueConstraint, ForbiddenMotif, QuantityAllConstraint, GroupSize, LetterGroup, ParityConstraint
+from getsomepuzzle.engine.constants import EMPTY
+from getsomepuzzle.engine.errors import CannotApplyConstraint, MaxIterRandomRule
 from getsomepuzzle.engine.utils import FakeEvent, state_to_str, line_export, line_import
-from getsomepuzzle.engine.solver.puzzle_solver import find_solution, find_solutions
+from getsomepuzzle.engine.solver.puzzle_solver import find_solution, find_solutions, old_find_solution, old_find_solution_with_apply
 from getsomepuzzle.engine.generator.puzzle_generator import PuzzleGenerator
 
 def generate_a_puzzle(load=None):
@@ -27,7 +29,7 @@ def generate_a_puzzle(load=None):
                 print("A", line_export(pg.puzzle))
             except RuntimeError as exc:
                 print("RTE while adding rule", exc)
-                break
+                continue
         pu = pg.puzzle
     else:
         pu = line_import(load)
@@ -84,16 +86,20 @@ def generate_a_puzzle(load=None):
 
 def playground_contstraints_apply():
     running = FakeEvent()
-    pu = Puzzle(running=running, width=3, height=3)
-    pu.state[2].value = 1
-    pu.state[2].options = []
-    pu.add_constraint(LetterGroup(indices=[2, 8], letter="A"))
+    pu = Puzzle(running=running, width=3, height=7)
+    pu.state[1].value = 1
+    pu.state[1].options = []
+    pu.state[10].value = 2
+    pu.state[10].options = []
+    pu.state[16].value = 2
+    pu.state[16].options = []
+    pu.add_constraint(ParityConstraint(indices=[7], side="vertical"))
     sol, bp, steps = find_solution(running, pu)
     print(pu)
     print(state_to_str(pu))
     print(pu.state)
     print("Solution can be found in", steps, "steps")
-    pu.add_constraint(LetterGroup(indices=[1, 6], letter="B"), debug=True)
+    pu.add_constraint(ParityConstraint(indices=[6], side="right"))
     sol, bp, steps = find_solution(running, pu)
     print(pu)
     print(state_to_str(pu))
@@ -107,18 +113,88 @@ def playground_contstraints_apply():
 
 def playground_find_solution():
     running = FakeEvent()
-    pu = line_import("xxxxx")
+    pu = line_import("12_3x7_000000000000021000000_LT:A.11.18;PA:13.vertical;FM:12;PA:8.vertical;LT:B.20.19;LT:C.4.0_1:211222111222221222211")
+    print(pu)
+    print(state_to_str(pu))
+    print(pu.state)
+    sol, bp, steps = old_find_solution_with_apply(running, pu, debug=False)
+    if not sol:
+        print("Solution cannot be found in", steps, "steps")
+    else:
+        print("Solution can be found in", steps, "steps")
+
+
+def playground_manually_check():
+    width = random.randint(4, 4)
+    height = random.randint(4, 4)
+    running = FakeEvent()
+    pg = PuzzleGenerator(running=running, width=width, height=height)
+    pu = pg.puzzle
+
+    rule_count = 0
+    ticks = 0
+    banned = []
+
+    while ticks < 1000:
+        ticks += 1
+        try:
+            added = pg.add_random_rule(banned, debug=False, auto_apply=False, auto_check=False)
+        except MaxIterRandomRule:
+            break
+        try:
+            clone = pu.clone()
+            sol, bp, steps = find_solution(running, clone, debug=False)
+            if not clone.is_valid() or sol is None:
+                raise CannotApplyConstraint
+        except CannotApplyConstraint:
+            pu.constraints = [c for c in pu.constraints if c != added]
+            banned.append(added)
+        else:
+            print("Rule added", added)
+        # msg = f"{ticks: 4} - Banned: {len(banned): 5} - Added: {len(pu.constraints): 5}"
+        # print(msg, end="\r")
+
+    print()
+    print(line_export(pu))
     sol, bp, steps = find_solution(running, pu, debug=False)
     print(pu)
     print(state_to_str(pu))
     print(pu.state)
     print("Solution can be found in", steps, "steps")
-    pu.apply_constraints()
-    sol, bp, steps = find_solution(running, pu)
-    print(pu)
-    print(state_to_str(pu))
-    print(pu.state)
-    print("Solution can be found in", steps, "steps")
+    print(sol)
+    print(state_to_str(sol))
+    print(sol.state)
+
+
+def compare_solvers(line):
+    running = FakeEvent()
+    pu = line_import(line)
+    ostart = time.time()
+    old_find_solution(running, pu)
+    oend = time.time()
+    print("OLD ok")
+    owstart = time.time()
+    old_find_solution_with_apply(running, pu)
+    owend = time.time()
+    print("OWA ok")
+    nstart = time.time()
+    find_solution(running, pu)
+    nend = time.time()
+    print(f"OLD {oend - ostart:.4} OWA {owend - owstart:.4} NEW {nend - nstart:.4} DLT {(nend - nstart) - (oend - ostart):.4}")
+
+def compare_solvers_all():
+    asset = Path("..") / "assets" / "puzzles.txt"
+    puzzles = [
+        line
+        for line in asset.read_text().split("\n")
+        if line
+    ]
+    total = len(puzzles)
+    print(f"{total} puzzles to check")
+    for line in puzzles:
+        print(line)
+        compare_solvers(line)
+
 
 
 def main():
@@ -128,6 +204,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
     # playground_contstraints_apply()
     # playground_find_solution()
+    # playground_manually_check()
+    compare_solvers_all()
