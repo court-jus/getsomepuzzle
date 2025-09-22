@@ -6,6 +6,9 @@ from ..utils import to_grid, to_groups, find_matching_group_neighbors
 from ..errors import CannotApplyConstraint
 from .base import CellCentricConstraint
 
+MAX_GS_RATIO = 0.5
+MAX_GROUP_SIZE = 15
+
 
 class GroupSize(CellCentricConstraint):
     slug = "GS"
@@ -85,10 +88,17 @@ class GroupSize(CellCentricConstraint):
 
     @staticmethod
     def generate_random_parameters(puzzle):
-        maximum_group_size = min(10, max(1, int(puzzle.width * puzzle.height * 0.2)))
+        maximum_group_size = min(MAX_GROUP_SIZE, max(1, int(puzzle.width * puzzle.height * MAX_GS_RATIO)))
         idx = random.randint(0, len(puzzle.state) - 1)
         size = random.randint(1, maximum_group_size)
         return {"indices": [idx], "size": size}
+
+    @staticmethod
+    def generate_all_parameters(puzzle):
+        maximum_group_size = min(MAX_GROUP_SIZE, max(1, int(puzzle.width * puzzle.height * MAX_GS_RATIO)))
+        for idx in range(len(puzzle.state)):
+            for size in range(1, maximum_group_size):
+                yield {"indices": [idx], "size": size}
 
     @staticmethod
     def maximum_presence(puzzle):

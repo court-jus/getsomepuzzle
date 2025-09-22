@@ -29,6 +29,12 @@ class FixedValueConstraint(Constraint):
             "val": random.choice(puzzle.domain),
         }
 
+    @staticmethod
+    def generate_all_parameters(puzzle):
+        for idx in range(len(puzzle.state)):
+            for val in puzzle.domain:
+                yield {"idx": idx, "val": val}
+
     def conflicts(self, other):
         if not isinstance(other, FixedValueConstraint):
             return False

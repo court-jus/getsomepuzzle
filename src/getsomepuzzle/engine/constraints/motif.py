@@ -45,6 +45,38 @@ class Motif(Constraint):
 
         return {"motif": motif}
 
+
+    @staticmethod
+    def generate_all_parameters(puzzle):
+        w = puzzle.width
+        h = puzzle.height
+
+        all_11 = [str(EMPTY)] + [str(v) for v in puzzle.domain]
+        all_12 = ["".join([i, j]) for i in all_11 for j in all_11]
+        all_13 = ["".join([i, j]) for i in all_11 for j in all_12]
+        all_21 = [[i, j] for i in all_11 for j in all_11]
+        all_22 = [[i, j] for i in all_12 for j in all_12]
+        all_23 = [[i, j] for i in all_13 for j in all_13]
+        all_31 = [[i, j, k] for i in all_11 for j in all_11 for k in all_11]
+        all_32 = [[i, j, k] for i in all_12 for j in all_12 for k in all_12]
+        all_33 = [[i, j, k] for i in all_13 for j in all_13 for k in all_13]
+        all_motifs = all_11 + all_12 + all_21 + all_22
+        if w > 2:
+            all_motifs = all_motifs + all_13 + all_23
+        if h > 2:
+            all_motifs = all_motifs + all_31 + all_32
+            if w > 2:
+                all_motifs = all_motifs + all_33
+        for motif in all_motifs:
+            if (
+                all(i == str(EMPTY) for i in motif[0]) or
+                all(i == str(EMPTY) for i in motif[-1]) or
+                all(r[0] == str(EMPTY) for r in motif) or
+                all(r[-1] == str(EMPTY) for r in motif)
+            ):
+                continue
+            yield {"motif": motif}
+
     def conflicts(self, other):
         if "motif" not in other.parameters:
             return False

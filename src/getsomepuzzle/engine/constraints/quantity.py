@@ -41,6 +41,14 @@ class QuantityAllConstraint(Constraint):
         }
 
     @staticmethod
+    def generate_all_parameters(puzzle):
+        min_count = 1
+        max_count = (puzzle.width * puzzle.height) - 1
+        for count in range(min_count, max_count):
+            for value in range(len(puzzle.domain)):
+                yield {"count": count, "value": value}
+
+    @staticmethod
     def maximum_presence(puzzle):
         return 1
 
