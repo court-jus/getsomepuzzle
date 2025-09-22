@@ -138,7 +138,7 @@ def line_export(pu):
     # found_solutions = find_solutions(pu, pu.running)
     # count = len(found_solutions)
     # solutions = ";".join("".join(str(v) for v in sol) for sol in found_solutions)
-    return f"{domain}_{w}x{h}_{values}_{constraints}" # _{count}:{solutions}"
+    return f"{domain}_{w}x{h}_{values}_{constraints}_0:0" # _{count}:{solutions}"
 
 
 def line_import(line):

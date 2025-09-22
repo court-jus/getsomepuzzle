@@ -141,25 +141,23 @@ class ParityConstraint(CellCentricConstraint):
             choices.append("vertical")
         side = random.choice(choices)
         if side in ("left", "right", "horizontal"):
-            min_left = 2 if side in ("left", "horizontal") else 0
-            max_right = width - 2 if side in ("right", "horizontal") else width
-            # the side(s) we pick must have an even number of cells
-            # so, because we are zero indexed, the index must be even
-            possible_indices = [
-                i for i in range(width) if min_left <= i <= max_right and i % 2 == 0
-            ]
+            possible_indices = [i for i in range(width)]
+            if side in ("left", "horizontal"):
+                possible_indices = [i for i in possible_indices if i >= 2 and i % 2 == 0]
+            if side in ("right", "horizontal"):
+                possible_indices = [i for i in possible_indices if i <= width - 2 and (width - 1 - i) % 2 == 0]
             if not possible_indices:
                 raise ValueError("Cannot generate parity constraint")
             col = random.choice(possible_indices)
-            row = random.randint(0, puzzle.height - 1)
+            row = random.randint(0, height - 1)
             return {"indices": [col + row * puzzle.width], "side": side}
 
         else:
-            min_top = 2 if side in ("top", "vertical") else 0
-            max_bottom = height - 2 if side in ("bottom", "vertical") else height
-            possible_indices = [
-                i for i in range(height) if min_top <= i <= max_bottom and i % 2 == 0
-            ]
+            possible_indices = [i for i in range(height)]
+            if side in ("top", "vertical"):
+                possible_indices = [i for i in possible_indices if i >= 2 and i % 2 == 0]
+            if side in ("bottom", "vertical"):
+                possible_indices = [i for i in possible_indices if i <= height - 2 and (height - 1 - i) % 2 == 0]
             if not possible_indices:
                 raise ValueError("Cannot generate parity constraint")
             col = random.randint(0, puzzle.width - 1)

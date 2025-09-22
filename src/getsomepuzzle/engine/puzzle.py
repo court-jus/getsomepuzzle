@@ -2,6 +2,7 @@ import random
 from .constraints import FixedValueConstraint
 from .constraints.base import CellCentricConstraint
 from .constants import DOMAIN, DEFAULT_SIZE, EMPTY, MAX_FORCABLE
+from .errors import RuleConflictError, CannotApplyConstraint
 from .cell import Cell
 from .solver.puzzle_solver import find_solution, find_solutions
 from .utils import line_export
@@ -24,6 +25,9 @@ class Puzzle:
         for c in sorted(self.constraints):
             result.append(str(c))
         return "\n".join(result)
+
+    def set_value(self, idx, value):
+        return self.state[idx].set_value(value)
 
     def get_cell_constraint(self, idx):
         for c in self.constraints:
@@ -70,24 +74,24 @@ class Puzzle:
         if debug:
             print("Trying to add", new_constraint, "to", [repr(c) for c in self.constraints])
         if any(c == new_constraint for c in self.constraints):
-            raise ValueError("Cannot add rule, it's already there")
+            raise RuleConflictError("Cannot add rule, it's already there")
         if isinstance(new_constraint, FixedValueConstraint):
             if new_constraint.parameters["val"] not in self.state[new_constraint.parameters["idx"]].options:
-                raise ValueError(f"Cannot add rule, it conflicts with current state")
+                raise RuleConflictError(f"Cannot add rule, it conflicts with current state")
         conflicting = [c for c in self.constraints if c.conflicts(new_constraint)]
         if conflicting:
-            raise ValueError(f"Cannot add rule, it conflicts with {conflicting}")
+            raise RuleConflictError(f"Cannot add rule, it conflicts with {conflicting}")
         if isinstance(new_constraint, FixedValueConstraint):
             fixed_cells = [c for c in self.state if c.value]
             if len(fixed_cells) == (self.width * self.height) - 1:
-                raise ValueError("Cannot add rule, it would fill the puzzle")
+                raise RuleConflictError("Cannot add rule, it would fill the puzzle")
         if auto_check:
             # Try to solve
             tmp = self.clone()
             tmp.constraints.append(new_constraint)
             sol, bp, _ = find_solution(self.running, tmp, debug=debug)
             if not sol:
-                raise ValueError("Cannot add rule, it makes the puzzle unsolvable")
+                raise RuleConflictError("Cannot add rule, it makes the puzzle unsolvable")
         self.constraints.append(new_constraint)
         if debug:
             print("Good it's added, let's apply it")
@@ -111,7 +115,7 @@ class Puzzle:
             c for c in self.constraints if not isinstance(c, FixedValueConstraint)
         ]
 
-    def apply_constraints(self):
+    def apply_constraints(self, auto_check=False):
         changed = True
         while changed:
             changed = False
@@ -124,7 +128,19 @@ class Puzzle:
                 else:
                     # print("Pas d'apply pour", constraint)
                     pass
+        if auto_check:
+            if not all(c.check(self) for c in self.constraints):
+                raise CannotApplyConstraint
 
+    def apply_with_force(self):
+        # Iterate over free cells. For each cell, try both values
+        # and apply constraints each time
+        cells = self.free_cells()
+        for cell, idx in cells:
+            for value in self.domain:
+                test_pu = self.clone()
+                test_pu.set_value(idx, value)
+                test_pu.apply_constraints(auto_check=True)
 
     def reset_user_input(self):
         for cell in self.state:
