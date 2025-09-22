@@ -246,6 +246,12 @@ def solve_by_applying(line):
     print(line_export(pu))
 
 
+def all_possible_constraints():
+    running = FakeEvent()
+    pu = Puzzle(running=running, width=5, height=5)
+    for rule in AVAILABLE_RULES:
+        for params in rule.generate_all_parameters(pu):
+            print(rule(**params))
 
 if __name__ == "__main__":
     # main()

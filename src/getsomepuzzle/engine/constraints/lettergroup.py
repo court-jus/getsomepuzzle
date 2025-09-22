@@ -89,7 +89,7 @@ class LetterGroup(CellCentricConstraint):
 
     @staticmethod
     def generate_random_parameters(puzzle):
-        # TODO allow reusing an existing letter but with some sort of poundering
+        # TODO allow reusing an existing letter but with some sort of mitigation
         used_letters = [ord(c.parameters["letter"]) for c in puzzle.constraints if isinstance(c, LetterGroup)]
         if used_letters:
             max_letter = max(used_letters)
@@ -103,6 +103,16 @@ class LetterGroup(CellCentricConstraint):
         # TODO: sometimes we may want to add more indices
         indices = allowed_indices[:2]
         return {"indices": indices, "letter": letter}
+
+    @staticmethod
+    def generate_all_parameters(puzzle):
+        for idx1 in range(len(puzzle.state)):
+            for idx2 in range(len(puzzle.state)):
+                if idx1 == idx2:
+                    continue
+                indices = [idx1, idx2]
+                for letter in range(LetterGroup.maximum_presence(puzzle)):
+                    yield {"indices": indices, "letter": chr(ord("A") + letter)}
 
     @staticmethod
     def maximum_presence(puzzle):

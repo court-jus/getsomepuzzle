@@ -165,6 +165,31 @@ class ParityConstraint(CellCentricConstraint):
             return {"indices": [col + row * puzzle.width], "side": side}
 
     @staticmethod
+    def generate_all_parameters(puzzle):
+        w = puzzle.width
+        h = puzzle.height
+        for idx in range(len(puzzle.state)):
+            ridx = idx // w
+            cidx = idx % w
+            left_size = cidx
+            right_size = w - 1 - cidx
+            top_size = ridx
+            bottom_size = h - 1 - ridx
+            if left_size % 2 == 0 and left_size > 0:
+                yield {"indices": [idx], "side": "left"}
+            if right_size % 2 == 0 and right_size > 0:
+                yield {"indices": [idx], "side": "right"}
+            if left_size % 2 == 0 and right_size % 2 == 0 and right_size > 0 and left_size > 0:
+                yield {"indices": [idx], "side": "horizontal"}
+            if top_size % 2 == 0 and top_size > 0:
+                yield {"indices": [idx], "side": "top"}
+            if bottom_size % 2 == 0 and bottom_size > 0:
+                yield {"indices": [idx], "side": "bottom"}
+            if top_size % 2 == 0 and bottom_size % 2 == 0 and bottom_size > 0 and top_size > 0:
+                yield {"indices": [idx], "side": "vertical"}
+
+
+    @staticmethod
     def maximum_presence(puzzle):
         return int((puzzle.width * puzzle.height) / 5)
 
