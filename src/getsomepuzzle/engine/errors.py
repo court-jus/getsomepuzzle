@@ -8,3 +8,7 @@ class MaxIterRandomRule(RuntimeError):
 
 class TooEmpty(RuntimeError):
     pass
+
+
+class RuleConflictError(ValueError):
+    pass
