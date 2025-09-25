@@ -42,3 +42,7 @@ class Cell:
         self.value = val
         self.options = []
         return True
+
+    def reset_value(self):
+        self.value = EMPTY
+        self.options = self.domain[:]
