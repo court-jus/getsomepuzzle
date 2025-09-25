@@ -223,8 +223,7 @@ class Puzzle:
             print("Check solution", solution)
         puzzle = self.clone()
         for idx, val in enumerate(solution):
-            puzzle.state[idx].value = val
-            puzzle.state[idx].options = []
+            puzzle.set_value(idx, val)
         if puzzle.is_complete(debug=debug):
             return True
         if debug:
