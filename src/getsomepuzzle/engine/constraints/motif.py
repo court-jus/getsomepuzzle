@@ -111,7 +111,7 @@ class Motif(Constraint):
             m = more.match(subst)
             if m:
                 if debug:
-                    print("found at", m.start())
+                    print("found at", idx, "(", subst ,")", m.start())
                 return True, idx
         if debug:
             print("not found")
@@ -157,7 +157,7 @@ class Motif(Constraint):
             if present:
                 return where, idx, car, submotif
 
-    def apply(self, puzzle):
+    def apply(self, puzzle, debug=False):
         motif = self.parameters["motif"]
         strmotif = ".".join(motif)
         mow = len(motif[0])
@@ -167,12 +167,25 @@ class Motif(Constraint):
             return False
 
         where, idx, car, submotif = submotif
-        row_count = (idx // (mow + 1))
-        idx += where - row_count
-        if puzzle.state[idx].value == int(car):
-            raise CannotApplyConstraint()
+        if debug:
+            print("In the puzzle, at idx", where, "we found the submotif", submotif, "(that was built by replacing car", car, "at idx", idx, "in the main motif", ".".join(motif), ")")
+        ridx = (idx // (mow + 1))
+        cidx = (idx % (mow + 1))
+        if debug:
+            print("In the submotif, the car replaced was at", cidx, "x", ridx, "(I", idx, "M", mow, ")")
+        wridx = (where // puzzle.width)
+        wcidx = (where % puzzle.width)
+        if debug:
+            print("The stuff was found at", where, ":", wcidx, "x", wridx, "in the puzzle")
+        fridx = wridx + ridx
+        fcidx = wcidx + cidx
+        fidx = fridx * puzzle.width + fcidx
+        if debug:
+            print("So the cell at", fidx, "(", fcidx, "x", fridx, ") cannot equal", car)
+        if puzzle.state[fidx].value == int(car):
+            raise CannotApplyConstraint(f"Cannot apply FM {motif} because {fidx + 1} == {int(car)}")
         opposite = [v for v in puzzle.domain if v != int(car)][0]
-        return puzzle.state[idx].set_value(opposite)
+        return puzzle.state[fidx].set_value(opposite)
 
 class ForbiddenMotif(Motif):
     slug = "FM"
