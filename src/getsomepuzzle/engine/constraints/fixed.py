@@ -19,7 +19,7 @@ class FixedValueConstraint(Constraint):
     def apply(self, puzzle):
         idx, val = self.parameters["idx"], self.parameters["val"]
         if puzzle.state[idx].value != val and puzzle.state[idx].value != EMPTY:
-            raise CannotApplyConstraint
+            raise CannotApplyConstraint(f"Cannot apply FixedValue {val} at {idx}, it's not empty")
         return puzzle.state[idx].set_value(val)
 
     @staticmethod

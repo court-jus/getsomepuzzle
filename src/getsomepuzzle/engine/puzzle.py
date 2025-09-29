@@ -130,17 +130,24 @@ class Puzzle:
                     pass
         if auto_check:
             if not all(c.check(self) for c in self.constraints):
-                raise CannotApplyConstraint
+                failed = [c for c in self.constraints if not c.check(self)]
+                raise CannotApplyConstraint(str(failed))
 
     def apply_with_force(self):
         # Iterate over free cells. For each cell, try both values
         # and apply constraints each time
         cells = self.free_cells()
         for cell, idx in cells:
-            for value in self.domain:
+            for value in cell.options:
                 test_pu = self.clone()
                 test_pu.set_value(idx, value)
-                test_pu.apply_constraints(auto_check=True)
+                try:
+                    test_pu.apply_constraints(auto_check=True)
+                except CannotApplyConstraint:
+                    # Remove this options from cell
+                    cell.options.remove(value)
+                    if len(cell.options) == 1:
+                        cell.set_value(cell.options[0])
 
     def reset_user_input(self):
         for cell in self.state:
