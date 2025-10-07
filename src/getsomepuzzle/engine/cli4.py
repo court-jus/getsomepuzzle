@@ -9,6 +9,8 @@ from getsomepuzzle.engine.errors import CannotApplyConstraint, MaxIterRandomRule
 from getsomepuzzle.engine.utils import FakeEvent, state_to_str, line_export, line_import
 from getsomepuzzle.engine.solver.puzzle_solver import find_solution, find_solutions, old_find_solution, old_find_solution_with_apply
 from getsomepuzzle.engine.generator.puzzle_generator import PuzzleGenerator
+from getsomepuzzle.engine.clitools import clear, write_at
+
 
 def generate_a_puzzle(load=None):
 
@@ -197,38 +199,59 @@ def apply_to_all(what_to_apply):
 
 
 def playground():
+    clear()
     rule_types = AVAILABLE_RULES[:]
     running = FakeEvent()
-    pu = Puzzle(running=running, width=10, height=10)
-    for i in range(150):
-        try:
-            rule = rule_types.pop(0)
-        except IndexError:
-            break
+    pu = Puzzle(running=running, width=3, height=3)
+    max_steps = 4
+    banned = []
+    # Generate all possible constraints
+    all_constraints = []
+    for rule in AVAILABLE_RULES:
+        for params in rule.generate_all_parameters(pu):
+            all_constraints.append(rule(**params))
+    write_at(0, 30, "All: "+ str(len(all_constraints)))
+    random.shuffle(all_constraints)
 
-        params = rule.generate_random_parameters(pu)
-        constraint = rule(**params)
+    izgood = False
+    while all_constraints:
+        bla = len(all_constraints)
+        constraint = all_constraints.pop()
+        if any(c == constraint for c in banned):
+            continue
         before = pu.clone()
         try:
-            pu.add_constraint(constraint, auto_apply=False, auto_check=False)
-            test_pu = pu.clone()
-            test_pu.apply_constraints(auto_check=True)
-            test_pu.apply_with_force()
+            test_pu = before.clone()
+            write_at(0, 2, f"Add {constraint}")
+            test_pu.add_constraint(constraint, auto_apply=False, auto_check=False)
+            solve_result = solve_by_applying(test_pu, max_steps=max_steps)
+            write_at(0, 5, str(solve_result))
+            if solve_result["solved"]:
+                write_at(0, 3, f"{bla: 5} The puzzle can be solved in its current state")
+                pu.add_constraint(constraint, auto_apply=False, auto_check=False)
+                izgood = True
+                break
+            elif solve_result["step_reached"] >= max_steps:
+                write_at(0, 3, f"{bla: 5} The puzzle is impossible")
+                raise RuleConflictError
+            elif solve_result["failed"]:
+                write_at(0, 3, f"{bla: 5} The puzzle is impossible")
+                raise RuleConflictError
+            else:
+                write_at(0, 3, f"{bla: 5} The puzzle has not enough constraint")
             if not all(c.check(test_pu) for c in test_pu.constraints):
                 raise RuleConflictError
-        except (CannotApplyConstraint, RuleConflictError):
+        except (CannotApplyConstraint, RuleConflictError) as exc:
+            write_at(0, 3, f"{bla: 5} The constraint cannot be added: {exc}")
             pu = before
+        else:
+            pu = test_pu
 
-        can_add_again = True
-        if hasattr(rule, "maximum_presence"):
-            presence = len(list(c for c in pu.constraints if isinstance(c, rule)))
-            if presence >= rule.maximum_presence(pu):
-                can_add_again = False
+        write_at(0, 15, line_export(pu), flush=True)
 
-        if can_add_again:
-            rule_types.append(rule)
-    pu.apply_fixed_constraints()
-    print(line_export(pu))
+    if izgood:
+        pu.apply_fixed_constraints()
+        return pu
 
 
 def main():
@@ -245,15 +268,19 @@ def solve_by_applying_all():
     total = len(puzzles)
     print(f"{total} puzzles to check")
     solved = 0
-    solved_in_steps = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    solved_in_steps = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     unsolved = []
     times = []
     for line in puzzles:
-        duration, solution, in_steps = solve_by_applying(line)
-        times.append(duration)
-        if in_steps:
-            solved_in_steps[in_steps] += 1
+        pu = line_import(line)
+        solve_result = solve_by_applying(pu, progress=False)
+        times.append(solve_result["duration"])
+        if solve_result["solved"]:
+            level = solve_result["step_reached"]
+            solved_in_steps[level] += 1
             solved += 1
+            with open(Path("..") / "assets" / f"level{level:02}.txt", "a") as fp:
+                fp.write(line + "\n")
         else:
             unsolved.append(line)
         print(f"{solved + len(unsolved)}/{total} - Solved: {solved} - steps: {solved_in_steps}", end="\r")
@@ -263,38 +290,80 @@ def solve_by_applying_all():
     print("Average time to solve run:", sum(times) / len(times))
     print()
 
-def solve_by_applying(line):
+def solve_by_applying(pu, max_steps=10, progress=True):
     start = time.time()
-    #print(line)
-    pu = line_import(line)
     #print("  => ", end="")
     #print("".join(str(c.value) for c in pu.state), end=" - ")
-    pu.apply_constraints()
-    if "0" not in "".join(str(c.value) for c in pu.state):
-        end = time.time()
-        return (end - start, "".join(str(c.value) for c in pu.state), 1)
-    pu.apply_with_force()
-    if "0" not in "".join(str(c.value) for c in pu.state):
-        end = time.time()
-        return (end - start, "".join(str(c.value) for c in pu.state), 2)
-    pu.apply_constraints()
-    if "0" not in "".join(str(c.value) for c in pu.state):
-        end = time.time()
-        return (end - start, "".join(str(c.value) for c in pu.state), 3)
-    pu.apply_with_force()
-    if "0" not in "".join(str(c.value) for c in pu.state):
-        end = time.time()
-        return (end - start, "".join(str(c.value) for c in pu.state), 4)
-    pu.apply_constraints()
-    if "0" not in "".join(str(c.value) for c in pu.state):
-        end = time.time()
-        return (end - start, "".join(str(c.value) for c in pu.state), 5)
-    pu.apply_with_force()
-    if "0" not in "".join(str(c.value) for c in pu.state):
-        end = time.time()
-        return (end - start, "".join(str(c.value) for c in pu.state), 6)
-    end = time.time()
-    return (end - start, "".join(str(c.value) for c in pu.state), False)
+    current_step = 0
+    solved = False
+    failed = False
+    while current_step <= max_steps:
+        changed = False
+        if progress:
+            write_at(0, 7, f"  / {current_step}")
+        if current_step % 2 == 0:
+            try:
+                changed = pu.apply_constraints(auto_check=True)
+            except CannotApplyConstraint:
+                if progress:
+                    write_at(0, 8, "Failed on apply")
+                failed = True
+                break
+        else:
+            try:
+                changed = pu.apply_with_force()
+            except CannotApplyConstraint:
+                write_at(0, 8, "Failed on force")
+                failed = True
+                break
+        if not all(c.check(pu) for c in pu.constraints):
+            if progress:
+                write_at(0, 8, "Failed on check")
+            failed = True
+            break
+        strstate = "".join(str(c.value) for c in pu.state)
+        if progress:
+            write_at(0, 9, f"{strstate}")
+        if "0" not in strstate:
+            if progress:
+                write_at(0, 10, "Solved")
+            solved = True
+            break
+        if current_step % 2 != 0 and not changed:
+            if progress:
+                write_at(0, 10, "NoChange")
+            break
+        current_step += 1
+    return {
+        "duration": time.time() - start,
+        "state": "".join(str(c.value) for c in pu.state),
+        "solved": solved,
+        "failed": failed,
+        "step_reached": current_step,
+    }
+
+def explain(pu, max_steps=10):
+    current_step = 0
+    solved = False
+    while current_step <= max_steps:
+        changed = False
+        print(f"{current_step}:")
+        if current_step % 2 == 0:
+            print("Apply constraints")
+            changed = pu.apply_constraints(explain=True)
+        else:
+            print("Apply with force")
+            changed = pu.apply_with_force(explain=True)
+        strstate = "".join(str(c.value) for c in pu.state)
+        print(f"State is now {strstate}")
+        if "0" not in strstate:
+            print("Solved!!")
+            solved = True
+            break
+        if current_step % 2 != 0 and not changed:
+            print("Nothing changed")
+            break
+        current_step += 1
 
 
 def all_possible_constraints():
@@ -379,5 +448,35 @@ if __name__ == "__main__":
     # solve_by_applying("12_10x10_0002000200002000010000000202000000000000000000000000002000000001000000000000000000000000021000000000_PA:62.left;FM:222;GS:9.1;LT:A.63.47;QA:1.8;PA:51.right;FM:22.02.20;GS:30.10;LT:B.13.82;PA:48.left;FM:1.1;GS:70.2;LT:C.11.40;PA:4.left;LT:D.52.43;PA:38.bottom;GS:99.2;LT:E.70.24;PA:20.top;GS:42.1;LT:F.5.55;PA:76.left;FM:1.1.2;GS:92.7;LT:G.73.53;GS:25.3;LT:H.22.46;PA:56.bottom;FM:001.001.101;GS:74.1;LT:I.8.97;PA:78.bottom;FM:11.10;FM:112;GS:57.3;LT:J.78.48;PA:88.top;LT:K.60.17;PA:15.right;FM:111.111.110;GS:49.1;LT:L.15.6;PA:61.top;LT:M.66.65;PA:57.right;FM:101.101.001;GS:3.8;LT:N.84.95;FM:100.110.111;PA:14.left;PA:67.right;LT:O.49.93;PA:85.top;PA:76.bottom;GS:62.1;PA:39.bottom;GS:86.7;PA:67.top;GS:36.4;GS:89.6;GS:37.10;GS:87.7;GS:61.6;GS:45.5;LT:P.76.1;PA:32.left;GS:2.1;LT:Q.35.4;LT:R.85.18;LT:S.67.29;LT:T.58.38_0:0")
     # solve_by_applying("12_10x10_1000000000000020000000000020000000100000001000000020000000000000001020000001000001000000000000000000_PA:11.bottom;FM:202.222;GS:18.9;LT:A.85.14;QA:2.11;PA:41.right;GS:62.9;LT:B.39.84;PA:58.left;FM:22.21.11;GS:86.5;LT:C.88.50;PA:19.bottom;FM:22;GS:25.9;LT:D.51.55;PA:83.top;FM:101.001.010;GS:21.4;LT:E.4.21;PA:12.left;FM:22.20;GS:59.7;LT:F.92.8;PA:72.left;FM:11.21.22;GS:2.6;LT:G.64.11;PA:54.bottom;FM:101.111;GS:71.10;LT:H.82.66;PA:27.top;GS:37.1;LT:I.31.76;PA:1.right;GS:67.4;LT:J.44.19;FM:112.112;GS:48.2;PA:30.bottom;PA:22.top;GS:33.7;FM:122;GS:73.1;GS:58.2;LT:K.52.97;PA:27.right;GS:7.10;PA:75.right;PA:87.top;GS:53.6;PA:91.right;FM:11.11;GS:43.2;LT:L.28.37;PA:36.left;LT:M.47.43;GS:24.2;LT:N.7.79;PA:48.top;PA:62.top;GS:41.1;GS:72.6;PA:74.left;LT:O.99.75;LT:P.61.49;LT:Q.16.33;LT:R.46.90;LT:S.80.25_0:0")
     # all_possible_constraints()
-    # solve_by_applying("12_3x3_002020010_PA:6.right;FM:11.12.21;FM:12.11;GS:4.1_1:212121212")
-    solve_by_applying_all()
+    # rint(solve_by_applying("12_3x3_002020010_PA:6.right;FM:11.12.21;FM:12.11;GS:4.1_1:212121212"))
+    # solve_by_applying_all()
+    pu = line_import("12_6x6_201002100001000000000020000210000100_FM:1.2;PA:32.left_1:221222121221121221121221121211121111")
+    c = pu.constraints[0]
+    result = c.apply(pu, debug=True)
+    print("Constraint did change something?", result)
+    # print(pu)
+    # print(state_to_str(pu))
+    # print(line_export(pu))
+    # explain(pu)
+    # print(solve_by_applying(pu, progress=False))
+    # solve_by_applying_all()
+    # found = False
+    # while not found:
+    #     try:
+    #         pu = playground()
+    #     except KeyboardInterrupt:
+    #         write_at(0, 32, "Break")
+    #     else:
+    #         if pu is not None:
+    #             clear()
+    #             write_at(0, 0, "")
+    #             print("I made a puzzle!!")
+    #             print(pu)
+    #             print(state_to_str(pu))
+    #             print(line_export(pu))
+    #             explain(pu)
+    #             found = True
+    #         else:
+    #             clear()
+    #             write_at(0, 0, "")
+    #             print("Could not find a puzzle")

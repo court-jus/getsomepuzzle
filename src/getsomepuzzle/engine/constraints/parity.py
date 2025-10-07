@@ -188,6 +188,29 @@ class ParityConstraint(CellCentricConstraint):
             if top_size % 2 == 0 and bottom_size % 2 == 0 and bottom_size > 0 and top_size > 0:
                 yield {"indices": [idx], "side": "vertical"}
 
+    def influence(self, puzzle):
+        # List the cells that are influenced by this rule
+        idx, side = self.parameters["indices"][0], self.parameters["side"]
+        w = puzzle.width
+        row = idx // w
+        col = idx % w
+        result = []
+        for ix in range(len(puzzle.state)):
+            if ix // w == row and side in ("left", "right", "horizontal"):
+                if side == "horizontal":
+                    result.append(ix)
+                elif side == "right" and ix % w > col:
+                    result.append(ix)
+                elif side == "left" and ix % w < col:
+                    result.append(ix)
+            elif ix % w == col and side in ("top", "bottom", "vertical"):
+                if side == "vertical":
+                    result.append(ix)
+                elif side == "bottom" and ix // w > row:
+                    result.append(ix)
+                elif side == "top" and ix // w < row:
+                    result.append(ix)
+        return result
 
     @staticmethod
     def maximum_presence(puzzle):

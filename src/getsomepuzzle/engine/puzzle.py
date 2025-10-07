@@ -115,16 +115,24 @@ class Puzzle:
             c for c in self.constraints if not isinstance(c, FixedValueConstraint)
         ]
 
-    def apply_constraints(self, auto_check=False):
+    def apply_constraints(self, auto_check=False, explain=False, only_idx=None):
         changed = True
         while changed:
             changed = False
             for constraint in self.constraints:
+                if only_idx is not None and only_idx not in constraint.influence(self):
+                    continue
+                before = [c.value for c in self.state]
                 if hasattr(constraint, "apply"):
                     if constraint.apply(self):
-                        # print("Constraint", constraint, "did change:")
-                        # print(line_export(self))
+                        if explain:
+                            diff = "".join(str(c.value) if before[idx] == EMPTY and c.value != EMPTY else "." for idx, c in enumerate(self.state))
+                            print("  Constraint", constraint, "gives us:")
+                            print(" ", diff)
                         changed = True
+                        break
+                    elif explain:
+                        print("  Constraint", constraint, "has nothing to say")
                 else:
                     # print("Pas d'apply pour", constraint)
                     pass
@@ -132,22 +140,41 @@ class Puzzle:
             if not all(c.check(self) for c in self.constraints):
                 failed = [c for c in self.constraints if not c.check(self)]
                 raise CannotApplyConstraint(str(failed))
+        return changed
 
-    def apply_with_force(self):
+    def apply_with_force(self, explain=False):
         # Iterate over free cells. For each cell, try both values
         # and apply constraints each time
+        changed = False
         cells = self.free_cells()
         for cell, idx in cells:
+            if len(cell.options) <= 1:
+                continue
             for value in cell.options:
+                if explain:
+                    print(f"Set {idx + 1} to {value}")
                 test_pu = self.clone()
                 test_pu.set_value(idx, value)
                 try:
-                    test_pu.apply_constraints(auto_check=True)
-                except CannotApplyConstraint:
+                    test_pu.apply_constraints(auto_check=True, explain=explain, only_idx=idx)
+                except CannotApplyConstraint as exc:
+                    if explain:
+                        print(" ", exc, f"tells us that cell {idx + 1} cannot equal {value}")
                     # Remove this options from cell
                     cell.options.remove(value)
                     if len(cell.options) == 1:
+                        if explain:
+                            print(f"  So we set {idx + 1} to {cell.options[0]}")
                         cell.set_value(cell.options[0])
+                        changed = True
+                    elif len(cell.options) == 0:
+                        if explain:
+                            print("  But now it has no option, that's a problem")
+                        raise
+                else:
+                    if explain:
+                        print(f"  It's OK to have {idx + 1} = {value}")
+        return changed
 
     def reset_user_input(self):
         for cell in self.state:

@@ -91,23 +91,28 @@ class Motif(Constraint):
         if (smotif in novice_patterns and omotif in basic_patterns) or (smotif in basic_patterns and omotif in novice_patterns):
             return True
 
-        if len(smotif) > len(omotif):
-            return omotif in smotif
-        return smotif in omotif
+        if Motif._is_present(smotif, "".join(omotif), len(omotif[0])):
+            # smotif is present in omotif
+            return True
+
+        if Motif._is_present(omotif, "".join(smotif), len(smotif[0])):
+            # omotif is present in smotif
+            return True
+
+        return False
 
     @staticmethod
-    def _is_present(motif, puzzle, debug=False):
-        pu = "".join(str(c.value) for c in puzzle.state)
+    def _is_present(motif, strstate, width, debug=False):
         if debug:
-            print("Find", motif, "in", pu)
+            print("Find", motif, "in", strstate)
         mow = len(motif[0])
-        pta = puzzle.width - mow
+        pta = width - mow
         more = (pta * ".").join(motif).replace(str(EMPTY), ".")
         more = re.compile(more)
-        for idx in range(len(pu)):
-            if (puzzle.width - (idx % puzzle.width)) < mow:
+        for idx in range(len(strstate)):
+            if (width - (idx % width)) < mow:
                 continue
-            subst = pu[idx:]
+            subst = strstate[idx:]
             m = more.match(subst)
             if m:
                 if debug:
@@ -119,7 +124,9 @@ class Motif(Constraint):
 
     def is_present(self, puzzle, debug=False):
         motif = self.parameters["motif"]
-        present, _ = Motif._is_present(motif, puzzle, debug=debug)
+        width = puzzle.width
+        state = "".join(str(c.value) for c in puzzle.state)
+        present, _ = Motif._is_present(motif, state, width, debug=debug)
         return present
 
     def line_export(self):
@@ -148,12 +155,17 @@ class Motif(Constraint):
 
     @staticmethod
     def find_submotif(strmotif, puzzle):
+        print("all motifs", [
+            (car, idx, strmotif[idx], replace_char_at_idx(strmotif, idx, str(EMPTY)))
+            for idx, car in enumerate(strmotif)
+        ])
         for idx, car, submotif in [
             (idx, strmotif[idx], replace_char_at_idx(strmotif, idx, str(EMPTY)))
             for idx, car in enumerate(strmotif)
             if car not in (str(EMPTY), ".")
         ]:
-            present, where = Motif._is_present(submotif.split("."), puzzle)
+            print("Try submotif", submotif)
+            present, where = Motif._is_present(submotif.split("."), "".join(str(c.value) for c in puzzle.state), puzzle.width)
             if present:
                 return where, idx, car, submotif
 
@@ -161,31 +173,35 @@ class Motif(Constraint):
         motif = self.parameters["motif"]
         strmotif = ".".join(motif)
         mow = len(motif[0])
+        result = False
+        changed = True
+        while changed:
+            submotif = Motif.find_submotif(strmotif, puzzle)
+            if submotif is None:
+                return False
 
-        submotif = Motif.find_submotif(strmotif, puzzle)
-        if submotif is None:
-            return False
-
-        where, idx, car, submotif = submotif
-        if debug:
-            print("In the puzzle, at idx", where, "we found the submotif", submotif, "(that was built by replacing car", car, "at idx", idx, "in the main motif", ".".join(motif), ")")
-        ridx = (idx // (mow + 1))
-        cidx = (idx % (mow + 1))
-        if debug:
-            print("In the submotif, the car replaced was at", cidx, "x", ridx, "(I", idx, "M", mow, ")")
-        wridx = (where // puzzle.width)
-        wcidx = (where % puzzle.width)
-        if debug:
-            print("The stuff was found at", where, ":", wcidx, "x", wridx, "in the puzzle")
-        fridx = wridx + ridx
-        fcidx = wcidx + cidx
-        fidx = fridx * puzzle.width + fcidx
-        if debug:
-            print("So the cell at", fidx, "(", fcidx, "x", fridx, ") cannot equal", car)
-        if puzzle.state[fidx].value == int(car):
-            raise CannotApplyConstraint(f"Cannot apply FM {motif} because {fidx + 1} == {int(car)}")
-        opposite = [v for v in puzzle.domain if v != int(car)][0]
-        return puzzle.state[fidx].set_value(opposite)
+            where, idx, car, submotif = submotif
+            if debug:
+                print("In the puzzle, at idx", where, "we found the submotif", submotif, "(that was built by replacing car", car, "at idx", idx, "in the main motif", ".".join(motif), ")")
+            ridx = (idx // (mow + 1))
+            cidx = (idx % (mow + 1))
+            if debug:
+                print("In the submotif, the car replaced was at", cidx, "x", ridx, "(I", idx, "M", mow, ")")
+            wridx = (where // puzzle.width)
+            wcidx = (where % puzzle.width)
+            if debug:
+                print("The stuff was found at", where, ":", wcidx, "x", wridx, "in the puzzle")
+            fridx = wridx + ridx
+            fcidx = wcidx + cidx
+            fidx = fridx * puzzle.width + fcidx
+            if debug:
+                print("So the cell at", fidx, "(", fcidx, "x", fridx, ") cannot equal", car)
+            if puzzle.state[fidx].value == int(car):
+                raise CannotApplyConstraint(f"Cannot apply FM {motif} because {fidx + 1} == {int(car)}")
+            opposite = [v for v in puzzle.domain if v != int(car)][0]
+            changed = puzzle.state[fidx].set_value(opposite)
+            result |= changed
+        return result
 
 class ForbiddenMotif(Motif):
     slug = "FM"
