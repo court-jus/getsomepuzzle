@@ -1,4 +1,4 @@
-    import random
+import random
 import pytest
 from getsomepuzzle.engine.constraints.motif import ForbiddenMotif
 from getsomepuzzle.engine.puzzle import Puzzle
@@ -108,6 +108,10 @@ def test_forbidden_motif_invalid(motif, puzzle):
     p = make_puzzle(puzzle)
     assert motif.check(p) is False
 
+def test_conflicting_motif():
+    motif = ForbiddenMotif(motif=["12", "21"])
+    other = ForbiddenMotif(motif=["211", "121", "211"])
+    assert motif.conflicts(other) is True
 
 @pytest.mark.skip()
 def test_forbidden_motif_generate():

@@ -123,11 +123,11 @@ def generate_one(args):
 def generate_once(running, width, height):
     w = width if width is not None else random.randint(3, 6)
     h = height if height is not None else random.randint(3, 6)
-    debug=True
+    debug=False
     try:
         pg = PuzzleGenerator(width=w, height=h, running=running)
-        params = LetterGroup.generate_random_parameters(pg.puzzle)
-        pu = pg.generate(LetterGroup(**params), debug=debug)
+        # params = LetterGroup.generate_random_parameters(pg.puzzle)
+        pu = pg.generate(debug=debug)
         if pu is None:
             return None
         solution, bp, _ = find_solution(running, pu, debug=debug)

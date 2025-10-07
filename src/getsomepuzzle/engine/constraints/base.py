@@ -47,6 +47,8 @@ class Constraint:
     def signature(self):
         return self.line_export()
 
+    def influence(self, puzzle):
+        return [ix for ix in range(len(puzzle.state))]
 
 class CellCentricConstraint(Constraint):
 

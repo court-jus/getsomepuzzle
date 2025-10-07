@@ -71,19 +71,19 @@ class LetterGroup(CellCentricConstraint):
 
         my_colors = [puzzle.state[idx].value for idx in indices if puzzle.state[idx].value != EMPTY]
         my_color = my_colors[0] if my_colors else EMPTY
-        other_letters = [idx for c in puzzle.constraints if isinstance(c, LetterGroup) and c != self for idx in c.parameters["indices"]]
+        other_letters = [idx for c in puzzle.constraints if isinstance(c, LetterGroup) and c.parameters["letter"] != letter for idx in c.parameters["indices"]]
         neighbors_with_letters = [nei for idx in indices for nei in get_neighbors(puzzle.state, puzzle.width, puzzle.height, idx) if nei is not None and nei in other_letters]
         if my_color:
             # Apply opposite color to neighbors_with_letters
             my_opposite = [v for v in puzzle.domain if v != my_color][0]
             for nei in neighbors_with_letters:
                 if puzzle.state[nei].value == my_color:
-                    raise CannotApplyConstraint(f"Cannot apply Letter {letter} at {indices} because {nei + 1} == my_color ({my_color})")
+                    raise CannotApplyConstraint(f"Cannot apply Letter {letter} at {indices} because {nei + 1}:{puzzle.state[nei].value} == my_color ({my_color})")
                 changed |= puzzle.state[nei].set_value(my_opposite)
             # Apply color to other members of the letter group
             for member in indices:
                 if puzzle.state[member].value == my_opposite:
-                    raise CannotApplyConstraint(f"Cannot apply Letter {letter} at {indices} because {member + 1} == my_opposite ({my_opposite})")
+                    raise CannotApplyConstraint(f"Cannot apply Letter {letter} at {indices} because {member + 1}:{puzzle.state[member].value} == my_opposite ({my_opposite})")
                 changed |= puzzle.state[member].set_value(my_color)
         return changed
 
