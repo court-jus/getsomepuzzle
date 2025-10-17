@@ -162,17 +162,19 @@ class Motif(Constraint):
         return f"{self.slug}:{motif}"
 
     @staticmethod
-    def find_submotif(strmotif, puzzle):
-        print("all motifs", [
-            (car, idx, strmotif[idx], replace_char_at_idx(strmotif, idx, str(EMPTY)))
-            for idx, car in enumerate(strmotif)
-        ])
+    def find_submotif(strmotif, puzzle, debug=False):
+        if debug:
+            print("all motifs", [
+                (car, idx, strmotif[idx], replace_char_at_idx(strmotif, idx, str(EMPTY)))
+                for idx, car in enumerate(strmotif)
+            ])
         for idx, car, submotif in [
             (idx, strmotif[idx], replace_char_at_idx(strmotif, idx, str(EMPTY)))
             for idx, car in enumerate(strmotif)
             if car not in (str(EMPTY), ".")
         ]:
-            print("Try submotif", submotif)
+            if debug:
+                print("Try submotif", submotif)
             present, where = Motif._is_present(submotif.split("."), "".join(str(c.value) for c in puzzle.state), puzzle.width)
             if present:
                 return where, idx, car, submotif
@@ -184,7 +186,7 @@ class Motif(Constraint):
         result = False
         changed = True
         while changed:
-            submotif = Motif.find_submotif(strmotif, puzzle)
+            submotif = Motif.find_submotif(strmotif, puzzle, debug=debug)
             if submotif is None:
                 return False
 
