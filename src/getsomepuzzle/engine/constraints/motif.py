@@ -6,6 +6,10 @@ from ..utils import to_grid, replace_char_at_idx
 from ..errors import CannotApplyConstraint
 from .base import Constraint
 
+ALLOW_3x3_MOTIFS = False
+ALLOW_3x2_MOTIFS = False
+ALLOW_2x3_MOTIFS = False
+
 
 class Motif(Constraint):
 
@@ -62,10 +66,14 @@ class Motif(Constraint):
         all_33 = [[i, j, k] for i in all_13 for j in all_13 for k in all_13]
         all_motifs = all_11 + all_12 + all_21 + all_22
         if w > 2:
-            all_motifs = all_motifs + all_13 + all_23
+            all_motifs = all_motifs + all_13
+            if ALLOW_2x3_MOTIFS:
+                all_motifs += all_23
         if h > 2:
-            all_motifs = all_motifs + all_31 + all_32
-            if w > 2:
+            all_motifs = all_motifs + all_31
+            if ALLOW_3x2_MOTIFS:
+                all_motifs += all_32
+            if w > 2 and ALLOW_3x3_MOTIFS:
                 all_motifs = all_motifs + all_33
         for motif in all_motifs:
             if (
