@@ -254,9 +254,6 @@ def playground():
         return pu
 
 
-def main():
-    for i in range(1):
-        generate_a_puzzle()
 
 def solve_by_applying_all():
     asset = Path("..") / "assets" / "puzzles.txt"
@@ -267,6 +264,8 @@ def solve_by_applying_all():
     ]
     total = len(puzzles)
     print(f"{total} puzzles to check")
+    for i in range(1):
+        generate_a_puzzle()
     solved = 0
     solved_in_steps = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     unsolved = []
@@ -435,48 +434,79 @@ def all_possible_constraints():
     print(state_to_str(pu))
     print(line_export(pu))
 
+
+def buildapuzzle(width, height, ratio):
+    running = FakeEvent()
+    solved = Puzzle(running=running, width=width, height=height)
+    pu = solved.clone()
+    # Randomize the content of the grid
+    for idx, cell in enumerate(solved.state):
+        v = random.choice(cell.domain)
+        cell.set_value(v)
+    generated_solution = [c.value for c in solved.state]
+    print("Puzzle ready", generated_solution)
+
+    # Generate all possible constraints
+    all_constraints = []
+    for rule in [r for r in AVAILABLE_RULES if r != FixedValueConstraint]:
+        for params in rule.generate_all_parameters(solved):
+            constraint = rule(**params)
+            if constraint.check(solved):
+                all_constraints.append(constraint)
+    total = len(all_constraints)
+    random.shuffle(all_constraints)
+
+    # Decide how many pre-filled cells we want
+    size = width * height
+    prefilled = size * (1 - ratio)
+    indices = list(range(size))
+    random.shuffle(indices)
+    while prefilled > 0:
+        prefilled -= 1
+        idx = indices.pop()
+        print(f"Set {idx+1} = {solved.state[idx].value}")
+        pu.state[idx].set_value(solved.state[idx].value)
+
+    # While the puzzle is not playable
+    ratio = pu.compute_ratio()
+    while ratio > 0:
+        # Add the first valid constraint
+        while True:
+            print(f"[{ratio:5}] {len(all_constraints):8} / {total:8}", end="\r")
+            constraint = all_constraints.pop(0)
+            cloned = pu.clone()
+            # First: apply previously added constraints
+            changed_step1 = True
+            while changed_step1:
+                changed_step1 = cloned.apply_constraints() or cloned.apply_with_force()
+
+            # Then: try to apply the new constraint and see if it helps
+            cloned.constraints.append(constraint)
+            changed_step2 = cloned.apply_constraints()
+            if changed_step2:
+                ratio = cloned.compute_ratio()
+                break
+            changed_step2 |= cloned.apply_with_force()
+            if changed_step2:
+                ratio = cloned.compute_ratio()
+                break
+
+        # We found a constraint that is helpful, add it to the resulting puzzle
+        pu.constraints.append(constraint)
+
+    return pu
+
 if __name__ == "__main__":
     """
     Ideas:
     * each rule could hold a list of cells that it influences (its perimeter)
     """
-    # main()
-    # playground_constraints_apply()
-    # playground_find_solution()
-    # playground_manually_check()
-    # apply_to_all(compare_solvers)
-    # solve_by_applying("12_10x10_0002000200002000010000000202000000000000000000000000002000000001000000000000000000000000021000000000_PA:62.left;FM:222;GS:9.1;LT:A.63.47;QA:1.8;PA:51.right;FM:22.02.20;GS:30.10;LT:B.13.82;PA:48.left;FM:1.1;GS:70.2;LT:C.11.40;PA:4.left;LT:D.52.43;PA:38.bottom;GS:99.2;LT:E.70.24;PA:20.top;GS:42.1;LT:F.5.55;PA:76.left;FM:1.1.2;GS:92.7;LT:G.73.53;GS:25.3;LT:H.22.46;PA:56.bottom;FM:001.001.101;GS:74.1;LT:I.8.97;PA:78.bottom;FM:11.10;FM:112;GS:57.3;LT:J.78.48;PA:88.top;LT:K.60.17;PA:15.right;FM:111.111.110;GS:49.1;LT:L.15.6;PA:61.top;LT:M.66.65;PA:57.right;FM:101.101.001;GS:3.8;LT:N.84.95;FM:100.110.111;PA:14.left;PA:67.right;LT:O.49.93;PA:85.top;PA:76.bottom;GS:62.1;PA:39.bottom;GS:86.7;PA:67.top;GS:36.4;GS:89.6;GS:37.10;GS:87.7;GS:61.6;GS:45.5;LT:P.76.1;PA:32.left;GS:2.1;LT:Q.35.4;LT:R.85.18;LT:S.67.29;LT:T.58.38_0:0")
-    # solve_by_applying("12_10x10_1000000000000020000000000020000000100000001000000020000000000000001020000001000001000000000000000000_PA:11.bottom;FM:202.222;GS:18.9;LT:A.85.14;QA:2.11;PA:41.right;GS:62.9;LT:B.39.84;PA:58.left;FM:22.21.11;GS:86.5;LT:C.88.50;PA:19.bottom;FM:22;GS:25.9;LT:D.51.55;PA:83.top;FM:101.001.010;GS:21.4;LT:E.4.21;PA:12.left;FM:22.20;GS:59.7;LT:F.92.8;PA:72.left;FM:11.21.22;GS:2.6;LT:G.64.11;PA:54.bottom;FM:101.111;GS:71.10;LT:H.82.66;PA:27.top;GS:37.1;LT:I.31.76;PA:1.right;GS:67.4;LT:J.44.19;FM:112.112;GS:48.2;PA:30.bottom;PA:22.top;GS:33.7;FM:122;GS:73.1;GS:58.2;LT:K.52.97;PA:27.right;GS:7.10;PA:75.right;PA:87.top;GS:53.6;PA:91.right;FM:11.11;GS:43.2;LT:L.28.37;PA:36.left;LT:M.47.43;GS:24.2;LT:N.7.79;PA:48.top;PA:62.top;GS:41.1;GS:72.6;PA:74.left;LT:O.99.75;LT:P.61.49;LT:Q.16.33;LT:R.46.90;LT:S.80.25_0:0")
-    # all_possible_constraints()
-    # rint(solve_by_applying("12_3x3_002020010_PA:6.right;FM:11.12.21;FM:12.11;GS:4.1_1:212121212"))
-    # solve_by_applying_all()
-    pu = line_import("12_6x6_201002100001000000000020000210000100_FM:1.2;PA:32.left_1:221222121221121221121221121211121111")
-    c = pu.constraints[0]
-    result = c.apply(pu, debug=True)
-    print("Constraint did change something?", result)
-    # print(pu)
-    # print(state_to_str(pu))
-    # print(line_export(pu))
-    # explain(pu)
-    # print(solve_by_applying(pu, progress=False))
-    # solve_by_applying_all()
-    # found = False
-    # while not found:
-    #     try:
-    #         pu = playground()
-    #     except KeyboardInterrupt:
-    #         write_at(0, 32, "Break")
-    #     else:
-    #         if pu is not None:
-    #             clear()
-    #             write_at(0, 0, "")
-    #             print("I made a puzzle!!")
-    #             print(pu)
-    #             print(state_to_str(pu))
-    #             print(line_export(pu))
-    #             explain(pu)
-    #             found = True
-    #         else:
-    #             clear()
-    #             write_at(0, 0, "")
-    #             print("Could not find a puzzle")
+    puzzle = None
+    while not puzzle:
+        try:
+            puzzle = buildapuzzle(5, 6, 0.75)
+        except IndexError:
+            continue
+    print(puzzle)
+    print(state_to_str(puzzle))
+    print(line_export(puzzle))
