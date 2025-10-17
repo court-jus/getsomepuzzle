@@ -64,6 +64,10 @@ class Puzzle:
     def free_cells(self):
         return [(c, idx) for idx, c in enumerate(self.state) if c.free()]
 
+    def compute_ratio(self):
+        values = [c.value for c in self.state]
+        return values.count(EMPTY) / len(values)
+
     def first_free_cell(self):
         cells = self.free_cells()
         if not cells:
@@ -117,9 +121,12 @@ class Puzzle:
 
     def apply_constraints(self, auto_check=False, explain=False, only_idx=None):
         changed = True
+        globally_changed = False
         while changed:
             changed = False
             for constraint in self.constraints:
+                if explain:
+                    print("  What does", constraint, "say?")
                 if only_idx is not None and only_idx not in constraint.influence(self):
                     continue
                 before = [c.value for c in self.state]
@@ -132,15 +139,16 @@ class Puzzle:
                         changed = True
                         break
                     elif explain:
-                        print("  Constraint", constraint, "has nothing to say")
+                        print("  Constraint", constraint, "has nothing (more) to say")
                 else:
                     # print("Pas d'apply pour", constraint)
                     pass
+            globally_changed |= changed
         if auto_check:
             if not all(c.check(self) for c in self.constraints):
                 failed = [c for c in self.constraints if not c.check(self)]
                 raise CannotApplyConstraint(str(failed))
-        return changed
+        return globally_changed
 
     def apply_with_force(self, explain=False):
         # Iterate over free cells. For each cell, try both values
