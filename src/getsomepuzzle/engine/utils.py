@@ -165,6 +165,8 @@ def line_import(line):
         for kls in AVAILABLE_RULES
     }
     for c in constraints:
+        if not c:
+            continue
         slug, parameters = c.split(":")
         kls = slugs[slug]
         parameters = kls.line_import(parameters)
