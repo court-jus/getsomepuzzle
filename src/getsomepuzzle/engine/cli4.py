@@ -62,7 +62,7 @@ def generate_a_puzzle(load=None):
                 values = [c.value for c in pu.state]
                 ratio = values.count(EMPTY) / len(values)
                 if ratio < 0.7:
-                    print("# The puzzle has lost its interest", ratio)
+                    print(f"# The puzzle has lost its interest {ratio:5.2}")
                     raise ValueError
     except ValueError:
         # This probably means that adding a fixed value constraint would fill the puzzle
@@ -154,7 +154,7 @@ def playground_manually_check():
         else:
             print("Rule added", added)
         # msg = f"{ticks: 4} - Banned: {len(banned): 5} - Added: {len(pu.constraints): 5}"
-        # print(msg, end="\r")
+        # print(f"\033[2K{msg}", end="\r")
 
     print()
     print(line_export(pu))
@@ -282,7 +282,7 @@ def solve_by_applying_all():
                 fp.write(line + "\n")
         else:
             unsolved.append(line)
-        print(f"{solved + len(unsolved)}/{total} - Solved: {solved} - steps: {solved_in_steps}", end="\r")
+        print(f"\033[2K{solved + len(unsolved)}/{total} - Solved: {solved} - steps: {solved_in_steps}", end="\r")
     print()
     print(f"Total: {total} - Solved: {solved} (unsolved: {len(unsolved)}) - steps: {solved_in_steps}")
     print(f"Example unsolved: {unsolved[0]}")
@@ -383,7 +383,7 @@ def all_possible_constraints():
     print()
     total = len(all_constraints)
     for idx, constraint in enumerate(all_constraints):
-        print(f"{idx} / {total}", end="\r")
+        print(f"\033[2K{idx} / {total}", end="\r")
         if constraint.check(pu):
             pu.constraints.append(constraint)
     print()
@@ -400,7 +400,7 @@ def all_possible_constraints():
     nb_cells_checked = 0
     total_constraint_check = 0
     while checked < total:
-        print(f"{checked: 6} / {total: 6} - {nb_cells_checked: 6} {total_constraint_check: 6} - ({len(pu.constraints): 6}) {last_msg}", end="\r")
+        print(f"\033[2K{checked: 6} / {total: 6} - {nb_cells_checked: 6} {total_constraint_check: 6} - ({len(pu.constraints): 6}) {last_msg}", end="\r")
         checked += 1
         nb_cells_checked = 0
         total_constraint_check = 0
@@ -434,79 +434,3 @@ def all_possible_constraints():
     print(state_to_str(pu))
     print(line_export(pu))
 
-
-def buildapuzzle(width, height, ratio):
-    running = FakeEvent()
-    solved = Puzzle(running=running, width=width, height=height)
-    pu = solved.clone()
-    # Randomize the content of the grid
-    for idx, cell in enumerate(solved.state):
-        v = random.choice(cell.domain)
-        cell.set_value(v)
-    generated_solution = [c.value for c in solved.state]
-    print("Puzzle ready", generated_solution)
-
-    # Generate all possible constraints
-    all_constraints = []
-    for rule in [r for r in AVAILABLE_RULES if r != FixedValueConstraint]:
-        for params in rule.generate_all_parameters(solved):
-            constraint = rule(**params)
-            if constraint.check(solved):
-                all_constraints.append(constraint)
-    total = len(all_constraints)
-    random.shuffle(all_constraints)
-
-    # Decide how many pre-filled cells we want
-    size = width * height
-    prefilled = size * (1 - ratio)
-    indices = list(range(size))
-    random.shuffle(indices)
-    while prefilled > 0:
-        prefilled -= 1
-        idx = indices.pop()
-        print(f"Set {idx+1} = {solved.state[idx].value}")
-        pu.state[idx].set_value(solved.state[idx].value)
-
-    # While the puzzle is not playable
-    ratio = pu.compute_ratio()
-    while ratio > 0:
-        # Add the first valid constraint
-        while True:
-            print(f"[{ratio:5}] {len(all_constraints):8} / {total:8}", end="\r")
-            constraint = all_constraints.pop(0)
-            cloned = pu.clone()
-            # First: apply previously added constraints
-            changed_step1 = True
-            while changed_step1:
-                changed_step1 = cloned.apply_constraints() or cloned.apply_with_force()
-
-            # Then: try to apply the new constraint and see if it helps
-            cloned.constraints.append(constraint)
-            changed_step2 = cloned.apply_constraints()
-            if changed_step2:
-                ratio = cloned.compute_ratio()
-                break
-            changed_step2 |= cloned.apply_with_force()
-            if changed_step2:
-                ratio = cloned.compute_ratio()
-                break
-
-        # We found a constraint that is helpful, add it to the resulting puzzle
-        pu.constraints.append(constraint)
-
-    return pu
-
-if __name__ == "__main__":
-    """
-    Ideas:
-    * each rule could hold a list of cells that it influences (its perimeter)
-    """
-    puzzle = None
-    while not puzzle:
-        try:
-            puzzle = buildapuzzle(5, 6, 0.75)
-        except IndexError:
-            continue
-    print(puzzle)
-    print(state_to_str(puzzle))
-    print(line_export(puzzle))
