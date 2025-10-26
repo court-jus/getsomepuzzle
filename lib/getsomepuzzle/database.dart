@@ -88,9 +88,9 @@ class Filters {
 
   Filters({
     this.minWidth = 3,
-    this.maxWidth = 6,
+    this.maxWidth = 10,
     this.minHeight = 3,
-    this.maxHeight = 8,
+    this.maxHeight = 10,
     this.minFilled = 0,
     this.maxFilled = 100,
     this.wantedRules = const {},

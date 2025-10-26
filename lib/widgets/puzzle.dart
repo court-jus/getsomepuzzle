@@ -15,10 +15,12 @@ class PuzzleWidget extends StatelessWidget {
     super.key,
     required this.currentPuzzle,
     required this.onCellTap,
+    required this.cellSize,
   });
 
   final Puzzle currentPuzzle;
   final ValueChanged<int> onCellTap;
+  final double cellSize;
 
   void _handleCellTap(int idx) {
     onCellTap(idx);
@@ -44,6 +46,7 @@ class PuzzleWidget extends StatelessWidget {
                       ? forbiddenColor
                       : mandatoryColor,
                   borderColor: constraint.isValid ? Colors.green : Colors.red,
+                  cellSize: cellSize,
                 )
               else if (constraint is QuantityConstraint)
                 QuantityWidget(
@@ -51,12 +54,13 @@ class PuzzleWidget extends StatelessWidget {
                   count: constraint.count,
                   bgColor: mandatoryColor,
                   borderColor: constraint.isValid ? Colors.green : Colors.red,
+                  cellSize: cellSize,
                 ),
           ],
         ),
         Table(
           border: TableBorder.all(),
-          defaultColumnWidth: FixedColumnWidth(64),
+          defaultColumnWidth: FixedColumnWidth(cellSize),
           children: [
             for (var (rowidx, row) in currentPuzzle.getRows().indexed)
               TableRow(
@@ -69,6 +73,7 @@ class PuzzleWidget extends StatelessWidget {
                           currentPuzzle.cellConstraints[rowidx *
                                   currentPuzzle.width +
                               cellidx],
+                      cellSize: cellSize,
                       onTap: () => {
                         _handleCellTap(rowidx * currentPuzzle.width + cellidx),
                       },

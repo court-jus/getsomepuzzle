@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 
 const bgColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
-const motifCellSize = 10.0;
-const motifSize = 64.0;
 
 class MotifWidget extends StatelessWidget {
   // Constructor
@@ -11,12 +10,14 @@ class MotifWidget extends StatelessWidget {
     required this.motif,
     required this.bgColor,
     required this.borderColor,
+    required this.cellSize,
   });
 
   // Attributes
   final List<List<int>> motif;
   final Color bgColor;
   final Color borderColor;
+  final double cellSize;
 
   // Build UI
   @override
@@ -27,8 +28,8 @@ class MotifWidget extends StatelessWidget {
         border: BoxBorder.all(color: borderColor, width: 4),
       ),
       child: SizedBox(
-        width: motifSize,
-        height: motifSize,
+        width: cellSize,
+        height: cellSize,
         child: Center(
           child: Table(
             defaultColumnWidth: FixedColumnWidth(motifCellSize),

@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -233,6 +234,20 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    double contextWidth = MediaQuery.sizeOf(context).width;
+    double contextHeight = (
+      MediaQuery.sizeOf(context).height
+      - 40  // The bottom bar
+      - 64  // The app bar
+      - 32  // Some margin
+    );
+    double cellSize = 32.0;
+    if (currentPuzzle != null) {
+      double maxWidth = contextWidth / currentPuzzle!.width;
+      double maxHeight = contextHeight / (currentPuzzle!.height + 2);
+      cellSize = min(maxWidth, maxHeight);
+    }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -268,11 +283,13 @@ class _MyHomePageState extends State<MyHomePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (currentPuzzle != null)
-                      PuzzleWidget(
-                        currentPuzzle: currentPuzzle!,
-                        onCellTap: handlePuzzleTap,
-                      ),
+                    (currentPuzzle != null)
+                        ? PuzzleWidget(
+                            currentPuzzle: currentPuzzle!,
+                            onCellTap: handlePuzzleTap,
+                            cellSize: cellSize,
+                          )
+                        : Text("No puzzle loaded."),
                   ],
                 ),
                 if (betweenPuzzles)
@@ -338,14 +355,13 @@ class _MyHomePageState extends State<MyHomePage> {
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: SizedBox(
-                        width: 64 * 6,
-                        height: 64 * 8,
+                        width: contextWidth,
+                        height: contextHeight,
                         child: Center(
-                          child: Text("Paused", style: TextStyle(fontSize: 92)),
+                          child: Icon(Icons.pause, size: cellSize * 3)),
                         ),
                       ),
                     ),
-                  ),
               ],
             ),
           ],

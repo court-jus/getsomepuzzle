@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 
 const textColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
 
@@ -11,6 +12,7 @@ class QuantityWidget extends StatelessWidget {
     required this.count,
     required this.bgColor,
     required this.borderColor,
+    required this.cellSize,
   });
 
   // Attributes
@@ -18,6 +20,7 @@ class QuantityWidget extends StatelessWidget {
   final int count;
   final Color bgColor;
   final Color borderColor;
+  final double cellSize;
 
   // Build UI
   @override
@@ -28,11 +31,11 @@ class QuantityWidget extends StatelessWidget {
         border: BoxBorder.all(color: borderColor, width: 4),
       ),
       child: SizedBox(
-        width: 64,
-        height: 64,
+        width: cellSize,
+        height: cellSize,
         child: Center(child: Text(
           count.toString(),
-           style: TextStyle(fontSize: 36, color: textColors[value]),
+           style: TextStyle(fontSize: cellSize * cellSizeToFontSize / count, color: textColors[value]),
         )),
       ),
     );

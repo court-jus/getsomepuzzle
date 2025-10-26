@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
 class Constraint {
@@ -9,12 +10,12 @@ class Constraint {
     return "";
   }
 
-  Widget toWidget(Color defaultColor, {int count = 1}) {
+  Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
     return SizedBox(
-      width: 64 / count,
-      height: 64 / count,
+      width: cellSize / count,
+      height: cellSize / count,
       child: Center(
-        child: Text(toString(), style: TextStyle(fontSize: 36 / count)),
+        child: Text(toString(), style: TextStyle(fontSize: cellSize * cellSizeToFontSize / count)),
       ),
     );
   }

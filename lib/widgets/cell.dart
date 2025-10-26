@@ -12,6 +12,7 @@ class CellWidget extends StatelessWidget {
     super.key,
     required this.value,
     required this.readonly,
+    required this.cellSize,
     required this.onTap,
     this.constraints,
   });
@@ -21,6 +22,7 @@ class CellWidget extends StatelessWidget {
   final bool readonly;
   final List<Constraint>? constraints;
   final VoidCallback onTap;
+  final double cellSize;
 
   // Methods
   void _handleTap() {
@@ -38,15 +40,16 @@ class CellWidget extends StatelessWidget {
       widgetScale = sqrt(constraints!.length).ceil();
     }
     final Widget label = constraints == null ? Text(" ") : Wrap(
-      alignment: WrapAlignment.center,
-      children: [
-        for (final constraint in constraints!)
-        constraint.toWidget(
-          fgColors[value] ?? Colors.black,
-          count: widgetScale,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final constraint in constraints!)
+                constraint.toWidget(
+                  fgColors[value] ?? Colors.black,
+                  cellSize,
+                  count: widgetScale,
         )
-      ],
-    );
+            ],
+          );
     return GestureDetector(
       onTap: _handleTap,
       child: DecoratedBox(
@@ -58,8 +61,8 @@ class CellWidget extends StatelessWidget {
           ),
         ),
         child: SizedBox(
-          width: 64,
-          height: 64,
+          width: cellSize,
+          height: cellSize,
           child: Center(child: label),
         ),
       ),
