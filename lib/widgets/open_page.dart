@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 
@@ -53,6 +55,7 @@ class _OpenPageState extends State<OpenPage> {
         changed = true;
       }
       if (newWRules != null) {
+        log("New WRules $newWRules");
         widget.database.currentFilters.wantedRules = newWRules.toSet();
         widget.database.currentFilters.bannedRules.removeAll(widget.database.currentFilters.wantedRules);
         changed = true;
@@ -64,12 +67,12 @@ class _OpenPageState extends State<OpenPage> {
       }
       if (newWFlags != null) {
         widget.database.currentFilters.wantedFlags = newWFlags.toSet();
-        widget.database.currentFilters.bannedFlags.removeAll(widget.database.currentFilters.wantedFlags);
+        widget.database.currentFilters.bannedFlags = widget.database.currentFilters.bannedFlags.where((flag) => !newWFlags.contains(flag)).toSet();
         changed = true;
       }
       if (newBFlags != null) {
         widget.database.currentFilters.bannedFlags = newBFlags.toSet();
-        widget.database.currentFilters.wantedFlags.removeAll(widget.database.currentFilters.bannedFlags);
+        widget.database.currentFilters.wantedFlags = widget.database.currentFilters.wantedFlags.where((flag) => !newBFlags.contains(flag)).toSet();
         changed = true;
       }
       if (changed) {
@@ -91,8 +94,14 @@ class _OpenPageState extends State<OpenPage> {
               .map((r) => r.split(":")[0])
               .toSet()
               .join(" ");
+          var flags = (
+            (puz.played ? "P" : "_")
+            + (puz.liked != null ? "L" : "_")
+            + (puz.skipped != null ? "S" : "_")
+            + (puz.disliked != null ? "D" : "_")
+          );
           return (
-            "${puz.width}x${puz.height}\n$rules\nPLLD",
+            "${puz.width}x${puz.height}\n$rules\n$flags",
             puz,
           );
         })

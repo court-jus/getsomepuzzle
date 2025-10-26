@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
@@ -181,7 +183,7 @@ class Database {
       if (puz.height > currentFilters.maxHeight) return false;
       if (puz.height < currentFilters.minHeight) return false;
       if (currentFilters.wantedRules.isNotEmpty &&
-          currentFilters.wantedRules.intersection(puz.rules.toSet()).isEmpty) {
+          currentFilters.wantedRules.intersection(puz.rules.toSet()).length != currentFilters.wantedRules.length) {
         return false;
       }
       if (currentFilters.bannedRules.isNotEmpty &&
@@ -199,15 +201,19 @@ class Database {
 
   void preparePlaylist() {
     playlist = filter().whereNot((puz) => puz.played).toList();
+    log("Playlist length ${playlist.length}");
   }
 
   PuzzleData? next() {
     if (playlist.isEmpty) {
+      log("Playlist empty");
       preparePlaylist();
     }
+    log("Playlist length: ${playlist.length}");
     if (playlist.isEmpty) return null;
     final selection = playlist.removeAt(0);
-    playlist.add(selection);
+    // playlist.add(selection);
+    log("Now, ${playlist.length}");
     return selection;
   }
 

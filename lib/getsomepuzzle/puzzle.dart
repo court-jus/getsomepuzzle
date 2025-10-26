@@ -5,7 +5,6 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
-import 'package:intl/intl.dart';
 
 
 class Stats {

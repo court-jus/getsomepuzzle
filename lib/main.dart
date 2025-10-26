@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -56,7 +57,6 @@ class _MyHomePageState extends State<MyHomePage> {
   bool shouldCheck = false;
   List<int> history = [];
   int dbSize = 0;
-  int playedCount = 0;
   bool paused = false;
   bool betweenPuzzles = false;
 
@@ -70,7 +70,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (currentPuzzle == null) return;
       setState(() {
         String statsText = currentMeta!.stats.toString();
-        bottomMessage = "$playedCount/$dbSize - $statsText";
+        bottomMessage = "$dbSize - $statsText";
       });
     });
     Timer.periodic(Duration(minutes: 1), (tmr) {
@@ -110,15 +110,21 @@ class _MyHomePageState extends State<MyHomePage> {
   void loadPuzzle() async {
     if (database == null) return;
     final randomPuzzle = database!.next();
+    developer.log("Found ${randomPuzzle?.lineRepresentation}");
     if (randomPuzzle != null) {
       openPuzzle(randomPuzzle);
+    } else {
+      developer.log("bah non");
+      setState(() {
+        currentPuzzle = null;
+        betweenPuzzles = false;
+      });
     }
   }
 
   void openPuzzle(PuzzleData puz) {
     setState(() {
       Iterable<PuzzleData> db = database!.filter();
-      playedCount = db.where((puz) => puz.played).length;
       dbSize = db.length;
 
       currentMeta = puz;
@@ -170,7 +176,11 @@ class _MyHomePageState extends State<MyHomePage> {
     final filePath = p.join(path, "stats.txt");
     final file = File(filePath);
 
-    file.writeAsStringSync(stats.join("\n"), mode: FileMode.writeOnly, flush: true);
+    file.writeAsStringSync(
+      stats.join("\n"),
+      mode: FileMode.writeOnly,
+      flush: true,
+    );
   }
 
   void autoCheck() {
@@ -237,12 +247,12 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     double contextWidth = MediaQuery.sizeOf(context).width;
-    double contextHeight = (
-      MediaQuery.sizeOf(context).height
-      - 40  // The bottom bar
-      - 64  // The app bar
-      - 32  // Some margin
-    );
+    double contextHeight =
+        (MediaQuery.sizeOf(context).height -
+        40 - // The bottom bar
+        64 - // The app bar
+        128  // Some margin
+        );
     double cellSize = 32.0;
     if (currentPuzzle != null) {
       double maxWidth = contextWidth / currentPuzzle!.width;
@@ -281,19 +291,6 @@ class _MyHomePageState extends State<MyHomePage> {
             Stack(
               alignment: AlignmentGeometry.center,
               children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    (currentPuzzle != null)
-                        ? PuzzleWidget(
-                            currentPuzzle: currentPuzzle!,
-                            onCellTap: handlePuzzleTap,
-                            cellSize: cellSize,
-                          )
-                        : Text("No puzzle loaded."),
-                  ],
-                ),
                 if (betweenPuzzles)
                   Column(
                     spacing: 16,
@@ -311,9 +308,11 @@ class _MyHomePageState extends State<MyHomePage> {
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.greenAccent,
-                              minimumSize: Size(64 * 3, 64 * 4),
-                              maximumSize: Size(64 * 3, 64 * 4),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(16)),
+                              minimumSize: Size(cellSize, cellSize),
+                              maximumSize: Size(cellSize * 2, cellSize * 2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadiusGeometry.circular(16),
+                              ),
                             ),
                             onPressed: () => like(true),
                             child: const Icon(Icons.thumb_up, size: 96),
@@ -321,9 +320,11 @@ class _MyHomePageState extends State<MyHomePage> {
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.redAccent[100],
-                              minimumSize: Size(64 * 3, 64 * 4),
-                              maximumSize: Size(64 * 3, 64 * 4),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(16)),
+                              minimumSize: Size(cellSize, cellSize),
+                              maximumSize: Size(cellSize * 2, cellSize * 2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadiusGeometry.circular(16),
+                              ),
                             ),
                             onPressed: () => like(false),
                             child: const Icon(Icons.thumb_down, size: 96),
@@ -333,9 +334,11 @@ class _MyHomePageState extends State<MyHomePage> {
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.lightBlueAccent[100],
-                          minimumSize: Size(64 * 6, 64 * 4),
-                          maximumSize: Size(64 * 6, 64 * 4),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(16)),
+                              minimumSize: Size(cellSize * 2, cellSize),
+                              maximumSize: Size(cellSize * 2, cellSize * 2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadiusGeometry.circular(16),
+                          ),
                         ),
                         onPressed: loadPuzzle,
                         child: const Column(
@@ -360,10 +363,25 @@ class _MyHomePageState extends State<MyHomePage> {
                         width: contextWidth,
                         height: contextHeight,
                         child: Center(
-                          child: Icon(Icons.pause, size: cellSize * 3)),
+                          child: Icon(Icons.pause, size: cellSize * 3),
                         ),
                       ),
                     ),
+                  )
+                else
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      (currentPuzzle != null)
+                          ? PuzzleWidget(
+                              currentPuzzle: currentPuzzle!,
+                              onCellTap: handlePuzzleTap,
+                              cellSize: cellSize,
+                            )
+                          : Text("No puzzle loaded."),
+                    ],
+                  ),
               ],
             ),
           ],
