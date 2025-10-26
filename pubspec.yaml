@@ -68,6 +68,7 @@ flutter:
     - assets/puzzles.txt
     - assets/help.en.md
     - assets/help.fr.md
+    - assets/help.es.md
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

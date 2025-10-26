@@ -12,7 +12,9 @@ class HelpPage extends StatefulWidget {
 class _HelpPageState extends State<HelpPage> {
   Markdown helpEn = Markdown.empty();
   Markdown helpFr = Markdown.empty();
-  String locale = "en";
+  Markdown helpEs = Markdown.empty();
+  Markdown help = Markdown.empty();
+  Set<String> locale = {"en"};
 
   @override
   void initState() {
@@ -23,17 +25,30 @@ class _HelpPageState extends State<HelpPage> {
   Future<void> loadTexts() async {
     final textEn = await rootBundle.loadString('assets/help.en.md');
     final textFr = await rootBundle.loadString('assets/help.fr.md');
+    final textEs = await rootBundle.loadString('assets/help.es.md');
     final markdownEn = Markdown.fromString(textEn);
     final markdownFr = Markdown.fromString(textFr);
+    final markdownEs = Markdown.fromString(textEs);
     setState(() {
       helpEn = markdownEn;
       helpFr = markdownFr;
+      helpEs = markdownEs;
+      help = markdownEn;
     });
   }
 
-  void handleButtonClick() {
+  void handleButtonClick(String newLocale) {
     setState(() {
-      locale = (locale == "en") ? "fr" : "en";
+      if (newLocale == "es") {
+        locale = {"es"};
+        help = helpEs;
+      } else if (newLocale == "fr") {
+        locale = {"fr"};
+        help = helpFr;
+      } else {
+        locale = {"en"};
+        help = helpEn;
+      }
     });
   }
 
@@ -46,15 +61,25 @@ class _HelpPageState extends State<HelpPage> {
           return SingleChildScrollView(
             scrollDirection: Axis.vertical,
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: viewportConstraints.maxHeight),
+              constraints: BoxConstraints(
+                minHeight: viewportConstraints.maxHeight,
+              ),
               child: Container(
                 margin: EdgeInsets.all(8),
                 child: Column(
                   children: [
-                    TextButton.icon(
-                      onPressed: handleButtonClick,
-                      label: Text("Change language"),
-                      icon: Icon(Icons.language),
+                    SegmentedButton(
+                      multiSelectionEnabled: false,
+                      emptySelectionAllowed: true,
+                      showSelectedIcon: false,
+                      selected: locale,
+                      onSelectionChanged: (newSelection) =>
+                          handleButtonClick(newSelection.first),
+                      segments: [
+                        ButtonSegment(value: "en", label: Text("English")),
+                        ButtonSegment(value: "es", label: Text("Español")),
+                        ButtonSegment(value: "fr", label: Text("Fançais")),
+                      ],
                     ),
                     MarkdownTheme(
                       data: MarkdownThemeData(
@@ -78,9 +103,7 @@ class _HelpPageState extends State<HelpPage> {
                           color: Colors.grey[600],
                         ),
                       ),
-                      child: MarkdownWidget(
-                        markdown: (locale == "en" ? helpEn : helpFr),
-                      ),
+                      child: MarkdownWidget(markdown: help),
                     ),
                   ],
                 ),

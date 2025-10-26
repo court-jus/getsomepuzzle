@@ -36,8 +36,7 @@ Las celdas que contengan la misma letra deben formar parte del mismo grupo. Un g
 
 ### Quantity (TODO: translate me)
 
-A black or white number over the puzzle, on a blue background indicates that the
-total number of cells of that color should match that number.
+A black or white number over the puzzle, on a blue background indicates that the total number of cells of that color should match that number.
 
 ## Estadísticas
 

@@ -36,8 +36,7 @@ Cells containing the same letter should be part of the same group. A group must 
 
 ### Quantity
 
-A black or white number over the puzzle, on a blue background indicates that the
-total number of cells of that color should match that number.
+A black or white number over the puzzle, on a blue background indicates that the total number of cells of that color should match that number.
 
 ## Stats
 
