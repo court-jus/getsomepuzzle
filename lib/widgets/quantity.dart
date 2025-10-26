@@ -35,7 +35,7 @@ class QuantityWidget extends StatelessWidget {
         height: cellSize,
         child: Center(child: Text(
           count.toString(),
-           style: TextStyle(fontSize: cellSize * cellSizeToFontSize / count, color: textColors[value]),
+           style: TextStyle(fontSize: cellSize * cellSizeToFontSize, color: textColors[value]),
         )),
       ),
     );

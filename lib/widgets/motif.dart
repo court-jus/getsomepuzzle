@@ -22,6 +22,7 @@ class MotifWidget extends StatelessWidget {
   // Build UI
   @override
   Widget build(BuildContext context) {
+    double motifCellSize = (cellSize * 0.8) / 3;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: bgColor,
