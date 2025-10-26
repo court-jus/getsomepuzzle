@@ -6,6 +6,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/widgets/more_menu.dart';
 import 'package:getsomepuzzle/widgets/pause_menu.dart';
@@ -62,6 +63,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     loadStats();
     Timer.periodic(Duration(seconds: 1), (tmr) {
       if (database == null) return;
