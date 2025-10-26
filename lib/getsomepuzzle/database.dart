@@ -87,9 +87,9 @@ class Filters {
   Set<String> bannedFlags;
 
   Filters({
-    this.minWidth = 3,
+    this.minWidth = 2,
     this.maxWidth = 10,
-    this.minHeight = 3,
+    this.minHeight = 2,
     this.maxHeight = 10,
     this.minFilled = 0,
     this.maxFilled = 100,
