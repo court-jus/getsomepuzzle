@@ -433,4 +433,3 @@ def all_possible_constraints():
     print(pu)
     print(state_to_str(pu))
     print(line_export(pu))
-

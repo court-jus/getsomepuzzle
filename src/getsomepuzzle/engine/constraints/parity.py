@@ -2,7 +2,7 @@ import random
 
 from ..utils import to_rows, to_columns
 from .base import CellCentricConstraint
-from ..constants import CONSTRAST, EMPTY
+from ..constants import EMPTY
 
 
 class ParityConstraint(CellCentricConstraint):
