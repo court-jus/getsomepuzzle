@@ -18,7 +18,7 @@ class OpenPage extends StatefulWidget {
 class _OpenPageState extends State<OpenPage> {
   List<(String, PuzzleData)> shownPuzzles = [];
 
-  static const List<(String, String)> existingRules = [("LT", "Letter"), ("GS", "Group size"), ("FM", "Forbidden motif"), ("PA", "Parity")];
+  static const List<(String, String)> existingRules = [("LT", "Letter"), ("GS", "Group size"), ("FM", "Forbidden motif"), ("PA", "Parity"), ("QA", "Quantity")];
 
   @override
   void initState() {
@@ -177,8 +177,8 @@ class _OpenPageState extends State<OpenPage> {
                               widget.database.currentFilters.maxWidth.toDouble(),
                             ),
                             onChanged: (value) => applyFilter(newWidth: value),
-                            min: 3,
-                            max: 6,
+                            min: 2,
+                            max: 10,
                             labels: RangeLabels(
                               widget.database.currentFilters.minWidth.toString(),
                               widget.database.currentFilters.maxWidth.toString(),
@@ -199,8 +199,8 @@ class _OpenPageState extends State<OpenPage> {
                               widget.database.currentFilters.maxHeight.toDouble(),
                             ),
                             onChanged: (value) => applyFilter(newHeight: value),
-                            min: 3,
-                            max: 8,
+                            min: 2,
+                            max: 10,
                             labels: RangeLabels(
                               widget.database.currentFilters.minHeight.toString(),
                               widget.database.currentFilters.maxHeight.toString(),
