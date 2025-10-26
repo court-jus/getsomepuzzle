@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
@@ -28,6 +29,21 @@ class PuzzleWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    double maxConstraintsInTopBarSize = cellSize;
+    int numberOfTopBarConstraints = currentPuzzle.constraints.where((constraint) => (constraint is Motif || constraint is QuantityConstraint)).length;
+    double totalWidth = MediaQuery.sizeOf(context).width;
+    double targetSize = (totalWidth / numberOfTopBarConstraints) - 2; // 2 pixels of spacing between items
+    double topBarConstraintsSize = targetSize;
+    double adjustedCellSize = cellSize;
+    if (targetSize > maxConstraintsInTopBarSize) topBarConstraintsSize = maxConstraintsInTopBarSize;
+    if (targetSize < minConstraintsInTopBarSize) {
+      // We need to put them on two or more rows and reduce the cells size
+      topBarConstraintsSize = minConstraintsInTopBarSize;
+      int constraintsPerRow = (totalWidth / topBarConstraintsSize).toInt();
+      int numberOfRows = (numberOfTopBarConstraints / constraintsPerRow).ceil();
+      double marginNeeded = (numberOfRows - 1) * topBarConstraintsSize;
+      adjustedCellSize -= marginNeeded / currentPuzzle.height;
+    }
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       spacing: 2,
@@ -46,7 +62,7 @@ class PuzzleWidget extends StatelessWidget {
                       ? forbiddenColor
                       : mandatoryColor,
                   borderColor: constraint.isValid ? Colors.green : Colors.red,
-                  cellSize: cellSize,
+                  cellSize: topBarConstraintsSize,
                 )
               else if (constraint is QuantityConstraint)
                 QuantityWidget(
@@ -54,13 +70,13 @@ class PuzzleWidget extends StatelessWidget {
                   count: constraint.count,
                   bgColor: mandatoryColor,
                   borderColor: constraint.isValid ? Colors.green : Colors.red,
-                  cellSize: cellSize,
+                  cellSize: topBarConstraintsSize,
                 ),
           ],
         ),
         Table(
           border: TableBorder.all(),
-          defaultColumnWidth: FixedColumnWidth(cellSize),
+          defaultColumnWidth: FixedColumnWidth(adjustedCellSize),
           children: [
             for (var (rowidx, row) in currentPuzzle.getRows().indexed)
               TableRow(
@@ -73,7 +89,7 @@ class PuzzleWidget extends StatelessWidget {
                           currentPuzzle.cellConstraints[rowidx *
                                   currentPuzzle.width +
                               cellidx],
-                      cellSize: cellSize,
+                      cellSize: adjustedCellSize,
                       onTap: () => {
                         _handleCellTap(rowidx * currentPuzzle.width + cellidx),
                       },
