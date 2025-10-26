@@ -12,6 +12,7 @@
 .swiftpm/
 dist/*
 migrate_working_dir/
+keep_local/*
 
 # IntelliJ related
 *.iml
