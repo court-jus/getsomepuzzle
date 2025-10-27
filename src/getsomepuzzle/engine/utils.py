@@ -148,7 +148,7 @@ def line_import(line):
     line_format = line.count("_")
     if line_format == 3:
         domain, size, values, constraints = line.split("_")
-        solutions = []
+        solutions = "0:0"
     else:
         domain, size, values, constraints, solutions = line.split("_")
     domain = [int(d) for d in domain]
