@@ -211,8 +211,8 @@ class Database {
     }
     log("Playlist length: ${playlist.length}");
     if (playlist.isEmpty) return null;
+    playlist.shuffle();
     final selection = playlist.removeAt(0);
-    // playlist.add(selection);
     log("Now, ${playlist.length}");
     return selection;
   }
