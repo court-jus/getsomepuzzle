@@ -3,8 +3,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'dart:developer' as developer;
 
+import 'package:logging/logging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -19,6 +19,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'getsomepuzzle/puzzle.dart';
 
 void main() {
+  Logger.root.level = Level.ALL; // defaults to Level.INFO
+  Logger.root.onRecord.listen((record) {
+    print('${record.level.name}: ${record.time}: ${record.message}');
+  });
   runApp(const MyApp());
 }
 
@@ -59,6 +63,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int dbSize = 0;
   bool paused = false;
   bool betweenPuzzles = false;
+  final log = Logger("HomePage");
 
   @override
   void initState() {
@@ -73,7 +78,7 @@ class _MyHomePageState extends State<MyHomePage> {
         bottomMessage = "$dbSize - $statsText";
       });
     });
-    Timer.periodic(Duration(seconds: 10), (tmr) {
+    Timer.periodic(Duration(seconds: 30), (tmr) {
       if (database == null) return;
       final List<String> stats = database!.getStats();
       writeStats(stats);
@@ -95,13 +100,13 @@ class _MyHomePageState extends State<MyHomePage> {
       final filePath = p.join(path, "stats.txt");
       final file = File(filePath);
       if (!(await file.exists())) {
-        print("Stats file does not exist");
+        log.warning("Stats file does not exist");
         file.createSync();
       }
       final content = await file.readAsString();
       stats.addAll(content.split("\n"));
     }
-    print("Stats to load $stats");
+    log.finest("Stats to load $stats");
     db.loadStats(stats);
     setState(() {
       database = db;
@@ -112,11 +117,10 @@ class _MyHomePageState extends State<MyHomePage> {
   void loadPuzzle() async {
     if (database == null) return;
     final randomPuzzle = database!.next();
-    developer.log("Found ${randomPuzzle?.lineRepresentation}");
+    log.fine("Found ${randomPuzzle?.lineRepresentation}");
     if (randomPuzzle != null) {
       openPuzzle(randomPuzzle);
     } else {
-      developer.log("bah non");
       setState(() {
         currentPuzzle = null;
         betweenPuzzles = false;
@@ -176,7 +180,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final path = p.join(documentsDirectory.path, "getsomepuzzle");
     await Directory(path).create(recursive: true);
     final filePath = p.join(path, "stats.txt");
-    print("filePath $filePath");
+    log.fine("filePath $filePath");
     final file = File(filePath);
 
     file.writeAsStringSync(

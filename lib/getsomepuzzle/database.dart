@@ -1,6 +1,5 @@
-import 'dart:developer';
+import 'package:logging/logging.dart';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:intl/intl.dart';
@@ -87,6 +86,7 @@ class Filters {
   Set<String> bannedRules;
   Set<String> wantedFlags;
   Set<String> bannedFlags;
+  final log = Logger("Filters");
 
   Filters({
     this.minWidth = 2,
@@ -115,7 +115,7 @@ class Filters {
     } on TypeError {
       save();
     } catch (e) {
-      print("Error $e");
+      log.severe("Error $e");
     }
   }
 
@@ -137,22 +137,23 @@ class Database {
   List<PuzzleData> puzzles = [];
   Filters currentFilters = Filters();
   List<PuzzleData> playlist = [];
+  final log = Logger("Database");
 
   void load(List<String> lines) {
     puzzles = lines.where((e) => e.isNotEmpty).map((e) => PuzzleData(e)).toList();
   }
 
   void loadStats(List<String> stats) {
-    print("loadStats");
+    log.finest("loadStats");
     final Map<String, List<String>> solvedPuzzles = {};
     for (final stat in stats) {
-      print("stat $stat");
+      log.finest("stat $stat");
       final List<String> statFields = stat.split(" ");
-      print("statFields $statFields");
+      log.finest("statFields $statFields");
       if (statFields.length < 4) continue;
       solvedPuzzles[statFields[3]] = statFields;
     }
-    print("solved $solvedPuzzles");
+    log.finest("solved $solvedPuzzles");
     for (final puz in puzzles) {
       if (!solvedPuzzles.containsKey(puz.lineRepresentation)) continue;
       puz.played = true;
@@ -217,19 +218,19 @@ class Database {
 
   void preparePlaylist() {
     playlist = filter().toList();
-    log("Playlist length ${playlist.length}");
+    log.info("Playlist length ${playlist.length}");
   }
 
   PuzzleData? next() {
     if (playlist.isEmpty) {
-      log("Playlist empty");
+      log.info("Playlist empty");
       preparePlaylist();
     }
-    log("Playlist length: ${playlist.length}");
+    log.finer("Playlist length: ${playlist.length}");
     if (playlist.isEmpty) return null;
     playlist.shuffle();
     final selection = playlist.removeAt(0);
-    log("Now, ${playlist.length}");
+    log.finer("Now, ${playlist.length}");
     return selection;
   }
 
