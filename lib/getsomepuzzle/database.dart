@@ -143,23 +143,39 @@ class Database {
   }
 
   void loadStats(List<String> stats) {
+    print("loadStats");
     final Map<String, List<String>> solvedPuzzles = {};
     for (final stat in stats) {
+      print("stat $stat");
       final List<String> statFields = stat.split(" ");
-      if (statFields.length != 5) continue;
-      solvedPuzzles[statFields[4]] = statFields;
+      print("statFields $statFields");
+      if (statFields.length < 4) continue;
+      solvedPuzzles[statFields[3]] = statFields;
     }
+    print("solved $solvedPuzzles");
     for (final puz in puzzles) {
       if (!solvedPuzzles.containsKey(puz.lineRepresentation)) continue;
       puz.played = true;
       final puzzleData = solvedPuzzles[puz.lineRepresentation];
       // unfinished 6s 0f 12_3x3_000201000_PA:8.left;GS:5.1;GS:0.1;PA:1.bottom_1:122221212 - ___ -  -  - 
       // 2025-09-15T18:58:22 4s 0f 12_3x3_000201020_LT:A.3.2;GS:7.1_1:222211121 - ___ -  -  - 
+      if (puzzleData![0] != "unfinished") {
+        puz.finished = DateTime.tryParse(puzzleData[0]);
+      }
+      if (puzzleData.length > 7 && puzzleData[7].isNotEmpty) {
+        puz.skipped = DateTime.tryParse(puzzleData[7]);
+      }
+      if (puzzleData.length > 9 && puzzleData[9].isNotEmpty) {
+        puz.liked = DateTime.tryParse(puzzleData[9]);
+      }
+      if (puzzleData.length > 11 && puzzleData[11].isNotEmpty) {
+        puz.disliked = DateTime.tryParse(puzzleData[11]);
+      }
       puz.duration = int.parse(
-        puzzleData![1].replaceAll("s", ""),
+        puzzleData[1].replaceAll("s", ""),
       );
       puz.failures = int.parse(
-        puzzleData[3].replaceAll("f", ""),
+        puzzleData[2].replaceAll("f", ""),
       );
     }
   }
@@ -200,7 +216,7 @@ class Database {
   }
 
   void preparePlaylist() {
-    playlist = filter().whereNot((puz) => puz.played).toList();
+    playlist = filter().toList();
     log("Playlist length ${playlist.length}");
   }
 

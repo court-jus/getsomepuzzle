@@ -73,7 +73,7 @@ class _MyHomePageState extends State<MyHomePage> {
         bottomMessage = "$dbSize - $statsText";
       });
     });
-    Timer.periodic(Duration(minutes: 1), (tmr) {
+    Timer.periodic(Duration(seconds: 10), (tmr) {
       if (database == null) return;
       final List<String> stats = database!.getStats();
       writeStats(stats);
@@ -95,11 +95,13 @@ class _MyHomePageState extends State<MyHomePage> {
       final filePath = p.join(path, "stats.txt");
       final file = File(filePath);
       if (!(await file.exists())) {
+        print("Stats file does not exist");
         file.createSync();
       }
       final content = await file.readAsString();
       stats.addAll(content.split("\n"));
     }
+    print("Stats to load $stats");
     db.loadStats(stats);
     setState(() {
       database = db;
@@ -174,6 +176,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final path = p.join(documentsDirectory.path, "getsomepuzzle");
     await Directory(path).create(recursive: true);
     final filePath = p.join(path, "stats.txt");
+    print("filePath $filePath");
     final file = File(filePath);
 
     file.writeAsStringSync(
