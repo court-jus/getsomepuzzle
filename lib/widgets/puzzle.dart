@@ -23,8 +23,9 @@ class PuzzleWidget extends StatelessWidget {
   final ValueChanged<int> onCellTap;
   final double cellSize;
 
-  void _handleCellTap(int idx) {
+  void _handleCellTap(int idx, {bool secondary = false}) {
     onCellTap(idx);
+    if (secondary) onCellTap(idx);
   }
 
   @override
@@ -91,7 +92,10 @@ class PuzzleWidget extends StatelessWidget {
                               cellidx],
                       cellSize: adjustedCellSize,
                       onTap: () => {
-                        _handleCellTap(rowidx * currentPuzzle.width + cellidx),
+                        _handleCellTap(rowidx * currentPuzzle.width + cellidx)
+                      },
+                      onSecondaryTap: () => {
+                        _handleCellTap(rowidx * currentPuzzle.width + cellidx, secondary: true)
                       },
                     ),
                 ],

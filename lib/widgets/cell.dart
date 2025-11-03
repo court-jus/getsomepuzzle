@@ -14,6 +14,7 @@ class CellWidget extends StatelessWidget {
     required this.readonly,
     required this.cellSize,
     required this.onTap,
+    required this.onSecondaryTap,
     this.constraints,
   });
 
@@ -22,12 +23,8 @@ class CellWidget extends StatelessWidget {
   final bool readonly;
   final List<Constraint>? constraints;
   final VoidCallback onTap;
+  final VoidCallback onSecondaryTap;
   final double cellSize;
-
-  // Methods
-  void _handleTap() {
-    onTap();
-  }
 
   // Build UI
   @override
@@ -51,7 +48,8 @@ class CellWidget extends StatelessWidget {
             ],
           );
     return GestureDetector(
-      onTap: _handleTap,
+      onTap: onTap,
+      onSecondaryTap: onSecondaryTap,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: color,

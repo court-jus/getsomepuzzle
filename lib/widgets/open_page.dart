@@ -172,7 +172,8 @@ class _OpenPageState extends State<OpenPage> {
                       ],
                     ),
                     Divider(),
-                    // TextField(onChanged: (value) => selectPuzzle(PuzzleData(value), context)),
+                    TextField(onChanged: (value) => selectPuzzle(PuzzleData(value), context)),
+                    Divider(),
                     Text("Dimensions"),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
