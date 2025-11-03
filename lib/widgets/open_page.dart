@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
+import 'package:getsomepuzzle/widgets/plusminus.dart';
 
 class OpenPage extends StatefulWidget {
   final Database database;
@@ -19,8 +20,15 @@ class OpenPage extends StatefulWidget {
 
 class _OpenPageState extends State<OpenPage> {
   List<(String, PuzzleData)> shownPuzzles = [];
+  int matchingCount = 0;
 
-  static const List<(String, String)> existingRules = [("LT", "Letter"), ("GS", "Group size"), ("FM", "Forbidden motif"), ("PA", "Parity"), ("QA", "Quantity")];
+  static const List<(String, String)> existingRules = [
+    ("LT", "Letter"),
+    ("GS", "Group size"),
+    ("FM", "Forbidden motif"),
+    ("PA", "Parity"),
+    ("QA", "Quantity"),
+  ];
 
   @override
   void initState() {
@@ -57,22 +65,36 @@ class _OpenPageState extends State<OpenPage> {
       if (newWRules != null) {
         log("New WRules $newWRules");
         widget.database.currentFilters.wantedRules = newWRules.toSet();
-        widget.database.currentFilters.bannedRules.removeAll(widget.database.currentFilters.wantedRules);
+        widget.database.currentFilters.bannedRules.removeAll(
+          widget.database.currentFilters.wantedRules,
+        );
         changed = true;
       }
       if (newBRules != null) {
         widget.database.currentFilters.bannedRules = newBRules.toSet();
-        widget.database.currentFilters.wantedRules.removeAll(widget.database.currentFilters.bannedRules);
+        widget.database.currentFilters.wantedRules.removeAll(
+          widget.database.currentFilters.bannedRules,
+        );
         changed = true;
       }
       if (newWFlags != null) {
         widget.database.currentFilters.wantedFlags = newWFlags.toSet();
-        widget.database.currentFilters.bannedFlags = widget.database.currentFilters.bannedFlags.where((flag) => !newWFlags.contains(flag)).toSet();
+        widget.database.currentFilters.bannedFlags = widget
+            .database
+            .currentFilters
+            .bannedFlags
+            .where((flag) => !newWFlags.contains(flag))
+            .toSet();
         changed = true;
       }
       if (newBFlags != null) {
         widget.database.currentFilters.bannedFlags = newBFlags.toSet();
-        widget.database.currentFilters.wantedFlags = widget.database.currentFilters.wantedFlags.where((flag) => !newBFlags.contains(flag)).toSet();
+        widget.database.currentFilters.wantedFlags = widget
+            .database
+            .currentFilters
+            .wantedFlags
+            .where((flag) => !newBFlags.contains(flag))
+            .toSet();
         changed = true;
       }
       if (changed) {
@@ -84,28 +106,22 @@ class _OpenPageState extends State<OpenPage> {
   }
 
   void updateShownPuzzles() {
-    shownPuzzles = widget.database
-        .filter()
-        .take(10)
-        .map((puz) {
-          final lineAttr = puz.lineRepresentation.split("_");
-          final rules = lineAttr[3]
-              .split(";")
-              .map((r) => r.split(":")[0])
-              .toSet()
-              .join(" ");
-          var flags = (
-            (puz.played ? "P" : "_")
-            + (puz.liked != null ? "L" : "_")
-            + (puz.skipped != null ? "S" : "_")
-            + (puz.disliked != null ? "D" : "_")
-          );
-          return (
-            "${puz.width}x${puz.height}\n$rules\n$flags",
-            puz,
-          );
-        })
-        .toList();
+    final filteredDatabase = widget.database.filter();
+    matchingCount = filteredDatabase.length;
+    shownPuzzles = filteredDatabase.take(10).map((puz) {
+      final lineAttr = puz.lineRepresentation.split("_");
+      final rules = lineAttr[3]
+          .split(";")
+          .map((r) => r.split(":")[0])
+          .toSet()
+          .join(" ");
+      var flags =
+          ((puz.played ? "P" : "_") +
+          (puz.liked != null ? "L" : "_") +
+          (puz.skipped != null ? "S" : "_") +
+          (puz.disliked != null ? "D" : "_"));
+      return ("${puz.width}x${puz.height}\n$rules\n$flags", puz);
+    }).toList();
   }
 
   void selectPuzzle(PuzzleData puz, BuildContext context) {
@@ -143,10 +159,19 @@ class _OpenPageState extends State<OpenPage> {
                           onSelectionChanged: (newSelection) =>
                               applyFilter(newWFlags: newSelection.toList()),
                           segments: [
-                            ButtonSegment(value: "played", label: Text("Played")),
-                            ButtonSegment(value: "skipped", label: Text("Skipped")),
+                            ButtonSegment(
+                              value: "played",
+                              label: Text("Played"),
+                            ),
+                            ButtonSegment(
+                              value: "skipped",
+                              label: Text("Skipped"),
+                            ),
                             ButtonSegment(value: "liked", label: Text("Liked")),
-                            ButtonSegment(value: "disliked", label: Text("Disliked")),
+                            ButtonSegment(
+                              value: "disliked",
+                              label: Text("Disliked"),
+                            ),
                           ],
                         ),
                       ],
@@ -163,75 +188,88 @@ class _OpenPageState extends State<OpenPage> {
                           onSelectionChanged: (newSelection) =>
                               applyFilter(newBFlags: newSelection.toList()),
                           segments: [
-                            ButtonSegment(value: "played", label: Text("Played")),
-                            ButtonSegment(value: "skipped", label: Text("Skipped")),
+                            ButtonSegment(
+                              value: "played",
+                              label: Text("Played"),
+                            ),
+                            ButtonSegment(
+                              value: "skipped",
+                              label: Text("Skipped"),
+                            ),
                             ButtonSegment(value: "liked", label: Text("Liked")),
-                            ButtonSegment(value: "disliked", label: Text("Disliked")),
+                            ButtonSegment(
+                              value: "disliked",
+                              label: Text("Disliked"),
+                            ),
                           ],
                         ),
                       ],
                     ),
                     Divider(),
-                    TextField(onChanged: (value) => selectPuzzle(PuzzleData(value), context)),
+                    TextField(
+                      onChanged: (value) =>
+                          selectPuzzle(PuzzleData(value), context),
+                      decoration: InputDecoration(
+                        label: Text(
+                          "Paste a puzzle representation here to open it",
+                        ),
+                      ),
+                    ),
                     Divider(),
-                    Text("Dimensions"),
+                    const Text("Dimensions"),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Width"),
-                        Expanded(
-                          child: RangeSlider(
-                            divisions: 4,
-                            values: RangeValues(
-                              widget.database.currentFilters.minWidth.toDouble(),
-                              widget.database.currentFilters.maxWidth.toDouble(),
-                            ),
-                            onChanged: (value) => applyFilter(newWidth: value),
-                            min: 2,
-                            max: 10,
-                            labels: RangeLabels(
-                              widget.database.currentFilters.minWidth.toString(),
-                              widget.database.currentFilters.maxWidth.toString(),
-                            ),
-                          ),
+                        const Text("Width"),
+                        PlusMinusField(
+                          onChanged: (minValue, maxValue) {
+                            final value = RangeValues(
+                              minValue.toDouble(),
+                              maxValue.toDouble(),
+                            );
+                            applyFilter(newWidth: value);
+                          },
+                          initialMin: widget.database.currentFilters.minWidth,
+                          initialMax: widget.database.currentFilters.maxWidth,
                         ),
                       ],
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Height"),
-                        Expanded(
-                          child: RangeSlider(
-                            divisions: 5,
-                            values: RangeValues(
-                              widget.database.currentFilters.minHeight.toDouble(),
-                              widget.database.currentFilters.maxHeight.toDouble(),
-                            ),
-                            onChanged: (value) => applyFilter(newHeight: value),
-                            min: 2,
-                            max: 10,
-                            labels: RangeLabels(
-                              widget.database.currentFilters.minHeight.toString(),
-                              widget.database.currentFilters.maxHeight.toString(),
-                            ),
-                          ),
+                        const Text("Height"),
+                        PlusMinusField(
+                          onChanged: (minValue, maxValue) {
+                            final value = RangeValues(
+                              minValue.toDouble(),
+                              maxValue.toDouble(),
+                            );
+                            applyFilter(newHeight: value);
+                          },
+                          initialMin: widget.database.currentFilters.minHeight,
+                          initialMax: widget.database.currentFilters.maxHeight,
                         ),
                       ],
                     ),
-                    Text("Fill ratio"),
-                    RangeSlider(
-                      values: RangeValues(
-                        widget.database.currentFilters.minFilled.toDouble(),
-                        widget.database.currentFilters.maxFilled.toDouble(),
-                      ),
-                      onChanged: (value) => applyFilter(newPrefilled: value),
-                      min: 0,
-                      max: 100,
-                      labels: RangeLabels(
-                        widget.database.currentFilters.minFilled.toString(),
-                        widget.database.currentFilters.maxFilled.toString(),
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Fill ratio"),
+                        PlusMinusField(
+                          onChanged: (minValue, maxValue) {
+                            final value = RangeValues(
+                              minValue.toDouble(),
+                              maxValue.toDouble(),
+                            );
+                            applyFilter(newPrefilled: value);
+                          },
+                          initialMin: widget.database.currentFilters.minFilled,
+                          initialMax: widget.database.currentFilters.maxFilled,
+                          minimum: 0,
+                          maximum: 100,
+                          increment: 5,
+                        ),
+                      ],
                     ),
                     const Text("Wanted rules"),
                     SegmentedButton(
@@ -243,8 +281,10 @@ class _OpenPageState extends State<OpenPage> {
                           applyFilter(newWRules: newSelection.toList()),
                       segments: existingRules
                           .map(
-                            (slug) =>
-                                ButtonSegment(value: slug.$1, label: Text(slug.$2)),
+                            (slug) => ButtonSegment(
+                              value: slug.$1,
+                              label: Text(slug.$2),
+                            ),
                           )
                           .toList(),
                     ),
@@ -259,11 +299,16 @@ class _OpenPageState extends State<OpenPage> {
                           applyFilter(newBRules: newSelection.toList()),
                       segments: existingRules
                           .map(
-                            (slug) =>
-                                ButtonSegment(value: slug.$1, label: Text(slug.$2)),
+                            (slug) => ButtonSegment(
+                              value: slug.$1,
+                              label: Text(slug.$2),
+                            ),
                           )
                           .toList(),
                     ),
+                    Divider(),
+                    Text("Puzzles matching filters: $matchingCount"),
+                    Divider(),
                     Wrap(
                       direction: Axis.horizontal,
                       alignment: WrapAlignment.center,
