@@ -25,9 +25,6 @@ class LetterGroup(CellCentricConstraint):
 
         return any(idx in other.parameters["indices"] for idx in self.parameters["indices"])
 
-    def get_cell_text(self):
-        return self.parameters["letter"]
-
     def check(self, puzzle, debug=False):
         result = self._check(puzzle, debug=debug)
         if self.ui_widget is not None:

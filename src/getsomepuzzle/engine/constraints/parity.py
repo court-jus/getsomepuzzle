@@ -35,18 +35,6 @@ class ParityConstraint(CellCentricConstraint):
         }
         return other.parameters["side"] in conflicting[self.parameters["side"]]
 
-    def get_cell_text(self):
-        # ⬅ ⮕ ⬆ ⬇ ⬌ ⬍  ⬉ ⬈ ⬊ ⬋
-        parity_icons = {
-            "left": "⬅",
-            "right": "⮕",
-            "horizontal": "⬌",
-            "top": "⬆",
-            "bottom": "⬇",
-            "vertical": "⬍",
-        }
-        return parity_icons[self.parameters["side"]]
-
     def _check(self, puzzle, debug=False):
         # The given cell has the same number of odd and even numbers on
         # one of its side (or both, vertically or horizontally),

@@ -57,6 +57,3 @@ class CellCentricConstraint(Constraint):
         if self.ui_widget is not None:
             self.ui_widget.color = "green" if result else "red"
         return result
-
-    def get_cell_text(self):
-        raise NotImplementedError("Should be implemented by subclass")
