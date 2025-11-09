@@ -118,7 +118,9 @@ class _OpenPageState extends State<OpenPage> {
     setState(() {
       collection = newCollection;
     });
-    widget.database.loadPuzzlesFile(collection.first).then((void _) => setState(updateShownPuzzles));
+    widget.database
+        .loadPuzzlesFile(collection.first)
+        .then((void _) => setState(updateShownPuzzles));
   }
 
   void setShuffle(bool newValue) {
@@ -146,7 +148,11 @@ class _OpenPageState extends State<OpenPage> {
     }).toList();
   }
 
-  void selectPuzzle(PuzzleData puz, BuildContext context, [bool popFromDatabase = true]) {
+  void selectPuzzle(
+    PuzzleData puz,
+    BuildContext context, [
+    bool popFromDatabase = true,
+  ]) {
     if (popFromDatabase) {
       widget.database.removePuzzleFromPlaylist(puz);
     }
@@ -195,7 +201,7 @@ class _OpenPageState extends State<OpenPage> {
                         Switch(
                           value: widget.database.shouldShuffle,
                           onChanged: setShuffle,
-                        )
+                        ),
                       ],
                     ),
                     Divider(),
@@ -361,21 +367,18 @@ class _OpenPageState extends State<OpenPage> {
                     Divider(),
                     Text("Puzzles matching filters: $matchingCount"),
                     Divider(),
-                    Wrap(
-                      direction: Axis.horizontal,
-                      alignment: WrapAlignment.center,
-                      spacing: 2,
-                      runSpacing: 2,
-                      children: [
-                        for (final puz in shownPuzzles)
-                          TextButton(
-                            child: Text(puz.$1),
-                            onPressed: () {
-                              selectPuzzle(puz.$2, context);
-                            },
+                    if (shownPuzzles.isNotEmpty)
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.cyan,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadiusGeometry.circular(16),
                           ),
-                      ],
-                    ),
+                        ),
+                        onPressed: () =>
+                            selectPuzzle(shownPuzzles[0].$2, context),
+                        child: const Icon(Icons.play_arrow, size: 96),
+                      ),
                   ],
                 ),
               ),
