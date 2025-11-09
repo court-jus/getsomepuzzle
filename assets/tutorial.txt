@@ -1,46 +1,23 @@
-# Puzzles that could be good for the tutorial
-
-## Letters
-
-12_3x3_100000000_LT:A.0.2;LT:B.1.4_0:
-12_5x3_000120010200202_LT:A.6.11;LT:B.10.13_1:111121211212212
-
-## Group size
-
-12_3x3_002000020_GS:0.1;GS:7.1;GS:2.1_1:212111121
-
-## Motif
-
-12_3x3_000000020_FM:1.2;FM:22_1:121121121
-12_3x3_010000200_FM:211;FM:1.2_1:212212212
-12_3x3_020100100_FM:21.11;FM:12_1:222111111
-12_4x7_0001000001000000000000000000_FM:1.2.2;FM:21;FM:11.11;FM:12.11_1:1111222211112222111122221111
-
-## Parity
-
-12_4x3_122211222102_PA:2.bottom_1:122211222112
-12_4x6_012112101212022111211211_PA:16.top;PA:11.top_1:212112121212222111211211
-12_6x4_011011102120111112110012_PA:17.top;PA:22.left;PA:8.left;PA:4.left_1:211211122122111112112212
-
-## Symmetry
-
-12_3x3_100102020_SY:3.4;SY:5.2_0
-12_3x3_112002000_SY:4.5;SY:5.2_0
-12_3x3_010010200_SY:1.1;SY:6.3_0
-
-## Two constraints
-
-12_3x3_202000000_LT:A.5.6;LT:B.0.1;PA:8.left;PA:2.bottom_1:222111122
-12_3x4_100000200200_LT:A.10.1;LT:B.4.3;PA:6.top;PA:9.right_1:111221211212
-12_3x3_210000000_LT:A.2.4;LT:B.3.7;PA:6.right;PA:8.top_1:211212221
-12_3x3_000000000_LT:A.1.4;FM:12;LT:B.0.3;PA:8.left_1:211211211
-
-## Three constraints
-
-12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top_1:212111111
-12_3x3_000000000_LT:A.0.5;FM:2.1;PA:7.top;PA:8.top;LT:B.1.2_1:211222222
-12_3x3_000000000_LT:A.0.5;LT:B.8.3;PA:1.bottom;PA:2.bottom;FM:12;PA:6.top;FM:2.1.2_1:111211222
-12_3x3_000000000_LT:A.1.3;FM:2.1.1;PA:7.top;PA:2.bottom;FM:112;FM:21.22;PA:0.right;LT:B.4.5_1:221211122
-12_3x3_000000000_LT:A.1.3;GS:0.1;FM:2.2;FM:1.2;PA:8.top_0
-12_3x3_000000000_LT:A.1.3;PA:7.top;FM:1.1;FM:221;PA:6.right_1:222212121
-
+12_3x3_100000000_LT:A.0.2;LT:B.1.4;TX:Hi,∅welcome∅to∅this∅tutorial.∅Your∅goal∅is∅to∅fill∅the∅grid∅with∅white∅and∅black∅cells∅while∅following∅some∅rules.∅When∅cells∅contain∅letters,∅identical∅letters∅should∅form∅groups∅of∅the∅same∅color.∅Different∅letters∅cannot∅be∅part∅of∅the∅same∅group.∅Complete∅this∅puzzle∅to∅move∅on._0:
+12_5x3_000120010200202_LT:A.6.11;LT:B.10.13;TX:This∅puzzle∅also∅uses∅the∅'Letters'∅rule.∅Remember∅that∅different∅letters∅cannot∅be∅part∅of∅the∅same∅group._1:111121211212212
+12_3x3_002000020_GS:0.1;GS:7.1;GS:2.1;TX:Here∅is∅a∅new∅rule.∅When∅a∅cell∅contains∅a∅number,∅it∅must∅be∅part∅of∅a∅group∅of∅adjacent∅cells∅of∅the∅same∅color∅and∅that∅group's∅size∅must∅match∅the∅number∅in∅the∅cell._1:212111121
+12_3x3_002000200_GS:0.1;GS:7.2;GS:2.1;TX:Sometimes∅you∅have∅to∅think∅a∅bit∅more.∅You∅probably∅want∅to∅start∅with∅the∅constraints∅that∅are∅obvious._0
+12_3x3_000000020_FM:1.2;FM:22;TX:Some∅constraints∅are∅represented∅outside∅the∅grid.∅This∅purple∅one∅indicates∅that∅you∅are∅not∅allowed∅to∅have∅this∅pattern∅in∅your∅finished∅grid._0
+12_3x3_010000200_FM:211;FM:1.2;TX:Another∅grid∅using∅the∅forbidden∅patterns._1:212212212
+12_3x3_020100100_FM:21.01;FM:12;TX:Some∅forbidden∅patterns∅contain∅empty∅cells.∅This∅means∅that∅the∅pattern∅is∅forbidden∅whatever∅the∅color∅of∅the∅empty∅cell∅is∅in∅the∅end._1:222111111
+12_4x7_0001000001000000000000000000_FM:1.2.2;FM:21;FM:11.11;FM:12.11;TX:Some∅complex∅rules∅can∅lead∅to∅a∅repetitive∅pattern∅in∅the∅grid.∅Be∅careful,∅only∅the∅rules∅matter,∅don't∅try∅to∅extrapolate∅the∅end∅result._1:1111222211112222111122221111
+12_4x3_122211222102_PA:2.bottom;TX:The∅parity∅rule∅is∅represented∅by∅arrows.∅An∅arrow∅like∅this∅means∅that∅there∅is∅the∅same∅number∅of∅white∅and∅black∅cells∅in∅that∅direction._1:122211222112
+12_3x5_101020000000211_PA:12.top;PA:6.right;PA:9.right;PA:1.bottom;PA:5.left;PA:8.vertical;PA:0.right;TX:An∅arrow∅can∅be∅double.∅In∅that∅case,∅both∅directions∅should∅be∅considred._0
+12_3x3_100102020_SY:3.4;SY:5.2;TX:The∅symmetry∅rule∅is∅represented∅with∅bars.∅It∅means∅that∅the∅cell∅must∅be∅part∅of∅a∅symmetrical∅group.∅The∅direction∅of∅the∅bar∅is∅the∅symmetry∅axis.∅The∅symmetry∅cannot∅extend∅past∅the∅borders∅of∅the∅puzzle._0
+12_3x3_112002000_SY:4.5;SY:5.2;TX:This∅circle∅represents∅a∅central∅symmetry.∅You∅can∅also∅see∅it∅as∅a∅halfturn∅rotation.∅Again,∅the∅group∅that∅contains∅the∅symbol∅must∅respect∅the∅rule._0
+12_3x3_010010200_SY:1.1;SY:6.3;TX:The∅axial∅symmetry∅can∅be∅diagonal.∅Here∅again,∅the∅group∅containing∅the∅symbol∅must∅be∅symmetrical∅along∅the∅axis._0
+12_3x3_202000000_LT:A.5.6;LT:B.0.1;PA:8.left;PA:2.bottom;TX:In∅the∅game,∅the∅rules∅will∅be∅mixed∅and∅you∅will∅see∅puzzles∅with∅many∅rules._1:222111122
+12_3x4_100000200200_LT:A.10.1;LT:B.4.3;PA:6.top;PA:9.right;TX:Start∅with∅the∅obvious∅ones,∅you∅should∅be∅able∅to∅solve∅this∅one∅easily∅now._1:111221211212
+12_3x3_000000000_LT:A.1.4;FM:12;LT:B.0.3;PA:8.left;TX:Another∅easy∅one._1:211211211
+12_3x3_210000000_LT:A.2.4;LT:B.3.7;PA:6.right;PA:8.top;TX:Smaller∅puzzles∅does∅not∅always∅mean∅easier∅puzzles.∅Start∅with∅the∅top∅right∅'A',∅can∅it∅be∅white?_1:211212221
+12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top;TX:In∅the∅top∅right∅corner∅of∅the∅screen,∅there's∅a∅menu∅where∅you∅can∅find∅help._1:212111111
+12_3x3_000000000_LT:A.0.5;FM:2.1;PA:7.top;PA:8.top;LT:B.1.2;TX:You∅may∅have∅noticed∅the∅arrow∅to∅undo∅your∅last∅move?_1:211222222
+12_3x3_000000000_LT:A.0.5;LT:B.8.3;PA:1.bottom;PA:2.bottom;FM:12;PA:6.top;FM:2.1.2;TX:The∅pause∅menu∅allows∅to∅restart∅the∅current∅puzzle._1:111211222
+12_3x3_000000000_LT:A.1.3;FM:2.1.1;PA:7.top;PA:2.bottom;FM:112;FM:21.22;PA:0.right;LT:B.4.5;TX:In∅the∅pause∅menu,∅there∅is∅also∅a∅link∅to∅open∅other∅puzzles,∅you∅will∅use∅it∅when∅the∅tutorial∅will∅be∅finished._1:221211122
+12_3x3_000000000_LT:A.1.3;GS:0.1;FM:2.2;FM:1.2;PA:8.top;TX:You∅are∅almost∅there,∅only∅one∅more∅to∅go∅after∅this∅one._0
+12_3x3_000000000_LT:A.1.3;PA:7.top;FM:1.1;FM:221;PA:6.right;TX:This∅is∅the∅last∅puzzle∅in∅the∅tutorial,∅now∅you∅should∅go∅open∅some∅puzzles,∅I∅suggest∅you∅start∅with∅the∅collection∅'A'._1:222212121

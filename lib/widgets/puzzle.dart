@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
@@ -72,6 +73,14 @@ class PuzzleWidget extends StatelessWidget {
                   bgColor: mandatoryColor,
                   borderColor: constraint.isValid ? Colors.green : Colors.red,
                   cellSize: topBarConstraintsSize,
+                )
+              else if (constraint is HelpText)
+                SizedBox(
+                  width: totalWidth,
+                  child: Text(
+                    constraint.text,
+                    style: TextStyle(fontSize: 20),
+                  ),
                 ),
           ],
         ),

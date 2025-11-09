@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
@@ -74,6 +75,8 @@ class Puzzle {
         constraints.add(QuantityConstraint(constraintAttr[1]));
       } else if (constraintAttr[0] == "SY") {
         constraints.add(SymmetryConstraint(constraintAttr[1]));
+      } else if (constraintAttr[0] == "TX") {
+        constraints.add(HelpText(constraintAttr[1]));
       }
     }
   }
