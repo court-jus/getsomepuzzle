@@ -234,7 +234,8 @@ class Database {
       final documentsDirectory = await getApplicationDocumentsDirectory();
       final path = p.join(documentsDirectory.path, "getsomepuzzle");
       await Directory(path).create(recursive: true);
-      final filePath = p.join(path, "stats_$collection.txt");
+      String filePath = p.join(path, "stats_$collection.txt");
+      if (collection == "puzzles") filePath = p.join(path, "stats.txt");
       log.fine("Loading stats from $filePath");
       final file = File(filePath);
       if (!(await file.exists())) {
@@ -252,15 +253,17 @@ class Database {
 
   Future<void> writeStats() async {
     final List<String> stats = getStats();
+    String statsName = "stats_$collection";
+    if (collection == "puzzles") statsName = "stats";
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('stats_$collection', stats);
+      await prefs.setStringList(statsName, stats);
       return;
     }
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = p.join(documentsDirectory.path, "getsomepuzzle");
     await Directory(path).create(recursive: true);
-    final filePath = p.join(path, "stats_$collection.txt");
+    final filePath = p.join(path, "$statsName.txt");
     log.fine("Writing stats to $filePath");
     final file = File(filePath);
 
