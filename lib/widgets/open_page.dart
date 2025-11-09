@@ -376,7 +376,7 @@ class _OpenPageState extends State<OpenPage> {
                           ),
                         ),
                         onPressed: () =>
-                            selectPuzzle(shownPuzzles[0].$2, context),
+                            selectPuzzle(widget.database.playlist.first, context),
                         child: const Icon(Icons.play_arrow, size: 96),
                       ),
                   ],

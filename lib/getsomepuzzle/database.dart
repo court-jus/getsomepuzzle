@@ -276,7 +276,10 @@ class Database {
 
   void preparePlaylist() {
     playlist = filter().toList();
-    log.info("Playlist prepared with ${playlist.length} puzzles");
+    if (shouldShuffle) {
+      playlist.shuffle();
+    }
+    log.info("Playlist prepared with ${playlist.length} puzzles (shuffled: $shouldShuffle)");
   }
 
   void removePuzzleFromPlaylist(PuzzleData puz) {
@@ -289,9 +292,6 @@ class Database {
       preparePlaylist();
     }
     if (playlist.isEmpty) return null;
-    if (shouldShuffle) {
-      playlist.shuffle();
-    }
     final selection = playlist.removeAt(0);
     log.finer("${playlist.length} puzzles remaining in playlist");
     writeStats();
