@@ -302,13 +302,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           ),
                         ),
                         onPressed: loadPuzzle,
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text("Next", style: TextStyle(fontSize: 40)),
-                            Icon(Icons.skip_next, size: 96),
-                          ],
-                        ),
+                        child: Icon(Icons.skip_next, size: 96),
                       ),
                     ],
                   )
