@@ -13,6 +13,9 @@
 dist/*
 migrate_working_dir/
 keep_local/*
+assets/liked
+assets/disliked
+assets/played
 
 # IntelliJ related
 *.iml

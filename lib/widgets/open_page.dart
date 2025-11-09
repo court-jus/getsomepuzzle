@@ -21,6 +21,13 @@ class OpenPage extends StatefulWidget {
 class _OpenPageState extends State<OpenPage> {
   List<(String, PuzzleData)> shownPuzzles = [];
   int matchingCount = 0;
+  Set<String> collection = {"puzzles"};
+  static const List<(String, String)> collections = [
+    ("tutorial", "Tutorial"),
+    ("puzzles", "A"),
+    ("new_puzzles", "B"),
+    ("high_ratio", "C"),
+  ];
 
   static const List<(String, String)> existingRules = [
     ("LT", "Letter"),
@@ -33,6 +40,7 @@ class _OpenPageState extends State<OpenPage> {
   @override
   void initState() {
     super.initState();
+    collection = {widget.database.collection};
     updateShownPuzzles();
   }
 
@@ -105,6 +113,19 @@ class _OpenPageState extends State<OpenPage> {
     });
   }
 
+  void chooseCollection(Set<String> newCollection) {
+    setState(() {
+      collection = newCollection;
+    });
+    widget.database.loadPuzzlesFile(collection.first).then((void _) => setState(updateShownPuzzles));
+  }
+
+  void setShuffle(bool newValue) {
+    setState(() {
+      widget.database.shouldShuffle = newValue;
+    });
+  }
+
   void updateShownPuzzles() {
     final filteredDatabase = widget.database.filter();
     matchingCount = filteredDatabase.length;
@@ -124,7 +145,10 @@ class _OpenPageState extends State<OpenPage> {
     }).toList();
   }
 
-  void selectPuzzle(PuzzleData puz, BuildContext context) {
+  void selectPuzzle(PuzzleData puz, BuildContext context, [bool popFromDatabase = true]) {
+    if (popFromDatabase) {
+      widget.database.removePuzzleFromPlaylist(puz);
+    }
     widget.onPuzzleSelected(puz);
     Navigator.pop(context);
   }
@@ -146,6 +170,33 @@ class _OpenPageState extends State<OpenPage> {
                 child: Column(
                   children: [
                     Text("You can filter to find the kind of puzzle you like."),
+                    Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Collection"),
+                        SegmentedButton(
+                          multiSelectionEnabled: false,
+                          emptySelectionAllowed: false,
+                          showSelectedIcon: false,
+                          selected: collection,
+                          onSelectionChanged: chooseCollection,
+                          segments: collections
+                              .map(
+                                (slug) => ButtonSegment(
+                                  value: slug.$1,
+                                  label: Text(slug.$2),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                        Text("Shuffle"),
+                        Switch(
+                          value: widget.database.shouldShuffle,
+                          onChanged: setShuffle,
+                        )
+                      ],
+                    ),
                     Divider(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -208,7 +259,7 @@ class _OpenPageState extends State<OpenPage> {
                     Divider(),
                     TextField(
                       onChanged: (value) =>
-                          selectPuzzle(PuzzleData(value), context),
+                          selectPuzzle(PuzzleData(value), context, false),
                       decoration: InputDecoration(
                         label: Text(
                           "Paste a puzzle representation here to open it",

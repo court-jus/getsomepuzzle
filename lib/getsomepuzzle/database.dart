@@ -1,8 +1,13 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
 import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PuzzleData {
@@ -135,12 +140,17 @@ class Filters {
 
 class Database {
   List<PuzzleData> puzzles = [];
+  String collection = "tutorial";
   Filters currentFilters = Filters();
+  bool shouldShuffle = false;
   List<PuzzleData> playlist = [];
   final log = Logger("Database");
 
   void load(List<String> lines) {
-    puzzles = lines.where((e) => e.isNotEmpty).map((e) => PuzzleData(e)).toList();
+    puzzles = lines
+      .where((e) => e.isNotEmpty && !e.startsWith("#"))
+      .map((e) => PuzzleData(e))
+      .toList();
   }
 
   void loadStats(List<String> stats) {
@@ -211,14 +221,65 @@ class Database {
     });
   }
 
-  Future<void> loadPuzzlesFile() async {
-    final assetContent = await rootBundle.loadString('assets/puzzles.txt');
+  Future<void> loadPuzzlesFile([String? fileToLoad]) async {
+    if (fileToLoad != null) {
+      collection = fileToLoad;
+    }
+    final assetContent = await rootBundle.loadString('assets/$collection.txt');
     load(assetContent.split("\n"));
+    await currentFilters.load();
+    final List<String> stats = [];
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      stats.addAll(prefs.getStringList('stats') ?? []);
+    } else {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final path = p.join(documentsDirectory.path, "getsomepuzzle");
+      await Directory(path).create(recursive: true);
+      final filePath = p.join(path, "stats_$collection.txt");
+      log.fine("Loading stats from $filePath");
+      final file = File(filePath);
+      if (!(await file.exists())) {
+        log.warning("Stats file does not exist");
+        file.createSync();
+      }
+      final content = await file.readAsString();
+      print(content);
+      stats.addAll(content.split("\n"));
+    }
+    log.finest("Stats to load $stats");
+    loadStats(stats);
+    preparePlaylist();
+  }
+
+  Future<void> writeStats() async {
+    final List<String> stats = getStats();
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('stats_$collection', stats);
+      return;
+    }
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final path = p.join(documentsDirectory.path, "getsomepuzzle");
+    await Directory(path).create(recursive: true);
+    final filePath = p.join(path, "stats_$collection.txt");
+    log.fine("Writing stats to $filePath");
+    final file = File(filePath);
+
+    file.writeAsStringSync(
+      stats.join("\n"),
+      mode: FileMode.writeOnly,
+      flush: true,
+    );
   }
 
   void preparePlaylist() {
     playlist = filter().toList();
-    log.info("Playlist length ${playlist.length}");
+    log.info("Playlist prepared with ${playlist.length} puzzles");
+  }
+
+  void removePuzzleFromPlaylist(PuzzleData puz) {
+    playlist.remove(puz);
   }
 
   PuzzleData? next() {
@@ -226,11 +287,13 @@ class Database {
       log.info("Playlist empty");
       preparePlaylist();
     }
-    log.finer("Playlist length: ${playlist.length}");
     if (playlist.isEmpty) return null;
-    playlist.shuffle();
+    if (shouldShuffle) {
+      playlist.shuffle();
+    }
     final selection = playlist.removeAt(0);
-    log.finer("Now, ${playlist.length}");
+    log.finer("${playlist.length} puzzles remaining in playlist");
+    writeStats();
     return selection;
   }
 

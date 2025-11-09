@@ -1,20 +1,15 @@
 // ignore_for_file: avoid_print
 
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:logging/logging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/widgets/more_menu.dart';
 import 'package:getsomepuzzle/widgets/pause_menu.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'getsomepuzzle/puzzle.dart';
 
@@ -69,7 +64,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     WakelockPlus.enable();
-    loadStats();
+    initializeDatabase();
     Timer.periodic(Duration(seconds: 1), (tmr) {
       if (database == null) return;
       if (currentPuzzle == null) return;
@@ -78,36 +73,15 @@ class _MyHomePageState extends State<MyHomePage> {
         bottomMessage = "$dbSize - $statsText";
       });
     });
-    Timer.periodic(Duration(seconds: 30), (tmr) {
+    Timer.periodic(Duration(seconds: 60), (tmr) {
       if (database == null) return;
-      final List<String> stats = database!.getStats();
-      writeStats(stats);
+      database!.writeStats();
     });
   }
 
-  Future<void> loadStats() async {
+  Future<void> initializeDatabase() async {
     final db = Database();
     await db.loadPuzzlesFile();
-    await db.currentFilters.load();
-    final List<String> stats = [];
-    if (kIsWeb) {
-      final prefs = await SharedPreferences.getInstance();
-      stats.addAll(prefs.getStringList('stats') ?? []);
-    } else {
-      final documentsDirectory = await getApplicationDocumentsDirectory();
-      final path = p.join(documentsDirectory.path, "getsomepuzzle");
-      await Directory(path).create(recursive: true);
-      final filePath = p.join(path, "stats.txt");
-      final file = File(filePath);
-      if (!(await file.exists())) {
-        log.warning("Stats file does not exist");
-        file.createSync();
-      }
-      final content = await file.readAsString();
-      stats.addAll(content.split("\n"));
-    }
-    log.finest("Stats to load $stats");
-    db.loadStats(stats);
     setState(() {
       database = db;
       loadPuzzle();
@@ -116,10 +90,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void loadPuzzle() async {
     if (database == null) return;
-    final randomPuzzle = database!.next();
-    log.fine("Found ${randomPuzzle?.lineRepresentation}");
-    if (randomPuzzle != null) {
-      openPuzzle(randomPuzzle);
+    final nextPuzzle = database!.next();
+    log.fine("Found ${nextPuzzle?.lineRepresentation}");
+    if (nextPuzzle != null) {
+      openPuzzle(nextPuzzle);
     } else {
       setState(() {
         currentPuzzle = null;
@@ -168,26 +142,6 @@ class _MyHomePageState extends State<MyHomePage> {
       shouldCheck = currentPuzzle!.complete;
       if (shouldCheck) Future.delayed(Duration(seconds: 1), autoCheck);
     });
-  }
-
-  Future<void> writeStats(List<String> stats) async {
-    if (kIsWeb) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('stats', stats);
-      return;
-    }
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final path = p.join(documentsDirectory.path, "getsomepuzzle");
-    await Directory(path).create(recursive: true);
-    final filePath = p.join(path, "stats.txt");
-    log.fine("filePath $filePath");
-    final file = File(filePath);
-
-    file.writeAsStringSync(
-      stats.join("\n"),
-      mode: FileMode.writeOnly,
-      flush: true,
-    );
   }
 
   void autoCheck() {
