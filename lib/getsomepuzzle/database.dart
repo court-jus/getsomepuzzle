@@ -168,8 +168,6 @@ class Database {
       if (!solvedPuzzles.containsKey(puz.lineRepresentation)) continue;
       puz.played = true;
       final puzzleData = solvedPuzzles[puz.lineRepresentation];
-      // unfinished 6s 0f 12_3x3_000201000_PA:8.left;GS:5.1;GS:0.1;PA:1.bottom_1:122221212 - ___ -  -  - 
-      // 2025-09-15T18:58:22 4s 0f 12_3x3_000201020_LT:A.3.2;GS:7.1_1:222211121 - ___ -  -  - 
       if (puzzleData![0] != "unfinished") {
         puz.finished = DateTime.tryParse(puzzleData[0]);
       }

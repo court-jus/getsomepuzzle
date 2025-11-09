@@ -29,12 +29,6 @@ class Puzzle:
     def set_value(self, idx, value):
         return self.state[idx].set_value(value)
 
-    def get_cell_constraint(self, idx):
-        for c in self.constraints:
-            if isinstance(c, CellCentricConstraint) and c.parameters["idx"] == idx:
-                return { "constraint": c, "text": c.get_cell_text() }
-        return None
-
     def clear_solutions(self):
         self.constraints = [c for c in self.constraints if c.slug != "OS"]
 
