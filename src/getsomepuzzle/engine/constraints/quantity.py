@@ -31,6 +31,17 @@ class QuantityAllConstraint(Constraint):
         matching_cells = [1 for c in puzzle.state if c.value == value]
         return len(matching_cells) == count
 
+    def apply(self, puzzle):
+        # If the number of free cells is necessary to match the quantity
+        # then all free cells should be of that color
+        value, count = self.parameters["value"], self.parameters["count"]
+        matching_count = len([c for c in puzzle.state if not c.free() and c.value == value])
+        changed = False
+        if count - matching_count == len(puzzle.free_cells()):
+            for cell, _ in puzzle.free_cells():
+                changed |= cell.set_value(value)
+        return changed
+
     @staticmethod
     def generate_random_parameters(puzzle):
         min_count = 1

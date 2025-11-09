@@ -7,6 +7,7 @@ from .fixed import FixedValueConstraint
 from .groups import GroupSize
 from .lettergroup import LetterGroup
 from .quantity import QuantityAllConstraint
+from .symmetry import SymmetryConstraint
 from ..utils import to_rows, to_columns, to_grid
 
 
@@ -19,4 +20,5 @@ AVAILABLE_RULES = [
     GroupSize,
     LetterGroup,
     QuantityAllConstraint,
+    SymmetryConstraint,
 ]

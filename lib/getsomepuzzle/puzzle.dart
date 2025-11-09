@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 
 
 class Stats {
@@ -71,6 +72,8 @@ class Puzzle {
         constraints.add(LetterGroup(constraintAttr[1]));
       } else if (constraintAttr[0] == "QA") {
         constraints.add(QuantityConstraint(constraintAttr[1]));
+      } else if (constraintAttr[0] == "SY") {
+        constraints.add(SymmetryConstraint(constraintAttr[1]));
       }
     }
   }
@@ -96,6 +99,10 @@ class Puzzle {
       }
     }
     return result;
+  }
+
+  int getValue(int idx) {
+    return cells[idx].value;
   }
 
   List<List<Cell>> getRows() {

@@ -130,19 +130,15 @@ class Puzzle:
                 if only_idx is not None and only_idx not in constraint.influence(self):
                     continue
                 before = [c.value for c in self.state]
-                if hasattr(constraint, "apply"):
-                    if constraint.apply(self):
-                        if explain:
-                            diff = "".join(str(c.value) if before[idx] == EMPTY and c.value != EMPTY else "." for idx, c in enumerate(self.state))
-                            print("  Constraint", constraint, "gives us:")
-                            print(" ", diff)
-                        changed = True
-                        break
-                    elif explain:
-                        print("  Constraint", constraint, "has nothing (more) to say")
-                else:
-                    # print("Pas d'apply pour", constraint)
-                    pass
+                if constraint.apply(self):
+                    if explain:
+                        diff = "".join(str(c.value) if before[idx] == EMPTY and c.value != EMPTY else "." for idx, c in enumerate(self.state))
+                        print("  Constraint", constraint, "gives us:")
+                        print(" ", diff)
+                    changed = True
+                    break
+                elif explain:
+                    print("  Constraint", constraint, "has nothing (more) to say")
             globally_changed |= changed
         if auto_check:
             if not all(c.check(self) for c in self.constraints):

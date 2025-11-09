@@ -35,6 +35,7 @@ class _OpenPageState extends State<OpenPage> {
     ("FM", "Forbidden motif"),
     ("PA", "Parity"),
     ("QA", "Quantity"),
+    ("SY", "Symmetry"),
   ];
 
   @override
