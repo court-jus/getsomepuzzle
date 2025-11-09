@@ -7,7 +7,7 @@ from getsomepuzzle.engine.constraints import FixedValueConstraint, AVAILABLE_RUL
 from getsomepuzzle.engine.utils import FakeEvent, line_export
 
 
-def buildapuzzle(width, height, ratio, verbose=False, progress=True):
+def buildapuzzle(width, height, ratio, verbose=False, progress=True, extra_text=""):
     running = FakeEvent()
     solved = Puzzle(running=running, width=width, height=height)
     pu = solved.clone()
@@ -47,7 +47,7 @@ def buildapuzzle(width, height, ratio, verbose=False, progress=True):
         # Add the first valid constraint
         while all_constraints:
             if progress:
-                print(f"\033[2K[{ratio:5.2}] {len(all_constraints):5} / {total:5}", end="\r")
+                print(f"\033[2K[{ratio:5.2}] {len(all_constraints):5} / {total:5} ({extra_text})", end="\r")
             constraint = all_constraints.pop(0)
             cloned = pu.clone()
             # First: apply previously added constraints
@@ -68,6 +68,14 @@ def buildapuzzle(width, height, ratio, verbose=False, progress=True):
 
         # We found a constraint that is helpful, add it to the resulting puzzle
         pu.constraints.append(constraint)
+        # Shuffle the remaining constraints
+        random.shuffle(all_constraints)
+        # See how many constraints of each type are already chosen for the puzzle
+        usage = {}
+        for c in pu.constraints:
+            usage.setdefault(c.slug, 0)
+            usage[c.slug] += 1
+        all_constraints.sort(key=lambda c: usage.get(c.slug, 0))
 
     if progress:
         print()
@@ -80,7 +88,7 @@ def buildapuzzle(width, height, ratio, verbose=False, progress=True):
         return None
 
     if ratio == 0:
-        path = Path("getsomepuzzle") / "new_puzzles3.txt"
+        path = Path("..") / "assets" / "new_puzzles2.txt"
         line = line_export(pu)
         with open(path, "a") as fp:
             fp.write(line + "\n")
@@ -94,7 +102,7 @@ def buildapuzzle(width, height, ratio, verbose=False, progress=True):
         if verbose:
             print(f"Will fill cell {idx} and save to another file")
         pu.set_value(idx, solved.state[idx].value)
-    path = Path("getsomepuzzle") / "high_ratio.txt"
+    path = Path("..") / "assets" / "high_ratio.txt"
     line = line_export(pu)
     with open(path, "a") as fp:
         fp.write(line + "\n")
@@ -102,19 +110,18 @@ def buildapuzzle(width, height, ratio, verbose=False, progress=True):
 
 if __name__ == "__main__":
     nb = 100
-    minwidth = 4
-    maxwidth = 6
+    minwidth = 3
+    maxwidth = 3
     minheight = 4
     maxheight = 8
-    minratio = 0.7
-    maxratio = 0.85
+    minratio = 0.8
+    maxratio = 1.0
 
     while nb:
         width = random.randint(minwidth, maxwidth)
         height = random.randint(minheight, maxheight)
         ratio = random.random() * (maxratio - minratio) + minratio
-        print(f"Will make a {width}x{height} puzzle filled at {int((1-ratio) * 100): 3}%.")
-        pu = buildapuzzle(width, height, ratio)
+        pu = buildapuzzle(width, height, ratio, extra_text=f"{nb} - {width}x{height} at {int((1-ratio) * 100): 3}%.")
         if pu:
             print(line_export(pu))
-        nb -= 1
+            nb -= 1
