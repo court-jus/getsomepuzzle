@@ -1,8 +1,11 @@
+import 'dart:math';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 const Map<int, String> axisRepresentation = {
     0: "🕱",
@@ -30,14 +33,25 @@ class SymmetryConstraint extends CellsCentricConstraint {
   @override
   Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
     final fgcolor = isValid ? defaultColor : Colors.redAccent;
+    final double size = cellSize * cellSizeToFontSize / count;
+    Widget icon = FaIcon(FontAwesomeIcons.circleDot, color: fgcolor, size: size);
+    if (axis == 1) {
+      icon = FaIcon(FontAwesomeIcons.slash, color: fgcolor, size: size);
+    } else if (axis == 2) {
+      icon = FaIcon(FontAwesomeIcons.gripLinesVertical, color: fgcolor, size: size);
+    } else if (axis == 3) {
+      icon = Transform.rotate(
+        angle: pi / 2,
+        child: FaIcon(FontAwesomeIcons.slash, color: fgcolor, size: size),
+      );
+    } else if (axis == 4) {
+      icon = FaIcon(FontAwesomeIcons.gripLines, color: fgcolor, size: size);
+    }
     return SizedBox(
       width: cellSize / count,
       height: cellSize / count,
       child: Center(
-        child: Text(
-          toString(),
-          style: TextStyle(fontSize: cellSize * cellSizeToFontSize / count, color: fgcolor),
-        ),
+        child: icon,
       ),
     );
   }

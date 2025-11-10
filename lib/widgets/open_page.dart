@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/widgets/plusminus.dart';
 
@@ -382,7 +383,13 @@ class _OpenPageState extends State<OpenPage> {
                         ),
                         onPressed: () =>
                             selectPuzzle(widget.database.playlist.first, context),
-                        child: const Icon(Icons.play_arrow, size: 96),
+                        child: SizedBox(
+                          height: 96,
+                          child: Container(
+                            alignment: AlignmentGeometry.center,
+                            child: FaIcon(FontAwesomeIcons.play, size: 80)
+                            )
+                        )
                       ),
                   ],
                 ),
