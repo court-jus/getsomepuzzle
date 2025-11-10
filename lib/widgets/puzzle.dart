@@ -79,7 +79,10 @@ class PuzzleWidget extends StatelessWidget {
                   width: totalWidth,
                   child: Text(
                     constraint.text,
-                    style: TextStyle(fontSize: 20),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                    ),
                   ),
                 ),
           ],
