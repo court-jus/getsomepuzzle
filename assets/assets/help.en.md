@@ -38,6 +38,12 @@ Cells containing the same letter should be part of the same group. A group must 
 
 A black or white number over the puzzle, on a blue background indicates that the total number of cells of that color should match that number.
 
+### Symmetry (⟍, |, ⟋, ― et 🞋)
+
+Whenever a cell contains one of those symbols, the group it belongs to must respect a symmetry along that axis.
+
+The central symmetry (🞋) is identical to a roration by half a turn.
+
 ## Stats
 
 The game records how many time has passed before a puzzle is solve and how many failures were made. This data is NOT collected automatically but if you solve a bunch of puzzles I hope you will send me your stats, I intend to sort the puzzles by difficulty and this would help a lot.

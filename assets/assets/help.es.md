@@ -38,6 +38,12 @@ Las celdas que contengan la misma letra deben formar parte del mismo grupo. Un g
 
 A black or white number over the puzzle, on a blue background indicates that the total number of cells of that color should match that number.
 
+### Symmetry (⟍, |, ⟋, ― et 🞋) (TODO: translate me)
+
+Whenever a cell contains one of those symbols, the group it belongs to must respect a symmetry along that axis.
+
+The central symmetry (🞋) is identical to a roration by half a turn.
+
 ## Estadísticas
 
 El juego registra cuánto tiempo ha pasado antes de que un rompecabezas se resuelva y cuántos fallos se cometieron. Estos datos NO se recopilan automáticamente, pero si resuelves un montón de rompecabezas, espero que me envíes tus estadísticas. Pretendo ordenar los rompecabezas por dificultad y esto ayudaría mucho.
