@@ -197,6 +197,11 @@ class _OpenPageState extends State<OpenPage> {
                               )
                               .toList(),
                         ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
                         Text("Shuffle"),
                         Switch(
                           value: widget.database.shouldShuffle,
