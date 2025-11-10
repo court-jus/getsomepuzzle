@@ -63,6 +63,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    // Prevent screen sleep
     WakelockPlus.enable();
     initializeDatabase();
     Timer.periodic(Duration(seconds: 1), (tmr) {
