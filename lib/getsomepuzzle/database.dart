@@ -227,15 +227,16 @@ class Database {
     load(assetContent.split("\n"));
     await currentFilters.load();
     final List<String> stats = [];
+    String statsName = "stats_$collection";
+    if (collection == "puzzles") statsName = "stats";
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      stats.addAll(prefs.getStringList('stats') ?? []);
+      stats.addAll(prefs.getStringList(statsName) ?? []);
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
       final path = p.join(documentsDirectory.path, "getsomepuzzle");
       await Directory(path).create(recursive: true);
-      String filePath = p.join(path, "stats_$collection.txt");
-      if (collection == "puzzles") filePath = p.join(path, "stats.txt");
+      String filePath = p.join(path, "$statsName.txt");
       log.fine("Loading stats from $filePath");
       final file = File(filePath);
       if (!(await file.exists())) {
@@ -257,6 +258,7 @@ class Database {
     if (collection == "puzzles") statsName = "stats";
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
+      log.fine("Writing stats to $statsName");
       await prefs.setStringList(statsName, stats);
       return;
     }
