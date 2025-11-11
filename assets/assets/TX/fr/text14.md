@@ -1,0 +1,1 @@
+Dans le jeu, les contraintes seront mélangées.
