@@ -20,7 +20,6 @@ class OpenPage extends StatefulWidget {
 }
 
 class _OpenPageState extends State<OpenPage> {
-  List<(String, PuzzleData)> shownPuzzles = [];
   int matchingCount = 0;
   Set<String> collection = {"puzzles"};
   static const List<(String, String)> collections = [
@@ -43,7 +42,7 @@ class _OpenPageState extends State<OpenPage> {
   void initState() {
     super.initState();
     collection = {widget.database.collection};
-    updateShownPuzzles();
+    updateMatchingCount();
   }
 
   void applyFilter({
@@ -110,7 +109,7 @@ class _OpenPageState extends State<OpenPage> {
       if (changed) {
         widget.database.currentFilters.save();
         widget.database.preparePlaylist();
-        updateShownPuzzles();
+        updateMatchingCount();
       }
     });
   }
@@ -121,7 +120,7 @@ class _OpenPageState extends State<OpenPage> {
     });
     widget.database
         .loadPuzzlesFile(collection.first)
-        .then((void _) => setState(updateShownPuzzles));
+        .then((void _) => setState(updateMatchingCount));
   }
 
   void setShuffle(bool newValue) {
@@ -130,23 +129,9 @@ class _OpenPageState extends State<OpenPage> {
     });
   }
 
-  void updateShownPuzzles() {
+  void updateMatchingCount() {
     final filteredDatabase = widget.database.filter();
     matchingCount = filteredDatabase.length;
-    shownPuzzles = filteredDatabase.take(10).map((puz) {
-      final lineAttr = puz.lineRepresentation.split("_");
-      final rules = lineAttr[3]
-          .split(";")
-          .map((r) => r.split(":")[0])
-          .toSet()
-          .join(" ");
-      var flags =
-          ((puz.played ? "P" : "_") +
-          (puz.liked != null ? "L" : "_") +
-          (puz.skipped != null ? "S" : "_") +
-          (puz.disliked != null ? "D" : "_"));
-      return ("${puz.width}x${puz.height}\n$rules\n$flags", puz);
-    }).toList();
   }
 
   void selectPuzzle(
@@ -373,7 +358,7 @@ class _OpenPageState extends State<OpenPage> {
                     Divider(),
                     Text("Puzzles matching filters: $matchingCount"),
                     Divider(),
-                    if (shownPuzzles.isNotEmpty)
+                    if (widget.database.filter().isNotEmpty)
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.cyan,

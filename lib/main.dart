@@ -48,6 +48,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
+  String locale = "en";
   String topMessage = "";
   String bottomMessage = "";
   PuzzleData? currentMeta;
@@ -86,6 +87,12 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       database = db;
       loadPuzzle();
+    });
+  }
+
+  void toggleLocale(Set<String> newLocale) {
+    setState(() {
+      locale = newLocale.first;
     });
   }
 
@@ -213,7 +220,7 @@ class _MyHomePageState extends State<MyHomePage> {
         (MediaQuery.sizeOf(context).height -
         40 - // The bottom bar
         64 - // The app bar
-        128  // Some margin
+        128 // Some margin
         );
     double cellSize = 32.0;
     if (currentPuzzle != null) {
@@ -227,6 +234,31 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         actions: [
+          MenuAnchor(
+            builder:
+                (
+                  BuildContext context,
+                  MenuController controller,
+                  Widget? child,
+                ) {
+                  return IconButton(
+                    onPressed: () {
+                      if (controller.isOpen) {
+                        controller.close();
+                      } else {
+                        controller.open();
+                      }
+                    },
+                    icon: const Icon(Icons.language),
+                    tooltip: 'Language',
+                  );
+                },
+            menuChildren: [
+              MenuItemButton(onPressed: () { toggleLocale({"en"}); }, child: Text("English")),
+              MenuItemButton(onPressed: () { toggleLocale({"es"}); }, child: Text("Español")),
+              MenuItemButton(onPressed: () { toggleLocale({"fr"}); }, child: Text("Français")),
+            ],
+          ),
           IconButton(
             icon: Icon(Icons.undo_outlined),
             tooltip: "Undo",
@@ -241,7 +273,11 @@ class _MyHomePageState extends State<MyHomePage> {
               restartPuzzle: restartPuzzle,
             ),
           if (database != null)
-            MenuAnchorMore(database: database!, togglePause: togglePause),
+            MenuAnchorMore(
+              database: database!,
+              togglePause: togglePause,
+              locale: locale,
+            ),
         ],
       ),
       body: Center(
@@ -296,8 +332,8 @@ class _MyHomePageState extends State<MyHomePage> {
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.lightBlueAccent[100],
-                              minimumSize: Size(cellSize * 2, cellSize),
-                              maximumSize: Size(cellSize * 2, cellSize * 2),
+                          minimumSize: Size(cellSize * 2, cellSize),
+                          maximumSize: Size(cellSize * 2, cellSize * 2),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadiusGeometry.circular(16),
                           ),
@@ -329,13 +365,15 @@ class _MyHomePageState extends State<MyHomePage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      (currentPuzzle != null)
-                          ? PuzzleWidget(
-                              currentPuzzle: currentPuzzle!,
-                              onCellTap: handlePuzzleTap,
-                              cellSize: cellSize,
-                            )
-                          : Text("No puzzle loaded."),
+                      if (currentPuzzle != null)
+                        PuzzleWidget(
+                          currentPuzzle: currentPuzzle!,
+                          onCellTap: handlePuzzleTap,
+                          cellSize: cellSize,
+                          locale: locale,
+                        )
+                      else
+                        Text("No puzzle loaded."),
                     ],
                   ),
               ],

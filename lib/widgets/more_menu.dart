@@ -9,11 +9,13 @@ enum SampleItem { itemOne, itemTwo, itemThree }
 class MenuAnchorMore extends StatefulWidget {
   final Database database;
   final Function() togglePause;
+  final String locale;
 
   const MenuAnchorMore({
     super.key,
     required this.database,
     required this.togglePause,
+    required this.locale,
   });
 
   @override
@@ -59,7 +61,11 @@ class _MenuAnchorMoreState extends State<MenuAnchorMore> {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => HelpPage()),
+              MaterialPageRoute(
+                builder: (context) => HelpPage(
+                  locale: widget.locale,
+                ),
+              ),
             );
           },
           child: Text("Help"),

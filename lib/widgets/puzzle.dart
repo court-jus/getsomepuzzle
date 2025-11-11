@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
+import 'package:getsomepuzzle/widgets/textpuzzle.dart';
 
 const forbiddenColor = Color.fromARGB(255, 185, 86, 202);
 const mandatoryColor = Colors.lightBlue;
@@ -18,11 +19,13 @@ class PuzzleWidget extends StatelessWidget {
     required this.currentPuzzle,
     required this.onCellTap,
     required this.cellSize,
+    required this.locale,
   });
 
   final Puzzle currentPuzzle;
   final ValueChanged<int> onCellTap;
   final double cellSize;
+  final String locale;
 
   void _handleCellTap(int idx, {bool secondary = false}) {
     onCellTap(idx);
@@ -32,12 +35,21 @@ class PuzzleWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double maxConstraintsInTopBarSize = cellSize;
-    int numberOfTopBarConstraints = currentPuzzle.constraints.where((constraint) => (constraint is Motif || constraint is QuantityConstraint)).length;
+    int numberOfTopBarConstraints = currentPuzzle.constraints
+        .where(
+          (constraint) =>
+              (constraint is Motif || constraint is QuantityConstraint),
+        )
+        .length;
     double totalWidth = MediaQuery.sizeOf(context).width;
-    double targetSize = (totalWidth / numberOfTopBarConstraints) - 2; // 2 pixels of spacing between items
+    double targetSize =
+        (totalWidth / numberOfTopBarConstraints) -
+        2; // 2 pixels of spacing between items
     double topBarConstraintsSize = targetSize;
     double adjustedCellSize = cellSize;
-    if (targetSize > maxConstraintsInTopBarSize) topBarConstraintsSize = maxConstraintsInTopBarSize;
+    if (targetSize > maxConstraintsInTopBarSize) {
+      topBarConstraintsSize = maxConstraintsInTopBarSize;
+    }
     if (targetSize < minConstraintsInTopBarSize) {
       // We need to put them on two or more rows and reduce the cells size
       topBarConstraintsSize = minConstraintsInTopBarSize;
@@ -76,17 +88,15 @@ class PuzzleWidget extends StatelessWidget {
                 )
               else if (constraint is HelpText)
                 SizedBox(
-                  width: totalWidth,
-                  child: Text(
-                    constraint.text,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 20,
-                    ),
+                  width: totalWidth - 20,
+                  child: TextpuzzleWidget(
+                    textName: constraint.text,
+                    locale: locale,
                   ),
                 ),
           ],
         ),
+        SizedBox(height: 10),
         Table(
           border: TableBorder.all(),
           defaultColumnWidth: FixedColumnWidth(adjustedCellSize),
@@ -104,10 +114,13 @@ class PuzzleWidget extends StatelessWidget {
                               cellidx],
                       cellSize: adjustedCellSize,
                       onTap: () => {
-                        _handleCellTap(rowidx * currentPuzzle.width + cellidx)
+                        _handleCellTap(rowidx * currentPuzzle.width + cellidx),
                       },
                       onSecondaryTap: () => {
-                        _handleCellTap(rowidx * currentPuzzle.width + cellidx, secondary: true)
+                        _handleCellTap(
+                          rowidx * currentPuzzle.width + cellidx,
+                          secondary: true,
+                        ),
                       },
                     ),
                 ],

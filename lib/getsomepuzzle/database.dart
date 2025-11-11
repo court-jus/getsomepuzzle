@@ -35,7 +35,11 @@ class PuzzleData {
     width = int.parse(dimensions[0]);
     height = int.parse(dimensions[1]);
     final cells = attributesStr[2].split("").map((e) => int.parse(e)).toList();
-    filled = (cells.where((c) => c > 0).length.toDouble() / cells.length.toDouble() * 100).toInt();
+    filled =
+        (cells.where((c) => c > 0).length.toDouble() /
+                cells.length.toDouble() *
+                100)
+            .toInt();
     final strConstraints = attributesStr[3].split(";");
     for (var strConstraint in strConstraints) {
       rules.add(strConstraint.split(":")[0]);
@@ -53,7 +57,9 @@ class PuzzleData {
       liked != null ? "L" : "_",
       disliked != null ? "D" : "_",
     ].join("");
-    final String finishedForLog = finished == null ? "unfinished" : formatter.format(finished!);
+    final String finishedForLog = finished == null
+        ? "unfinished"
+        : formatter.format(finished!);
     final dates = [
       skipped != null ? formatter.format(skipped!) : "",
       liked != null ? formatter.format(liked!) : "",
@@ -70,7 +76,11 @@ class PuzzleData {
   }
 
   void stop() {
-    if (stats == null) throw UnimplementedError("Should never stop the time before having started it.");
+    if (stats == null) {
+      throw UnimplementedError(
+        "Should never stop the time before having started it.",
+      );
+    }
     stats!.stop(lineRepresentation);
 
     played = true;
@@ -135,7 +145,6 @@ class Filters {
     prefs.setStringList("wantedRulesFilter", wantedRules.toList());
     prefs.setStringList("bannedRulesFilter", bannedRules.toList());
   }
-
 }
 
 class Database {
@@ -148,9 +157,9 @@ class Database {
 
   void load(List<String> lines) {
     puzzles = lines
-      .where((e) => e.isNotEmpty && !e.startsWith("#"))
-      .map((e) => PuzzleData(e))
-      .toList();
+        .where((e) => e.isNotEmpty && !e.startsWith("#"))
+        .map((e) => PuzzleData(e))
+        .toList();
   }
 
   void loadStats(List<String> stats) {
@@ -180,26 +189,40 @@ class Database {
       if (puzzleData.length > 11 && puzzleData[11].isNotEmpty) {
         puz.disliked = DateTime.tryParse(puzzleData[11]);
       }
-      puz.duration = int.parse(
-        puzzleData[1].replaceAll("s", ""),
-      );
-      puz.failures = int.parse(
-        puzzleData[2].replaceAll("f", ""),
-      );
+      puz.duration = int.parse(puzzleData[1].replaceAll("s", ""));
+      puz.failures = int.parse(puzzleData[2].replaceAll("f", ""));
     }
   }
 
   Iterable<PuzzleData> filter() {
     return puzzles.where((puz) {
-      if (puz.played && currentFilters.bannedFlags.contains("played")) return false;
-      if (puz.skipped != null && currentFilters.bannedFlags.contains("skipped")) return false;
-      if (puz.liked != null && currentFilters.bannedFlags.contains("liked")) return false;
-      if (puz.disliked != null && currentFilters.bannedFlags.contains("disliked")) return false;
+      if (puz.played && currentFilters.bannedFlags.contains("played")) {
+        return false;
+      }
+      if (puz.skipped != null && currentFilters.bannedFlags.contains("skipped")) {
+        return false;
+      }
+      if (puz.liked != null && currentFilters.bannedFlags.contains("liked")) {
+        return false;
+      }
+      if (puz.disliked != null &&
+          currentFilters.bannedFlags.contains("disliked")) {
+        return false;
+      }
 
-      if (!puz.played && currentFilters.wantedFlags.contains("played")) return false;
-      if (puz.skipped == null && currentFilters.wantedFlags.contains("skipped")) return false;
-      if (puz.liked == null && currentFilters.wantedFlags.contains("liked")) return false;
-      if (puz.disliked == null && currentFilters.wantedFlags.contains("disliked")) return false;
+      if (!puz.played && currentFilters.wantedFlags.contains("played")) {
+        return false;
+      }
+      if (puz.skipped == null && currentFilters.wantedFlags.contains("skipped")) {
+        return false;
+      }
+      if (puz.liked == null && currentFilters.wantedFlags.contains("liked")) {
+        return false;
+      }
+      if (puz.disliked == null &&
+          currentFilters.wantedFlags.contains("disliked")) {
+        return false;
+      }
 
       if (puz.filled > currentFilters.maxFilled) return false;
       if (puz.filled < currentFilters.minFilled) return false;
@@ -208,11 +231,14 @@ class Database {
       if (puz.height > currentFilters.maxHeight) return false;
       if (puz.height < currentFilters.minHeight) return false;
       if (currentFilters.wantedRules.isNotEmpty &&
-          currentFilters.wantedRules.intersection(puz.rules.toSet()).length != currentFilters.wantedRules.length) {
+          currentFilters.wantedRules.intersection(puz.rules.toSet()).length !=
+              currentFilters.wantedRules.length) {
         return false;
       }
       if (currentFilters.bannedRules.isNotEmpty &&
-          currentFilters.bannedRules.intersection(puz.rules.toSet()).isNotEmpty) {
+          currentFilters.bannedRules
+              .intersection(puz.rules.toSet())
+              .isNotEmpty) {
         return false;
       }
       return true;
@@ -244,7 +270,6 @@ class Database {
         file.createSync();
       }
       final content = await file.readAsString();
-      print(content);
       stats.addAll(content.split("\n"));
     }
     log.finest("Stats to load $stats");
@@ -281,7 +306,9 @@ class Database {
     if (shouldShuffle) {
       playlist.shuffle();
     }
-    log.info("Playlist prepared with ${playlist.length} puzzles (shuffled: $shouldShuffle)");
+    log.info(
+      "Playlist prepared with ${playlist.length} puzzles (shuffled: $shouldShuffle)",
+    );
   }
 
   void removePuzzleFromPlaylist(PuzzleData puz) {
@@ -301,7 +328,9 @@ class Database {
   }
 
   List<String> getStats() {
-    return puzzles.where((puz) => puz.played).map((puz) => puz.getStat()).toList();
+    return puzzles
+        .where((puz) => puz.played)
+        .map((puz) => puz.getStat())
+        .toList();
   }
-
 }
