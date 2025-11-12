@@ -1,8 +1,10 @@
 // ignore_for_file: avoid_print
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -65,7 +67,9 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     // Prevent screen sleep
-    WakelockPlus.enable();
+    if (!kIsWeb && Platform.isAndroid) {
+      WakelockPlus.enable();
+    }
     initializeDatabase();
     Timer.periodic(Duration(seconds: 1), (tmr) {
       if (database == null) return;
