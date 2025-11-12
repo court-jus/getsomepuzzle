@@ -125,7 +125,7 @@ class _OpenPageState extends State<OpenPage> {
 
   void setShuffle(bool newValue) {
     setState(() {
-      widget.database.shouldShuffle = newValue;
+      widget.database.setShouldShuffle(newValue);
     });
   }
 

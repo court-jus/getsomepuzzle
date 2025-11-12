@@ -247,6 +247,7 @@ class Database {
 
   Future<void> loadPuzzlesFile([String? fileToLoad]) async {
     final prefs = await SharedPreferences.getInstance();
+    shouldShuffle = prefs.getBool("shouldShuffleCollection") ?? false;
     if (fileToLoad == null) {
       collection = prefs.getString("collectionToLoad") ?? "tutorial";
     } else {
@@ -303,6 +304,12 @@ class Database {
       mode: FileMode.writeOnly,
       flush: true,
     );
+  }
+
+  Future<void> setShouldShuffle(bool newValue) async {
+    shouldShuffle = newValue;
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setBool("shouldShuffleCollection", newValue);
   }
 
   void preparePlaylist() {
