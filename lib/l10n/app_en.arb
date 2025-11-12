@@ -1,0 +1,119 @@
+{
+    "@@locale": "en",
+    "help": "Help",
+    "@help": {
+        "description": "Label of the menu choice that opens the help text"
+    },
+    "stats": "Stats",
+    "@stats": {
+        "description": "Label of the menu choice that displays game statistics"
+    },
+    "newgame": "New",
+    "@newgame": {
+        "description": "Label of the menu choice that allows to choose the next puzzle to play"
+    },
+    "open": "Open",
+    "@open": {
+        "description": "Label of the menu choice that allows to manually open a puzzle to play"
+    },
+    "restart": "Restart",
+    "@restart": {
+        "description": "Label of the menu choice that allows to restart the current puzzle"
+    },
+    "report": "Report",
+    "@report": {
+        "description": "Label of the menu choice that allows to report a buggy puzzle"
+    },
+    "pause": "Pause",
+    "@pause": {
+        "description": "Tooltip that appears on the pause menu"
+    },
+    "msgPuzzleSolved": "Puzzle solved!",
+    "@msgPuzzleSolved": {
+        "description": "Message displayed to congratulate the user after they solved a puzzle."
+    },
+    "questionFunToPlay": "Was if fun to play?",
+    "@questionFunToPlay": {
+        "description": "Question asked after a user has finished playing a puzzle."
+    },
+    "infoNoPuzzle": "No puzzle loaded.",
+    "@infoNoPuzzle": {
+        "description": "Message displayed in the middle of the screen when no puzzle is loaded."
+    },
+    "titleOpenPuzzlePage": "Open puzzle",
+    "@titleOpenPuzzlePage": {
+        "description": "Title of the page that allows to open a puzzle"
+    },
+    "infoFilterCollection": "You can filter to find the kind of puzzle you like.",
+    "@infoFilterCollection": {
+        "description": "Explanation displayed in the open puzzle page"
+    },
+    "labelSelectCollection": "Collection",
+    "@labelSelectCollection": {
+        "description": "Label of the widget"
+    },
+    "labelToggleShuffle": "Shuffle",
+    "@labelToggleShuffle": {
+        "description": "Label of the widget"
+    },
+    "labelChooseOnly": "Only",
+    "@labelChooseOnly": {
+        "description": "Label of the widget"
+    },
+    "labelStatePlayed": "Played",
+    "@labelStatePlayed": {
+        "description": "Label of the widget"
+    },
+    "labelStateSkipped": "Skipped",
+    "@labelStateSkipped": {
+        "description": "Label of the widget"
+    },
+    "labelStateLiked": "Liked",
+    "@labelStateLiked": {
+        "description": "Label of the widget"
+    },
+    "labelStateDisliked": "Disliked",
+    "@labelStateDisliked": {
+        "description": "Label of the widget"
+    },
+    "labelChooseNot": "Not",
+    "@labelChooseNot": {
+        "description": "Label of the widget"
+    },
+    "placeholderWidgetPastePuzzle": "Paste a puzzle representation here to open it",
+    "@placeholderWidgetPastePuzzle": {
+        "description": "Placeholder of a text field in which the user can paste a text representation of a puzzle"
+    },
+    "labelWidgetDimensions": "Dimensions",
+    "@labelWidgetDimensions": {
+        "description": "Label of the widget"
+    },
+    "labelWidgetWidth": "Width",
+    "@labelWidgetWidth": {
+        "description": "Label of the widget"
+    },
+    "labelWidgetHeight": "Height",
+    "@labelWidgetHeight": {
+        "description": "Label of the widget"
+    },
+    "labelWidgetFillRatio": "Fill ratio",
+    "@labelWidgetFillRatio": {
+        "description": "Label of the widget"
+    },
+    "labelWidgetWantedrules": "Wanted rules",
+    "@labelWidgetWantedrules": {
+        "description": "Label of the widget"
+    },
+    "labelWidgetBannedrules": "Banned rules",
+    "@labelWidgetBannedrules": {
+        "description": "Label of the widget"
+    },
+    "msgCountMatchingPuzzles": "Puzzles matching filters",
+    "@msgCountMatchingPuzzles": {
+        "description": "Message displayed before the number of puzzles"
+    },
+    "btnCopyClipboard": "Copy to clipboard",
+    "@btnCopyClipboard": {
+        "description": "Label on the button that allows to copy the text to the clipboard."
+    }
+}

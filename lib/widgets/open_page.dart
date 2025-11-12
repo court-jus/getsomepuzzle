@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
+import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/plusminus.dart';
 
 class OpenPage extends StatefulWidget {
@@ -149,7 +150,7 @@ class _OpenPageState extends State<OpenPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Open puzzle")),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.titleOpenPuzzlePage)),
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints viewportConstraints) {
           return SingleChildScrollView(
@@ -162,12 +163,12 @@ class _OpenPageState extends State<OpenPage> {
                 margin: EdgeInsets.all(8),
                 child: Column(
                   children: [
-                    Text("You can filter to find the kind of puzzle you like."),
+                    Text(AppLocalizations.of(context)!.infoFilterCollection),
                     Divider(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Collection"),
+                        Text(AppLocalizations.of(context)!.labelSelectCollection),
                         SegmentedButton(
                           multiSelectionEnabled: false,
                           emptySelectionAllowed: false,
@@ -188,7 +189,7 @@ class _OpenPageState extends State<OpenPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Shuffle"),
+                        Text(AppLocalizations.of(context)!.labelToggleShuffle),
                         Switch(
                           value: widget.database.shouldShuffle,
                           onChanged: setShuffle,
@@ -199,7 +200,7 @@ class _OpenPageState extends State<OpenPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Only"),
+                        Text(AppLocalizations.of(context)!.labelChooseOnly),
                         SegmentedButton(
                           multiSelectionEnabled: true,
                           emptySelectionAllowed: true,
@@ -210,16 +211,16 @@ class _OpenPageState extends State<OpenPage> {
                           segments: [
                             ButtonSegment(
                               value: "played",
-                              label: Text("Played"),
+                              label: Text(AppLocalizations.of(context)!.labelStatePlayed),
                             ),
                             ButtonSegment(
                               value: "skipped",
-                              label: Text("Skipped"),
+                              label: Text(AppLocalizations.of(context)!.labelStateSkipped),
                             ),
-                            ButtonSegment(value: "liked", label: Text("Liked")),
+                            ButtonSegment(value: "liked", label: Text(AppLocalizations.of(context)!.labelStateLiked)),
                             ButtonSegment(
                               value: "disliked",
-                              label: Text("Disliked"),
+                              label: Text(AppLocalizations.of(context)!.labelStateDisliked),
                             ),
                           ],
                         ),
@@ -228,7 +229,7 @@ class _OpenPageState extends State<OpenPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Not"),
+                        Text(AppLocalizations.of(context)!.labelChooseNot),
                         SegmentedButton(
                           multiSelectionEnabled: true,
                           emptySelectionAllowed: true,
@@ -239,16 +240,16 @@ class _OpenPageState extends State<OpenPage> {
                           segments: [
                             ButtonSegment(
                               value: "played",
-                              label: Text("Played"),
+                              label: Text(AppLocalizations.of(context)!.labelStatePlayed),
                             ),
                             ButtonSegment(
                               value: "skipped",
-                              label: Text("Skipped"),
+                              label: Text(AppLocalizations.of(context)!.labelStateSkipped),
                             ),
-                            ButtonSegment(value: "liked", label: Text("Liked")),
+                            ButtonSegment(value: "liked", label: Text(AppLocalizations.of(context)!.labelStateLiked)),
                             ButtonSegment(
                               value: "disliked",
-                              label: Text("Disliked"),
+                              label: Text(AppLocalizations.of(context)!.labelStateDisliked),
                             ),
                           ],
                         ),
@@ -260,16 +261,16 @@ class _OpenPageState extends State<OpenPage> {
                           selectPuzzle(PuzzleData(value), context, false),
                       decoration: InputDecoration(
                         label: Text(
-                          "Paste a puzzle representation here to open it",
+                          AppLocalizations.of(context)!.placeholderWidgetPastePuzzle,
                         ),
                       ),
                     ),
                     Divider(),
-                    const Text("Dimensions"),
+                    Text(AppLocalizations.of(context)!.labelWidgetDimensions),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("Width"),
+                        Text(AppLocalizations.of(context)!.labelWidgetWidth),
                         PlusMinusField(
                           onChanged: (minValue, maxValue) {
                             final value = RangeValues(
@@ -286,7 +287,7 @@ class _OpenPageState extends State<OpenPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("Height"),
+                        Text(AppLocalizations.of(context)!.labelWidgetHeight),
                         PlusMinusField(
                           onChanged: (minValue, maxValue) {
                             final value = RangeValues(
@@ -303,7 +304,7 @@ class _OpenPageState extends State<OpenPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("Fill ratio"),
+                        Text(AppLocalizations.of(context)!.labelWidgetFillRatio),
                         PlusMinusField(
                           onChanged: (minValue, maxValue) {
                             final value = RangeValues(
@@ -320,7 +321,7 @@ class _OpenPageState extends State<OpenPage> {
                         ),
                       ],
                     ),
-                    const Text("Wanted rules"),
+                    Text(AppLocalizations.of(context)!.labelWidgetWantedrules),
                     SegmentedButton(
                       multiSelectionEnabled: true,
                       emptySelectionAllowed: true,
@@ -338,7 +339,7 @@ class _OpenPageState extends State<OpenPage> {
                           .toList(),
                     ),
                     const SizedBox(height: 20),
-                    const Text("Banned rules"),
+                    Text(AppLocalizations.of(context)!.labelWidgetBannedrules),
                     SegmentedButton(
                       multiSelectionEnabled: true,
                       emptySelectionAllowed: true,
@@ -356,7 +357,7 @@ class _OpenPageState extends State<OpenPage> {
                           .toList(),
                     ),
                     Divider(),
-                    Text("Puzzles matching filters: $matchingCount"),
+                    Text("${AppLocalizations.of(context)!.msgCountMatchingPuzzles}: $matchingCount"),
                     Divider(),
                     if (widget.database.filter().isNotEmpty)
                       ElevatedButton(

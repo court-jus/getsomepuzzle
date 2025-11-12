@@ -5,15 +5,17 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:logging/logging.dart';
 import 'package:flutter/material.dart';
+
+import 'package:logging/logging.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/widgets/more_menu.dart';
 import 'package:getsomepuzzle/widgets/pause_menu.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
-
 import 'getsomepuzzle/puzzle.dart';
+import 'l10n/app_localizations.dart';
 
 void main() {
   Logger.root.level = Level.ALL; // defaults to Level.INFO
@@ -23,26 +25,46 @@ void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  Locale selectedLocale = Locale("en");
+
+  void setAppLocale(String newLocale) {
+    setState(() {
+      selectedLocale = Locale(newLocale);
+    });
+  }
 
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Get Some Puzzle',
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: selectedLocale, // controlled by state
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Get Some Puzzle'),
+      home: MyHomePage(
+        title: 'Get Some Puzzle',
+        setAppLocale: setAppLocale,
+      ),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  const MyHomePage({super.key, required this.title, required this.setAppLocale});
 
   final String title;
+  final Function setAppLocale;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -97,6 +119,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void toggleLocale(Set<String> newLocale) {
     setState(() {
       locale = newLocale.first;
+      widget.setAppLocale(locale);
     });
   }
 
@@ -258,9 +281,24 @@ class _MyHomePageState extends State<MyHomePage> {
                   );
                 },
             menuChildren: [
-              MenuItemButton(onPressed: () { toggleLocale({"en"}); }, child: Text("English")),
-              MenuItemButton(onPressed: () { toggleLocale({"es"}); }, child: Text("Español")),
-              MenuItemButton(onPressed: () { toggleLocale({"fr"}); }, child: Text("Français")),
+              MenuItemButton(
+                onPressed: () {
+                  toggleLocale({"en"});
+                },
+                child: Text("English"),
+              ),
+              MenuItemButton(
+                onPressed: () {
+                  toggleLocale({"es"});
+                },
+                child: Text("Español"),
+              ),
+              MenuItemButton(
+                onPressed: () {
+                  toggleLocale({"fr"});
+                },
+                child: Text("Français"),
+              ),
             ],
           ),
           IconButton(
@@ -298,9 +336,9 @@ class _MyHomePageState extends State<MyHomePage> {
                     Column(
                       spacing: 16,
                       children: [
-                        Text("Puzzle solved!", style: TextStyle(fontSize: 48)),
+                        Text(AppLocalizations.of(context)!.msgPuzzleSolved, style: TextStyle(fontSize: 48)),
                         Text(
-                          "Was it fun to play?",
+                          AppLocalizations.of(context)!.questionFunToPlay,
                           style: TextStyle(fontSize: 24),
                         ),
                         Row(
@@ -314,7 +352,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                 minimumSize: Size(cellSize, cellSize),
                                 maximumSize: Size(cellSize * 2, cellSize * 2),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadiusGeometry.circular(16),
+                                  borderRadius: BorderRadiusGeometry.circular(
+                                    16,
+                                  ),
                                 ),
                               ),
                               onPressed: () => like(true),
@@ -326,7 +366,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                 minimumSize: Size(cellSize, cellSize),
                                 maximumSize: Size(cellSize * 2, cellSize * 2),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadiusGeometry.circular(16),
+                                  borderRadius: BorderRadiusGeometry.circular(
+                                    16,
+                                  ),
                                 ),
                               ),
                               onPressed: () => like(false),
@@ -378,7 +420,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             locale: locale,
                           )
                         else
-                          Text("No puzzle loaded."),
+                          Text(AppLocalizations.of(context)!.infoNoPuzzle),
                       ],
                     ),
                 ],

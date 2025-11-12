@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
+import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class StatsPage extends StatefulWidget {
   const StatsPage({super.key, required this.database});
@@ -29,7 +30,7 @@ Future<void> setData() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Stats')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.stats)),
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints viewportConstraints) {
           return SingleChildScrollView(
@@ -42,7 +43,7 @@ Future<void> setData() async {
                 children: [
                   TextButton.icon(
                       onPressed: setData,
-                      label: Text("Copy to clipboard"),
+                      label: Text(AppLocalizations.of(context)!.btnCopyClipboard),
                       icon: Icon(Icons.copy),
                     ),
                   Container(
