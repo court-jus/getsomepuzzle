@@ -246,8 +246,12 @@ class Database {
   }
 
   Future<void> loadPuzzlesFile([String? fileToLoad]) async {
-    if (fileToLoad != null) {
+    final prefs = await SharedPreferences.getInstance();
+    if (fileToLoad == null) {
+      collection = prefs.getString("collectionToLoad") ?? "tutorial";
+    } else {
       collection = fileToLoad;
+      prefs.setString("collectionToLoad", collection);
     }
     final assetContent = await rootBundle.loadString('assets/$collection.txt');
     load(assetContent.split("\n"));
