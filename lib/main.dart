@@ -285,104 +285,106 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          spacing: 2,
-          children: <Widget>[
-            Text(topMessage),
-            Stack(
-              alignment: AlignmentGeometry.center,
-              children: [
-                if (betweenPuzzles)
-                  Column(
-                    spacing: 16,
-                    children: [
-                      Text("Puzzle solved!", style: TextStyle(fontSize: 48)),
-                      Text(
-                        "Was it fun to play?",
-                        style: TextStyle(fontSize: 24),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        spacing: 16,
-                        children: [
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.greenAccent,
-                              minimumSize: Size(cellSize, cellSize),
-                              maximumSize: Size(cellSize * 2, cellSize * 2),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadiusGeometry.circular(16),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            spacing: 2,
+            children: <Widget>[
+              Text(topMessage),
+              Stack(
+                alignment: AlignmentGeometry.center,
+                children: [
+                  if (betweenPuzzles)
+                    Column(
+                      spacing: 16,
+                      children: [
+                        Text("Puzzle solved!", style: TextStyle(fontSize: 48)),
+                        Text(
+                          "Was it fun to play?",
+                          style: TextStyle(fontSize: 24),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          spacing: 16,
+                          children: [
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.greenAccent,
+                                minimumSize: Size(cellSize, cellSize),
+                                maximumSize: Size(cellSize * 2, cellSize * 2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadiusGeometry.circular(16),
+                                ),
                               ),
+                              onPressed: () => like(true),
+                              child: const Icon(Icons.thumb_up, size: 96),
                             ),
-                            onPressed: () => like(true),
-                            child: const Icon(Icons.thumb_up, size: 96),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.redAccent[100],
-                              minimumSize: Size(cellSize, cellSize),
-                              maximumSize: Size(cellSize * 2, cellSize * 2),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadiusGeometry.circular(16),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent[100],
+                                minimumSize: Size(cellSize, cellSize),
+                                maximumSize: Size(cellSize * 2, cellSize * 2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadiusGeometry.circular(16),
+                                ),
                               ),
+                              onPressed: () => like(false),
+                              child: const Icon(Icons.thumb_down, size: 96),
                             ),
-                            onPressed: () => like(false),
-                            child: const Icon(Icons.thumb_down, size: 96),
+                          ],
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.lightBlueAccent[100],
+                            minimumSize: Size(cellSize * 2, cellSize),
+                            maximumSize: Size(cellSize * 2, cellSize * 2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadiusGeometry.circular(16),
+                            ),
                           ),
-                        ],
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.lightBlueAccent[100],
-                          minimumSize: Size(cellSize * 2, cellSize),
-                          maximumSize: Size(cellSize * 2, cellSize * 2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadiusGeometry.circular(16),
+                          onPressed: loadPuzzle,
+                          child: Icon(Icons.skip_next, size: 96),
+                        ),
+                      ],
+                    )
+                  else if (paused)
+                    TextButton(
+                      onPressed: resume,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.teal,
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: SizedBox(
+                          width: contextWidth,
+                          height: contextHeight,
+                          child: Center(
+                            child: Icon(Icons.pause, size: cellSize * 3),
                           ),
                         ),
-                        onPressed: loadPuzzle,
-                        child: Icon(Icons.skip_next, size: 96),
                       ),
-                    ],
-                  )
-                else if (paused)
-                  TextButton(
-                    onPressed: resume,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.teal,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: SizedBox(
-                        width: contextWidth,
-                        height: contextHeight,
-                        child: Center(
-                          child: Icon(Icons.pause, size: cellSize * 3),
-                        ),
-                      ),
+                    )
+                  else
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (currentPuzzle != null)
+                          PuzzleWidget(
+                            currentPuzzle: currentPuzzle!,
+                            onCellTap: handlePuzzleTap,
+                            cellSize: cellSize,
+                            locale: locale,
+                          )
+                        else
+                          Text("No puzzle loaded."),
+                      ],
                     ),
-                  )
-                else
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      if (currentPuzzle != null)
-                        PuzzleWidget(
-                          currentPuzzle: currentPuzzle!,
-                          onCellTap: handlePuzzleTap,
-                          cellSize: cellSize,
-                          locale: locale,
-                        )
-                      else
-                        Text("No puzzle loaded."),
-                    ],
-                  ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: BottomAppBar(
