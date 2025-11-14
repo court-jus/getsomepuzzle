@@ -12,87 +12,88 @@ class AppLocalizationsEs extends AppLocalizations {
   String get help => 'Ayuda';
 
   @override
-  String get stats => 'stats translate me';
+  String get stats => 'Stats';
 
   @override
-  String get newgame => 'new translate me';
+  String get newgame => 'Nuevo';
 
   @override
-  String get open => 'open translate me';
+  String get open => 'Abrir';
 
   @override
-  String get restart => 'restart translate me';
+  String get restart => 'Reiniciar';
 
   @override
-  String get report => 'report translate me';
+  String get report => 'Denunciar';
 
   @override
-  String get pause => 'pause translate me';
+  String get pause => 'Pausa';
 
   @override
-  String get msgPuzzleSolved => 'msgPuzzleSolved translate me';
+  String get msgPuzzleSolved => '¡Problema Resuelto!';
 
   @override
-  String get questionFunToPlay => 'questionFunToPlay translate me';
+  String get questionFunToPlay => '¿Ha sido divertido jugar?';
 
   @override
-  String get infoNoPuzzle => 'infoNoPuzzle translate me';
+  String get infoNoPuzzle => 'Ningún puzzle cargado.';
 
   @override
-  String get titleOpenPuzzlePage => 'titleOpenPuzzlePage translate me';
+  String get titleOpenPuzzlePage => 'Abrir puzzle';
 
   @override
-  String get infoFilterCollection => 'infoFilterCollection translate me';
+  String get infoFilterCollection =>
+      'Puedes filtrar para encontrar el tipo de rompecabezas que te gusta.';
 
   @override
-  String get labelSelectCollection => 'labelSelectCollection translate me';
+  String get labelSelectCollection => 'Colección';
 
   @override
-  String get labelToggleShuffle => 'labelToggleShuffle translate me';
+  String get labelToggleShuffle => 'Mezclar';
 
   @override
-  String get labelChooseOnly => 'labelChooseOnly translate me';
+  String get labelChooseOnly => 'Solamente';
 
   @override
-  String get labelStatePlayed => 'labelStatePlayed translate me';
+  String get labelStatePlayed => 'Jugado';
 
   @override
-  String get labelStateSkipped => 'labelStateSkipped translate me';
+  String get labelStateSkipped => 'Omitido';
 
   @override
-  String get labelStateLiked => 'labelStateLiked translate me';
+  String get labelStateLiked => 'Gustado';
 
   @override
-  String get labelStateDisliked => 'labelStateDisliked translate me';
+  String get labelStateDisliked => 'Disgustado';
 
   @override
-  String get labelChooseNot => 'labelChooseNot translate me';
+  String get labelChooseNot => 'No';
 
   @override
   String get placeholderWidgetPastePuzzle =>
-      'placeholderWidgetPastePuzzle translate me';
+      'Pega una representación de rompecabezas aquí para abrirla';
 
   @override
-  String get labelWidgetDimensions => 'labelWidgetDimensions translate me';
+  String get labelWidgetDimensions => 'Dimensiones';
 
   @override
-  String get labelWidgetWidth => 'labelWidgetWidth translate me';
+  String get labelWidgetWidth => 'Largo';
 
   @override
-  String get labelWidgetHeight => 'labelWidgetHeight translate me';
+  String get labelWidgetHeight => 'Alto';
 
   @override
-  String get labelWidgetFillRatio => 'labelWidgetFillRatio translate me';
+  String get labelWidgetFillRatio => 'Relación de relleno';
 
   @override
-  String get labelWidgetWantedrules => 'labelWidgetWantedrules translate me';
+  String get labelWidgetWantedrules => 'Reglas deseadas';
 
   @override
-  String get labelWidgetBannedrules => 'labelWidgetBannedrules translate me';
+  String get labelWidgetBannedrules => 'Reglas prohibidas';
 
   @override
-  String get msgCountMatchingPuzzles => 'msgCountMatchingPuzzles translate me';
+  String get msgCountMatchingPuzzles => 'Puzzles que coinciden con filtros';
 
   @override
-  String get btnCopyClipboard => 'btnCopyClipboard translate me';
+  String get btnCopyClipboard => 'Copiar al portapapeles';
 }
