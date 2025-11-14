@@ -73,7 +73,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
   String locale = "en";
-  String topMessage = "";
+  String topMessage = "Version 1.3.0";
   String bottomMessage = "";
   PuzzleData? currentMeta;
   Puzzle? currentPuzzle;
@@ -175,7 +175,11 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle!.incrValue(idx);
       if (history.isEmpty || history.last != idx) history.add(idx);
       shouldCheck = currentPuzzle!.complete;
-      if (shouldCheck) Future.delayed(Duration(seconds: 1), autoCheck);
+      if (shouldCheck) {
+        Future.delayed(Duration(seconds: 1), autoCheck);
+      } else {
+        currentPuzzle!.clearConstraintsValidity();
+      }
     });
   }
 
