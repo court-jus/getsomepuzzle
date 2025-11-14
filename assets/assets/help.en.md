@@ -24,7 +24,7 @@ If you see a pattern above the puzzles that has a purple background, you must fi
 
 ### Group size
 
-If a cell contains a number, it must be part of a group of orthogonally adjacent cells of the same color and that group's size much match the number.
+If a cell contains a number, it must be part of a group of orthogonally connected cells of the same color and that group's size much match the number.
 
 ### Parity
 
