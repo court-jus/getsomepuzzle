@@ -1,4 +1,4 @@
-La contrainte de **symetrie** est représentée par des barres.
+La contrainte de **symétrie** est représentée par des barres.
 
 Une cellule contenant une barre doit faire partie d'un groupe symétrique selon cet axe.
 
