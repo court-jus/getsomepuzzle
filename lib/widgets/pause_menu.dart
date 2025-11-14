@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
+import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
 
 // This is the type used by the menu below.
@@ -50,7 +51,7 @@ class _MenuAnchorPauseState extends State<MenuAnchorPause> {
         MenuItemButton(
           leadingIcon: Icon(Icons.fiber_new),
           onPressed: widget.newPuzzle,
-          child: Text("New"),
+          child: Text(AppLocalizations.of(context)!.newgame),
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.file_open),
@@ -65,12 +66,12 @@ class _MenuAnchorPauseState extends State<MenuAnchorPause> {
               ),
             );
           },
-          child: Text("Open"),
+          child: Text(AppLocalizations.of(context)!.open),
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.restart_alt_rounded),
           onPressed: widget.restartPuzzle,
-          child: Text("Restart"),
+          child: Text(AppLocalizations.of(context)!.restart),
         ),
       ],
     );

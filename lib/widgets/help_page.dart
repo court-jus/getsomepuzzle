@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_md/flutter_md.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
+import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key, required this.locale});
@@ -39,7 +40,7 @@ class _HelpPageState extends State<HelpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Help')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.help)),
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints viewportConstraints) {
           return SingleChildScrollView(
