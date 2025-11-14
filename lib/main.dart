@@ -146,7 +146,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle = currentMeta!.begin();
       paused = false;
       betweenPuzzles = false;
-      topMessage = "";
+      topMessage = "Version 1.3.0";
     });
   }
 
