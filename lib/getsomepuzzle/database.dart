@@ -119,14 +119,16 @@ class Filters {
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     try {
-      minWidth = prefs.getInt("minWidthFilter") ?? 3;
-      maxWidth = prefs.getInt("maxWidthFilter") ?? 6;
-      minHeight = prefs.getInt("minHeightFilter") ?? 3;
-      maxHeight = prefs.getInt("maxHeightFilter") ?? 8;
+      minWidth = prefs.getInt("minWidthFilter") ?? 2;
+      maxWidth = prefs.getInt("maxWidthFilter") ?? 10;
+      minHeight = prefs.getInt("minHeightFilter") ?? 2;
+      maxHeight = prefs.getInt("maxHeightFilter") ?? 10;
       minFilled = prefs.getInt("minPrefilledFilter") ?? 0;
       maxFilled = prefs.getInt("maxPrefilledFilter") ?? 100;
       wantedRules = (prefs.getStringList("wantedRulesFilter") ?? []).toSet();
       bannedRules = (prefs.getStringList("bannedRulesFilter") ?? []).toSet();
+      wantedFlags = (prefs.getStringList("wantedFlagsFilter") ?? []).toSet();
+      bannedFlags = (prefs.getStringList("bannedFlagsFilter") ?? ["played", "skipped", "disliked"]).toSet();
     } on TypeError {
       save();
     } catch (e) {
@@ -144,6 +146,8 @@ class Filters {
     prefs.setInt("maxPrefilledFilter", maxFilled);
     prefs.setStringList("wantedRulesFilter", wantedRules.toList());
     prefs.setStringList("bannedRulesFilter", bannedRules.toList());
+    prefs.setStringList("wantedFlagsFilter", wantedFlags.toList());
+    prefs.setStringList("bannedFlagsFilter", bannedFlags.toList());
   }
 }
 
