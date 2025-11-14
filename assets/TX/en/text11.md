@@ -8,4 +8,4 @@ The symmetry cannot extend past the borders of the puzzle.
 
 ----
 
-Remember that a **group** contains all the cell of the **same color** that are **orthogonally** adjacent.
+Remember that a **group** contains all the cell of the **same color** that are **orthogonally** connected.

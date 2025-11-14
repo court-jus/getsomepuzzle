@@ -4,7 +4,7 @@ Your goal is to fill the grid with white and black cells while following some ru
 
 When cells contain letters, identical letters should form groups of the same color.
 
-A **group** contains all the cell of the **same color** that are **orthogonally** adjacent.
+A **group** contains all the cell of the **same color** that are **orthogonally** connected
 
 Different letters cannot be part of the same group.
 
