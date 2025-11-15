@@ -28,7 +28,7 @@ jobs:
           name: ApkReleases
           path: build/app/outputs/flutter-apk/app-release.apk
   build-windows:
-    runs-on: windows-11-arm
+    runs-on: windows-latest
     name: Build Windows
     steps:
       - name: Clone repository
