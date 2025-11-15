@@ -72,10 +72,12 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
+const versionNumber = "Version 1.3.2";
+
 class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
   String locale = "en";
-  String topMessage = "Version 1.3.0";
+  String topMessage = versionNumber;
   String bottomMessage = "";
   PuzzleData? currentMeta;
   Puzzle? currentPuzzle;
@@ -174,7 +176,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle = currentMeta!.begin();
       paused = false;
       betweenPuzzles = false;
-      topMessage = "Version 1.3.1";
+      topMessage = versionNumber;
     });
   }
 
@@ -199,6 +201,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void handlePuzzleTap(int idx) {
     if (currentPuzzle == null) return;
+    if (currentPuzzle!.cells[idx].readonly) {
+      return;
+    }
     setState(() {
       currentPuzzle!.incrValue(idx);
       if (history.isEmpty || history.last != idx) history.add(idx);
