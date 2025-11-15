@@ -69,6 +69,85 @@ def to_groups(strpuzzle, w, h, transformer=lambda x: x):
     return [sorted(list(grp)) for grp in sorted(groups.values())]
 
 
+def get_neighbors_same_value_or_empty(strpuzzle, w, h, idx, value, transformer=lambda x: x):
+    return [
+        n for n in get_neighbors(strpuzzle, w, h, idx)
+        if n is not None and (
+            transformer(strpuzzle[n]) == value or
+            transformer(strpuzzle[n]) == EMPTY
+        )
+    ] + [idx]
+
+
+def find_and_pop(setlist, value):
+    """
+    Pops the sets in setlist that contains value.
+    """
+    indices = set()
+    for idx, candidate in enumerate(setlist):
+        if value in candidate:
+            indices.add(idx)
+    return [setlist.pop(idx) for idx in sorted(indices, reverse=True)]
+
+
+def to_virtual_groups(strpuzzle, w, h, transformer=lambda x: x):
+    """
+    Get all possible groups.
+
+    A group is possible if its cells are separated by empty cells.
+    """
+    debug = False
+    idx_to_explore = [
+        (idx, transformer(strpuzzle[idx]))
+        for idx in range(len(strpuzzle)) if transformer(strpuzzle[idx]) != EMPTY
+    ]
+    explored = {}
+    if debug:
+        print("explore", idx_to_explore)
+    groups_per_value_per_cell = {}
+    while idx_to_explore:
+        explore_idx, value = idx_to_explore.pop(0)
+        if explore_idx in explored.get(value, []):
+            continue
+        explored.setdefault(value, []).append(explore_idx)
+        same_or_empty = get_neighbors_same_value_or_empty(strpuzzle, w, h, explore_idx, value, transformer=transformer)
+        groups_per_value_per_cell.setdefault(value, {}).setdefault(explore_idx, []).extend(same_or_empty)
+        if debug:
+            print(f"For {explore_idx} ({value}): {same_or_empty}")
+        for neighbor in same_or_empty:
+            if neighbor != explore_idx:
+                idx_to_explore.append((neighbor, value))
+    if debug:
+        print("gpvpc", groups_per_value_per_cell)
+    sets_per_value = {}
+    for value, value_data in groups_per_value_per_cell.items():
+        sets_per_value.setdefault(value, [])
+        for idx, group in value_data.items():
+            if debug:
+                print(f"For {idx} ({value}), look at {group}")
+            new_grp = set(group)
+            for existing in find_and_pop(sets_per_value[value], idx):
+                if debug:
+                    print("I'm already in a group", existing)
+                new_grp = new_grp.union(existing)
+            sets_per_value[value].append(new_grp)
+    if debug:
+        print("sets_per_value", sets_per_value)
+    #     # Merge the groups
+    #     new_gidx = list(existing.keys())[0]
+    #     new_grp = existing[new_gidx].union(others)
+    #     idx_remove = [i for i in existing.keys() if i != new_gidx]
+    #     if debug:
+    #         print("Add", others, "to", new_gidx, new_grp)
+    #     for idx_to_remove in idx_remove:
+    #         remove_grp = existing[idx_to_remove]
+    #         del groups[idx_to_remove]
+    #         if debug:
+    #             print("Merge", remove_grp, "into", new_gidx, new_grp)
+    #         new_grp = new_grp.union(remove_grp)
+    #     groups[new_gidx] = groups[new_gidx].union(new_grp)
+    return [sorted(list(grp)) for grp in sorted(sets_per_value.values())]
+
 def find_matching_group_neighbors(strpuzzle, w, h, grp, match, transformer=lambda x: x):
     result = []
     for idx in grp:
@@ -168,6 +247,8 @@ def line_import(line):
         if not c:
             continue
         slug, parameters = c.split(":")
+        if slug == "TX":
+            continue
         kls = slugs[slug]
         parameters = kls.line_import(parameters)
         pu.constraints.append(kls(**parameters))
