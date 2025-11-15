@@ -25,10 +25,10 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Releases
+          name: ApkReleases
           path: build/app/outputs/flutter-apk/app-release.apk
   build-windows:
-    runs-on: ubuntu-latest
+    runs-on: windows-11-arm
     name: Build Windows
     steps:
       - name: Clone repository
@@ -50,7 +50,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Releases
+          name: WindowsRelease
           path: build/windows-build.tgz
   build-web:
     runs-on: ubuntu-latest
@@ -75,5 +75,20 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Releases
+          name: WebRelease
           path: build/web-build.tgz
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [build-apk, build-windows, build-web]
+    steps:
+    - name: Extract version from pubspec.yaml
+      id: extract_version
+      run: |
+        version=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
+        echo "VERSION=$version" >> $GITHUB_ENV
+    - name: Create Release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "build/app/outputs/flutter-apk/app-release.apk,build/windows-build.tgz,build/web-build.tgz"
+        name: v${{ env.VERSION }}
