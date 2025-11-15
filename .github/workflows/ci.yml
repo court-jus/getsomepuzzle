@@ -23,7 +23,7 @@ jobs:
       - name: Build
         run: flutter build apk --release
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: Releases
           path: build/app/outputs/flutter-apk/app-release.apk
@@ -48,7 +48,7 @@ jobs:
           cd build
           tar -czvf windows-build.tgz windows/x64/runner/Release
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: Releases
           path: build/windows-build.tgz
@@ -73,7 +73,7 @@ jobs:
           cd build
           tar -czvf web-build.tgz web
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: Releases
           path: build/web-build.tgz
