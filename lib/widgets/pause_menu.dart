@@ -44,7 +44,7 @@ class _MenuAnchorPauseState extends State<MenuAnchorPause> {
                 }
               },
               icon: const Icon(Icons.pause),
-              tooltip: 'Pause...',
+              tooltip: AppLocalizations.of(context)!.tooltipPause,
             );
           },
       menuChildren: [

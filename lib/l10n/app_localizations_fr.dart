@@ -96,4 +96,16 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get btnCopyClipboard => 'Copier dans le presse papier';
+
+  @override
+  String get tooltipPause => 'Pause...';
+
+  @override
+  String get tooltipMore => 'Plus...';
+
+  @override
+  String get tooltipUndo => 'Annuler';
+
+  @override
+  String get tooltipLanguage => 'Langue';
 }

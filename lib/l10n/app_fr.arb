@@ -28,5 +28,9 @@
     "labelWidgetWantedrules": "Règles désirées",
     "labelWidgetBannedrules": "Règles refusées",
     "msgCountMatchingPuzzles": "Nombre de puzzles correspondant",
-    "btnCopyClipboard": "Copier dans le presse papier"
+    "btnCopyClipboard": "Copier dans le presse papier",
+    "tooltipPause": "Pause...",
+    "tooltipMore": "Plus...",
+    "tooltipLanguage": "Langue",
+    "tooltipUndo": "Annuler"
 }

@@ -96,4 +96,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get btnCopyClipboard => 'Copy to clipboard';
+
+  @override
+  String get tooltipPause => 'Pause...';
+
+  @override
+  String get tooltipMore => 'More...';
+
+  @override
+  String get tooltipUndo => 'Undo';
+
+  @override
+  String get tooltipLanguage => 'Language...';
 }

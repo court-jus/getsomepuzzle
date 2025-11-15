@@ -96,4 +96,16 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get btnCopyClipboard => 'Copiar al portapapeles';
+
+  @override
+  String get tooltipPause => 'Pausa...';
+
+  @override
+  String get tooltipMore => 'Más...';
+
+  @override
+  String get tooltipUndo => 'Deshacer';
+
+  @override
+  String get tooltipLanguage => 'Idioma';
 }

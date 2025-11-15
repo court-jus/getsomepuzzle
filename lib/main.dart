@@ -6,8 +6,10 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
 
 import 'package:logging/logging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
@@ -83,6 +85,8 @@ class _MyHomePageState extends State<MyHomePage> {
   int dbSize = 0;
   bool paused = false;
   bool betweenPuzzles = false;
+  bool initialized = false;
+  bool shouldChooseLocale = true;
   final log = Logger("HomePage");
 
   @override
@@ -92,7 +96,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (!kIsWeb && Platform.isAndroid) {
       WakelockPlus.enable();
     }
-    initializeDatabase();
+    initialize();
     Timer.periodic(Duration(seconds: 1), (tmr) {
       if (database == null) return;
       if (currentPuzzle == null) return;
@@ -107,6 +111,14 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  Future<void> initialize() async {
+    var futures = <Future>[];
+    futures.add(initializeDatabase());
+    futures.add(initializeLocale());
+    await Future.wait(futures);
+    initialized = true;
+  }
+
   Future<void> initializeDatabase() async {
     final db = Database();
     await db.loadPuzzlesFile();
@@ -116,11 +128,27 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void toggleLocale(Set<String> newLocale) {
+  Future<void> initializeLocale() async {
+    final prefs = await SharedPreferences.getInstance();
+    final prefLocale = prefs.getString("locale");
+    if (prefLocale != null && prefLocale != "") {
+      shouldChooseLocale = false;
+      toggleLocale(prefLocale);
+    }
+  }
+
+  Future<void> saveChosenLocale(String newLocale) async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString("locale", newLocale);
+  }
+
+  void toggleLocale(String newLocale) {
     setState(() {
-      locale = newLocale.first;
+      shouldChooseLocale = false;
+      locale = newLocale;
       widget.setAppLocale(locale);
     });
+    saveChosenLocale(newLocale);
   }
 
   void loadPuzzle() async {
@@ -146,7 +174,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle = currentMeta!.begin();
       paused = false;
       betweenPuzzles = false;
-      topMessage = "Version 1.3.0";
+      topMessage = "Version 1.3.1";
     });
   }
 
@@ -281,25 +309,25 @@ class _MyHomePageState extends State<MyHomePage> {
                       }
                     },
                     icon: const Icon(Icons.language),
-                    tooltip: 'Language',
+                    tooltip: AppLocalizations.of(context)!.tooltipLanguage,
                   );
                 },
             menuChildren: [
               MenuItemButton(
                 onPressed: () {
-                  toggleLocale({"en"});
+                  toggleLocale("en");
                 },
                 child: Text("English"),
               ),
               MenuItemButton(
                 onPressed: () {
-                  toggleLocale({"es"});
+                  toggleLocale("es");
                 },
                 child: Text("Español"),
               ),
               MenuItemButton(
                 onPressed: () {
-                  toggleLocale({"fr"});
+                  toggleLocale("fr");
                 },
                 child: Text("Français"),
               ),
@@ -307,7 +335,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           IconButton(
             icon: Icon(Icons.undo_outlined),
-            tooltip: "Undo",
+            tooltip: AppLocalizations.of(context)!.tooltipUndo,
             onPressed: undo,
           ),
           if (database != null)
@@ -333,7 +361,7 @@ class _MyHomePageState extends State<MyHomePage> {
             spacing: 2,
             children: <Widget>[
               Text(topMessage),
-              Stack(
+              (initialized && !shouldChooseLocale) ? Stack(
                 alignment: AlignmentGeometry.center,
                 children: [
                   if (betweenPuzzles)
@@ -428,16 +456,18 @@ class _MyHomePageState extends State<MyHomePage> {
                       ],
                     ),
                 ],
-              ),
+              ) : (shouldChooseLocale ? Initiallocalechooser(
+                selectLocale: toggleLocale,
+              ) : Text("Loading...")),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: BottomAppBar(
+      bottomNavigationBar: (initialized && !shouldChooseLocale) ? BottomAppBar(
         height: 40,
         color: Colors.amber,
         child: Center(child: Text(bottomMessage)),
-      ),
+      ) : null,
     );
   }
 }

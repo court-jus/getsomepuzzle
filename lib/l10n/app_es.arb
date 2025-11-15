@@ -28,5 +28,9 @@
     "labelWidgetWantedrules": "Reglas deseadas",
     "labelWidgetBannedrules": "Reglas prohibidas",
     "msgCountMatchingPuzzles": "Puzzles que coinciden con filtros",
-    "btnCopyClipboard": "Copiar al portapapeles"
+    "btnCopyClipboard": "Copiar al portapapeles",
+    "tooltipPause": "Pausa...",
+    "tooltipMore": "Más...",
+    "tooltipLanguage": "Idioma",
+    "tooltipUndo": "Deshacer"
 }

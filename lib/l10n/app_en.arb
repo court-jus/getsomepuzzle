@@ -115,5 +115,21 @@
     "btnCopyClipboard": "Copy to clipboard",
     "@btnCopyClipboard": {
         "description": "Label on the button that allows to copy the text to the clipboard."
+    },
+    "tooltipPause": "Pause...",
+    "@tooltipPause": {
+        "description": "Tooltip displayed while the mouse is over the pause menu"
+    },
+    "tooltipMore": "More...",
+    "@tooltipMore": {
+        "description": "Tooltip displayed while the mouse is over the extra menu"
+    },
+    "tooltipUndo": "Undo",
+    "@tooltipUndo": {
+        "description": "Tooltip displayed while the mouse is over the undo button"
+    },
+    "tooltipLanguage": "Language...",
+    "@tooltipLanguage": {
+        "description": "Tooltip displayed while the mouse is over the language choosing menu"
     }
 }

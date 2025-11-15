@@ -41,7 +41,7 @@ class _MenuAnchorMoreState extends State<MenuAnchorMore> {
                 }
               },
               icon: const Icon(Icons.more_horiz),
-              tooltip: 'More...',
+              tooltip: AppLocalizations.of(context)!.tooltipMore,
             );
           },
       menuChildren: [

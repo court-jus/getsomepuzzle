@@ -273,6 +273,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy to clipboard'**
   String get btnCopyClipboard;
+
+  /// Tooltip displayed while the mouse is over the pause menu
+  ///
+  /// In en, this message translates to:
+  /// **'Pause...'**
+  String get tooltipPause;
+
+  /// Tooltip displayed while the mouse is over the extra menu
+  ///
+  /// In en, this message translates to:
+  /// **'More...'**
+  String get tooltipMore;
+
+  /// Tooltip displayed while the mouse is over the undo button
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get tooltipUndo;
+
+  /// Tooltip displayed while the mouse is over the language choosing menu
+  ///
+  /// In en, this message translates to:
+  /// **'Language...'**
+  String get tooltipLanguage;
 }
 
 class _AppLocalizationsDelegate
