@@ -6,18 +6,21 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
+import 'package:getsomepuzzle/widgets/open_page.dart';
+import 'package:getsomepuzzle/widgets/stats_page.dart';
 
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
-import 'package:getsomepuzzle/widgets/more_menu.dart';
-import 'package:getsomepuzzle/widgets/pause_menu.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'getsomepuzzle/puzzle.dart';
 import 'l10n/app_localizations.dart';
+
+const versionText = "Version 1.3.3";
 
 void main() {
   Logger.root.level = Level.ALL; // defaults to Level.INFO
@@ -54,16 +57,17 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: MyHomePage(
-        title: 'Get Some Puzzle',
-        setAppLocale: setAppLocale,
-      ),
+      home: MyHomePage(title: 'Get Some Puzzle', setAppLocale: setAppLocale),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title, required this.setAppLocale});
+  const MyHomePage({
+    super.key,
+    required this.title,
+    required this.setAppLocale,
+  });
 
   final String title;
   final Function setAppLocale;
@@ -75,7 +79,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
   String locale = "en";
-  String topMessage = "Version 1.3.0";
+  String topMessage = versionText;
   String bottomMessage = "";
   PuzzleData? currentMeta;
   Puzzle? currentPuzzle;
@@ -174,7 +178,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle = currentMeta!.begin();
       paused = false;
       betweenPuzzles = false;
-      topMessage = "Version 1.3.1";
+      topMessage = versionText;
     });
   }
 
@@ -293,66 +297,107 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         actions: [
-          MenuAnchor(
-            builder:
-                (
-                  BuildContext context,
-                  MenuController controller,
-                  Widget? child,
-                ) {
-                  return IconButton(
-                    onPressed: () {
-                      if (controller.isOpen) {
-                        controller.close();
-                      } else {
-                        controller.open();
-                      }
-                    },
-                    icon: const Icon(Icons.language),
-                    tooltip: AppLocalizations.of(context)!.tooltipLanguage,
-                  );
-                },
-            menuChildren: [
-              MenuItemButton(
-                onPressed: () {
-                  toggleLocale("en");
-                },
-                child: Text("English"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  toggleLocale("es");
-                },
-                child: Text("Español"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  toggleLocale("fr");
-                },
-                child: Text("Français"),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: Icon(Icons.undo_outlined),
-            tooltip: AppLocalizations.of(context)!.tooltipUndo,
-            onPressed: undo,
-          ),
-          if (database != null)
-            MenuAnchorPause(
-              database: database!,
-              togglePause: togglePause,
-              newPuzzle: loadPuzzle,
-              selectPuzzle: openPuzzle,
-              restartPuzzle: restartPuzzle,
+          if (currentPuzzle != null && !shouldChooseLocale)
+            IconButton(
+              icon: Icon(Icons.undo_outlined),
+              tooltip: AppLocalizations.of(context)!.tooltipUndo,
+              onPressed: undo,
             ),
-          if (database != null)
-            MenuAnchorMore(
-              database: database!,
-              togglePause: togglePause,
-              locale: locale,
+          if (currentPuzzle != null && !shouldChooseLocale)
+            IconButton(
+              icon: Icon(Icons.restart_alt_outlined),
+              tooltip: AppLocalizations.of(context)!.restart,
+              onPressed: restartPuzzle,
+            ),
+          if (database != null && !shouldChooseLocale)
+            IconButton(
+              icon: Icon(Icons.pause),
+              tooltip: AppLocalizations.of(context)!.tooltipPause,
+              onPressed: togglePause,
             ),
         ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(color: Colors.blue),
+              child: Column(
+                children: [
+                  Text(widget.title, style: TextStyle(fontSize: 24)),
+                  Text(versionText),
+                  SizedBox(height: 10),
+                  Text('Ghislain "court-jus" Lévêque'),
+                ],
+              ),
+            ),
+            if (database != null)
+              ListTile(
+                leading: Icon(Icons.fiber_new),
+                title: Text(AppLocalizations.of(context)!.newgame),
+                onTap: () {
+                  loadPuzzle();
+                  Navigator.pop(context);
+                },
+              ),
+            if (database != null)
+              ListTile(
+                leading: Icon(Icons.file_open),
+                title: Text(AppLocalizations.of(context)!.open),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (context) => OpenPage(
+                        database: database!,
+                        onPuzzleSelected: openPuzzle,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            if (database != null)
+              ListTile(
+                leading: Icon(Icons.newspaper),
+                title: Text(AppLocalizations.of(context)!.stats),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (context) => StatsPage(database: database!),
+                    ),
+                  );
+                },
+              ),
+            Divider(),
+            ListTile(
+              leading: Icon(Icons.help),
+              title: Text(AppLocalizations.of(context)!.help),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HelpPage(locale: locale),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.language),
+              title: Text(AppLocalizations.of(context)!.tooltipLanguage),
+              onTap: () {
+                setState(() {
+                  shouldChooseLocale = true;
+                  Navigator.pop(context);
+                });
+              },
+            ),
+          ],
+        ),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -361,113 +406,131 @@ class _MyHomePageState extends State<MyHomePage> {
             spacing: 2,
             children: <Widget>[
               Text(topMessage),
-              (initialized && !shouldChooseLocale) ? Stack(
-                alignment: AlignmentGeometry.center,
-                children: [
-                  if (betweenPuzzles)
-                    Column(
-                      spacing: 16,
+              (initialized && !shouldChooseLocale)
+                  ? Stack(
+                      alignment: AlignmentGeometry.center,
                       children: [
-                        Text(AppLocalizations.of(context)!.msgPuzzleSolved, style: TextStyle(fontSize: 48)),
-                        Text(
-                          AppLocalizations.of(context)!.questionFunToPlay,
-                          style: TextStyle(fontSize: 24),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          spacing: 16,
-                          children: [
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.greenAccent,
-                                minimumSize: Size(cellSize, cellSize),
-                                maximumSize: Size(cellSize * 2, cellSize * 2),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadiusGeometry.circular(
-                                    16,
+                        if (betweenPuzzles)
+                          Column(
+                            spacing: 16,
+                            children: [
+                              Text(
+                                AppLocalizations.of(context)!.msgPuzzleSolved,
+                                style: TextStyle(fontSize: 48),
+                              ),
+                              Text(
+                                AppLocalizations.of(context)!.questionFunToPlay,
+                                style: TextStyle(fontSize: 24),
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                spacing: 16,
+                                children: [
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.greenAccent,
+                                      minimumSize: Size(cellSize, cellSize),
+                                      maximumSize: Size(
+                                        cellSize * 2,
+                                        cellSize * 2,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadiusGeometry.circular(16),
+                                      ),
+                                    ),
+                                    onPressed: () => like(true),
+                                    child: const Icon(Icons.thumb_up, size: 96),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.redAccent[100],
+                                      minimumSize: Size(cellSize, cellSize),
+                                      maximumSize: Size(
+                                        cellSize * 2,
+                                        cellSize * 2,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadiusGeometry.circular(16),
+                                      ),
+                                    ),
+                                    onPressed: () => like(false),
+                                    child: const Icon(
+                                      Icons.thumb_down,
+                                      size: 96,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.lightBlueAccent[100],
+                                  minimumSize: Size(cellSize * 2, cellSize),
+                                  maximumSize: Size(cellSize * 2, cellSize * 2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadiusGeometry.circular(
+                                      16,
+                                    ),
                                   ),
                                 ),
+                                onPressed: loadPuzzle,
+                                child: Icon(Icons.skip_next, size: 96),
                               ),
-                              onPressed: () => like(true),
-                              child: const Icon(Icons.thumb_up, size: 96),
-                            ),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.redAccent[100],
-                                minimumSize: Size(cellSize, cellSize),
-                                maximumSize: Size(cellSize * 2, cellSize * 2),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadiusGeometry.circular(
-                                    16,
-                                  ),
+                            ],
+                          )
+                        else if (paused)
+                          TextButton(
+                            onPressed: resume,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.teal,
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: SizedBox(
+                                width: contextWidth,
+                                height: contextHeight,
+                                child: Center(
+                                  child: Icon(Icons.pause, size: cellSize * 3),
                                 ),
                               ),
-                              onPressed: () => like(false),
-                              child: const Icon(Icons.thumb_down, size: 96),
                             ),
-                          ],
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.lightBlueAccent[100],
-                            minimumSize: Size(cellSize * 2, cellSize),
-                            maximumSize: Size(cellSize * 2, cellSize * 2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadiusGeometry.circular(16),
-                            ),
-                          ),
-                          onPressed: loadPuzzle,
-                          child: Icon(Icons.skip_next, size: 96),
-                        ),
-                      ],
-                    )
-                  else if (paused)
-                    TextButton(
-                      onPressed: resume,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.teal,
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: SizedBox(
-                          width: contextWidth,
-                          height: contextHeight,
-                          child: Center(
-                            child: Icon(Icons.pause, size: cellSize * 3),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (currentPuzzle != null)
-                          PuzzleWidget(
-                            currentPuzzle: currentPuzzle!,
-                            onCellTap: handlePuzzleTap,
-                            cellSize: cellSize,
-                            locale: locale,
                           )
                         else
-                          Text(AppLocalizations.of(context)!.infoNoPuzzle),
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              if (currentPuzzle != null)
+                                PuzzleWidget(
+                                  currentPuzzle: currentPuzzle!,
+                                  onCellTap: handlePuzzleTap,
+                                  cellSize: cellSize,
+                                  locale: locale,
+                                )
+                              else
+                                Text(
+                                  AppLocalizations.of(context)!.infoNoPuzzle,
+                                ),
+                            ],
+                          ),
                       ],
-                    ),
-                ],
-              ) : (shouldChooseLocale ? Initiallocalechooser(
-                selectLocale: toggleLocale,
-              ) : Text("Loading...")),
+                    )
+                  : (shouldChooseLocale
+                        ? Initiallocalechooser(selectLocale: toggleLocale)
+                        : Text("Loading...")),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: (initialized && !shouldChooseLocale) ? BottomAppBar(
-        height: 40,
-        color: Colors.amber,
-        child: Center(child: Text(bottomMessage)),
-      ) : null,
+      bottomNavigationBar: (initialized && !shouldChooseLocale)
+          ? BottomAppBar(
+              height: 40,
+              color: Colors.amber,
+              child: Center(child: Text(bottomMessage)),
+            )
+          : null,
     );
   }
 }
