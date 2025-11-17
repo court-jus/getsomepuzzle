@@ -1,0 +1,38 @@
+notes
+
+expliquer la logique de "mise en place" du jeu
+
+expliquer que bleu c'est vierge ou alors grisé ou un motif quadrillage pour montrer que c'est vide
+
+marquer mieux les cases verrouillées (le curseur de la souris pourrais devenir un cadenas)
+
+déplacer le bouton restart dans la barre et changer le texte du tuto qui en parle
+
+pouvoir valider manuellement
+
+voir trouver un autre terme que parité
+
+pour parité, expliquer que la flêche elle même ne compte pas
+
+pas clair la symétrie, on peut pense que c'est noir VS blanc
+
+virer le gros bouton "pause" quand on redémarre
+
+une seule barre plutôt qu'un "=" pour la symétrie
+
+pas le bon texte sur symétrie centrale
+
+rappeler lors de la symétrie en diagonale que c'est le groupe qui compte et qu'on sort pas la grille
+
+"Dans le jeu, les contraintes seront mélangées"
+
+"faire discuter A avec A et B avec B"
+
+"Dans le menu ... se trouve un menu"
+
+dans les textes de tuto: séparer les consignes et les "trucs d'interface"
+
+durant le tuto, mettre immédiatement en rouge les erreurs et les expliquer
+
+Un petit message à la fin pour dire bravo pour le tuto
+
