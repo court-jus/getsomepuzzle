@@ -79,7 +79,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
   String locale = "en";
-  String topMessage = versionText;
+  String topMessage = "";
   String bottomMessage = "";
   PuzzleData? currentMeta;
   Puzzle? currentPuzzle;
@@ -178,7 +178,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle = currentMeta!.begin();
       paused = false;
       betweenPuzzles = false;
-      topMessage = versionText;
+      topMessage = "";
     });
   }
 
@@ -187,6 +187,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       topMessage = "";
       history = [];
+      betweenPuzzles = false;
       currentPuzzle!.restart();
       currentPuzzle!.clearConstraintsValidity();
     });
@@ -195,6 +196,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void undo() {
     if (currentPuzzle == null || history.isEmpty) return;
     setState(() {
+      betweenPuzzles = false;
       currentPuzzle!.resetCell(history.removeLast());
       currentPuzzle!.clearConstraintsValidity();
       topMessage = "";
