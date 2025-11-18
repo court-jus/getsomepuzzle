@@ -131,5 +131,33 @@
     "tooltipLanguage": "Language...",
     "@tooltipLanguage": {
         "description": "Tooltip displayed while the mouse is over the language choosing menu"
+    },
+    "closeMenu": "Close",
+    "@closeMenu": {
+        "description": "Menu item that allows to close the menu"
+    },
+    "settings": "Settings",
+    "@settings": {
+        "description": "Menu item that allows to change application settings"
+    },
+    "manuallyValidatePuzzle": "Validate",
+    "@manuallyValidatePuzzle": {
+        "description": "Verb describing the action of validating the solution of a puzzzle"
+    },
+    "settingValidateType": "Validation",
+    "@settingValidateType": {
+        "description": "How does the player want the puzzles to be validated?"
+    },
+    "settingValidateTypeManual": "Manual",
+    "@settingValidateTypeManual": {
+        "description": "The player wants to manually validate each puzzle"
+    },
+    "settingValidateTypeDefault": "Default",
+    "@settingValidateTypeDefault": {
+        "description": "The default validation mode"
+    },
+    "settingValidateTypeAutomatic": "Automatic",
+    "@settingValidateTypeAutomatic": {
+        "description": "The player wants to move on to the next puzzle automatically"
     }
 }

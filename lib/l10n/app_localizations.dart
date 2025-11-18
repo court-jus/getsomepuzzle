@@ -297,6 +297,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Language...'**
   String get tooltipLanguage;
+
+  /// Menu item that allows to close the menu
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeMenu;
+
+  /// Menu item that allows to change application settings
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settings;
+
+  /// Verb describing the action of validating the solution of a puzzzle
+  ///
+  /// In en, this message translates to:
+  /// **'Validate'**
+  String get manuallyValidatePuzzle;
+
+  /// How does the player want the puzzles to be validated?
+  ///
+  /// In en, this message translates to:
+  /// **'Validation'**
+  String get settingValidateType;
+
+  /// The player wants to manually validate each puzzle
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get settingValidateTypeManual;
+
+  /// The default validation mode
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get settingValidateTypeDefault;
+
+  /// The player wants to move on to the next puzzle automatically
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get settingValidateTypeAutomatic;
 }
 
 class _AppLocalizationsDelegate

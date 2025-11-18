@@ -32,5 +32,12 @@
     "tooltipPause": "Pausa...",
     "tooltipMore": "Más...",
     "tooltipLanguage": "Idioma",
-    "tooltipUndo": "Deshacer"
+    "tooltipUndo": "Deshacer",
+    "closeMenu": "Cerrar",
+    "settings": "Ajustes",
+    "manuallyValidatePuzzle": "Validar",
+    "settingValidateType": "Tipo de validación",
+    "settingValidateTypeManual": "A mano",
+    "settingValidateTypeDefault": "Predeterminado",
+    "settingValidateTypeAutomatic": "Automático"
 }

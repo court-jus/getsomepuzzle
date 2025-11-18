@@ -32,5 +32,12 @@
     "tooltipPause": "Pause...",
     "tooltipMore": "Plus...",
     "tooltipLanguage": "Langue",
-    "tooltipUndo": "Annuler"
+    "tooltipUndo": "Annuler",
+    "closeMenu": "Fermer",
+    "settings": "Paramètres",
+    "manuallyValidatePuzzle": "Valider",
+    "settingValidateType": "Type de validation",
+    "settingValidateTypeManual": "Manuel",
+    "settingValidateTypeDefault": "Par défaut",
+    "settingValidateTypeAutomatic": "Automatique"
 }

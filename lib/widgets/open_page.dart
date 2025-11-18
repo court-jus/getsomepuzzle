@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:unicons/unicons.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/plusminus.dart';
@@ -23,11 +24,13 @@ class OpenPage extends StatefulWidget {
 class _OpenPageState extends State<OpenPage> {
   int matchingCount = 0;
   Set<String> collection = {"puzzles"};
-  static const List<(String, String)> collections = [
-    ("tutorial", "Tutorial"),
-    ("puzzles", "A"),
-    ("new_puzzles", "B"),
-    ("high_ratio", "C"),
+  static const List<(String, Widget)> collections = [
+    ("tutorial", Text("Tutorial")),
+    ("easy", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("1"), Icon(UniconsLine.temperature_quarter)])),
+    ("medium", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("2"), Icon(UniconsLine.temperature_half)])),
+    ("hard", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("3"), Icon(UniconsLine.temperature_three_quarter)])),
+    ("harder", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("4"), Icon(UniconsLine.temperature)])),
+    ("evil", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("5"), Icon(UniconsLine.temperature_plus)])),
   ];
 
   static const List<(String, String)> existingRules = [
@@ -179,7 +182,7 @@ class _OpenPageState extends State<OpenPage> {
                               .map(
                                 (slug) => ButtonSegment(
                                   value: slug.$1,
-                                  label: Text(slug.$2),
+                                  label: slug.$2,
                                 ),
                               )
                               .toList(),

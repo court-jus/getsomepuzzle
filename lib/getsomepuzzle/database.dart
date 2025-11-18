@@ -258,7 +258,12 @@ class Database {
       collection = fileToLoad;
       prefs.setString("collectionToLoad", collection);
     }
-    final assetContent = await rootBundle.loadString('assets/$collection.txt');
+    String assetContent;
+    try {
+      assetContent = await rootBundle.loadString('assets/$collection.txt');
+    } catch(_) {
+      assetContent = await rootBundle.loadString('assets/tutorial.txt');
+    }
     load(assetContent.split("\n"));
     await currentFilters.load();
     final List<String> stats = [];
@@ -314,6 +319,7 @@ class Database {
     shouldShuffle = newValue;
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool("shouldShuffleCollection", newValue);
+    preparePlaylist();
   }
 
   void preparePlaylist() {

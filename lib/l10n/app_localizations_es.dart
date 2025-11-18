@@ -108,4 +108,25 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get tooltipLanguage => 'Idioma';
+
+  @override
+  String get closeMenu => 'Cerrar';
+
+  @override
+  String get settings => 'Ajustes';
+
+  @override
+  String get manuallyValidatePuzzle => 'Validar';
+
+  @override
+  String get settingValidateType => 'Tipo de validación';
+
+  @override
+  String get settingValidateTypeManual => 'A mano';
+
+  @override
+  String get settingValidateTypeDefault => 'Predeterminado';
+
+  @override
+  String get settingValidateTypeAutomatic => 'Automático';
 }
