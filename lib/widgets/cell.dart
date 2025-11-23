@@ -12,6 +12,7 @@ class CellWidget extends StatelessWidget {
     super.key,
     required this.value,
     required this.readonly,
+    required this.isHighlighted,
     required this.cellSize,
     required this.onTap,
     required this.onSecondaryTap,
@@ -21,6 +22,7 @@ class CellWidget extends StatelessWidget {
   // Attributes
   final int value;
   final bool readonly;
+  final bool isHighlighted;
   final List<Constraint>? constraints;
   final VoidCallback onTap;
   final VoidCallback onSecondaryTap;
@@ -41,7 +43,7 @@ class CellWidget extends StatelessWidget {
             children: [
               for (final constraint in constraints!)
                 constraint.toWidget(
-                  fgColors[value] ?? Colors.black,
+                  constraint.isHighlighted ? Colors.deepPurple : (fgColors[value] ?? Colors.black),
                   cellSize,
                   count: widgetScale,
         )
@@ -54,8 +56,8 @@ class CellWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           border: BoxBorder.all(
-            width: readonly ? 4 : 1,
-            color: Colors.blueAccent,
+            width: (readonly || isHighlighted) ? 8 : 1,
+            color: isHighlighted ? Colors.deepPurple : Colors.blueAccent,
           ),
         ),
         child: SizedBox(

@@ -58,7 +58,8 @@ class Puzzle {
     cells = attributesStr[2]
         .split("")
         .map((e) => int.parse(e))
-        .map((e) => Cell(e, domain, e > 0))
+        .indexed
+        .map((e) => Cell(e.$2, e.$1, domain, e.$2 > 0))
         .toList();
     final strConstraints = attributesStr[3].split(";");
     for (var strConstraint in strConstraints) {
@@ -188,7 +189,13 @@ class Puzzle {
     return result;
   }
 
-  int setValue(int idx, int value) {
+  List<int> getNeighborsSameValueOrEmpty(int idx, int myValue) {
+    final List<int> result = [idx];
+    result.addAll(getNeighbors(idx).where((e) => cellValues[e] == myValue || cellValues[e] == 0));
+    return result;
+  }
+
+  bool setValue(int idx, int value) {
     final cell = cells[idx];
     return cell.setValue(value);
   }
@@ -198,23 +205,81 @@ class Puzzle {
     cell.reset();
   }
 
-  int incrValue(int idx) {
+  void incrValue(int idx) {
     final currentValue = cellValues[idx];
-    return setValue(idx, (currentValue + 1) % (domain.length + 1));
+    setValue(idx, (currentValue + 1) % (domain.length + 1));
   }
 
   bool get complete {
     return !cellValues.any((val) => val == 0);
   }
 
-  List<Constraint> check() {
+  List<Constraint> check({ bool saveResult = true }) {
     final List<Constraint> result = [];
     for (var constraint in constraints) {
-      if (!constraint.check(this)) {
+      if (!constraint.check(this, saveResult: saveResult)) {
         result.add(constraint);
       }
     }
     return result;
+  }
+
+  Move? apply() {
+    for (var c in constraints) {
+      final move = c.apply(this);
+      if (move != null) return move;
+    }
+    return null;
+  }
+
+  Move? applyAll() {
+    bool finished = false;
+    while (!finished) {
+      final move = apply();
+      if (move == null) return null;
+      if (move.isImpossible != null) {
+        finished = true;
+        return Move(0, 0, move.givenBy, isImpossible: move.isImpossible);
+      }
+      setValue(move.idx, move.value);
+      if (complete) {
+        finished = true;
+        return Move(0, 0, move.givenBy, isImpossible: check(saveResult: false).isNotEmpty ? move.givenBy : null);
+      }
+    }
+    return null;
+  }
+
+  Move? findAMove() {
+    // First try by directly applying the constraint
+    final easyMove = apply();
+    if (easyMove != null) return easyMove;
+    // Nothing was found, we will now try on a cloned puzzle
+    // to randomly set a cell's value and see if that leads to
+    // an impossible to solve puzzle. It would mean that this
+    // value is forbidden.
+    final clone = Puzzle(lineRepresentation);
+    clone.constraints = constraints;
+    for (var cell in cellValues.indexed) {
+      clone.setValue(cell.$1, cell.$2);
+    }
+    for (var freeCell in clone.cells.indexed.where((entry) => entry.$2.value == 0)) {
+      for (var value in clone.domain) {
+        clone.setValue(freeCell.$1, value);
+        Move? result = clone.applyAll();
+        if (result != null && result.isImpossible != null) {
+          final opposite = clone.domain.whereNot((v) => v == value).first;
+          return Move(freeCell.$1, opposite, result.givenBy);
+        } else if (result != null && result.isImpossible == null) {
+          return Move(freeCell.$1, value, result.givenBy);
+        } else {
+          for (var cell in cellValues.indexed) {
+            clone.setValue(cell.$1, cell.$2);
+          }
+        }
+      }
+    }
+    return null;
   }
 
   void clearConstraintsValidity() {
@@ -222,4 +287,79 @@ class Puzzle {
       constraint.isValid = true;
     }
   }
+
+  void clearHighlights() {
+    for (var constraint in constraints) {
+      constraint.isHighlighted = false;
+    }
+    for (var cell in cells) {
+      cell.isHighlighted = false;
+    }
+  }
+
+  List<List<int>> toVirtualGroups() {
+    final idxToExplore = cellValues.indexed.toList();
+    final Map<int, List<int>> explored = {};
+    final Map<int, Map<int, List<int>>> groupsPerValuePerCell = {};
+    while(idxToExplore.isNotEmpty) {
+      final exploring = idxToExplore.removeAt(0);
+      final exploreIdx = exploring.$1;
+      final value = exploring.$2;
+      final others = explored[value] ?? [];
+      if (others.contains(exploreIdx)) {
+        continue;
+      }
+      others.add(exploreIdx);
+      explored[value] = others;
+      final sameOrEmpty = getNeighborsSameValueOrEmpty(exploreIdx, value);
+      if (groupsPerValuePerCell[value] == null) {
+        groupsPerValuePerCell[value] = {};
+      }
+      if (groupsPerValuePerCell[value]![exploreIdx] == null) {
+        groupsPerValuePerCell[value]![exploreIdx] = [];
+      }
+      groupsPerValuePerCell[value]![exploreIdx]!.addAll(sameOrEmpty);
+      for (var neighbor in sameOrEmpty) {
+        if (neighbor != exploreIdx) {
+          idxToExplore.add((neighbor, value));
+        }
+      }
+    } // while
+    final Map<int, List<Set<int>>> setsPerValue = {};
+    for (var valueEntry in groupsPerValuePerCell.entries) {
+      final value = valueEntry.key;
+      final valueData = valueEntry.value;
+      for (var dataEntry in valueData.entries) {
+        final idx = dataEntry.key;
+        final newGroup = dataEntry.value.toSet();
+        if (setsPerValue[value] == null) {
+          setsPerValue[value] = [];
+        }
+        for (var existing in findAndPop(setsPerValue[value]!, idx)) {
+          newGroup.addAll(existing);
+        }
+        setsPerValue[value]!.add(newGroup);
+      }
+    }
+    return setsPerValue.values.flattenedToList.map((grp) => grp.toList()).toList();
+  }
+}
+
+List<Set<int>> findAndPop(List<Set<int>> setlist, int value) {
+    /*
+    Pops the sets in setlist that contains value.
+    */
+    final Set<int> indices = {};
+    for (var setEntry in setlist.indexed) {
+      final idx = setEntry.$1;
+      final candidate = setEntry.$2;
+      if (candidate.contains(value)) {
+        indices.add(idx);
+      }
+    }
+    final List<Set<int>> result = [];
+    for (var idx in indices.sorted((a, b) => a - b).reversed) {
+      result.add(setlist.removeAt(idx));
+    }
+    return result;
 }

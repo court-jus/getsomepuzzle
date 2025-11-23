@@ -6,6 +6,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/settings.dart';
@@ -21,7 +22,7 @@ import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.3.4";
+const versionText = "Version 1.3.5";
 
 void main() {
   Logger.root.level = Level.ALL; // defaults to Level.INFO
@@ -92,6 +93,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool betweenPuzzles = false;
   bool initialized = false;
   bool shouldChooseLocale = true;
+  Move? helpMove;
   final log = Logger("HomePage");
 
   @override
@@ -181,6 +183,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle = currentMeta!.begin();
       paused = false;
       betweenPuzzles = false;
+      helpMe();
     });
   }
 
@@ -191,7 +194,9 @@ class _MyHomePageState extends State<MyHomePage> {
       history = [];
       currentPuzzle!.restart();
       currentPuzzle!.clearConstraintsValidity();
+      currentPuzzle!.clearHighlights();
       betweenPuzzles = false;
+      helpMe();
     });
   }
 
@@ -200,9 +205,27 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       currentPuzzle!.resetCell(history.removeLast());
       currentPuzzle!.clearConstraintsValidity();
+      currentPuzzle!.clearHighlights();
       topMessage = "";
       betweenPuzzles = false;
+      helpMe();
     });
+  }
+
+  Future<void> helpMe() async {
+    if (currentPuzzle == null) return;
+    helpMove = currentPuzzle!.findAMove();
+  }
+
+  void showHelpMove() {
+    if (helpMove == null) return;
+    currentPuzzle!.clearHighlights();
+    if (helpMove!.isImpossible != null) {
+      helpMove!.isImpossible!.isValid = false;
+    } else {
+      helpMove!.givenBy.isHighlighted = true;
+      currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
+    }
   }
 
   void handlePuzzleTap(int idx) {
@@ -210,6 +233,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (currentPuzzle!.cells[idx].readonly) {
       return;
     }
+    currentPuzzle!.clearHighlights();
     setState(() {
       currentPuzzle!.incrValue(idx);
       if (history.isEmpty || history.last != idx) history.add(idx);
@@ -218,6 +242,8 @@ class _MyHomePageState extends State<MyHomePage> {
         Future.delayed(Duration(seconds: 1), autoCheck);
       } else {
         currentPuzzle!.clearConstraintsValidity();
+        helpMove = null;
+        helpMe();
       }
     });
   }
@@ -330,13 +356,19 @@ class _MyHomePageState extends State<MyHomePage> {
                   ).colorScheme.secondaryFixedDim,
                   // tooltip: AppLocalizations.of(context)!.manuallyValidatePuzzle,
                 ),
-                onPressed: currentPuzzle!.complete ? checkPuzzle : null,
+                onPressed: (currentPuzzle!.complete && !betweenPuzzles) ? checkPuzzle : null,
                 icon: const Icon(Icons.check),
                 label: Text(
                   AppLocalizations.of(context)!.manuallyValidatePuzzle,
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
+            ),
+          if (currentPuzzle != null && !shouldChooseLocale)
+            IconButton(
+              icon: Icon(Icons.lightbulb),
+              tooltip: AppLocalizations.of(context)!.tooltipUndo,
+              onPressed: helpMove == null ? null : showHelpMove,
             ),
           if (currentPuzzle != null && !shouldChooseLocale)
             IconButton(

@@ -75,7 +75,8 @@ class PuzzleWidget extends StatelessWidget {
                   bgColor: constraint is ForbiddenMotif
                       ? forbiddenColor
                       : mandatoryColor,
-                  borderColor: constraint.isValid ? Colors.green : Colors.red,
+                  borderColor: constraint.isHighlighted ? Colors.deepPurple : (constraint.isValid ? Colors.green : Colors.red),
+                  isHighlighted: constraint.isHighlighted,
                   cellSize: topBarConstraintsSize,
                 )
               else if (constraint is QuantityConstraint)
@@ -83,7 +84,7 @@ class PuzzleWidget extends StatelessWidget {
                   value: constraint.value,
                   count: constraint.count,
                   bgColor: mandatoryColor,
-                  borderColor: constraint.isValid ? Colors.green : Colors.red,
+                  borderColor: constraint.isHighlighted ? Colors.deepPurple : (constraint.isValid ? Colors.green : Colors.red),
                   cellSize: topBarConstraintsSize,
                 )
               else if (constraint is HelpText)
@@ -108,6 +109,7 @@ class PuzzleWidget extends StatelessWidget {
                     CellWidget(
                       value: cell.value,
                       readonly: cell.readonly,
+                      isHighlighted: cell.isHighlighted,
                       constraints:
                           currentPuzzle.cellConstraints[rowidx *
                                   currentPuzzle.width +

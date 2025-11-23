@@ -68,7 +68,11 @@ class LetterGroup(CellCentricConstraint):
 
         my_colors = [puzzle.state[idx].value for idx in indices if puzzle.state[idx].value != EMPTY]
         my_color = my_colors[0] if my_colors else EMPTY
-        other_letters = [idx for c in puzzle.constraints if isinstance(c, LetterGroup) and c.parameters["letter"] != letter for idx in c.parameters["indices"]]
+        other_letters = [idx
+            for c in puzzle.constraints
+            if isinstance(c, LetterGroup) and c.parameters["letter"] != letter
+            for idx in c.parameters["indices"]
+            ]
         neighbors_with_letters = [nei for idx in indices for nei in get_neighbors(puzzle.state, puzzle.width, puzzle.height, idx) if nei is not None and nei in other_letters]
         if my_color == EMPTY:
             return changed
@@ -86,7 +90,11 @@ class LetterGroup(CellCentricConstraint):
             changed |= puzzle.state[member].set_value(my_color)
 
         # Now, find if other members of the letter group are disconnected and raise
-        virtual_groups = [s for v in to_virtual_groups(puzzle.state, puzzle.width, puzzle.height, transformer=lambda cell: cell.value) for s in v]
+        virtual_groups = [
+            s
+            for v in to_virtual_groups(puzzle.state, puzzle.width, puzzle.height, transformer=lambda cell: cell.value)
+            for s in v
+        ]
         if not any(
             all(member in group for member in indices)
             for group in virtual_groups

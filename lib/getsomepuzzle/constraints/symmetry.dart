@@ -32,7 +32,7 @@ class SymmetryConstraint extends CellsCentricConstraint {
 
   @override
   Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
-    final fgcolor = isValid ? defaultColor : Colors.redAccent;
+    final fgcolor = isHighlighted ? Colors.deepPurple : (isValid ? defaultColor : Colors.redAccent);
     final double size = cellSize * cellSizeToFontSize / count;
     Widget icon = FaIcon(FontAwesomeIcons.circleDot, color: fgcolor, size: size);
     if (axis == 1) {

@@ -53,7 +53,6 @@ class _PlusMinusFieldState extends State<PlusMinusField> {
           if (minValue == maxValue) minValue -= widget.increment;
         }
       }
-      print("$minOrMax min $minValue max $maxValue");
       if (widget.increment != 1) {
         minValue = (minValue / widget.increment).floor() * widget.increment;
         maxValue = (maxValue / widget.increment).floor() * widget.increment;

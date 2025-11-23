@@ -10,6 +10,7 @@ class MotifWidget extends StatelessWidget {
     required this.motif,
     required this.bgColor,
     required this.borderColor,
+    required this.isHighlighted,
     required this.cellSize,
   });
 
@@ -17,6 +18,7 @@ class MotifWidget extends StatelessWidget {
   final List<List<int>> motif;
   final Color bgColor;
   final Color borderColor;
+  final bool isHighlighted;
   final double cellSize;
 
   // Build UI
@@ -26,7 +28,10 @@ class MotifWidget extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: bgColor,
-        border: BoxBorder.all(color: borderColor, width: 4),
+        border: BoxBorder.all(
+          color: borderColor,
+          width: isHighlighted ? 8 : 4,
+        ),
       ),
       child: SizedBox(
         width: cellSize,
