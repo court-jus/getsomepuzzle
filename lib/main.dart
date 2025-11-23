@@ -10,6 +10,7 @@ import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/settings.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/between_puzzles.dart';
 import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
@@ -190,6 +191,7 @@ class _MyHomePageState extends State<MyHomePage> {
       history = [];
       currentPuzzle!.restart();
       currentPuzzle!.clearConstraintsValidity();
+      betweenPuzzles = false;
     });
   }
 
@@ -199,6 +201,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle!.resetCell(history.removeLast());
       currentPuzzle!.clearConstraintsValidity();
       topMessage = "";
+      betweenPuzzles = false;
     });
   }
 
@@ -278,11 +281,12 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void like(bool liked) {
+  void like(int liked) {
     if (currentMeta == null) return;
-    if (liked) {
+    currentMeta!.pleasure = liked;
+    if (liked > 0) {
       currentMeta!.liked = DateTime.now();
-    } else {
+    } else if (liked < 0) {
       currentMeta!.disliked = DateTime.now();
     }
     loadPuzzle();
@@ -476,68 +480,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       spacing: 16,
                       children: [
                         if (betweenPuzzles)
-                          Column(
-                            spacing: 16,
-                            children: [
-                              Text(
-                                AppLocalizations.of(context)!.msgPuzzleSolved,
-                                style: TextStyle(fontSize: 48),
-                              ),
-                              Text(
-                                AppLocalizations.of(context)!.questionFunToPlay,
-                                style: TextStyle(fontSize: 24),
-                              ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                spacing: 8,
-                                children: [
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.greenAccent,
-                                      minimumSize: Size(96, 96),
-                                      maximumSize: Size(128, 200),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadiusGeometry.circular(16),
-                                      ),
-                                    ),
-                                    onPressed: () => like(true),
-                                    child: const Icon(Icons.thumb_up, size: 48),
-                                  ),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orangeAccent[100],
-                                      minimumSize: Size(96, 96),
-                                      maximumSize: Size(128, 200),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadiusGeometry.circular(16),
-                                      ),
-                                    ),
-                                    onPressed: loadPuzzle,
-                                    child: Icon(Icons.question_mark, size: 48),
-                                  ),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.redAccent[100],
-                                      minimumSize: Size(96, 96),
-                                      maximumSize: Size(128, 200),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadiusGeometry.circular(16),
-                                      ),
-                                    ),
-                                    onPressed: () => like(false),
-                                    child: const Icon(
-                                      Icons.thumb_down,
-                                      size: 48,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          )
+                          BetweenPuzzles(like: like, loadPuzzle: loadPuzzle)
                         else if (paused)
                           TextButton(
                             onPressed: resume,

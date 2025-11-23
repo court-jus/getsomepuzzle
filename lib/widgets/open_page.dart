@@ -168,26 +168,47 @@ class _OpenPageState extends State<OpenPage> {
                   children: [
                     Text(AppLocalizations.of(context)!.infoFilterCollection),
                     Divider(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(AppLocalizations.of(context)!.labelSelectCollection),
-                        SegmentedButton(
-                          multiSelectionEnabled: false,
-                          emptySelectionAllowed: false,
-                          showSelectedIcon: false,
-                          selected: collection,
-                          onSelectionChanged: chooseCollection,
-                          segments: collections
-                              .map(
-                                (slug) => ButtonSegment(
-                                  value: slug.$1,
-                                  label: slug.$2,
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ],
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.sizeOf(context).width
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        spacing: 8,
+                        children: [
+                          Text(AppLocalizations.of(context)!.labelSelectCollection),
+                          Expanded(
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              runAlignment: WrapAlignment.start,
+                              children: 
+                                collections.map((slug) => ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: slug.$1 == "tutorial" ? 120 : 80,
+                                  ),
+                                  child: OutlinedButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Theme.of(context).colorScheme.primary,
+                                      disabledBackgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceDim,
+                                      disabledForegroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.secondaryFixedDim,
+                                      // tooltip: AppLocalizations.of(context)!.manuallyValidatePuzzle,
+                                    ),
+                                    label: slug.$2,
+                                    onPressed: () {
+                                      chooseCollection({slug.$1});
+                                    },
+                                  ),
+                                )).toList()
+                              
+                            ),
+                          )
+                        ],
+                      ),
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,

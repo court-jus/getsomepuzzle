@@ -24,6 +24,7 @@ class PuzzleData {
   DateTime? started;
   DateTime? finished;
   DateTime? skipped;
+  int? pleasure;
   DateTime? liked;
   DateTime? disliked;
 
@@ -60,12 +61,13 @@ class PuzzleData {
     final String finishedForLog = finished == null
         ? "unfinished"
         : formatter.format(finished!);
-    final dates = [
+    final extraFields = [
       skipped != null ? formatter.format(skipped!) : "",
       liked != null ? formatter.format(liked!) : "",
       disliked != null ? formatter.format(disliked!) : "",
+      pleasure != null ? pleasure.toString() : "",
     ].join(" - ");
-    return "$finishedForLog ${duration}s ${failures}f $lineRepresentation - $sld - $dates";
+    return "$finishedForLog ${duration}s ${failures}f $lineRepresentation - $sld - $extraFields";
   }
 
   Puzzle begin() {
@@ -192,6 +194,9 @@ class Database {
       }
       if (puzzleData.length > 11 && puzzleData[11].isNotEmpty) {
         puz.disliked = DateTime.tryParse(puzzleData[11]);
+      }
+      if (puzzleData.length > 12 && puzzleData[13].isNotEmpty) {
+        puz.pleasure = int.tryParse(puzzleData[13]);
       }
       puz.duration = int.parse(puzzleData[1].replaceAll("s", ""));
       puz.failures = int.parse(puzzleData[2].replaceAll("f", ""));
