@@ -18,12 +18,16 @@ class PuzzleWidget extends StatelessWidget {
     super.key,
     required this.currentPuzzle,
     required this.onCellTap,
+    required this.onCellDrag,
+    required this.onCellDragEnd,
     required this.cellSize,
     required this.locale,
   });
 
   final Puzzle currentPuzzle;
   final ValueChanged<int> onCellTap;
+  final ValueChanged<int> onCellDrag;
+  final VoidCallback onCellDragEnd;
   final double cellSize;
   final String locale;
 
@@ -124,6 +128,12 @@ class PuzzleWidget extends StatelessWidget {
                           secondary: true,
                         ),
                       },
+                      onDrag: (Offset offset) {
+                        final int targetRow = (rowidx + offset.dy).floor();
+                        final int targetCell = (cellidx + offset.dx).floor();
+                        onCellDrag(targetRow * currentPuzzle.width + targetCell);
+                      },
+                      onDragEnd: onCellDragEnd,
                     ),
                 ],
               ),

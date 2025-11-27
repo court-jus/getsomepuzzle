@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
@@ -94,6 +95,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool initialized = false;
   bool shouldChooseLocale = true;
   Move? helpMove;
+  int? firstDragValue;
+  int? lastDragIdx;
   final log = Logger("HomePage");
 
   @override
@@ -244,6 +247,38 @@ class _MyHomePageState extends State<MyHomePage> {
         currentPuzzle!.clearConstraintsValidity();
         helpMove = null;
         helpMe();
+      }
+    });
+  }
+
+  void handlePuzzleDrag(int idx) {
+    if (currentPuzzle == null) return;
+    if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
+    if (lastDragIdx != null && idx == lastDragIdx) return;
+    setState(() {
+      lastDragIdx = idx;
+      if (firstDragValue == null) {
+        final myOpposite = currentPuzzle!.domain.whereNot((e) => e == currentPuzzle!.cellValues[idx]).first;
+        firstDragValue = myOpposite;
+        currentPuzzle!.setValue(idx, firstDragValue!);
+        if (history.isEmpty || history.last != idx) history.add(idx);
+      }
+      if (currentPuzzle!.cellValues[idx] != firstDragValue && currentPuzzle!.cellValues[idx] == 0) {
+        currentPuzzle!.setValue(idx, firstDragValue!);
+        if (history.isEmpty || history.last != idx) history.add(idx);
+      }
+    });
+  }
+
+  void handlePuzzleDragEnd() {
+    setState(() {
+      firstDragValue = null;
+      lastDragIdx = null;
+      shouldCheck = currentPuzzle!.complete;
+      if (shouldCheck) {
+        Future.delayed(Duration(seconds: 1), autoCheck);
+      } else {
+        currentPuzzle!.clearConstraintsValidity();
       }
     });
   }
@@ -558,6 +593,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           PuzzleWidget(
                             currentPuzzle: currentPuzzle!,
                             onCellTap: handlePuzzleTap,
+                            onCellDrag: handlePuzzleDrag,
+                            onCellDragEnd: handlePuzzleDragEnd,
                             cellSize: cellSize,
                             locale: locale,
                           )
