@@ -59,16 +59,17 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: MyHomePage(
-        title: 'Get Some Puzzle',
-        setAppLocale: setAppLocale,
-      ),
+      home: MyHomePage(title: 'Get Some Puzzle', setAppLocale: setAppLocale),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title, required this.setAppLocale});
+  const MyHomePage({
+    super.key,
+    required this.title,
+    required this.setAppLocale,
+  });
 
   final String title;
   final Function setAppLocale;
@@ -241,7 +242,7 @@ class _MyHomePageState extends State<MyHomePage> {
       helpMe();
       if (history.isEmpty || history.last != idx) history.add(idx);
       if (settings.validateType == ValidateType.manual) return;
-      if (settings.liveCheckType == LiveCheckType.all) {
+      if (settings.liveCheckType == LiveCheckType.all || settings.liveCheckType == LiveCheckType.count) {
         shouldCheck = true;
         autoCheck();
         return;
@@ -261,7 +262,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void checkPuzzle() {
-    final failedConstraints = currentPuzzle!.check();
+    final shouldShowErrors =
+        settings.liveCheckType == LiveCheckType.all || currentPuzzle!.complete;
+    final failedConstraints = currentPuzzle!.check(
+      saveResult: shouldShowErrors,
+    );
     if (failedConstraints.isEmpty) {
       if (currentPuzzle!.complete) {
         currentMeta!.stop();
@@ -273,14 +278,20 @@ class _MyHomePageState extends State<MyHomePage> {
           }
         });
       }
-    } else {
+    } else if (settings.liveCheckType == LiveCheckType.complete) {
       currentMeta!.failures += 1;
       currentMeta!.stats?.failures += 1;
     }
     setState(() {
-      topMessage = failedConstraints.isNotEmpty
-          ? "Some constraints are not valid."
-          : "";
+      if (failedConstraints.isNotEmpty) {
+        if (shouldShowErrors) {
+          topMessage = "Some constraints are not valid.";
+        } else {
+          topMessage = "${failedConstraints.length} errors.";
+        }
+      } else {
+        topMessage = "";
+      }
     });
   }
 
@@ -361,7 +372,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   ).colorScheme.secondaryFixedDim,
                   // tooltip: AppLocalizations.of(context)!.manuallyValidatePuzzle,
                 ),
-                onPressed: (currentPuzzle!.complete && !betweenPuzzles) ? checkPuzzle : null,
+                onPressed: (currentPuzzle!.complete && !betweenPuzzles)
+                    ? checkPuzzle
+                    : null,
                 icon: const Icon(Icons.check),
                 label: Text(
                   AppLocalizations.of(context)!.manuallyValidatePuzzle,
@@ -509,15 +522,41 @@ class _MyHomePageState extends State<MyHomePage> {
             spacing: 2,
             children: <Widget>[
               Text(topMessage),
-              (initialized && !shouldChooseLocale) ? Stack(
-                alignment: AlignmentGeometry.center,
-                children: [
-                  if (betweenPuzzles)
-                    Column(
-                      spacing: 16,
+              (initialized && !shouldChooseLocale)
+                  ? Stack(
+                      alignment: AlignmentGeometry.center,
                       children: [
                         if (betweenPuzzles)
-                          BetweenPuzzles(like: like, loadPuzzle: loadPuzzle)
+                          Column(
+                            spacing: 16,
+                            children: [
+                              if (betweenPuzzles)
+                                BetweenPuzzles(
+                                  like: like,
+                                  loadPuzzle: loadPuzzle,
+                                )
+                              else if (paused)
+                                TextButton(
+                                  onPressed: resume,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal,
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    child: SizedBox(
+                                      width: contextWidth,
+                                      height: contextHeight,
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.pause,
+                                          size: cellSize * 3,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
                         else if (paused)
                           TextButton(
                             onPressed: resume,
@@ -534,55 +573,41 @@ class _MyHomePageState extends State<MyHomePage> {
                                 ),
                               ),
                             ),
-                        ),
-                      ],
-                    )
-                  else if (paused)
-                    TextButton(
-                      onPressed: resume,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.teal,
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: SizedBox(
-                          width: contextWidth,
-                          height: contextHeight,
-                          child: Center(
-                            child: Icon(Icons.pause, size: cellSize * 3),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (currentPuzzle != null)
-                          PuzzleWidget(
-                            currentPuzzle: currentPuzzle!,
-                            onCellTap: handlePuzzleTap,
-                            cellSize: cellSize,
-                            locale: locale,
                           )
                         else
-                          Text(AppLocalizations.of(context)!.infoNoPuzzle),
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              if (currentPuzzle != null)
+                                PuzzleWidget(
+                                  currentPuzzle: currentPuzzle!,
+                                  onCellTap: handlePuzzleTap,
+                                  cellSize: cellSize,
+                                  locale: locale,
+                                )
+                              else
+                                Text(
+                                  AppLocalizations.of(context)!.infoNoPuzzle,
+                                ),
+                            ],
+                          ),
                       ],
-                    ),
-                ],
-              ) : (shouldChooseLocale ? Initiallocalechooser(
-                selectLocale: toggleLocale,
-              ) : Text("Loading...")),
+                    )
+                  : (shouldChooseLocale
+                        ? Initiallocalechooser(selectLocale: toggleLocale)
+                        : Text("Loading...")),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: (initialized && !shouldChooseLocale) ? BottomAppBar(
-        height: 40,
-        color: Colors.amber,
-        child: Center(child: Text(bottomMessage)),
-      ) : null,
+      bottomNavigationBar: (initialized && !shouldChooseLocale)
+          ? BottomAppBar(
+              height: 40,
+              color: Colors.amber,
+              child: Center(child: Text(bottomMessage)),
+            )
+          : null,
     );
   }
 }
