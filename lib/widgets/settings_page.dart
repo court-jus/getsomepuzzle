@@ -32,6 +32,12 @@ class _SettingsPageState extends State<SettingsPage> {
       ValidateType.automatic: AppLocalizations.of(context)!.settingValidateTypeAutomatic,
     };
 
+    final Map<LiveCheckType, String> settingsLiveCheckType = {
+      LiveCheckType.all: AppLocalizations.of(context)!.settingsLiveCheckTypeAll,
+      LiveCheckType.count: AppLocalizations.of(context)!.settingsLiveCheckTypeCount,
+      LiveCheckType.complete: AppLocalizations.of(context)!.settingsLiveCheckTypeComplete,
+    };
+
     return Scaffold(
       appBar: AppBar(title: Text(AppLocalizations.of(context)!.settings)),
       body: LayoutBuilder(
@@ -65,6 +71,31 @@ class _SettingsPageState extends State<SettingsPage> {
                                 (slug) => ButtonSegment(
                                   value: slug,
                                   label: Text(settingsValidateType[slug]!),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(AppLocalizations.of(context)!.settingsLiveCheckType),
+                        SegmentedButton(
+                          multiSelectionEnabled: false,
+                          emptySelectionAllowed: false,
+                          showSelectedIcon: false,
+                          selected: {widget.settings.liveCheckType},
+                          onSelectionChanged: (newValue) {
+                            setState(() {
+                              widget.settings.change(ChangeableSettings(liveCheckType: newValue.first));
+                            });
+                          },
+                          segments: LiveCheckType.values
+                              .map(
+                                (slug) => ButtonSegment(
+                                  value: slug,
+                                  label: Text(settingsLiveCheckType[slug]!),
                                 ),
                               )
                               .toList(),

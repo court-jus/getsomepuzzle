@@ -19,6 +19,10 @@ class QuantityConstraint extends Constraint {
   @override
   bool verify(Puzzle puzzle) {
     final myValues = puzzle.cellValues.where((val) => val == value);
-    return myValues.length == count;
+    if (puzzle.complete) {
+      return myValues.length == count;
+    } else {
+      return myValues.length <= count;
+    }
   }
 }

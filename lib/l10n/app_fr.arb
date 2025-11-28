@@ -39,5 +39,9 @@
     "settingValidateType": "Type de validation",
     "settingValidateTypeManual": "Manuel",
     "settingValidateTypeDefault": "Par défaut",
-    "settingValidateTypeAutomatic": "Automatique"
+    "settingValidateTypeAutomatic": "Automatique",
+    "settingsLiveCheckType": "Erreurs",
+    "settingsLiveCheckTypeAll": "Live",
+    "settingsLiveCheckTypeCount": "Compte",
+    "settingsLiveCheckTypeComplete": "Attendre"
 }

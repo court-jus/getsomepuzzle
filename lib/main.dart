@@ -236,14 +236,19 @@ class _MyHomePageState extends State<MyHomePage> {
     currentPuzzle!.clearHighlights();
     setState(() {
       currentPuzzle!.incrValue(idx);
+      currentPuzzle!.clearConstraintsValidity();
+      helpMove = null;
+      helpMe();
       if (history.isEmpty || history.last != idx) history.add(idx);
+      if (settings.validateType == ValidateType.manual) return;
+      if (settings.liveCheckType == LiveCheckType.all) {
+        shouldCheck = true;
+        autoCheck();
+        return;
+      }
       shouldCheck = currentPuzzle!.complete;
-      if (shouldCheck && settings.validateType != ValidateType.manual) {
+      if (shouldCheck) {
         Future.delayed(Duration(seconds: 1), autoCheck);
-      } else {
-        currentPuzzle!.clearConstraintsValidity();
-        helpMove = null;
-        helpMe();
       }
     });
   }

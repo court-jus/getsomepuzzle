@@ -129,4 +129,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingValidateTypeAutomatic => 'Automatic';
+
+  @override
+  String get settingsLiveCheckType => 'Errors check';
+
+  @override
+  String get settingsLiveCheckTypeAll => 'Live';
+
+  @override
+  String get settingsLiveCheckTypeCount => 'Count';
+
+  @override
+  String get settingsLiveCheckTypeComplete => 'Wait';
 }
