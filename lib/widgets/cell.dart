@@ -16,6 +16,8 @@ class CellWidget extends StatelessWidget {
     required this.cellSize,
     required this.onTap,
     required this.onSecondaryTap,
+    required this.onDrag,
+    required this.onDragEnd,
     this.constraints,
   });
 
@@ -26,6 +28,8 @@ class CellWidget extends StatelessWidget {
   final List<Constraint>? constraints;
   final VoidCallback onTap;
   final VoidCallback onSecondaryTap;
+  final ValueChanged<Offset> onDrag;
+  final VoidCallback onDragEnd;
   final double cellSize;
 
   // Build UI
@@ -52,6 +56,13 @@ class CellWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       onSecondaryTap: onSecondaryTap,
+      onVerticalDragUpdate: (details) {
+        final localPos = details.localPosition;
+        final offsetX = localPos.dx / cellSize;
+        final offsetY = localPos.dy / cellSize;
+        onDrag(Offset(offsetX.floor().toDouble(), offsetY.floor().toDouble()));
+      },
+      onVerticalDragEnd: (details) => onDragEnd(),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: color,
