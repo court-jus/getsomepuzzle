@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_print
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -18,11 +19,12 @@ import 'package:getsomepuzzle/widgets/open_page.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
+import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.3.5";
+const versionText = "Version 1.3.6";
 
 void main() {
   Logger.root.level = Level.ALL; // defaults to Level.INFO
@@ -59,16 +61,17 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: MyHomePage(
-        title: 'Get Some Puzzle',
-        setAppLocale: setAppLocale,
-      ),
+      home: MyHomePage(title: 'Get Some Puzzle', setAppLocale: setAppLocale),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title, required this.setAppLocale});
+  const MyHomePage({
+    super.key,
+    required this.title,
+    required this.setAppLocale,
+  });
 
   final String title;
   final Function setAppLocale;
@@ -310,12 +313,24 @@ class _MyHomePageState extends State<MyHomePage> {
   void like(int liked) {
     if (currentMeta == null) return;
     currentMeta!.pleasure = liked;
+    postMessage(
+      "like",
+      jsonEncode({"puzzle": currentMeta!.lineRepresentation, "liked": liked}),
+    );
     if (liked > 0) {
       currentMeta!.liked = DateTime.now();
     } else if (liked < 0) {
       currentMeta!.disliked = DateTime.now();
     }
     loadPuzzle();
+  }
+
+  void report() {
+    if (currentMeta == null) return;
+    postMessage(
+      "report",
+      jsonEncode({"puzzle": currentMeta!.lineRepresentation}),
+    );
   }
 
   @override
@@ -356,7 +371,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   ).colorScheme.secondaryFixedDim,
                   // tooltip: AppLocalizations.of(context)!.manuallyValidatePuzzle,
                 ),
-                onPressed: (currentPuzzle!.complete && !betweenPuzzles) ? checkPuzzle : null,
+                onPressed: (currentPuzzle!.complete && !betweenPuzzles)
+                    ? checkPuzzle
+                    : null,
                 icon: const Icon(Icons.check),
                 label: Text(
                   AppLocalizations.of(context)!.manuallyValidatePuzzle,
@@ -367,7 +384,7 @@ class _MyHomePageState extends State<MyHomePage> {
           if (currentPuzzle != null && !shouldChooseLocale)
             IconButton(
               icon: Icon(Icons.lightbulb),
-              tooltip: AppLocalizations.of(context)!.tooltipUndo,
+              tooltip: AppLocalizations.of(context)!.tooltipClue,
               onPressed: helpMove == null ? null : showHelpMove,
             ),
           if (currentPuzzle != null && !shouldChooseLocale)
@@ -410,6 +427,15 @@ class _MyHomePageState extends State<MyHomePage> {
               title: Text(AppLocalizations.of(context)!.closeMenu),
               onTap: () {
                 loadPuzzle();
+                Navigator.pop(context);
+              },
+            ),
+            Divider(),
+            ListTile(
+              leading: Icon(Icons.bug_report),
+              title: Text(AppLocalizations.of(context)!.report),
+              onTap: () {
+                report();
                 Navigator.pop(context);
               },
             ),
@@ -504,15 +530,41 @@ class _MyHomePageState extends State<MyHomePage> {
             spacing: 2,
             children: <Widget>[
               Text(topMessage),
-              (initialized && !shouldChooseLocale) ? Stack(
-                alignment: AlignmentGeometry.center,
-                children: [
-                  if (betweenPuzzles)
-                    Column(
-                      spacing: 16,
+              (initialized && !shouldChooseLocale)
+                  ? Stack(
+                      alignment: AlignmentGeometry.center,
                       children: [
                         if (betweenPuzzles)
-                          BetweenPuzzles(like: like, loadPuzzle: loadPuzzle)
+                          Column(
+                            spacing: 16,
+                            children: [
+                              if (betweenPuzzles)
+                                BetweenPuzzles(
+                                  like: like,
+                                  loadPuzzle: loadPuzzle,
+                                )
+                              else if (paused)
+                                TextButton(
+                                  onPressed: resume,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal,
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    child: SizedBox(
+                                      width: contextWidth,
+                                      height: contextHeight,
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.pause,
+                                          size: cellSize * 3,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
                         else if (paused)
                           TextButton(
                             onPressed: resume,
@@ -529,55 +581,58 @@ class _MyHomePageState extends State<MyHomePage> {
                                 ),
                               ),
                             ),
-                        ),
-                      ],
-                    )
-                  else if (paused)
-                    TextButton(
-                      onPressed: resume,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.teal,
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: SizedBox(
-                          width: contextWidth,
-                          height: contextHeight,
-                          child: Center(
-                            child: Icon(Icons.pause, size: cellSize * 3),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (currentPuzzle != null)
-                          PuzzleWidget(
-                            currentPuzzle: currentPuzzle!,
-                            onCellTap: handlePuzzleTap,
-                            cellSize: cellSize,
-                            locale: locale,
                           )
                         else
-                          Text(AppLocalizations.of(context)!.infoNoPuzzle),
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              if (currentPuzzle != null)
+                                PuzzleWidget(
+                                  currentPuzzle: currentPuzzle!,
+                                  onCellTap: handlePuzzleTap,
+                                  cellSize: cellSize,
+                                  locale: locale,
+                                )
+                              else
+                                Text(
+                                  AppLocalizations.of(context)!.infoNoPuzzle,
+                                ),
+                            ],
+                          ),
                       ],
-                    ),
-                ],
-              ) : (shouldChooseLocale ? Initiallocalechooser(
-                selectLocale: toggleLocale,
-              ) : Text("Loading...")),
+                    )
+                  : (shouldChooseLocale
+                        ? Initiallocalechooser(selectLocale: toggleLocale)
+                        : Text("Loading...")),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: (initialized && !shouldChooseLocale) ? BottomAppBar(
-        height: 40,
-        color: Colors.amber,
-        child: Center(child: Text(bottomMessage)),
-      ) : null,
+      bottomNavigationBar: (initialized && !shouldChooseLocale)
+          ? BottomAppBar(
+              height: 40,
+              color: Colors.amber,
+              child: Center(child: Text(bottomMessage)),
+            )
+          : null,
     );
+  }
+}
+
+Future<http.Response>? postMessage(String endpoint, String body) {
+  final log = Logger("Network");
+  log.info("Posting message $endpoint with data $body");
+  try {
+    return http.post(
+      Uri.parse("https://getsomepuzzle.court-jus.net:444/$endpoint/"),
+      headers: <String, String>{
+        "Content-type": "application/json; charset=UTF-8",
+      },
+      body: body,
+    );
+  } catch (err) {
+    log.severe("HTTP error: $err");
+    return null;
   }
 }

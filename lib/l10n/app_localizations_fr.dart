@@ -104,6 +104,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get tooltipMore => 'Plus...';
 
   @override
+  String get tooltipClue => 'Indice';
+
+  @override
   String get tooltipUndo => 'Annuler';
 
   @override

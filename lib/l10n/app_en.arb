@@ -124,6 +124,10 @@
     "@tooltipMore": {
         "description": "Tooltip displayed while the mouse is over the extra menu"
     },
+    "tooltipClue": "Clue",
+    "@tooltipClue": {
+        "description": "Tooltip displayed while the mouse is over the 'give me a clue' button"
+    },
     "tooltipUndo": "Undo",
     "@tooltipUndo": {
         "description": "Tooltip displayed while the mouse is over the undo button"

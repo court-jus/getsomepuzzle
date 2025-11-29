@@ -286,6 +286,12 @@ abstract class AppLocalizations {
   /// **'More...'**
   String get tooltipMore;
 
+  /// Tooltip displayed while the mouse is over the 'give me a clue' button
+  ///
+  /// In en, this message translates to:
+  /// **'Clue'**
+  String get tooltipClue;
+
   /// Tooltip displayed while the mouse is over the undo button
   ///
   /// In en, this message translates to:
