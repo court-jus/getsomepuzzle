@@ -163,5 +163,21 @@
     "settingValidateTypeAutomatic": "Automatic",
     "@settingValidateTypeAutomatic": {
         "description": "The player wants to move on to the next puzzle automatically"
+    },
+    "settingsLiveCheckType": "Errors check",
+    "@settingsLiveCheckType": {
+        "description": "Does the player want a live check for errors?"
+    },
+    "settingsLiveCheckTypeAll": "Live",
+    "@settingsLiveCheckTypeAll": {
+        "description": "The player wants all errors to be displayed live"
+    },
+    "settingsLiveCheckTypeCount": "Count",
+    "@settingsLiveCheckTypeCount": {
+        "description": "The player only wants to see the number of errors live"
+    },
+    "settingsLiveCheckTypeComplete": "Wait",
+    "@settingsLiveCheckTypeComplete": {
+        "description": "The player wants to wait until puzzle completion to see errors"
     }
 }

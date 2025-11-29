@@ -345,6 +345,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatic'**
   String get settingValidateTypeAutomatic;
+
+  /// Does the player want a live check for errors?
+  ///
+  /// In en, this message translates to:
+  /// **'Errors check'**
+  String get settingsLiveCheckType;
+
+  /// The player wants all errors to be displayed live
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get settingsLiveCheckTypeAll;
+
+  /// The player only wants to see the number of errors live
+  ///
+  /// In en, this message translates to:
+  /// **'Count'**
+  String get settingsLiveCheckTypeCount;
+
+  /// The player wants to wait until puzzle completion to see errors
+  ///
+  /// In en, this message translates to:
+  /// **'Wait'**
+  String get settingsLiveCheckTypeComplete;
 }
 
 class _AppLocalizationsDelegate

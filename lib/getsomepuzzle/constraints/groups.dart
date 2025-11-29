@@ -44,8 +44,14 @@ class GroupSize extends CellsCentricConstraint {
     final groups = puzzle.getGroups();
     final idx = indices[0];
     final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
-    if (myGroup == null) return false;
-    return myGroup.length == size;
+    if (myGroup == null) {
+      return !puzzle.complete;
+    }
+    if (puzzle.complete) {
+      return myGroup.length == size;
+    } else {
+      return myGroup.length <= size;
+    }
   }
 
   @override

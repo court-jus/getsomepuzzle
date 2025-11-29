@@ -244,14 +244,19 @@ class _MyHomePageState extends State<MyHomePage> {
     currentPuzzle!.clearHighlights();
     setState(() {
       currentPuzzle!.incrValue(idx);
+      currentPuzzle!.clearConstraintsValidity();
+      helpMove = null;
+      helpMe();
       if (history.isEmpty || history.last != idx) history.add(idx);
+      if (settings.validateType == ValidateType.manual) return;
+      if (settings.liveCheckType == LiveCheckType.all || settings.liveCheckType == LiveCheckType.count) {
+        shouldCheck = true;
+        autoCheck();
+        return;
+      }
       shouldCheck = currentPuzzle!.complete;
-      if (shouldCheck && settings.validateType != ValidateType.manual) {
+      if (shouldCheck) {
         Future.delayed(Duration(seconds: 1), autoCheck);
-      } else {
-        currentPuzzle!.clearConstraintsValidity();
-        helpMove = null;
-        helpMe();
       }
     });
   }
@@ -296,7 +301,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void checkPuzzle() {
-    final failedConstraints = currentPuzzle!.check();
+    final shouldShowErrors =
+        settings.liveCheckType == LiveCheckType.all || currentPuzzle!.complete;
+    final failedConstraints = currentPuzzle!.check(
+      saveResult: shouldShowErrors,
+    );
     if (failedConstraints.isEmpty) {
       if (currentPuzzle!.complete) {
         currentMeta!.stop();
@@ -308,14 +317,20 @@ class _MyHomePageState extends State<MyHomePage> {
           }
         });
       }
-    } else {
+    } else if (settings.liveCheckType == LiveCheckType.complete) {
       currentMeta!.failures += 1;
       currentMeta!.stats?.failures += 1;
     }
     setState(() {
-      topMessage = failedConstraints.isNotEmpty
-          ? "Some constraints are not valid."
-          : "";
+      if (failedConstraints.isNotEmpty) {
+        if (shouldShowErrors) {
+          topMessage = "Some constraints are not valid.";
+        } else {
+          topMessage = "${failedConstraints.length} errors.";
+        }
+      } else {
+        topMessage = "";
+      }
     });
   }
 
@@ -629,7 +644,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                   currentPuzzle: currentPuzzle!,
                                   onCellTap: handlePuzzleTap,
                                   onCellDrag: handlePuzzleDrag,
-                                  onCellDragEnd: handlePuzzleDragEnd,,
+                                  onCellDragEnd: handlePuzzleDragEnd,
                                   cellSize: cellSize,
                                   locale: locale,
                                 )
