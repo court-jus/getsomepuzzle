@@ -42,13 +42,19 @@ class ParityConstraint extends CellsCentricConstraint {
       "top": Icons.arrow_circle_up_outlined,
       "bottom": Icons.arrow_circle_down_outlined,
     };
-    final fgcolor = isHighlighted ? Colors.deepPurple : (isValid ? defaultColor : Colors.redAccent);
+    final fgcolor = isHighlighted
+        ? Colors.deepPurple
+        : (isValid ? defaultColor : Colors.redAccent);
     if (icons.containsKey(side)) {
       return SizedBox(
         width: cellSize / count,
         height: cellSize / count,
         child: Center(
-          child: Icon(icons[side], size: cellSize * cellSizeToFontSize * fontSizeRatio / count, color: fgcolor),
+          child: Icon(
+            icons[side],
+            size: cellSize * cellSizeToFontSize * fontSizeRatio / count,
+            color: fgcolor,
+          ),
         ),
       );
     }
@@ -119,15 +125,19 @@ class ParityConstraint extends CellsCentricConstraint {
       sides.add(colValuesAndCells.where((e) => e.$1 > ridx));
     }
     for (var side in sides) {
-      if (side.where((element) => element.$2.value == 0).isEmpty) {
-        continue;
-      }
-      final int even = side.where((v) => v.$2.value != 0 && v.$2.value % 2 == 0).length;
-      final int odd = side.where((v) => v.$2.value != 0 && v.$2.value % 2 != 0).length;
+      final int even = side
+          .where((v) => v.$2.value != 0 && v.$2.value % 2 == 0)
+          .length;
+      final int odd = side
+          .where((v) => v.$2.value != 0 && v.$2.value % 2 != 0)
+          .length;
       final int half = (side.length / 2).floor();
       if (even > half) return Move(0, 0, this, isImpossible: this);
       if (odd > half) return Move(0, 0, this, isImpossible: this);
-      if (even < half && odd < half) return null;
+      if (side.where((element) => element.$2.value == 0).isEmpty) {
+        continue;
+      }
+      if (even < half && odd < half) continue;
       final firstFreeCell = side.firstWhere((element) => element.$2.value == 0);
       if (even == half) {
         // Empty cells should be odd

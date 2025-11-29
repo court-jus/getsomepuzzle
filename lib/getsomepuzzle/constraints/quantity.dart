@@ -1,3 +1,5 @@
+import 'package:collection/collection.dart';
+import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
@@ -24,5 +26,24 @@ class QuantityConstraint extends Constraint {
     } else {
       return myValues.length <= count;
     }
+  }
+
+  @override
+  Move? apply(Puzzle puzzle) {
+    final myValues = puzzle.cellValues.where((val) => val == value);
+    final myOpposite = puzzle.domain.whereNot((val) => val == value).first;
+    final freeCells = puzzle.cellValues.indexed.where((val) => val.$2 == 0);
+    final firstFreeCell = freeCells.first.$1;
+    if (myValues.length > count) {
+      return Move(0, 0, this, isImpossible: this);
+    }
+    if (myValues.length == count) {
+      // I'm already complete, all the rest of the puzzle should be myOpposite
+      return Move(firstFreeCell, myOpposite, this);
+    } else if (count - myValues.length == freeCells.length) {
+      // The number of free cells match what I need, I take all them
+      return Move(firstFreeCell, value, this);
+    }
+    return null;
   }
 }

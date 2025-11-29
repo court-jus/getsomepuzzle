@@ -79,7 +79,9 @@ class PuzzleWidget extends StatelessWidget {
                   bgColor: constraint is ForbiddenMotif
                       ? forbiddenColor
                       : mandatoryColor,
-                  borderColor: constraint.isHighlighted ? Colors.deepPurple : (constraint.isValid ? Colors.green : Colors.red),
+                  borderColor: constraint.isHighlighted
+                      ? Colors.deepPurple
+                      : (constraint.isValid ? Colors.green : Colors.red),
                   isHighlighted: constraint.isHighlighted,
                   cellSize: topBarConstraintsSize,
                 )
@@ -88,7 +90,9 @@ class PuzzleWidget extends StatelessWidget {
                   value: constraint.value,
                   count: constraint.count,
                   bgColor: mandatoryColor,
-                  borderColor: constraint.isHighlighted ? Colors.deepPurple : (constraint.isValid ? Colors.green : Colors.red),
+                  borderColor: constraint.isHighlighted
+                      ? Colors.deepPurple
+                      : (constraint.isValid ? Colors.green : Colors.red),
                   cellSize: topBarConstraintsSize,
                 )
               else if (constraint is HelpText)
@@ -112,6 +116,7 @@ class PuzzleWidget extends StatelessWidget {
                   for (var (cellidx, cell) in row.indexed)
                     CellWidget(
                       value: cell.value,
+                      idx: rowidx * currentPuzzle.width + cellidx,
                       readonly: cell.readonly,
                       isHighlighted: cell.isHighlighted,
                       constraints:
@@ -131,7 +136,9 @@ class PuzzleWidget extends StatelessWidget {
                       onDrag: (Offset offset) {
                         final int targetRow = (rowidx + offset.dy).floor();
                         final int targetCell = (cellidx + offset.dx).floor();
-                        onCellDrag(targetRow * currentPuzzle.width + targetCell);
+                        onCellDrag(
+                          targetRow * currentPuzzle.width + targetCell,
+                        );
                       },
                       onDragEnd: onCellDragEnd,
                     ),

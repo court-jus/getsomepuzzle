@@ -11,6 +11,7 @@ class CellWidget extends StatelessWidget {
   const CellWidget({
     super.key,
     required this.value,
+    required this.idx,
     required this.readonly,
     required this.isHighlighted,
     required this.cellSize,
@@ -23,6 +24,7 @@ class CellWidget extends StatelessWidget {
 
   // Attributes
   final int value;
+  final int idx;
   final bool readonly;
   final bool isHighlighted;
   final List<Constraint>? constraints;
@@ -42,15 +44,24 @@ class CellWidget extends StatelessWidget {
       // 1: 1, 2: 2, 3: 2, 4: 2, 5: 3
       widgetScale = sqrt(constraints!.length).ceil();
     }
-    final Widget label = constraints == null ? Text(" ") : Wrap(
+    // final Widget emptyText = Text(" ");
+    final Widget emptyText = Text(
+      idx.toString(),
+      style: TextStyle(color: (fgColors[value] ?? Colors.black)),
+    );
+    final Widget label = constraints == null
+        ? emptyText
+        : Wrap(
             alignment: WrapAlignment.center,
             children: [
               for (final constraint in constraints!)
                 constraint.toWidget(
-                  constraint.isHighlighted ? Colors.deepPurple : (fgColors[value] ?? Colors.black),
+                  constraint.isHighlighted
+                      ? Colors.deepPurple
+                      : (fgColors[value] ?? Colors.black),
                   cellSize,
                   count: widgetScale,
-        )
+                ),
             ],
           );
     return GestureDetector(

@@ -8,7 +8,6 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 
-
 class Stats {
   int failures = 0;
   int duration = 0;
@@ -38,7 +37,6 @@ class Stats {
     duration = (timer.elapsedMilliseconds / 1000).round();
     timer.reset();
   }
-
 }
 
 class Puzzle {
@@ -191,7 +189,11 @@ class Puzzle {
 
   List<int> getNeighborsSameValueOrEmpty(int idx, int myValue) {
     final List<int> result = [idx];
-    result.addAll(getNeighbors(idx).where((e) => cellValues[e] == myValue || cellValues[e] == 0));
+    result.addAll(
+      getNeighbors(
+        idx,
+      ).where((e) => cellValues[e] == myValue || cellValues[e] == 0),
+    );
     return result;
   }
 
@@ -214,7 +216,7 @@ class Puzzle {
     return !cellValues.any((val) => val == 0);
   }
 
-  List<Constraint> check({ bool saveResult = true }) {
+  List<Constraint> check({bool saveResult = true}) {
     final List<Constraint> result = [];
     for (var constraint in constraints) {
       if (!constraint.check(this, saveResult: saveResult)) {
@@ -244,14 +246,30 @@ class Puzzle {
       setValue(move.idx, move.value);
       if (complete) {
         finished = true;
-        return Move(0, 0, move.givenBy, isImpossible: check(saveResult: false).isNotEmpty ? move.givenBy : null);
+        return Move(
+          0,
+          0,
+          move.givenBy,
+          isImpossible: check(saveResult: false).isNotEmpty
+              ? move.givenBy
+              : null,
+        );
       }
     }
     return null;
   }
 
   Move? findAMove() {
-    // First try by directly applying the constraint
+    // First find broken constraints
+    final hasErrors = check(saveResult: false);
+    if (hasErrors.isNotEmpty) {
+      final firstError = hasErrors.first;
+      final errorMove = firstError.apply(this);
+      if (errorMove != null) {
+        return errorMove;
+      }
+    }
+    // Then try by directly applying the constraint
     final easyMove = apply();
     if (easyMove != null) return easyMove;
     // Nothing was found, we will now try on a cloned puzzle
@@ -263,7 +281,9 @@ class Puzzle {
     for (var cell in cellValues.indexed) {
       clone.setValue(cell.$1, cell.$2);
     }
-    for (var freeCell in clone.cells.indexed.where((entry) => entry.$2.value == 0)) {
+    for (var freeCell in clone.cells.indexed.where(
+      (entry) => entry.$2.value == 0,
+    )) {
       for (var value in clone.domain) {
         clone.setValue(freeCell.$1, value);
         Move? result = clone.applyAll();
@@ -301,7 +321,7 @@ class Puzzle {
     final idxToExplore = cellValues.indexed.toList();
     final Map<int, List<int>> explored = {};
     final Map<int, Map<int, List<int>>> groupsPerValuePerCell = {};
-    while(idxToExplore.isNotEmpty) {
+    while (idxToExplore.isNotEmpty) {
       final exploring = idxToExplore.removeAt(0);
       final exploreIdx = exploring.$1;
       final value = exploring.$2;
@@ -341,25 +361,27 @@ class Puzzle {
         setsPerValue[value]!.add(newGroup);
       }
     }
-    return setsPerValue.values.flattenedToList.map((grp) => grp.toList()).toList();
+    return setsPerValue.values.flattenedToList
+        .map((grp) => grp.toList())
+        .toList();
   }
 }
 
 List<Set<int>> findAndPop(List<Set<int>> setlist, int value) {
-    /*
+  /*
     Pops the sets in setlist that contains value.
     */
-    final Set<int> indices = {};
-    for (var setEntry in setlist.indexed) {
-      final idx = setEntry.$1;
-      final candidate = setEntry.$2;
-      if (candidate.contains(value)) {
-        indices.add(idx);
-      }
+  final Set<int> indices = {};
+  for (var setEntry in setlist.indexed) {
+    final idx = setEntry.$1;
+    final candidate = setEntry.$2;
+    if (candidate.contains(value)) {
+      indices.add(idx);
     }
-    final List<Set<int>> result = [];
-    for (var idx in indices.sorted((a, b) => a - b).reversed) {
-      result.add(setlist.removeAt(idx));
-    }
-    return result;
+  }
+  final List<Set<int>> result = [];
+  for (var idx in indices.sorted((a, b) => a - b).reversed) {
+    result.add(setlist.removeAt(idx));
+  }
+  return result;
 }

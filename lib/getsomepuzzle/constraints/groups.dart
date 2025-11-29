@@ -26,14 +26,19 @@ class GroupSize extends CellsCentricConstraint {
 
   @override
   Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
-    final fgcolor = isHighlighted ? Colors.deepPurple : (isValid ? defaultColor : Colors.redAccent);
+    final fgcolor = isHighlighted
+        ? Colors.deepPurple
+        : (isValid ? defaultColor : Colors.redAccent);
     return SizedBox(
       width: cellSize / count,
       height: cellSize / count,
       child: Center(
         child: Text(
           toString(),
-          style: TextStyle(fontSize: cellSize * cellSizeToFontSize / count, color: fgcolor),
+          style: TextStyle(
+            fontSize: cellSize * cellSizeToFontSize / count,
+            color: fgcolor,
+          ),
         ),
       ),
     );
@@ -65,7 +70,9 @@ class GroupSize extends CellsCentricConstraint {
     if (myGroup.length == size) {
       // My group is finished, we can fill the neighbors
       for (var member in myGroup) {
-        final freeNeighbors = puzzle.getNeighbors(member).where((nei) => puzzle.cellValues[nei] == 0);
+        final freeNeighbors = puzzle
+            .getNeighbors(member)
+            .where((nei) => puzzle.cellValues[nei] == 0);
         if (freeNeighbors.isNotEmpty) {
           return Move(freeNeighbors.first, myOpposite, this);
         }
@@ -76,10 +83,14 @@ class GroupSize extends CellsCentricConstraint {
       // Find members that only have one empty neighbor
       final Set<int> groupFreeNeighbors = {};
       for (var member in myGroup) {
-        groupFreeNeighbors.addAll(puzzle.getNeighbors(member).where((idx) => puzzle.getValue(idx) == 0));
+        groupFreeNeighbors.addAll(
+          puzzle.getNeighbors(member).where((idx) => puzzle.getValue(idx) == 0),
+        );
       }
       if (groupFreeNeighbors.length == 1) {
         return Move(groupFreeNeighbors.first, myColor, this);
+      } else if (myGroup.length < size && groupFreeNeighbors.isEmpty) {
+        return Move(0, 0, this, isImpossible: this);
       }
     }
     return null;
@@ -103,14 +114,19 @@ class LetterGroup extends CellsCentricConstraint {
 
   @override
   Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
-    final fgcolor = isHighlighted ? Colors.deepPurple : (isValid ? defaultColor : Colors.redAccent);
+    final fgcolor = isHighlighted
+        ? Colors.deepPurple
+        : (isValid ? defaultColor : Colors.redAccent);
     return SizedBox(
       width: cellSize / count,
       height: cellSize / count,
       child: Center(
         child: Text(
           letter,
-          style: TextStyle(fontSize: cellSize * cellSizeToFontSize / count, color: fgcolor),
+          style: TextStyle(
+            fontSize: cellSize * cellSizeToFontSize / count,
+            color: fgcolor,
+          ),
         ),
       ),
     );
@@ -150,22 +166,17 @@ class LetterGroup extends CellsCentricConstraint {
 
   @override
   Move? apply(Puzzle puzzle) {
-    final myColors = indices.map((idx) => puzzle.getValue(idx)).where((value) => value != 0);
+    final myColors = indices
+        .map((idx) => puzzle.getValue(idx))
+        .where((value) => value != 0);
     if (myColors.isEmpty) return null;
     final myColor = myColors.first;
-    final otherLetters = puzzle.constraints.whereType<LetterGroup>().where((c) => c.letter != letter).map((c) => c.indices).flattenedToList;
-    final neighborWithLetters = indices.map((idx) => puzzle.getNeighbors(idx)).flattened.where((nei) => otherLetters.contains(nei));
+    final otherLetters = puzzle.constraints
+        .whereType<LetterGroup>()
+        .where((c) => c.letter != letter)
+        .map((c) => c.indices)
+        .flattenedToList;
     final myOpposite = puzzle.domain.whereNot((v) => v == myColor).first;
-    // Apply opposite color to neighbors_with_letters
-    for(var nei in neighborWithLetters) {
-      final neiValue = puzzle.getValue(nei);
-      if (neiValue == myColor) {
-        return Move(nei, myOpposite, this, isImpossible: this);
-      }
-      if (neiValue == 0) {
-        return Move(nei, myOpposite, this);
-      }
-    }
     // Apply color to other members of the letter group
     for (var member in indices) {
       final memberValue = puzzle.getValue(member);
@@ -176,25 +187,65 @@ class LetterGroup extends CellsCentricConstraint {
         return Move(member, myColor, this);
       }
     }
-    // If not connected yet, find members that only have one empty neighbor
     final allGroups = puzzle.getGroups();
-    final sameGroup = allGroups.where(
-      (grp) {
-        return grp.toSet().intersection(indices.toSet()).length == indices.length;
+    final myGroupsJoined = allGroups
+        .where((grp) => grp.toSet().intersection(indices.toSet()).isNotEmpty)
+        .flattened;
+    final neighborWithLetters = myGroupsJoined
+        .map((idx) => puzzle.getNeighbors(idx))
+        .flattened
+        .where((nei) => otherLetters.contains(nei));
+    // Apply opposite color to neighbors_with_letters
+    for (var nei in neighborWithLetters) {
+      final neiValue = puzzle.getValue(nei);
+      if (neiValue == myColor) {
+        return Move(nei, myOpposite, this, isImpossible: this);
       }
-    ).isNotEmpty;
-    if (!sameGroup) {
-      for (var member in indices) {
-        final memberGroup = allGroups.where((grp) => grp.contains(member)).first;
-        final Set<int> groupFreeNeighbors = {};
-        for (var groupCell in memberGroup) {
-          groupFreeNeighbors.addAll(puzzle.getNeighbors(groupCell).where((idx) => puzzle.getValue(idx) == 0));
-        }
-        if (groupFreeNeighbors.length == 1) {
-          return Move(groupFreeNeighbors.first, myColor, this);
+      if (neiValue == 0) {
+        return Move(nei, myOpposite, this);
+      }
+    }
+    // If not connected yet, find members that only have one empty neighbor
+    final sameGroup = allGroups.where((grp) {
+      return grp.toSet().intersection(indices.toSet()).length == indices.length;
+    }).isNotEmpty;
+    final Set<int> groupFreeNeighbors = {};
+    for (var member in indices) {
+      final memberGroup = allGroups.where((grp) => grp.contains(member)).first;
+      for (var groupCell in memberGroup) {
+        groupFreeNeighbors.addAll(
+          puzzle
+              .getNeighbors(groupCell)
+              .where((idx) => puzzle.getValue(idx) == 0),
+        );
+      }
+    }
+    if (!sameGroup && groupFreeNeighbors.length == 1) {
+      return Move(groupFreeNeighbors.first, myColor, this);
+    }
+    // Find cells that would create a conflict if set
+    // We need to find all the neighbors of this letter group that
+    // are also neighbor of another letter of the same color
+    final otherSameColor = otherLetters.where(
+      (idx) => puzzle.cellValues[idx] == myColor,
+    );
+    final otherGroups = allGroups
+        .where(
+          (grp) => grp.toSet().intersection(otherSameColor.toSet()).isNotEmpty,
+        )
+        .flattened;
+    if (otherSameColor.isNotEmpty) {
+      for (final groupFreeNeighbor in groupFreeNeighbors) {
+        final neighborNeighborsWithOtherLetters = puzzle
+            .getNeighbors(groupFreeNeighbor)
+            .where((nei) => otherGroups.contains(nei));
+        if (neighborNeighborsWithOtherLetters.isNotEmpty) {
+          // We know that groupFreeNeighbor can't be myColor
+          return Move(groupFreeNeighbor, myOpposite, this);
         }
       }
     }
+
     // Now, find if other members of the letter group are disconnected and raise
     var foundVGroup = false;
     for (var vgroup in puzzle.toVirtualGroups()) {
@@ -205,7 +256,7 @@ class LetterGroup extends CellsCentricConstraint {
       }
     }
     if (!foundVGroup) {
-        return Move(0, 0, this, isImpossible: this);
+      return Move(0, 0, this, isImpossible: this);
     }
     return null;
   }
