@@ -195,6 +195,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       topMessage = "";
       history = [];
+      betweenPuzzles = false;
       currentPuzzle!.restart();
       currentPuzzle!.clearConstraintsValidity();
       currentPuzzle!.clearHighlights();
@@ -206,6 +207,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void undo() {
     if (currentPuzzle == null || history.isEmpty) return;
     setState(() {
+      betweenPuzzles = false;
       currentPuzzle!.resetCell(history.removeLast());
       currentPuzzle!.clearConstraintsValidity();
       currentPuzzle!.clearHighlights();
