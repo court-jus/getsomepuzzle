@@ -25,7 +25,7 @@ import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.3.6";
+const versionText = "Version 1.3.7";
 
 void main() {
   Logger.root.level = Level.ALL; // defaults to Level.INFO
@@ -84,7 +84,8 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   bool helpVisible = false;
   String locale = "en";
-  String topMessage = versionText;
+  String topMessage = "";
+  Color topMessageColor = Colors.black;
   String bottomMessage = "";
   PuzzleData? currentMeta;
   Puzzle? currentPuzzle;
@@ -165,6 +166,13 @@ class _MyHomePageState extends State<MyHomePage> {
     saveChosenLocale(newLocale);
   }
 
+  void setTopMessage({ String text = "", Color color = Colors.black }) {
+    setState(() {
+      topMessage = text;
+      topMessageColor = color;
+    });
+  }
+
   void loadPuzzle() async {
     if (database == null) return;
     final nextPuzzle = database!.next();
@@ -196,7 +204,8 @@ class _MyHomePageState extends State<MyHomePage> {
   void restartPuzzle() {
     if (currentPuzzle == null) return;
     setState(() {
-      topMessage = "";
+      setTopMessage();
+      topMessageColor = Colors.black;
       history = [];
       betweenPuzzles = false;
       currentPuzzle!.restart();
@@ -214,7 +223,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle!.resetCell(history.removeLast());
       currentPuzzle!.clearConstraintsValidity();
       currentPuzzle!.clearHighlights();
-      topMessage = "";
+      setTopMessage();
       betweenPuzzles = false;
       helpMe();
     });
@@ -236,6 +245,19 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void handleCheck() {
+      if (settings.validateType == ValidateType.manual) return;
+      if (settings.liveCheckType == LiveCheckType.all || settings.liveCheckType == LiveCheckType.count) {
+        shouldCheck = true;
+        autoCheck();
+        return;
+      }
+      shouldCheck = currentPuzzle!.complete;
+      if (shouldCheck) {
+        Future.delayed(Duration(seconds: 1), autoCheck);
+      }
+  }
+
   void handlePuzzleTap(int idx) {
     if (currentPuzzle == null) return;
     if (currentPuzzle!.cells[idx].readonly) {
@@ -248,16 +270,7 @@ class _MyHomePageState extends State<MyHomePage> {
       helpMove = null;
       helpMe();
       if (history.isEmpty || history.last != idx) history.add(idx);
-      if (settings.validateType == ValidateType.manual) return;
-      if (settings.liveCheckType == LiveCheckType.all || settings.liveCheckType == LiveCheckType.count) {
-        shouldCheck = true;
-        autoCheck();
-        return;
-      }
-      shouldCheck = currentPuzzle!.complete;
-      if (shouldCheck) {
-        Future.delayed(Duration(seconds: 1), autoCheck);
-      }
+      handleCheck();
     });
   }
 
@@ -284,12 +297,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       firstDragValue = null;
       lastDragIdx = null;
-      shouldCheck = currentPuzzle!.complete;
-      if (shouldCheck) {
-        Future.delayed(Duration(seconds: 1), autoCheck);
-      } else {
-        currentPuzzle!.clearConstraintsValidity();
-      }
+      handleCheck();
     });
   }
 
@@ -324,12 +332,12 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       if (failedConstraints.isNotEmpty) {
         if (shouldShowErrors) {
-          topMessage = "Some constraints are not valid.";
+          setTopMessage(text: "Some constraints are not valid.", color: Colors.red);
         } else {
-          topMessage = "${failedConstraints.length} errors.";
+          setTopMessage(text: "${failedConstraints.length} errors.", color: Colors.red);
         }
       } else {
-        topMessage = "";
+        setTopMessage();
       }
     });
   }
@@ -581,7 +589,14 @@ class _MyHomePageState extends State<MyHomePage> {
             mainAxisAlignment: MainAxisAlignment.center,
             spacing: 2,
             children: <Widget>[
-              Text(topMessage),
+              Text(
+                topMessage,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: topMessageColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               (initialized && !shouldChooseLocale)
                   ? Stack(
                       alignment: AlignmentGeometry.center,
