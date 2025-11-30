@@ -346,6 +346,24 @@ abstract class AppLocalizations {
   /// **'Automatic'**
   String get settingValidateTypeAutomatic;
 
+  /// Does the player want to rate each of the played puzzles?
+  ///
+  /// In en, this message translates to:
+  /// **'Show rating'**
+  String get settingShowRating;
+
+  /// The player wants to rate each puzzle
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get settingShowRatingYes;
+
+  /// The player does not want to rate each puzzle
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get settingShowRatingNo;
+
   /// Does the player want a live check for errors?
   ///
   /// In en, this message translates to:

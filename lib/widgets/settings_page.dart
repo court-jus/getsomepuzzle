@@ -17,25 +17,38 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-
   @override
   void initState() {
     super.initState();
   }
-  
+
   @override
   Widget build(BuildContext context) {
-
     final Map<ValidateType, String> settingsValidateType = {
-      ValidateType.manual: AppLocalizations.of(context)!.settingValidateTypeManual,
-      ValidateType.intermediate: AppLocalizations.of(context)!.settingValidateTypeDefault,
-      ValidateType.automatic: AppLocalizations.of(context)!.settingValidateTypeAutomatic,
+      ValidateType.manual: AppLocalizations.of(
+        context,
+      )!.settingValidateTypeManual,
+      ValidateType.intermediate: AppLocalizations.of(
+        context,
+      )!.settingValidateTypeDefault,
+      ValidateType.automatic: AppLocalizations.of(
+        context,
+      )!.settingValidateTypeAutomatic,
+    };
+
+    final Map<ShowRating, String> settingsShowRating = {
+      ShowRating.yes: AppLocalizations.of(context)!.settingShowRatingYes,
+      ShowRating.no: AppLocalizations.of(context)!.settingShowRatingNo,
     };
 
     final Map<LiveCheckType, String> settingsLiveCheckType = {
       LiveCheckType.all: AppLocalizations.of(context)!.settingsLiveCheckTypeAll,
-      LiveCheckType.count: AppLocalizations.of(context)!.settingsLiveCheckTypeCount,
-      LiveCheckType.complete: AppLocalizations.of(context)!.settingsLiveCheckTypeComplete,
+      LiveCheckType.count: AppLocalizations.of(
+        context,
+      )!.settingsLiveCheckTypeCount,
+      LiveCheckType.complete: AppLocalizations.of(
+        context,
+      )!.settingsLiveCheckTypeComplete,
     };
 
     return Scaffold(
@@ -56,21 +69,50 @@ class _SettingsPageState extends State<SettingsPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(AppLocalizations.of(context)!.settingValidateType),
-                        SegmentedButton(
-                          multiSelectionEnabled: false,
-                          emptySelectionAllowed: false,
-                          showSelectedIcon: false,
-                          selected: {widget.settings.validateType},
-                          onSelectionChanged: (newValue) {
+                        DropdownButton<ValidateType>(
+                          value: widget.settings.validateType,
+                          items: [
+                            DropdownMenuItem(
+                              value: ValidateType.manual,
+                              child: Text(
+                                settingsValidateType[ValidateType.manual]!,
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: ValidateType.automatic,
+                              child: Text(
+                                settingsValidateType[ValidateType.automatic]!,
+                              ),
+                            ),
+                          ],
+                          onChanged: (newValue) {
                             setState(() {
-                              widget.settings.change(ChangeableSettings(validateType: newValue.first));
+                              widget.settings.change(
+                                ChangeableSettings(validateType: newValue),
+                              );
                             });
                           },
-                          segments: ValidateType.values
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(AppLocalizations.of(context)!.settingShowRating),
+                        DropdownButton<ShowRating>(
+                          value: widget.settings.showRating,
+                          onChanged: (newValue) {
+                            setState(() {
+                              widget.settings.change(
+                                ChangeableSettings(showRating: newValue),
+                              );
+                            });
+                          },
+                          items: ShowRating.values
                               .map(
-                                (slug) => ButtonSegment(
+                                (slug) => DropdownMenuItem(
                                   value: slug,
-                                  label: Text(settingsValidateType[slug]!),
+                                  child: Text(settingsShowRating[slug]!),
                                 ),
                               )
                               .toList(),
@@ -80,34 +122,35 @@ class _SettingsPageState extends State<SettingsPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(AppLocalizations.of(context)!.settingsLiveCheckType),
-                        SegmentedButton(
-                          multiSelectionEnabled: false,
-                          emptySelectionAllowed: false,
-                          showSelectedIcon: false,
-                          selected: {widget.settings.liveCheckType},
-                          onSelectionChanged: (newValue) {
+                        Text(
+                          AppLocalizations.of(context)!.settingsLiveCheckType,
+                        ),
+                        DropdownButton<LiveCheckType>(
+                          value: widget.settings.liveCheckType,
+                          onChanged: (newValue) {
                             setState(() {
-                              widget.settings.change(ChangeableSettings(liveCheckType: newValue.first));
+                              widget.settings.change(
+                                ChangeableSettings(liveCheckType: newValue),
+                              );
                             });
                           },
-                          segments: LiveCheckType.values
+                          items: LiveCheckType.values
                               .map(
-                                (slug) => ButtonSegment(
+                                (slug) => DropdownMenuItem(
                                   value: slug,
-                                  label: Text(settingsLiveCheckType[slug]!),
+                                  child: Text(settingsLiveCheckType[slug]!),
                                 ),
                               )
                               .toList(),
                         ),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
             ),
           );
-        }
+        },
       ),
     );
   }

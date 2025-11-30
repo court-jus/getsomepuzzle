@@ -134,14 +134,23 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingValidateTypeAutomatic => 'Automático';
 
   @override
-  String get settingsLiveCheckType => 'Err';
+  String get settingShowRating => 'Calificar';
 
   @override
-  String get settingsLiveCheckTypeAll => 'Li';
+  String get settingShowRatingYes => 'Sí';
 
   @override
-  String get settingsLiveCheckTypeCount => 'Co';
+  String get settingShowRatingNo => 'No';
 
   @override
-  String get settingsLiveCheckTypeComplete => 'At';
+  String get settingsLiveCheckType => 'Comprobación de errores';
+
+  @override
+  String get settingsLiveCheckTypeAll => 'Tiempo real';
+
+  @override
+  String get settingsLiveCheckTypeCount => 'Recuento';
+
+  @override
+  String get settingsLiveCheckTypeComplete => 'Esperar';
 }

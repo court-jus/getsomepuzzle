@@ -23,14 +23,44 @@ class OpenPage extends StatefulWidget {
 
 class _OpenPageState extends State<OpenPage> {
   int matchingCount = 0;
-  Set<String> collection = {"puzzles"};
+  String collection = "puzzles";
   static const List<(String, Widget)> collections = [
     ("tutorial", Text("Tutorial")),
-    ("easy", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("1"), Icon(UniconsLine.temperature_quarter)])),
-    ("medium", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("2"), Icon(UniconsLine.temperature_half)])),
-    ("hard", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("3"), Icon(UniconsLine.temperature_three_quarter)])),
-    ("harder", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("4"), Icon(UniconsLine.temperature)])),
-    ("evil", Row(mainAxisAlignment: MainAxisAlignment.center, children:[Text("5"), Icon(UniconsLine.temperature_plus)])),
+    (
+      "easy",
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text("1"), Icon(UniconsLine.temperature_quarter)],
+      ),
+    ),
+    (
+      "medium",
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text("2"), Icon(UniconsLine.temperature_half)],
+      ),
+    ),
+    (
+      "hard",
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text("3"), Icon(UniconsLine.temperature_three_quarter)],
+      ),
+    ),
+    (
+      "harder",
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text("4"), Icon(UniconsLine.temperature)],
+      ),
+    ),
+    (
+      "evil",
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text("5"), Icon(UniconsLine.temperature_plus)],
+      ),
+    ),
   ];
 
   static const List<(String, String)> existingRules = [
@@ -45,7 +75,7 @@ class _OpenPageState extends State<OpenPage> {
   @override
   void initState() {
     super.initState();
-    collection = {widget.database.collection};
+    collection = widget.database.collection;
     updateMatchingCount();
   }
 
@@ -118,12 +148,12 @@ class _OpenPageState extends State<OpenPage> {
     });
   }
 
-  void chooseCollection(Set<String> newCollection) {
+  void chooseCollection(String newCollection) {
     setState(() {
       collection = newCollection;
     });
     widget.database
-        .loadPuzzlesFile(collection.first)
+        .loadPuzzlesFile(collection)
         .then((void _) => setState(updateMatchingCount));
   }
 
@@ -153,7 +183,9 @@ class _OpenPageState extends State<OpenPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context)!.titleOpenPuzzlePage)),
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context)!.titleOpenPuzzlePage),
+      ),
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints viewportConstraints) {
           return SingleChildScrollView(
@@ -168,47 +200,22 @@ class _OpenPageState extends State<OpenPage> {
                   children: [
                     Text(AppLocalizations.of(context)!.infoFilterCollection),
                     Divider(),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.sizeOf(context).width
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        spacing: 8,
-                        children: [
-                          Text(AppLocalizations.of(context)!.labelSelectCollection),
-                          Expanded(
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              runAlignment: WrapAlignment.start,
-                              children: 
-                                collections.map((slug) => ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth: slug.$1 == "tutorial" ? 120 : 80,
-                                  ),
-                                  child: OutlinedButton.icon(
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: Theme.of(context).colorScheme.primary,
-                                      disabledBackgroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.surfaceDim,
-                                      disabledForegroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.secondaryFixedDim,
-                                      // tooltip: AppLocalizations.of(context)!.manuallyValidatePuzzle,
-                                    ),
-                                    label: slug.$2,
-                                    onPressed: () {
-                                      chooseCollection({slug.$1});
-                                    },
-                                  ),
-                                )).toList()
-                              
-                            ),
-                          )
-                        ],
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          AppLocalizations.of(context)!.labelSelectCollection,
+                        ),
+                        DropdownButton<String>(
+                          value: collection,
+                          items: [
+                            for (final item in collections)
+                              DropdownMenuItem(value: item.$1, child: item.$2),
+                          ],
+                          onChanged: (newValue) =>
+                              chooseCollection(newValue ?? "tutorial"),
+                        ),
+                      ],
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -235,16 +242,29 @@ class _OpenPageState extends State<OpenPage> {
                           segments: [
                             ButtonSegment(
                               value: "played",
-                              label: Text(AppLocalizations.of(context)!.labelStatePlayed),
+                              label: Text(
+                                AppLocalizations.of(context)!.labelStatePlayed,
+                              ),
                             ),
                             ButtonSegment(
                               value: "skipped",
-                              label: Text(AppLocalizations.of(context)!.labelStateSkipped),
+                              label: Text(
+                                AppLocalizations.of(context)!.labelStateSkipped,
+                              ),
                             ),
-                            ButtonSegment(value: "liked", label: Text(AppLocalizations.of(context)!.labelStateLiked)),
+                            ButtonSegment(
+                              value: "liked",
+                              label: Text(
+                                AppLocalizations.of(context)!.labelStateLiked,
+                              ),
+                            ),
                             ButtonSegment(
                               value: "disliked",
-                              label: Text(AppLocalizations.of(context)!.labelStateDisliked),
+                              label: Text(
+                                AppLocalizations.of(
+                                  context,
+                                )!.labelStateDisliked,
+                              ),
                             ),
                           ],
                         ),
@@ -264,16 +284,29 @@ class _OpenPageState extends State<OpenPage> {
                           segments: [
                             ButtonSegment(
                               value: "played",
-                              label: Text(AppLocalizations.of(context)!.labelStatePlayed),
+                              label: Text(
+                                AppLocalizations.of(context)!.labelStatePlayed,
+                              ),
                             ),
                             ButtonSegment(
                               value: "skipped",
-                              label: Text(AppLocalizations.of(context)!.labelStateSkipped),
+                              label: Text(
+                                AppLocalizations.of(context)!.labelStateSkipped,
+                              ),
                             ),
-                            ButtonSegment(value: "liked", label: Text(AppLocalizations.of(context)!.labelStateLiked)),
+                            ButtonSegment(
+                              value: "liked",
+                              label: Text(
+                                AppLocalizations.of(context)!.labelStateLiked,
+                              ),
+                            ),
                             ButtonSegment(
                               value: "disliked",
-                              label: Text(AppLocalizations.of(context)!.labelStateDisliked),
+                              label: Text(
+                                AppLocalizations.of(
+                                  context,
+                                )!.labelStateDisliked,
+                              ),
                             ),
                           ],
                         ),
@@ -285,7 +318,9 @@ class _OpenPageState extends State<OpenPage> {
                           selectPuzzle(PuzzleData(value), context, false),
                       decoration: InputDecoration(
                         label: Text(
-                          AppLocalizations.of(context)!.placeholderWidgetPastePuzzle,
+                          AppLocalizations.of(
+                            context,
+                          )!.placeholderWidgetPastePuzzle,
                         ),
                       ),
                     ),
@@ -328,7 +363,9 @@ class _OpenPageState extends State<OpenPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(AppLocalizations.of(context)!.labelWidgetFillRatio),
+                        Text(
+                          AppLocalizations.of(context)!.labelWidgetFillRatio,
+                        ),
                         PlusMinusField(
                           onChanged: (minValue, maxValue) {
                             final value = RangeValues(
@@ -381,7 +418,9 @@ class _OpenPageState extends State<OpenPage> {
                           .toList(),
                     ),
                     Divider(),
-                    Text("${AppLocalizations.of(context)!.msgCountMatchingPuzzles}: $matchingCount"),
+                    Text(
+                      "${AppLocalizations.of(context)!.msgCountMatchingPuzzles}: $matchingCount",
+                    ),
                     Divider(),
                     if (widget.database.filter().isNotEmpty)
                       ElevatedButton(
@@ -391,15 +430,17 @@ class _OpenPageState extends State<OpenPage> {
                             borderRadius: BorderRadiusGeometry.circular(16),
                           ),
                         ),
-                        onPressed: () =>
-                            selectPuzzle(widget.database.playlist.first, context),
+                        onPressed: () => selectPuzzle(
+                          widget.database.playlist.first,
+                          context,
+                        ),
                         child: SizedBox(
                           height: 96,
                           child: Container(
                             alignment: AlignmentGeometry.center,
-                            child: FaIcon(FontAwesomeIcons.play, size: 80)
-                            )
-                        )
+                            child: FaIcon(FontAwesomeIcons.play, size: 80),
+                          ),
+                        ),
                       ),
                   ],
                 ),

@@ -166,15 +166,18 @@ class _MyHomePageState extends State<MyHomePage> {
     saveChosenLocale(newLocale);
   }
 
-  void setTopMessage({ String text = "", Color color = Colors.black }) {
+  void setTopMessage({String text = "", Color color = Colors.black}) {
     setState(() {
       topMessage = text;
       topMessageColor = color;
     });
   }
 
-  void loadPuzzle() async {
+  void loadPuzzle({bool skipped = false}) async {
     if (database == null) return;
+    if (currentMeta != null && skipped) {
+      currentMeta!.skipped = DateTime.now();
+    }
     final nextPuzzle = database!.next();
     log.fine("Found ${nextPuzzle?.lineRepresentation}");
     if (nextPuzzle != null) {
@@ -246,16 +249,17 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void handleCheck() {
-      if (settings.validateType == ValidateType.manual) return;
-      if (settings.liveCheckType == LiveCheckType.all || settings.liveCheckType == LiveCheckType.count) {
-        shouldCheck = true;
-        autoCheck();
-        return;
-      }
-      shouldCheck = currentPuzzle!.complete;
-      if (shouldCheck) {
-        Future.delayed(Duration(seconds: 1), autoCheck);
-      }
+    if (settings.liveCheckType == LiveCheckType.all ||
+        settings.liveCheckType == LiveCheckType.count) {
+      shouldCheck = true;
+      autoCheck();
+      return;
+    }
+    if (settings.validateType == ValidateType.manual) return;
+    shouldCheck = currentPuzzle!.complete;
+    if (shouldCheck) {
+      Future.delayed(Duration(seconds: 1), autoCheck);
+    }
   }
 
   void handlePuzzleTap(int idx) {
@@ -281,12 +285,15 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       lastDragIdx = idx;
       if (firstDragValue == null) {
-        final myOpposite = currentPuzzle!.domain.whereNot((e) => e == currentPuzzle!.cellValues[idx]).first;
+        final myOpposite = currentPuzzle!.domain
+            .whereNot((e) => e == currentPuzzle!.cellValues[idx])
+            .first;
         firstDragValue = myOpposite;
         currentPuzzle!.setValue(idx, firstDragValue!);
         if (history.isEmpty || history.last != idx) history.add(idx);
       }
-      if (currentPuzzle!.cellValues[idx] != firstDragValue && currentPuzzle!.cellValues[idx] == 0) {
+      if (currentPuzzle!.cellValues[idx] != firstDragValue &&
+          currentPuzzle!.cellValues[idx] == 0) {
         currentPuzzle!.setValue(idx, firstDragValue!);
         if (history.isEmpty || history.last != idx) history.add(idx);
       }
@@ -308,14 +315,15 @@ class _MyHomePageState extends State<MyHomePage> {
     checkPuzzle();
   }
 
-  void checkPuzzle() {
+  void checkPuzzle({bool manualCheck = false}) {
     final shouldShowErrors =
         settings.liveCheckType == LiveCheckType.all || currentPuzzle!.complete;
     final failedConstraints = currentPuzzle!.check(
       saveResult: shouldShowErrors,
     );
     if (failedConstraints.isEmpty) {
-      if (currentPuzzle!.complete) {
+      if (currentPuzzle!.complete &&
+          (manualCheck || settings.validateType != ValidateType.manual)) {
         currentMeta!.stop();
         setState(() {
           if (settings.validateType == ValidateType.automatic) {
@@ -332,9 +340,15 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       if (failedConstraints.isNotEmpty) {
         if (shouldShowErrors) {
-          setTopMessage(text: "Some constraints are not valid.", color: Colors.red);
+          setTopMessage(
+            text: "Some constraints are not valid.",
+            color: Colors.red,
+          );
         } else {
-          setTopMessage(text: "${failedConstraints.length} errors.", color: Colors.red);
+          setTopMessage(
+            text: "${failedConstraints.length} errors.",
+            color: Colors.red,
+          );
         }
       } else {
         setTopMessage();
@@ -432,7 +446,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   // tooltip: AppLocalizations.of(context)!.manuallyValidatePuzzle,
                 ),
                 onPressed: (currentPuzzle!.complete && !betweenPuzzles)
-                    ? checkPuzzle
+                    ? () => checkPuzzle(manualCheck: true)
                     : null,
                 icon: const Icon(Icons.check),
                 label: Text(
@@ -505,7 +519,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 leading: Icon(Icons.fiber_new),
                 title: Text(AppLocalizations.of(context)!.newgame),
                 onTap: () {
-                  loadPuzzle();
+                  loadPuzzle(skipped: true);
                   Navigator.pop(context);
                 },
               ),

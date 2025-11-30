@@ -1,4 +1,4 @@
-    {
+{
     "@@locale": "es",
     "help": "Ayuda",
     "stats": "Stats",
@@ -41,8 +41,11 @@
     "settingValidateTypeManual": "A mano",
     "settingValidateTypeDefault": "Predeterminado",
     "settingValidateTypeAutomatic": "Automático",
-    "settingsLiveCheckType": "Err",
-    "settingsLiveCheckTypeAll": "Li",
-    "settingsLiveCheckTypeCount": "Co",
-    "settingsLiveCheckTypeComplete": "At"
+    "settingShowRating": "Calificar",
+    "settingShowRatingYes": "Sí",
+    "settingShowRatingNo": "No",
+    "settingsLiveCheckType": "Comprobación de errores",
+    "settingsLiveCheckTypeAll": "Tiempo real",
+    "settingsLiveCheckTypeCount": "Recuento",
+    "settingsLiveCheckTypeComplete": "Esperar"
 }

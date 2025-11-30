@@ -164,6 +164,18 @@
     "@settingValidateTypeAutomatic": {
         "description": "The player wants to move on to the next puzzle automatically"
     },
+    "settingShowRating": "Show rating",
+    "@settingShowRating": {
+        "description": "Does the player want to rate each of the played puzzles?"
+    },
+    "settingShowRatingYes": "Yes",
+    "@settingShowRatingYes": {
+        "description": "The player wants to rate each puzzle"
+    },
+    "settingShowRatingNo": "No",
+    "@settingShowRatingNo": {
+        "description": "The player does not want to rate each puzzle"
+    },
     "settingsLiveCheckType": "Errors check",
     "@settingsLiveCheckType": {
         "description": "Does the player want a live check for errors?"

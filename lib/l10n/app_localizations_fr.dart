@@ -134,13 +134,22 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingValidateTypeAutomatic => 'Automatique';
 
   @override
+  String get settingShowRating => 'Noter les puzzles';
+
+  @override
+  String get settingShowRatingYes => 'Oui';
+
+  @override
+  String get settingShowRatingNo => 'Non';
+
+  @override
   String get settingsLiveCheckType => 'Erreurs';
 
   @override
-  String get settingsLiveCheckTypeAll => 'Live';
+  String get settingsLiveCheckTypeAll => 'Temps réel';
 
   @override
-  String get settingsLiveCheckTypeCount => 'Compte';
+  String get settingsLiveCheckTypeCount => 'Décompte';
 
   @override
   String get settingsLiveCheckTypeComplete => 'Attendre';

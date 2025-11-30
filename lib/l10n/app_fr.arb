@@ -41,8 +41,11 @@
     "settingValidateTypeManual": "Manuel",
     "settingValidateTypeDefault": "Par défaut",
     "settingValidateTypeAutomatic": "Automatique",
+    "settingShowRating": "Noter les puzzles",
+    "settingShowRatingYes": "Oui",
+    "settingShowRatingNo": "Non",
     "settingsLiveCheckType": "Erreurs",
-    "settingsLiveCheckTypeAll": "Live",
-    "settingsLiveCheckTypeCount": "Compte",
+    "settingsLiveCheckTypeAll": "Temps réel",
+    "settingsLiveCheckTypeCount": "Décompte",
     "settingsLiveCheckTypeComplete": "Attendre"
 }
