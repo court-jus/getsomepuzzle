@@ -43,7 +43,7 @@ class ParityConstraint extends CellsCentricConstraint {
       "bottom": Icons.arrow_circle_down_outlined,
     };
     final fgcolor = isHighlighted
-        ? Colors.deepPurple
+        ? highlightColor
         : (isValid ? defaultColor : Colors.redAccent);
     if (icons.containsKey(side)) {
       return SizedBox(

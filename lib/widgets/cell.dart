@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 
 const bgColors = {0: Colors.cyan, 1: Colors.black, 2: Colors.white};
@@ -44,11 +45,11 @@ class CellWidget extends StatelessWidget {
       // 1: 1, 2: 2, 3: 2, 4: 2, 5: 3
       widgetScale = sqrt(constraints!.length).ceil();
     }
-    // final Widget emptyText = Text(" ");
-    final Widget emptyText = Text(
-      idx.toString(),
-      style: TextStyle(color: (fgColors[value] ?? Colors.black)),
-    );
+    final Widget emptyText = Text(" ");
+    // final Widget emptyText = Text(
+    //   idx.toString(),
+    //   style: TextStyle(color: (fgColors[value] ?? Colors.black)),
+    // );
     final Widget label = constraints == null
         ? emptyText
         : Wrap(
@@ -57,7 +58,7 @@ class CellWidget extends StatelessWidget {
               for (final constraint in constraints!)
                 constraint.toWidget(
                   constraint.isHighlighted
-                      ? Colors.deepPurple
+                      ? highlightColor
                       : (fgColors[value] ?? Colors.black),
                   cellSize,
                   count: widgetScale,
@@ -78,8 +79,8 @@ class CellWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           border: BoxBorder.all(
-            width: (readonly || isHighlighted) ? 8 : 1,
-            color: isHighlighted ? Colors.deepPurple : Colors.blueAccent,
+            width: (readonly || isHighlighted) ? 6 : 1,
+            color: isHighlighted ? highlightColor : Colors.blueAccent,
           ),
         ),
         child: SizedBox(

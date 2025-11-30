@@ -80,7 +80,7 @@ class PuzzleWidget extends StatelessWidget {
                       ? forbiddenColor
                       : mandatoryColor,
                   borderColor: constraint.isHighlighted
-                      ? Colors.deepPurple
+                      ? highlightColor
                       : (constraint.isValid ? Colors.green : Colors.red),
                   isHighlighted: constraint.isHighlighted,
                   cellSize: topBarConstraintsSize,
@@ -91,7 +91,7 @@ class PuzzleWidget extends StatelessWidget {
                   count: constraint.count,
                   bgColor: mandatoryColor,
                   borderColor: constraint.isHighlighted
-                      ? Colors.deepPurple
+                      ? highlightColor
                       : (constraint.isValid ? Colors.green : Colors.red),
                   cellSize: topBarConstraintsSize,
                 )

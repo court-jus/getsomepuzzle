@@ -4,6 +4,7 @@ import 'package:flutter_md/flutter_md.dart';
 const cellSizeToFontSize = 48.0 / 64.0;
 const minConstraintsInTopBarSize = 60.0;
 const motifConstraintInTopBarFillRatio = 0.7;
+const highlightColor = Colors.deepOrange;
 
 final mdTheme = MarkdownThemeData(
   textStyle: TextStyle(fontSize: 16.0, color: Colors.black87),

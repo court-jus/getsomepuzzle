@@ -27,7 +27,7 @@ class GroupSize extends CellsCentricConstraint {
   @override
   Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
     final fgcolor = isHighlighted
-        ? Colors.deepPurple
+        ? highlightColor
         : (isValid ? defaultColor : Colors.redAccent);
     return SizedBox(
       width: cellSize / count,
@@ -117,7 +117,7 @@ class LetterGroup extends CellsCentricConstraint {
   @override
   Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
     final fgcolor = isHighlighted
-        ? Colors.deepPurple
+        ? highlightColor
         : (isValid ? defaultColor : Colors.redAccent);
     return SizedBox(
       width: cellSize / count,
