@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
@@ -130,7 +131,10 @@ class Filters {
       wantedRules = (prefs.getStringList("wantedRulesFilter") ?? []).toSet();
       bannedRules = (prefs.getStringList("bannedRulesFilter") ?? []).toSet();
       wantedFlags = (prefs.getStringList("wantedFlagsFilter") ?? []).toSet();
-      bannedFlags = (prefs.getStringList("bannedFlagsFilter") ?? ["played", "skipped", "disliked"]).toSet();
+      bannedFlags =
+          (prefs.getStringList("bannedFlagsFilter") ??
+                  ["played", "skipped", "disliked"])
+              .toSet();
     } on TypeError {
       save();
     } catch (e) {
@@ -208,7 +212,8 @@ class Database {
       if (puz.played && currentFilters.bannedFlags.contains("played")) {
         return false;
       }
-      if (puz.skipped != null && currentFilters.bannedFlags.contains("skipped")) {
+      if (puz.skipped != null &&
+          currentFilters.bannedFlags.contains("skipped")) {
         return false;
       }
       if (puz.liked != null && currentFilters.bannedFlags.contains("liked")) {
@@ -222,7 +227,8 @@ class Database {
       if (!puz.played && currentFilters.wantedFlags.contains("played")) {
         return false;
       }
-      if (puz.skipped == null && currentFilters.wantedFlags.contains("skipped")) {
+      if (puz.skipped == null &&
+          currentFilters.wantedFlags.contains("skipped")) {
         return false;
       }
       if (puz.liked == null && currentFilters.wantedFlags.contains("liked")) {
@@ -266,55 +272,54 @@ class Database {
     String assetContent;
     try {
       assetContent = await rootBundle.loadString('assets/$collection.txt');
-    } catch(_) {
+    } catch (_) {
       assetContent = await rootBundle.loadString('assets/tutorial.txt');
     }
     load(assetContent.split("\n"));
     await currentFilters.load();
     final List<String> stats = [];
-    String statsName = "stats_$collection";
-    if (collection == "puzzles") statsName = "stats";
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      stats.addAll(prefs.getStringList(statsName) ?? []);
+      print(prefs.getKeys());
+      for (final key in prefs.getKeys()) {
+        if (key.startsWith("stats")) {
+          stats.addAll(prefs.getStringList(key) ?? []);
+        }
+      }
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
       final path = p.join(documentsDirectory.path, "getsomepuzzle");
+      final pattern = p.join(path, "stats");
       await Directory(path).create(recursive: true);
-      String filePath = p.join(path, "$statsName.txt");
-      log.fine("Loading stats from $filePath");
-      final file = File(filePath);
-      if (!(await file.exists())) {
-        log.warning("Stats file does not exist");
-        file.createSync();
+      for (final file in Directory(path).listSync()) {
+        if (file.path.contains(pattern)) {
+          log.fine("Loading stats from ${file.path}");
+          final fileIo = File(file.path);
+          final content = await fileIo.readAsString();
+          stats.addAll(content.split("\n"));
+        }
       }
-      final content = await file.readAsString();
-      stats.addAll(content.split("\n"));
     }
-    log.finest("Stats to load $stats");
     loadStats(stats);
     preparePlaylist();
   }
 
   Future<void> writeStats() async {
     final List<String> stats = getStats();
-    String statsName = "stats_$collection";
-    if (collection == "puzzles") statsName = "stats";
+    log.fine("Writing stats");
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      log.fine("Writing stats to $statsName");
-      await prefs.setStringList(statsName, stats);
+      await prefs.setStringList("stats", stats);
       return;
     }
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = p.join(documentsDirectory.path, "getsomepuzzle");
     await Directory(path).create(recursive: true);
-    final filePath = p.join(path, "$statsName.txt");
-    log.fine("Writing stats to $filePath");
+    final filePath = p.join(path, "stats.txt");
     final file = File(filePath);
 
     file.writeAsStringSync(
-      stats.join("\n"),
+      stats.sorted().join("\n"),
       mode: FileMode.writeOnly,
       flush: true,
     );
