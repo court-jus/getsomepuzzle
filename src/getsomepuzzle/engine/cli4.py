@@ -208,7 +208,7 @@ def playground():
     # Generate all possible constraints
     all_constraints = []
     for rule in AVAILABLE_RULES:
-        for params in rule.generate_all_parameters(pu):
+        for params in rule.generate_all_parameters(pu.width, pu.height, tuple(pu.domain)):
             all_constraints.append(rule(**params))
     write_at(0, 30, "All: "+ str(len(all_constraints)))
     random.shuffle(all_constraints)
@@ -349,7 +349,7 @@ def all_possible_constraints():
     # Generate all possible constraints
     all_constraints = []
     for rule in AVAILABLE_RULES:
-        for params in rule.generate_all_parameters(pu):
+        for params in rule.generate_all_parameters(pu.width, pu.height, tuple(pu.domain)):
             all_constraints.append(rule(**params))
     print("All:", len(all_constraints))
     # Randomize the content of the grid

@@ -92,6 +92,8 @@ class GroupSize extends CellsCentricConstraint {
       } else if (myGroup.length < size && groupFreeNeighbors.isEmpty) {
         return Move(0, 0, this, isImpossible: this);
       }
+      // TODO: If extending in a direction would merge me with another group and create a "too big group",
+      // then add a boundary in that direction, it is forbidden to grow there
     }
     return null;
   }

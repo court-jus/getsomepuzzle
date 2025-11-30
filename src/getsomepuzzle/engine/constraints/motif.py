@@ -49,13 +49,12 @@ class Motif(Constraint):
 
         return {"motif": motif}
 
-
     @staticmethod
-    def generate_all_parameters(puzzle):
-        w = puzzle.width
-        h = puzzle.height
+    def generate_all_parameters(width, height, domain):
+        w = width
+        h = height
 
-        all_11 = [str(EMPTY)] + [str(v) for v in puzzle.domain]
+        all_11 = [str(EMPTY)] + [str(v) for v in domain]
         all_12 = ["".join([i, j]) for i in all_11 for j in all_11]
         all_13 = ["".join([i, j]) for i in all_11 for j in all_12]
         all_21 = [[i, j] for i in all_11 for j in all_11]
@@ -77,10 +76,10 @@ class Motif(Constraint):
                 all_motifs = all_motifs + all_33
         for motif in all_motifs:
             if (
-                all(i == str(EMPTY) for i in motif[0]) or
-                all(i == str(EMPTY) for i in motif[-1]) or
-                all(r[0] == str(EMPTY) for r in motif) or
-                all(r[-1] == str(EMPTY) for r in motif)
+                all(i == str(EMPTY) for i in motif[0])
+                or all(i == str(EMPTY) for i in motif[-1])
+                or all(r[0] == str(EMPTY) for r in motif)
+                or all(r[-1] == str(EMPTY) for r in motif)
             ):
                 continue
             yield {"motif": motif}
@@ -91,12 +90,17 @@ class Motif(Constraint):
 
         smotif, omotif = self.parameters["motif"], other.parameters["motif"]
         basic_patterns = [
-            ["11"], ["22"], ["1", "1"], ["2", "2"],
+            ["11"],
+            ["22"],
+            ["1", "1"],
+            ["2", "2"],
         ]
         if smotif in basic_patterns and omotif in basic_patterns:
             return True
         novice_patterns = [["12"], ["21"], ["1", "2"], ["2", "1"]]
-        if (smotif in novice_patterns and omotif in basic_patterns) or (smotif in basic_patterns and omotif in novice_patterns):
+        if (smotif in novice_patterns and omotif in basic_patterns) or (
+            smotif in basic_patterns and omotif in novice_patterns
+        ):
             return True
 
         if Motif._is_present(smotif, "".join(omotif), len(omotif[0])):
@@ -124,7 +128,7 @@ class Motif(Constraint):
             m = more.match(subst)
             if m:
                 if debug:
-                    print("found at", idx, "(", subst ,")", m.start())
+                    print("found at", idx, "(", subst, ")", m.start())
                 return True, idx
         if debug:
             print("not found")
@@ -144,10 +148,7 @@ class Motif(Constraint):
     @staticmethod
     def line_import(line):
         lines = line.split(".")
-        motif = [
-            "".join([v for v in row])
-            for row in lines
-        ]
+        motif = ["".join([v for v in row]) for row in lines]
         return {"motif": motif}
 
     def signature(self):
@@ -164,10 +165,18 @@ class Motif(Constraint):
     @staticmethod
     def find_submotif(strmotif, puzzle, debug=False):
         if debug:
-            print("all motifs", [
-                (car, idx, strmotif[idx], replace_char_at_idx(strmotif, idx, str(EMPTY)))
-                for idx, car in enumerate(strmotif)
-            ])
+            print(
+                "all motifs",
+                [
+                    (
+                        car,
+                        idx,
+                        strmotif[idx],
+                        replace_char_at_idx(strmotif, idx, str(EMPTY)),
+                    )
+                    for idx, car in enumerate(strmotif)
+                ],
+            )
         for idx, car, submotif in [
             (idx, strmotif[idx], replace_char_at_idx(strmotif, idx, str(EMPTY)))
             for idx, car in enumerate(strmotif)
@@ -175,7 +184,11 @@ class Motif(Constraint):
         ]:
             if debug:
                 print("Try submotif", submotif)
-            present, where = Motif._is_present(submotif.split("."), "".join(str(c.value) for c in puzzle.state), puzzle.width)
+            present, where = Motif._is_present(
+                submotif.split("."),
+                "".join(str(c.value) for c in puzzle.state),
+                puzzle.width,
+            )
             if present:
                 return where, idx, car, submotif
 
@@ -192,26 +205,68 @@ class Motif(Constraint):
 
             where, idx, car, submotif = submotif
             if debug:
-                print("In the puzzle, at idx", where, "we found the submotif", submotif, "(that was built by replacing car", car, "at idx", idx, "in the main motif", ".".join(motif), ")")
-            ridx = (idx // (mow + 1))
-            cidx = (idx % (mow + 1))
+                print(
+                    "In the puzzle, at idx",
+                    where,
+                    "we found the submotif",
+                    submotif,
+                    "(that was built by replacing car",
+                    car,
+                    "at idx",
+                    idx,
+                    "in the main motif",
+                    ".".join(motif),
+                    ")",
+                )
+            ridx = idx // (mow + 1)
+            cidx = idx % (mow + 1)
             if debug:
-                print("In the submotif, the car replaced was at", cidx, "x", ridx, "(I", idx, "M", mow, ")")
-            wridx = (where // puzzle.width)
-            wcidx = (where % puzzle.width)
+                print(
+                    "In the submotif, the car replaced was at",
+                    cidx,
+                    "x",
+                    ridx,
+                    "(I",
+                    idx,
+                    "M",
+                    mow,
+                    ")",
+                )
+            wridx = where // puzzle.width
+            wcidx = where % puzzle.width
             if debug:
-                print("The stuff was found at", where, ":", wcidx, "x", wridx, "in the puzzle")
+                print(
+                    "The stuff was found at",
+                    where,
+                    ":",
+                    wcidx,
+                    "x",
+                    wridx,
+                    "in the puzzle",
+                )
             fridx = wridx + ridx
             fcidx = wcidx + cidx
             fidx = fridx * puzzle.width + fcidx
             if debug:
-                print("So the cell at", fidx, "(", fcidx, "x", fridx, ") cannot equal", car)
+                print(
+                    "So the cell at",
+                    fidx,
+                    "(",
+                    fcidx,
+                    "x",
+                    fridx,
+                    ") cannot equal",
+                    car,
+                )
             if puzzle.state[fidx].value == int(car):
-                raise CannotApplyConstraint(f"Cannot apply FM {motif} because {fidx + 1} == {int(car)}")
+                raise CannotApplyConstraint(
+                    f"Cannot apply FM {motif} because {fidx + 1} == {int(car)}"
+                )
             opposite = [v for v in puzzle.domain if v != int(car)][0]
             changed = puzzle.state[fidx].set_value(opposite)
             result |= changed
         return result
+
 
 class ForbiddenMotif(Motif):
     slug = "FM"
@@ -225,8 +280,8 @@ class ForbiddenMotif(Motif):
         return not super().is_present(puzzle, debug=debug)
 
     @staticmethod
-    def maximum_presence(puzzle):
-        return puzzle.width
+    def maximum_presence(w, h):
+        return w
 
 
 class RequiredMotif(Motif):
@@ -241,5 +296,5 @@ class RequiredMotif(Motif):
         return super().is_present(puzzle, debug=debug)
 
     @staticmethod
-    def maximum_presence(puzzle):
-        return puzzle.width
+    def maximum_presence(w, h):
+        return w

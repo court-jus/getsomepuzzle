@@ -21,7 +21,7 @@ class AllDifferentConstraint(Constraint):
         return True
 
     @staticmethod
-    def maximum_presence(*_a):
+    def maximum_presence(w, h):
         return 1
 
     def line_export(self):

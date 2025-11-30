@@ -153,10 +153,10 @@ class ParityConstraint(CellCentricConstraint):
             return {"indices": [col + row * puzzle.width], "side": side}
 
     @staticmethod
-    def generate_all_parameters(puzzle):
-        w = puzzle.width
-        h = puzzle.height
-        for idx in range(len(puzzle.state)):
+    def generate_all_parameters(width, height, domain):
+        w = width
+        h = height
+        for idx in range(w * h):
             ridx = idx // w
             cidx = idx % w
             left_size = cidx
@@ -201,8 +201,8 @@ class ParityConstraint(CellCentricConstraint):
         return result
 
     @staticmethod
-    def maximum_presence(puzzle):
-        return int((puzzle.width * puzzle.height) / 5)
+    def maximum_presence(w, h):
+        return int((w * h) / 5)
 
     def line_export(self):
         indices, side = self.parameters["indices"], self.parameters["side"]

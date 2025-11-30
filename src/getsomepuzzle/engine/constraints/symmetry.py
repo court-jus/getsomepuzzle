@@ -50,7 +50,9 @@ class SymmetryConstraint(CellCentricConstraint):
             sym = self._compute_symmetry(puzzle, cellidx, debug=debug)
             if sym is None:
                 # The target cell is outside of the grid
-                raise CannotApplyConstraint("The symmetry constraint cannot extend past the borders of the puzzle.")
+                raise CannotApplyConstraint(
+                    "The symmetry constraint cannot extend past the borders of the puzzle."
+                )
             if puzzle.state[sym].free():
                 # The target cell is free, set its value to my_color
                 changed |= puzzle.set_value(sym, my_color)
@@ -142,8 +144,8 @@ class SymmetryConstraint(CellCentricConstraint):
         return {"indices": [idx], "axis": axis}
 
     @staticmethod
-    def generate_all_parameters(puzzle):
-        for idx in range(len(puzzle.state)):
+    def generate_all_parameters(width, height, domain):
+        for idx in range(width * height):
             for axis in AXIS:
                 yield {"indices": [idx], "axis": axis}
 

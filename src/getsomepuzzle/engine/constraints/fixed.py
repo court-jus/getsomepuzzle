@@ -30,9 +30,9 @@ class FixedValueConstraint(Constraint):
         }
 
     @staticmethod
-    def generate_all_parameters(puzzle):
-        for idx in range(len(puzzle.state)):
-            for val in puzzle.domain:
+    def generate_all_parameters(width, height, domain):
+        for idx in range(width * height):
+            for val in domain:
                 yield {"idx": idx, "val": val}
 
     def conflicts(self, other):
@@ -50,6 +50,6 @@ class FixedValueConstraint(Constraint):
         return {"idx": int(idx), "val": int(val)}
 
     @staticmethod
-    def maximum_presence(puzzle):
-        return max(puzzle.width, puzzle.height)
+    def maximum_presence(w, h):
+        return max(w, h)
 

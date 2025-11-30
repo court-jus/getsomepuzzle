@@ -3,11 +3,15 @@ import random
 from pathlib import Path
 
 from getsomepuzzle.engine.puzzle import Puzzle
-from getsomepuzzle.engine.constraints import FixedValueConstraint, AVAILABLE_RULES
+from getsomepuzzle.engine.constraints import FixedValueConstraint, ForbiddenMotif, AVAILABLE_RULES
 from getsomepuzzle.engine.utils import FakeEvent, line_export
 
 
 def buildapuzzle(width, height, ratio, verbose=False, progress=True, extra_text=""):
+    available_rules = [
+        r for r in AVAILABLE_RULES
+        # if r is not ForbiddenMotif
+    ]
     running = FakeEvent()
     solved = Puzzle(running=running, width=width, height=height)
     pu = solved.clone()
@@ -31,23 +35,40 @@ def buildapuzzle(width, height, ratio, verbose=False, progress=True, extra_text=
 
     # Generate all possible constraints
     all_constraints = []
-    for rule in [r for r in AVAILABLE_RULES if r != FixedValueConstraint]:
-        for params in rule.generate_all_parameters(solved):
+    for rule in [r for r in available_rules if r != FixedValueConstraint]:
+        for params in rule.generate_all_parameters(width, height, tuple(solved.domain)):
             constraint = rule(**params)
             if constraint.check(solved):
                 all_constraints.append(constraint)
     total = len(all_constraints)
     random.shuffle(all_constraints)
+
+    # Priority to the less used constraints globally
+    usage = {
+        "FM": 15379,
+        "QA": 187,
+        "SY": 1442,
+        "LT": 1019,
+        "GS": 13312,
+        "PA": 15032,
+    }
+    all_constraints.sort(key=lambda c: usage.get(c.slug, 0))
+    pu.constraints.append(all_constraints.pop(0))
+
     if verbose:
         print(f"{total} constraints to be tried.")
 
     # While the puzzle is not playable
     ratio = pu.compute_ratio()
+    cloned = None
     while ratio > 0 and all_constraints:
         # Add the first valid constraint
         while all_constraints:
             if progress:
-                print(f"\033[2K[{ratio:5.2}] {len(all_constraints):5} / {total:5} ({extra_text})", end="\r")
+                print(
+                    f"\033[2K[{ratio:5.2}] {len(all_constraints):5} / {total:5} ({extra_text})",
+                    end="\r",
+                )
             constraint = all_constraints.pop(0)
             cloned = pu.clone()
             # First: apply previously added constraints
@@ -108,10 +129,11 @@ def buildapuzzle(width, height, ratio, verbose=False, progress=True, extra_text=
         fp.write(line + "\n")
     return pu
 
+
 if __name__ == "__main__":
-    nb = 100
-    minwidth = 3
-    maxwidth = 3
+    nb = 2000
+    minwidth = 4
+    maxwidth = 7
     minheight = 4
     maxheight = 8
     minratio = 0.8
@@ -121,7 +143,12 @@ if __name__ == "__main__":
         width = random.randint(minwidth, maxwidth)
         height = random.randint(minheight, maxheight)
         ratio = random.random() * (maxratio - minratio) + minratio
-        pu = buildapuzzle(width, height, ratio, extra_text=f"{nb} - {width}x{height} at {int((1-ratio) * 100): 3}%.")
+        pu = buildapuzzle(
+            width,
+            height,
+            ratio,
+            extra_text=f"{nb} - {width}x{height} at {int((1-ratio) * 100): 3}%.",
+        )
         if pu:
             print(line_export(pu))
             nb -= 1
