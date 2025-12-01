@@ -326,10 +326,10 @@ class _MyHomePageState extends State<MyHomePage> {
           (manualCheck || settings.validateType != ValidateType.manual)) {
         currentMeta!.stop();
         setState(() {
-          if (settings.validateType == ValidateType.automatic) {
-            loadPuzzle();
-          } else {
+          if (settings.showRating == ShowRating.yes) {
             betweenPuzzles = true;
+          } else {
+            loadPuzzle();
           }
         });
       }
