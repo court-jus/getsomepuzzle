@@ -13,6 +13,11 @@ class ChangeableSettings {
   LiveCheckType? liveCheckType;
 
   ChangeableSettings({this.validateType, this.showRating, this.liveCheckType});
+
+  @override
+  String toString() {
+    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}";
+  }
 }
 
 class Settings {
@@ -27,6 +32,11 @@ class Settings {
     this.showRating = ShowRating.yes,
     this.liveCheckType = LiveCheckType.complete,
   });
+
+  @override
+  String toString() {
+    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}";
+  }
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -58,6 +68,7 @@ class Settings {
       case "no":
         showRating = ShowRating.no;
     }
+    // print("Loaded ${toString()}");
   }
 
   Future<void> save() async {
@@ -68,6 +79,7 @@ class Settings {
   }
 
   void change(ChangeableSettings newValue) {
+    // print("change $newValue");
     if (newValue.validateType != null) {
       validateType = newValue.validateType!;
     }
@@ -77,6 +89,7 @@ class Settings {
     if (newValue.showRating != null) {
       showRating = newValue.showRating!;
     }
+    // print("Changed ${toString()}");
     save();
   }
 }
