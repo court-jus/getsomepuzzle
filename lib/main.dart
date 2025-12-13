@@ -328,6 +328,10 @@ class _MyHomePageState extends State<MyHomePage> {
       if (currentPuzzle!.complete &&
           (manualCheck || settings.validateType != ValidateType.manual)) {
         currentMeta!.stop();
+      postMessage(
+        "played",
+        jsonEncode({"puzzle": currentMeta!.lineRepresentation}),
+      );
         setState(() {
           if (settings.showRating == ShowRating.yes) {
             betweenPuzzles = true;
