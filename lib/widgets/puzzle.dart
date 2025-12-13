@@ -89,6 +89,9 @@ class PuzzleWidget extends StatelessWidget {
                 QuantityWidget(
                   value: constraint.value,
                   count: constraint.count,
+                  actualCount: currentPuzzle.cellValues
+                      .where((val) => val == constraint.value)
+                      .length,
                   bgColor: mandatoryColor,
                   borderColor: constraint.isHighlighted
                       ? highlightColor
