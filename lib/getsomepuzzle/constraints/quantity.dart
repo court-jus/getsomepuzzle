@@ -33,6 +33,7 @@ class QuantityConstraint extends Constraint {
     final myValues = puzzle.cellValues.where((val) => val == value);
     final myOpposite = puzzle.domain.whereNot((val) => val == value).first;
     final freeCells = puzzle.cellValues.indexed.where((val) => val.$2 == 0);
+    if (freeCells.isEmpty) return null;
     final firstFreeCell = freeCells.first.$1;
     if (myValues.length > count) {
       return Move(0, 0, this, isImpossible: this);
