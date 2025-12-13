@@ -51,7 +51,7 @@ class SymmetryConstraint(CellCentricConstraint):
             if sym is None:
                 # The target cell is outside of the grid
                 raise CannotApplyConstraint(
-                    "The symmetry constraint cannot extend past the borders of the puzzle."
+                    f"{self}: The symmetry constraint cannot extend past the borders of the puzzle."
                 )
             if puzzle.state[sym].free():
                 # The target cell is free, set its value to my_color

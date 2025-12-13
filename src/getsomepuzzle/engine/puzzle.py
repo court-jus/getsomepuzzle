@@ -1,4 +1,5 @@
 import random
+import json
 from .constraints import FixedValueConstraint
 from .constraints.base import CellCentricConstraint
 from .constants import DOMAIN, DEFAULT_SIZE, EMPTY, MAX_FORCABLE
@@ -116,29 +117,37 @@ class Puzzle:
     def apply_constraints(self, auto_check=False, explain=False, only_idx=None):
         changed = True
         globally_changed = False
+        count = 0
         while changed:
             changed = False
             for constraint in self.constraints:
-                if explain:
-                    print("  What does", constraint, "say?")
                 if only_idx is not None and only_idx not in constraint.influence(self):
                     continue
                 before = [c.value for c in self.state]
-                if constraint.apply(self):
+                try:
+                    constraint_result = constraint.apply(self)
+                except CannotApplyConstraint:
+                    raise CannotApplyConstraint(json.dumps({
+                        "constraints": [str(constraint)],
+                        "count": count,
+                    }))
+                if constraint_result:
                     if explain:
                         diff = "".join(str(c.value) if before[idx] == EMPTY and c.value != EMPTY else "." for idx, c in enumerate(self.state))
                         print("  Constraint", constraint, "gives us:")
                         print(" ", diff)
+                    count += 1
                     changed = True
                     break
-                elif explain:
-                    print("  Constraint", constraint, "has nothing (more) to say")
             globally_changed |= changed
-        if auto_check:
-            if not all(c.check(self) for c in self.constraints):
-                failed = [c for c in self.constraints if not c.check(self)]
-                raise CannotApplyConstraint(str(failed))
-        return globally_changed
+            if auto_check:
+                if not all(c.check(self) for c in self.constraints):
+                    failed = [c for c in self.constraints if not c.check(self)]
+                    raise CannotApplyConstraint(json.dumps({
+                        "constraints": [str(c) for c in failed],
+                        "count": count,
+                    }))
+        return count
 
     def apply_with_force(self, explain=False):
         # Iterate over free cells. For each cell, try both values

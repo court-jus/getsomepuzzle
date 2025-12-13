@@ -144,7 +144,7 @@ class LetterGroup(CellCentricConstraint):
                 changed |= puzzle.state[boundary].set_value(my_opposite)
 
         # Check if we are connected and what needs to be to connect
-        print(letter, my_whole_group, my_groups)
+        # print(letter, my_whole_group, my_groups)
 
 
         # Now, find if other members of the letter group are disconnected and raise
