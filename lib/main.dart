@@ -86,7 +86,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String locale = "en";
   String topMessage = "";
   Color topMessageColor = Colors.black;
-  String bottomMessage = "";
+  List<String> bottomMessage = [];
   PuzzleData? currentMeta;
   Puzzle? currentPuzzle;
   Database? database;
@@ -115,8 +115,11 @@ class _MyHomePageState extends State<MyHomePage> {
       if (database == null) return;
       if (currentPuzzle == null) return;
       setState(() {
-        String statsText = currentMeta!.stats.toString();
-        bottomMessage = "$dbSize - $statsText";
+        bottomMessage = [
+          "${currentPuzzle!.width}x${currentPuzzle!.height} (${currentPuzzle!.width * currentPuzzle!.height})",
+          currentMeta!.stats.toString(),
+          "$dbSize",
+        ];
       });
     });
     Timer.periodic(Duration(seconds: 60), (tmr) {
@@ -696,7 +699,10 @@ class _MyHomePageState extends State<MyHomePage> {
           ? BottomAppBar(
               height: 40,
               color: Colors.amber,
-              child: Center(child: Text(bottomMessage)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: bottomMessage.map((t) => Text(t)).toList(),
+              ),
             )
           : null,
     );
