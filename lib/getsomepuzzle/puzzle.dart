@@ -49,17 +49,17 @@ class Puzzle {
 
   Puzzle(this.lineRepresentation) {
     var attributesStr = lineRepresentation.split("_");
-    final dimensions = attributesStr[1].split("x");
-    domain = attributesStr[0].split("").map((e) => int.parse(e)).toList();
+    final dimensions = attributesStr[2].split("x");
+    domain = attributesStr[1].split("").map((e) => int.parse(e)).toList();
     width = int.parse(dimensions[0]);
     height = int.parse(dimensions[1]);
-    cells = attributesStr[2]
+    cells = attributesStr[3]
         .split("")
         .map((e) => int.parse(e))
         .indexed
         .map((e) => Cell(e.$2, e.$1, domain, e.$2 > 0))
         .toList();
-    final strConstraints = attributesStr[3].split(";");
+    final strConstraints = attributesStr[4].split(";");
     for (var strConstraint in strConstraints) {
       final constraintAttr = strConstraint.split(":");
       if (constraintAttr[0] == "FM") {

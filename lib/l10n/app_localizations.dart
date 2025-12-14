@@ -253,6 +253,12 @@ abstract class AppLocalizations {
   /// Label of the widget
   ///
   /// In en, this message translates to:
+  /// **'Complexity'**
+  String get labelWidgetCplx;
+
+  /// Label of the widget
+  ///
+  /// In en, this message translates to:
   /// **'Wanted rules'**
   String get labelWidgetWantedrules;
 

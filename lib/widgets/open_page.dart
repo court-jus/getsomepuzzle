@@ -23,45 +23,8 @@ class OpenPage extends StatefulWidget {
 
 class _OpenPageState extends State<OpenPage> {
   int matchingCount = 0;
-  String collection = "puzzles";
-  static const List<(String, Widget)> collections = [
-    ("tutorial", Text("Tutorial")),
-    (
-      "easy",
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("1"), Icon(UniconsLine.temperature_quarter)],
-      ),
-    ),
-    (
-      "medium",
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("2"), Icon(UniconsLine.temperature_half)],
-      ),
-    ),
-    (
-      "hard",
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("3"), Icon(UniconsLine.temperature_three_quarter)],
-      ),
-    ),
-    (
-      "harder",
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("4"), Icon(UniconsLine.temperature)],
-      ),
-    ),
-    (
-      "evil",
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("5"), Icon(UniconsLine.temperature_plus)],
-      ),
-    ),
-  ];
+  String collection = "tutorial";
+  
 
   static const List<(String, String)> existingRules = [
     ("LT", "Letter"),
@@ -83,6 +46,7 @@ class _OpenPageState extends State<OpenPage> {
     RangeValues? newWidth,
     RangeValues? newHeight,
     RangeValues? newPrefilled,
+    RangeValues? newCplx,
     List<String>? newWRules,
     List<String>? newBRules,
     List<String>? newWFlags,
@@ -103,6 +67,11 @@ class _OpenPageState extends State<OpenPage> {
       if (newPrefilled != null) {
         widget.database.currentFilters.minFilled = newPrefilled.start.toInt();
         widget.database.currentFilters.maxFilled = newPrefilled.end.toInt();
+        changed = true;
+      }
+      if (newCplx != null) {
+        widget.database.currentFilters.minCplx = newCplx.start.toInt();
+        widget.database.currentFilters.maxCplx = newCplx.end.toInt();
         changed = true;
       }
       if (newWRules != null) {
@@ -209,7 +178,7 @@ class _OpenPageState extends State<OpenPage> {
                         DropdownButton<String>(
                           value: collection,
                           items: [
-                            for (final item in collections)
+                            for (final item in widget.database.collections)
                               DropdownMenuItem(value: item.$1, child: item.$2),
                           ],
                           onChanged: (newValue) =>
@@ -379,6 +348,28 @@ class _OpenPageState extends State<OpenPage> {
                           minimum: 0,
                           maximum: 100,
                           increment: 5,
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          AppLocalizations.of(context)!.labelWidgetCplx,
+                        ),
+                        PlusMinusField(
+                          onChanged: (minValue, maxValue) {
+                            final value = RangeValues(
+                              minValue.toDouble(),
+                              maxValue.toDouble(),
+                            );
+                            applyFilter(newCplx: value);
+                          },
+                          initialMin: widget.database.currentFilters.minCplx,
+                          initialMax: widget.database.currentFilters.maxCplx,
+                          minimum: 0,
+                          maximum: widget.database.maxCplx,
+                          increment: 1,
                         ),
                       ],
                     ),

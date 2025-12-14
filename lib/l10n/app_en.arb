@@ -100,6 +100,10 @@
     "@labelWidgetFillRatio": {
         "description": "Label of the widget"
     },
+    "labelWidgetCplx": "Complexity",
+    "@labelWidgetCplx": {
+        "description": "Label of the widget"
+    },
     "labelWidgetWantedrules": "Wanted rules",
     "@labelWidgetWantedrules": {
         "description": "Label of the widget"

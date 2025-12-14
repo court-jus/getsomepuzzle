@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unicons/unicons.dart';
 
 class PuzzleData {
   String lineRepresentation = "";
@@ -17,6 +19,7 @@ class PuzzleData {
   int width = 0;
   int height = 0;
   int filled = 0;
+  int cplx = 0;
   List<String> rules = [];
   bool played = false;
   int duration = 0;
@@ -32,20 +35,21 @@ class PuzzleData {
   PuzzleData(this.lineRepresentation) {
     lineRepresentation = lineRepresentation.trim();
     var attributesStr = lineRepresentation.split("_");
-    final dimensions = attributesStr[1].split("x");
-    domain = attributesStr[0].split("").map((e) => int.parse(e)).toList();
+    final dimensions = attributesStr[2].split("x");
+    domain = attributesStr[1].split("").map((e) => int.parse(e)).toList();
     width = int.parse(dimensions[0]);
     height = int.parse(dimensions[1]);
-    final cells = attributesStr[2].split("").map((e) => int.parse(e)).toList();
+    final cells = attributesStr[3].split("").map((e) => int.parse(e)).toList();
     filled =
         (cells.where((c) => c > 0).length.toDouble() /
                 cells.length.toDouble() *
                 100)
             .toInt();
-    final strConstraints = attributesStr[3].split(";");
+    final strConstraints = attributesStr[4].split(";");
     for (var strConstraint in strConstraints) {
       rules.add(strConstraint.split(":")[0]);
     }
+    cplx = int.tryParse(attributesStr[6]) ?? 0;
   }
 
   Puzzle getPuzzle() {
@@ -100,6 +104,8 @@ class Filters {
   int maxHeight;
   int minFilled;
   int maxFilled;
+  int minCplx;
+  int maxCplx;
   Set<String> wantedRules;
   Set<String> bannedRules;
   Set<String> wantedFlags;
@@ -113,6 +119,8 @@ class Filters {
     this.maxHeight = 10,
     this.minFilled = 0,
     this.maxFilled = 100,
+    this.minCplx = 0,
+    this.maxCplx = 100,
     this.wantedRules = const {},
     this.bannedRules = const {},
     this.wantedFlags = const {},
@@ -128,6 +136,8 @@ class Filters {
       maxHeight = prefs.getInt("maxHeightFilter") ?? 10;
       minFilled = prefs.getInt("minPrefilledFilter") ?? 0;
       maxFilled = prefs.getInt("maxPrefilledFilter") ?? 100;
+      minCplx = prefs.getInt("minCplxFilter") ?? 0;
+      maxCplx = prefs.getInt("maxCplxFilter") ?? 100;
       wantedRules = (prefs.getStringList("wantedRulesFilter") ?? []).toSet();
       bannedRules = (prefs.getStringList("bannedRulesFilter") ?? []).toSet();
       wantedFlags = (prefs.getStringList("wantedFlagsFilter") ?? []).toSet();
@@ -150,6 +160,8 @@ class Filters {
     prefs.setInt("maxHeightFilter", maxHeight);
     prefs.setInt("minPrefilledFilter", minFilled);
     prefs.setInt("maxPrefilledFilter", maxFilled);
+    prefs.setInt("minCplxFilter", minCplx);
+    prefs.setInt("maxCplxFilter", maxCplx);
     prefs.setStringList("wantedRulesFilter", wantedRules.toList());
     prefs.setStringList("bannedRulesFilter", bannedRules.toList());
     prefs.setStringList("wantedFlagsFilter", wantedFlags.toList());
@@ -162,14 +174,31 @@ class Database {
   String collection = "tutorial";
   Filters currentFilters = Filters();
   bool shouldShuffle = false;
+  int maxCplx = 0;
   List<PuzzleData> playlist = [];
   final log = Logger("Database");
-
+  final List<(String, Widget)> collections = [
+    (
+      "tutorial",
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text("Tutorial"), Icon(UniconsLine.baby_carriage)],
+      ),
+    ),
+    (
+      "default",
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text("Puzzles"), Icon(UniconsLine.puzzle_piece)],
+      ),
+    ),
+  ];
   void load(List<String> lines) {
     puzzles = lines
         .where((e) => e.isNotEmpty && !e.startsWith("#"))
         .map((e) => PuzzleData(e))
         .toList();
+    maxCplx = puzzles.map((puz) => puz.cplx).max;
   }
 
   void loadStats(List<String> stats) {
@@ -241,6 +270,8 @@ class Database {
 
       if (puz.filled > currentFilters.maxFilled) return false;
       if (puz.filled < currentFilters.minFilled) return false;
+      if (puz.cplx > currentFilters.maxCplx) return false;
+      if (puz.cplx < currentFilters.minCplx) return false;
       if (puz.width > currentFilters.maxWidth) return false;
       if (puz.width < currentFilters.minWidth) return false;
       if (puz.height > currentFilters.maxHeight) return false;
@@ -263,12 +294,16 @@ class Database {
   Future<void> loadPuzzlesFile([String? fileToLoad]) async {
     final prefs = await SharedPreferences.getInstance();
     shouldShuffle = prefs.getBool("shouldShuffleCollection") ?? false;
-    if (fileToLoad == null) {
-      collection = prefs.getString("collectionToLoad") ?? "tutorial";
-    } else {
-      collection = fileToLoad;
-      prefs.setString("collectionToLoad", collection);
+    String collectionToLoad = (fileToLoad == null)
+        ? (prefs.getString("collectionToLoad") ?? "tutorial")
+        : fileToLoad;
+    if (collections
+        .where((element) => element.$1 == collectionToLoad)
+        .isEmpty) {
+      collectionToLoad = "tutorial";
     }
+    collection = collectionToLoad;
+    prefs.setString("collectionToLoad", collection);
     String assetContent;
     try {
       assetContent = await rootBundle.loadString('assets/$collection.txt');

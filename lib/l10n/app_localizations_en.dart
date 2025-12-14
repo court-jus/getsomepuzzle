@@ -86,6 +86,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get labelWidgetFillRatio => 'Fill ratio';
 
   @override
+  String get labelWidgetCplx => 'Complexity';
+
+  @override
   String get labelWidgetWantedrules => 'Wanted rules';
 
   @override

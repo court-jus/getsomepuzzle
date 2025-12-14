@@ -214,28 +214,45 @@ def line_export(pu):
     domain = "".join(str(v) for v in pu.domain)
     values = "".join(str(c.value) for c in pu.state)
     constraints = ";".join(c.line_export() for c in pu.constraints)
+    cplx = pu.cplx
     # found_solutions = find_solutions(pu, pu.running)
     # count = len(found_solutions)
     # solutions = ";".join("".join(str(v) for v in sol) for sol in found_solutions)
-    return f"{domain}_{w}x{h}_{values}_{constraints}_0:0" # _{count}:{solutions}"
+    return f"v2_{domain}_{w}x{h}_{values}_{constraints}_0:0_{cplx}" # _{count}:{solutions}"
 
 
 def line_import(line):
     from .puzzle import Puzzle
     from .constraints import AVAILABLE_RULES
 
-    line_format = line.count("_")
-    if line_format == 3:
-        domain, size, values, constraints = line.split("_")
-        solutions = "0:0"
+    fields = line.split("_")
+
+    if fields[0].startswith("v"):
+        version = int(fields[0].replace("v", ""))
     else:
-        domain, size, values, constraints, solutions = line.split("_")
+        line_format = line.count("_")
+        if line_format == 3:
+            version = 0
+        else:
+            version = 1
+
+    if version == 0:
+        domain, size, values, constraints = fields
+        solutions = "0:0"
+        cplx = 0
+    elif version == 1:
+        domain, size, values, constraints, solutions = fields
+        cplx = 0
+    elif version == 2:
+        domain, size, values, constraints, solutions, cplx = fields[1:]
+
     domain = [int(d) for d in domain]
     w, h = size.split("x")
     values = [int(v) for v in values]
     constraints = constraints.split(";")
     count, solutions = solutions.split(":")
     pu = Puzzle(running=None, width=int(w), height=int(h), domain=domain)
+    pu.cplx = cplx
     for idx, cell in enumerate(pu.state):
         cell.value = values[idx]
         cell.options = pu.domain[:] if cell.value == EMPTY else []

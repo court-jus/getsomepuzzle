@@ -86,6 +86,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get labelWidgetFillRatio => 'Relación de relleno';
 
   @override
+  String get labelWidgetCplx => 'Complejidad';
+
+  @override
   String get labelWidgetWantedrules => 'Reglas deseadas';
 
   @override

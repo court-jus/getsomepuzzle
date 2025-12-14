@@ -86,6 +86,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get labelWidgetFillRatio => 'Taux de remplissage';
 
   @override
+  String get labelWidgetCplx => 'Complexité';
+
+  @override
   String get labelWidgetWantedrules => 'Règles désirées';
 
   @override

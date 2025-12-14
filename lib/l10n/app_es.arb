@@ -25,6 +25,7 @@
     "labelWidgetWidth": "Largo",
     "labelWidgetHeight": "Alto",
     "labelWidgetFillRatio": "Relación de relleno",
+    "labelWidgetCplx": "Complejidad",
     "labelWidgetWantedrules": "Reglas deseadas",
     "labelWidgetBannedrules": "Reglas prohibidas",
     "msgCountMatchingPuzzles": "Puzzles que coinciden con filtros",

@@ -16,6 +16,7 @@ class Puzzle:
         self.domain = domain if domain is not None else DOMAIN
         self.state = [Cell(self.domain) for _ in range(width * height)]
         self.constraints = []
+        self.cplx = 0
 
     def __repr__(self):
         result = [

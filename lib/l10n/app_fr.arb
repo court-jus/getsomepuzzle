@@ -25,6 +25,7 @@
     "labelWidgetWidth": "Largeur",
     "labelWidgetHeight": "Hauteur",
     "labelWidgetFillRatio": "Taux de remplissage",
+    "labelWidgetCplx": "Complexité",
     "labelWidgetWantedrules": "Règles désirées",
     "labelWidgetBannedrules": "Règles refusées",
     "msgCountMatchingPuzzles": "Nombre de puzzles correspondant",
