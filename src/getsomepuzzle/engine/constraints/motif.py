@@ -121,6 +121,7 @@ class Motif(Constraint):
         pta = width - mow
         more = (pta * ".").join(motif).replace(str(EMPTY), ".")
         more = re.compile(more)
+        present_at = []
         for idx in range(len(strstate)):
             if (width - (idx % width)) < mow:
                 continue
@@ -129,17 +130,17 @@ class Motif(Constraint):
             if m:
                 if debug:
                     print("found at", idx, "(", subst, ")", m.start())
-                return True, idx
-        if debug:
+                present_at.append(idx)
+        if debug and not present_at:
             print("not found")
-        return False, None
+        return present_at
 
     def is_present(self, puzzle, debug=False):
         motif = self.parameters["motif"]
         width = puzzle.width
         state = "".join(str(c.value) for c in puzzle.state)
-        present, _ = Motif._is_present(motif, state, width, debug=debug)
-        return present
+        present = Motif._is_present(motif, state, width, debug=debug)
+        return bool(present)
 
     def line_export(self):
         motif = ".".join("".join(row) for row in self.parameters["motif"])
@@ -171,7 +172,6 @@ class Motif(Constraint):
                     (
                         car,
                         idx,
-                        strmotif[idx],
                         replace_char_at_idx(strmotif, idx, str(EMPTY)),
                     )
                     for idx, car in enumerate(strmotif)
@@ -184,13 +184,22 @@ class Motif(Constraint):
         ]:
             if debug:
                 print("Try submotif", submotif)
-            present, where = Motif._is_present(
+            present_at = Motif._is_present(
                 submotif.split("."),
                 "".join(str(c.value) for c in puzzle.state),
                 puzzle.width,
+                debug=debug,
             )
-            if present:
-                return where, idx, car, submotif
+            for presence in present_at:
+                nblines = submotif.count(".")
+                replaced_car_idx = presence + idx - nblines
+                if debug:
+                    print(f"Check presence at {presence} + {idx} ({nblines}) = {replaced_car_idx} for {submotif} {idx} {car}")
+                replaced_car_was = puzzle.state[replaced_car_idx].value
+                if debug:
+                    print(f"Check presence at {replaced_car_idx} for {submotif} {idx} {car} : {replaced_car_was}")
+                if replaced_car_was == EMPTY:
+                    return presence, idx, car, submotif
 
     def apply(self, puzzle, debug=False):
         motif = self.parameters["motif"]
@@ -199,71 +208,37 @@ class Motif(Constraint):
         result = False
         changed = True
         while changed:
+            if debug:
+                print(f"Currently, changed is {changed}, result is {result}")
             submotif = Motif.find_submotif(strmotif, puzzle, debug=debug)
             if submotif is None:
-                return False
+                changed = False
+                break
 
             where, idx, car, submotif = submotif
             if debug:
-                print(
-                    "In the puzzle, at idx",
-                    where,
-                    "we found the submotif",
-                    submotif,
-                    "(that was built by replacing car",
-                    car,
-                    "at idx",
-                    idx,
-                    "in the main motif",
-                    ".".join(motif),
-                    ")",
-                )
+                print(f"In the puzzle, at idx {where} we found the submotif {submotif} (that was built by replacing car {car} at idx {idx} in the main motif {'.'.join(motif)})")
             ridx = idx // (mow + 1)
             cidx = idx % (mow + 1)
             if debug:
-                print(
-                    "In the submotif, the car replaced was at",
-                    cidx,
-                    "x",
-                    ridx,
-                    "(I",
-                    idx,
-                    "M",
-                    mow,
-                    ")",
-                )
+                print(f"In the submotif, the car replaced was at {cidx}x{ridx} (I {idx} M {mow})")
             wridx = where // puzzle.width
             wcidx = where % puzzle.width
             if debug:
-                print(
-                    "The stuff was found at",
-                    where,
-                    ":",
-                    wcidx,
-                    "x",
-                    wridx,
-                    "in the puzzle",
-                )
+                print(f"The stuff was found at {where}: {wcidx}x{wridx} in the puzzle")
             fridx = wridx + ridx
             fcidx = wcidx + cidx
             fidx = fridx * puzzle.width + fcidx
             if debug:
-                print(
-                    "So the cell at",
-                    fidx,
-                    "(",
-                    fcidx,
-                    "x",
-                    fridx,
-                    ") cannot equal",
-                    car,
-                )
+                print(f"So the cell at {fidx} ({fcidx}x{fridx}) cannot equal {car}")
             if puzzle.state[fidx].value == int(car):
                 raise CannotApplyConstraint(
                     f"Cannot apply FM {motif} because {fidx + 1} == {int(car)}"
                 )
             opposite = [v for v in puzzle.domain if v != int(car)][0]
             changed = puzzle.state[fidx].set_value(opposite)
+            if debug:
+                print(f"Doing that did change: {changed}")
             result |= changed
         return result
 
