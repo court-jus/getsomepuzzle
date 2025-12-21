@@ -98,7 +98,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get msgCountMatchingPuzzles => 'Nombre de puzzles correspondant';
 
   @override
-  String get btnCopyClipboard => 'Copier dans le presse papier';
+  String get btnShareStats => 'Partager';
 
   @override
   String get tooltipPause => 'Pause...';

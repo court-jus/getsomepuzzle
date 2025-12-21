@@ -118,7 +118,7 @@ abstract class AppLocalizations {
   /// **'New'**
   String get newgame;
 
-  /// Label of the menu choice that allows to manually open a puzzle to play
+  /// Label of the menu choice that allows to manually open a puzzle to play or a file
   ///
   /// In en, this message translates to:
   /// **'Open'**
@@ -274,11 +274,11 @@ abstract class AppLocalizations {
   /// **'Puzzles matching filters'**
   String get msgCountMatchingPuzzles;
 
-  /// Label on the button that allows to copy the text to the clipboard.
+  /// Label on the button that allows to share the stats.
   ///
   /// In en, this message translates to:
-  /// **'Copy to clipboard'**
-  String get btnCopyClipboard;
+  /// **'Share'**
+  String get btnShareStats;
 
   /// Tooltip displayed while the mouse is over the pause menu
   ///

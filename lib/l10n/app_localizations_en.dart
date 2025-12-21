@@ -98,7 +98,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get msgCountMatchingPuzzles => 'Puzzles matching filters';
 
   @override
-  String get btnCopyClipboard => 'Copy to clipboard';
+  String get btnShareStats => 'Share';
 
   @override
   String get tooltipPause => 'Pause...';

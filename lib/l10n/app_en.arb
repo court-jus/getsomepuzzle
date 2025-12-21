@@ -14,7 +14,7 @@
     },
     "open": "Open",
     "@open": {
-        "description": "Label of the menu choice that allows to manually open a puzzle to play"
+        "description": "Label of the menu choice that allows to manually open a puzzle to play or a file"
     },
     "restart": "Restart",
     "@restart": {
@@ -116,9 +116,9 @@
     "@msgCountMatchingPuzzles": {
         "description": "Message displayed before the number of puzzles"
     },
-    "btnCopyClipboard": "Copy to clipboard",
-    "@btnCopyClipboard": {
-        "description": "Label on the button that allows to copy the text to the clipboard."
+    "btnShareStats": "Share",
+    "@btnShareStats": {
+        "description": "Label on the button that allows to share the stats."
     },
     "tooltipPause": "Pause...",
     "@tooltipPause": {
