@@ -146,6 +146,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingShowRatingNo => 'Non';
 
   @override
+  String get settingShareData => 'Partager mes données';
+
+  @override
+  String get settingShareDataYes => 'Oui';
+
+  @override
+  String get settingShareDataNo => 'Non';
+
+  @override
   String get settingsLiveCheckType => 'Erreurs';
 
   @override

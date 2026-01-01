@@ -318,6 +318,7 @@ class Database {
       print(prefs.getKeys());
       for (final key in prefs.getKeys()) {
         if (key.startsWith("stats")) {
+          log.fine("Loading stats from $key");
           stats.addAll(prefs.getStringList(key) ?? []);
         }
       }

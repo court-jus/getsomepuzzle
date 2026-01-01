@@ -146,6 +146,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingShowRatingNo => 'No';
 
   @override
+  String get settingShareData => 'Compartir';
+
+  @override
+  String get settingShareDataYes => 'Sí';
+
+  @override
+  String get settingShareDataNo => 'No';
+
+  @override
   String get settingsLiveCheckType => 'Comprobación de errores';
 
   @override

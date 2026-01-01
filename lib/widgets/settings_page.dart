@@ -41,6 +41,11 @@ class _SettingsPageState extends State<SettingsPage> {
       ShowRating.no: AppLocalizations.of(context)!.settingShowRatingNo,
     };
 
+    final Map<ShareData, String> settingsShareData = {
+      ShareData.yes: AppLocalizations.of(context)!.settingShareDataYes,
+      ShareData.no: AppLocalizations.of(context)!.settingShareDataNo,
+    };
+
     final Map<LiveCheckType, String> settingsLiveCheckType = {
       LiveCheckType.all: AppLocalizations.of(context)!.settingsLiveCheckTypeAll,
       LiveCheckType.count: AppLocalizations.of(
@@ -139,6 +144,30 @@ class _SettingsPageState extends State<SettingsPage> {
                                 (slug) => DropdownMenuItem(
                                   value: slug,
                                   child: Text(settingsLiveCheckType[slug]!),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(AppLocalizations.of(context)!.settingShareData),
+                        DropdownButton<ShareData>(
+                          value: widget.settings.shareData,
+                          onChanged: (newValue) {
+                            setState(() {
+                              widget.settings.change(
+                                ChangeableSettings(shareData: newValue),
+                              );
+                            });
+                          },
+                          items: ShareData.values
+                              .map(
+                                (slug) => DropdownMenuItem(
+                                  value: slug,
+                                  child: Text(settingsShareData[slug]!),
                                 ),
                               )
                               .toList(),

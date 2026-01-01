@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 
-const bgColors = {0: Colors.cyan, 1: Colors.black, 2: Colors.white};
+const bgColors = {
+  0: Color.fromARGB(255, 192, 235, 241),
+  1: Colors.black,
+  2: Colors.white,
+};
 const fgColors = {0: Colors.black, 1: Colors.white, 2: Colors.black};
 
 class CellWidget extends StatelessWidget {

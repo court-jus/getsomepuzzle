@@ -370,6 +370,24 @@ abstract class AppLocalizations {
   /// **'No'**
   String get settingShowRatingNo;
 
+  /// Does the player want to share they played/liked data?
+  ///
+  /// In en, this message translates to:
+  /// **'Share data'**
+  String get settingShareData;
+
+  /// The player wants to share
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get settingShareDataYes;
+
+  /// The player does not want to share
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get settingShareDataNo;
+
   /// Does the player want a live check for errors?
   ///
   /// In en, this message translates to:

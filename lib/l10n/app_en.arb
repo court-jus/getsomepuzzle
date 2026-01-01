@@ -180,6 +180,18 @@
     "@settingShowRatingNo": {
         "description": "The player does not want to rate each puzzle"
     },
+    "settingShareData": "Share data",
+    "@settingShareData": {
+        "description": "Does the player want to share they played/liked data?"
+    },
+    "settingShareDataYes": "Yes",
+    "@settingShareDataYes": {
+        "description": "The player wants to share"
+    },
+    "settingShareDataNo": "No",
+    "@settingShareDataNo": {
+        "description": "The player does not want to share"
+    },
     "settingsLiveCheckType": "Errors check",
     "@settingsLiveCheckType": {
         "description": "Does the player want a live check for errors?"

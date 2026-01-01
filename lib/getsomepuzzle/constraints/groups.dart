@@ -57,7 +57,9 @@ class GroupSize extends CellsCentricConstraint {
     } else {
       // If it has free neighbors it can still grow
       for (var member in myGroup) {
-        final freeNeighbors = puzzle.getNeighbors(member).where((nei) => puzzle.cellValues[nei] == 0);
+        final freeNeighbors = puzzle
+            .getNeighbors(member)
+            .where((nei) => puzzle.cellValues[nei] == 0);
         if (freeNeighbors.isNotEmpty) {
           return myGroup.length <= size;
         }

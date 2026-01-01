@@ -328,10 +328,11 @@ class _MyHomePageState extends State<MyHomePage> {
       if (currentPuzzle!.complete &&
           (manualCheck || settings.validateType != ValidateType.manual)) {
         currentMeta!.stop();
-      postMessage(
-        "played",
-        jsonEncode({"puzzle": currentMeta!.lineRepresentation}),
-      );
+        postMessage(
+          "played",
+          jsonEncode({"puzzle": currentMeta!.lineRepresentation}),
+          settings.shareData,
+        );
         setState(() {
           if (settings.showRating == ShowRating.yes) {
             betweenPuzzles = true;
@@ -397,6 +398,7 @@ class _MyHomePageState extends State<MyHomePage> {
     postMessage(
       "like",
       jsonEncode({"puzzle": currentMeta!.lineRepresentation, "liked": liked}),
+      settings.shareData,
     );
     if (liked > 0) {
       currentMeta!.liked = DateTime.now();
@@ -411,6 +413,7 @@ class _MyHomePageState extends State<MyHomePage> {
     postMessage(
       "report",
       jsonEncode({"puzzle": currentMeta!.lineRepresentation}),
+      settings.shareData,
     );
   }
 
@@ -713,19 +716,27 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-Future<http.Response>? postMessage(String endpoint, String body) {
+Future<http.Response?> postMessage(
+  String endpoint,
+  String body,
+  ShareData share,
+) async {
+  if (share == ShareData.no) return null;
   final log = Logger("Network");
   log.info("Posting message $endpoint with data $body");
   try {
-    return http.post(
+    return await http.post(
       Uri.parse("https://getsomepuzzle.court-jus.net:444/$endpoint/"),
       headers: <String, String>{
         "Content-type": "application/json; charset=UTF-8",
       },
       body: body,
     );
+  } on http.ClientException catch (err) {
+    log.severe("Client could not connect $err");
+    return null;
   } catch (err) {
-    log.severe("HTTP error: $err");
+    log.severe("Unkown exception while connecting $err");
     return null;
   }
 }

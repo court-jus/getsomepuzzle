@@ -5,24 +5,33 @@ enum ValidateType { manual, intermediate, automatic }
 
 enum ShowRating { yes, no }
 
+enum ShareData { yes, no }
+
 enum LiveCheckType { all, count, complete }
 
 class ChangeableSettings {
   ValidateType? validateType;
   ShowRating? showRating;
   LiveCheckType? liveCheckType;
+  ShareData? shareData;
 
-  ChangeableSettings({this.validateType, this.showRating, this.liveCheckType});
+  ChangeableSettings({
+    this.validateType,
+    this.showRating,
+    this.liveCheckType,
+    this.shareData,
+  });
 
   @override
   String toString() {
-    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}";
+    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Shar: ${shareData?.name}";
   }
 }
 
 class Settings {
   ValidateType validateType;
   ShowRating showRating;
+  ShareData shareData;
   LiveCheckType liveCheckType;
 
   final log = Logger("Settings");
@@ -30,12 +39,13 @@ class Settings {
   Settings({
     this.validateType = ValidateType.intermediate,
     this.showRating = ShowRating.yes,
+    this.shareData = ShareData.yes,
     this.liveCheckType = LiveCheckType.complete,
   });
 
   @override
   String toString() {
-    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}";
+    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Shar: ${shareData.name}";
   }
 
   Future<void> load() async {
@@ -68,7 +78,14 @@ class Settings {
       case "no":
         showRating = ShowRating.no;
     }
-    // print("Loaded ${toString()}");
+    final String settingsShareData =
+        prefs.getString("settingsShareData") ?? "yes";
+    switch (settingsShareData) {
+      case "yes":
+        shareData = ShareData.yes;
+      case "no":
+        shareData = ShareData.no;
+    }
   }
 
   Future<void> save() async {
@@ -76,6 +93,7 @@ class Settings {
     prefs.setString("settingsValidateType", validateType.name);
     prefs.setString("settingsLiveCheckType", liveCheckType.name);
     prefs.setString("settingsShowRating", showRating.name);
+    prefs.setString("settingsShareData", shareData.name);
   }
 
   void change(ChangeableSettings newValue) {
@@ -89,7 +107,9 @@ class Settings {
     if (newValue.showRating != null) {
       showRating = newValue.showRating!;
     }
-    // print("Changed ${toString()}");
+    if (newValue.shareData != null) {
+      shareData = newValue.shareData!;
+    }
     save();
   }
 }
