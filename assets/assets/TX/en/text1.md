@@ -1,6 +1,8 @@
 # Hi, welcome to this tutorial.
 
-Your goal is to fill the grid with white and black cells while following some rules.
+Your goal is to fill the grid with white and black cells while following some rules. Click or touch a cell to change its color.
+
+Cells with a thicker border are fixed and cannot be changed.
 
 When cells contain letters, identical letters should form groups of the same color.
 

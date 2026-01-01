@@ -6,11 +6,11 @@ To know which cell has to be which color, you have to follow some constraints (r
 
 Click (or touch on mobile) a cell to change its color.
 
-Some cells can be already filled and you won't be able to change them, they are indicated by a thin inside border.
+Some cells can be already filled and you won't be able to change them, they are indicated by a thicker inside border.
 
 You will not be shown when you make a mistake but when the grid is filled, your solution is checked. If you won, another puzzle will start immediately. If you made a mistake, the corresponding constraint will be highlighted and you will be able to change your solution.
 
-If you are stuck, the trashcan icon resets the puzzle to its initial state.
+If you are stuck, the "restart" icon resets the puzzle to its initial state.
 
 While playing, your timing is recorded (see the Stats section below). If needed, the game can be paused and resumed.
 
@@ -47,6 +47,8 @@ The central symmetry (🞋) is identical to a roration by half a turn.
 ## Stats
 
 The game records how many time has passed before a puzzle is solve and how many failures were made. This data is NOT collected automatically but if you solve a bunch of puzzles I hope you will send me your stats, I intend to sort the puzzles by difficulty and this would help a lot.
+
+If the network is available, the game automatically sends the identification of played puzzles and their rating. That data is totally anonymous but you opt out via the settings menu.
 
 To send the stats, click the "Journal" icon on the main page, to the left of the help icon, copy the content and send it to me.
 
