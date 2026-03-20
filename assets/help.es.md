@@ -6,7 +6,7 @@ Para saber qué celda debe ir en qué color, debes seguir algunas restricciones 
 
 Haz clic (o toca en móvil) en una celda para cambiar su color.
 
-Algunas celdas ya pueden estar rellenas y no podrás cambiarlas, están indicadas por un borde interno fino.
+Algunas celdas ya pueden estar rellenas y no podrás cambiarlas, están indicadas por un borde interno más grueso.
 
 No se te mostrará cuando cometas un error, pero cuando la cuadrícula esté llena, tu solución será verificada. Si ganaste, otro rompecabezas comenzará inmediatamente. Si cometiste un error, se resaltará la restricción correspondiente y podrás cambiar tu solución.
 
@@ -34,19 +34,22 @@ Si ves una flecha en una celda, debe haber el mismo número de celdas negras y b
 
 Las celdas que contengan la misma letra deben formar parte del mismo grupo. Un grupo no debe contener letras diferentes.
 
-### Quantity (TODO: translate me)
+### Cantidad
 
-A black or white number over the puzzle, on a blue background indicates that the total number of cells of that color should match that number.
+Un número negro o blanco sobre el rompecabezas, sobre un fondo azul, indica que el número total de celdas de ese color debe coincidir con ese número.
 
-### Symmetry (⟍, |, ⟋, ― et 🞋) (TODO: translate me)
+### Simetría (⟍, |, ⟋, ― y 🞋)
 
-Whenever a cell contains one of those symbols, the group it belongs to must respect a symmetry along that axis.
+Cuando una celda contiene uno de estos símbolos, el grupo al que pertenece debe respetar una simetría a lo largo de ese eje.
 
-The central symmetry (🞋) is identical to a roration by half a turn.
+La simetría central (🞋) es equivalente a una rotación de medio giro.
 
 ## Estadísticas
 
 El juego registra cuánto tiempo ha pasado antes de que un rompecabezas se resuelva y cuántos fallos se cometieron. Estos datos NO se recopilan automáticamente, pero si resuelves un montón de rompecabezas, espero que me envíes tus estadísticas. Pretendo ordenar los rompecabezas por dificultad y esto ayudaría mucho.
 
+Si la red está disponible, el juego envía automáticamente la identificación de los rompecabezas jugados y su valoración. Estos datos son totalmente anónimos, pero puedes desactivar el envío en el menú de ajustes.
+
 Para enviar las estadísticas, haz clic en el ícono de "Journal" en la página principal, a la izquierda del ícono de ayuda, copia el contenido y envíamelo.
- 
+
+> Muchas gracias.

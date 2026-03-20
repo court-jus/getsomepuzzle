@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
@@ -71,6 +72,26 @@ class SymmetryConstraint extends CellsCentricConstraint {
       if (puzzle.getValue(sym) != myValue) return false;
     }
     return true;
+  }
+
+  @override
+  Move? apply(Puzzle puzzle) {
+    final groups = puzzle.getGroups();
+    final idx = indices[0];
+    final myValue = puzzle.getValue(idx);
+    if (myValue == 0) return null;
+    final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
+    if (myGroup == null) return null;
+    for (final cellidx in myGroup) {
+      final sym = _computeSymmetry(puzzle, cellidx);
+      if (sym == null) {
+        return Move(0, 0, this, isImpossible: this);
+      }
+      if (puzzle.getValue(sym) == 0) {
+        return Move(sym, myValue, this);
+      }
+    }
+    return null;
   }
 
   int? _computeSymmetry(Puzzle puzzle, int cellidx) {

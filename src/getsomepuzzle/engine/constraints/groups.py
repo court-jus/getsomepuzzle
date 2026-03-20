@@ -50,8 +50,13 @@ class GroupSize(CellCentricConstraint):
             return True
         if len(my_group) > size:
             return False
-        # If my group is too small but there are still free cells, consider it ok
-        return any(c.free() for c in puzzle.state)
+        # If my group has free neighbors it can still grow
+        for member in my_group:
+            neighbors = get_neighbors(puzzle.state, puzzle.width, puzzle.height, member)
+            if any(n is not None and puzzle.state[n].value == EMPTY for n in neighbors):
+                return len(my_group) <= size
+        # The group has no free neighbor, it needs to be exactly the target size
+        return len(my_group) == size
 
     def apply(self, puzzle):
         indices, size = self.parameters["indices"], self.parameters["size"]

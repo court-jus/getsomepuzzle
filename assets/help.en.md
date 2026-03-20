@@ -2,7 +2,7 @@
 
 In this game, your aim is to color the cells of the grid in black or white.
 
-To know which cell has to be which color, you have to follow some constraints (rules are explained bellow).
+To know which cell has to be which color, you have to follow some constraints (rules are explained below).
 
 Click (or touch on mobile) a cell to change its color.
 
@@ -14,7 +14,7 @@ If you are stuck, the "restart" icon resets the puzzle to its initial state.
 
 While playing, your timing is recorded (see the Stats section below). If needed, the game can be paused and resumed.
 
-There are about 5k puzzles bundled within the app. Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see the your progress bellow the puzzle.
+There are about 5k puzzles bundled within the app. Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see your progress below the puzzle.
 
 ## Constraints
 
@@ -24,7 +24,7 @@ If you see a pattern above the puzzles that has a purple background, you must fi
 
 ### Group size
 
-If a cell contains a number, it must be part of a group of orthogonally connected cells of the same color and that group's size much match the number.
+If a cell contains a number, it must be part of a group of orthogonally connected cells of the same color and that group's size must match the number.
 
 ### Parity
 
@@ -42,11 +42,11 @@ A black or white number over the puzzle, on a blue background indicates that the
 
 Whenever a cell contains one of those symbols, the group it belongs to must respect a symmetry along that axis.
 
-The central symmetry (🞋) is identical to a roration by half a turn.
+The central symmetry (🞋) is identical to a rotation by half a turn.
 
 ## Stats
 
-The game records how many time has passed before a puzzle is solve and how many failures were made. This data is NOT collected automatically but if you solve a bunch of puzzles I hope you will send me your stats, I intend to sort the puzzles by difficulty and this would help a lot.
+The game records how much time has passed before a puzzle is solved and how many failures were made. This data is NOT collected automatically but if you solve a bunch of puzzles I hope you will send me your stats, I intend to sort the puzzles by difficulty and this would help a lot.
 
 If the network is available, the game automatically sends the identification of played puzzles and their rating. That data is totally anonymous but you opt out via the settings menu.
 

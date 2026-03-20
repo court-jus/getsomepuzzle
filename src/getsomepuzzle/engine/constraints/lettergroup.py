@@ -89,12 +89,6 @@ class LetterGroup(CellCentricConstraint):
             if isinstance(c, LetterGroup) and c.parameters["letter"] != letter
             for idx in c.parameters["indices"]
         ]
-        neighbors_with_letters = [
-            nei
-            for idx in indices
-            for nei in get_neighbors(puzzle.state, puzzle.width, puzzle.height, idx)
-            if nei is not None and nei in other_letters
-        ]
         if my_color == EMPTY:
             return changed
 
@@ -106,7 +100,20 @@ class LetterGroup(CellCentricConstraint):
                 )
             changed |= puzzle.state[member].set_value(my_color)
 
-        # Apply opposite color to neighbors_with_letters
+        # Compute groups and whole group for broader neighbor scope
+        groups = to_groups(
+            puzzle.state, puzzle.width, puzzle.height, lambda cell: cell.value
+        )
+        my_groups = [grp for grp in groups if any(i in grp for i in indices)]
+        my_whole_group = [cell for grp in my_groups for cell in grp]
+
+        # Apply opposite color to neighbors of the whole group that have other letters
+        neighbors_with_letters = [
+            nei
+            for cell in my_whole_group
+            for nei in get_neighbors(puzzle.state, puzzle.width, puzzle.height, cell)
+            if nei is not None and nei in other_letters
+        ]
         for nei in neighbors_with_letters:
             if puzzle.state[nei].value == my_color:
                 raise CannotApplyConstraint(
@@ -116,11 +123,6 @@ class LetterGroup(CellCentricConstraint):
 
         # Look at boundaries, if we need to grow in a direction that would make us
         # touch another letter group, we can't
-        groups = to_groups(
-            puzzle.state, puzzle.width, puzzle.height, lambda cell: cell.value
-        )
-        my_groups = [grp for grp in groups if any(i in grp for i in indices)]
-        my_whole_group = [cell for grp in my_groups for cell in grp]
 
         boundaries = find_matching_group_neighbors(
             puzzle.state,
@@ -142,6 +144,11 @@ class LetterGroup(CellCentricConstraint):
             boundary_neighbors = get_neighbors(puzzle.state, puzzle.width, puzzle.height, boundary)
             if any(bound_nei in same_color_groups for bound_nei in boundary_neighbors):
                 changed |= puzzle.state[boundary].set_value(my_opposite)
+
+        # If not all members are connected yet and only one boundary exists, grow
+        same_group = any(all(i in grp for i in indices) for grp in groups)
+        if not same_group and len(boundaries) == 1:
+            changed |= puzzle.state[boundaries[0]].set_value(my_color)
 
         # Check if we are connected and what needs to be to connect
         # print(letter, my_whole_group, my_groups)

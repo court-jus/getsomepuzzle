@@ -16,7 +16,7 @@ Pendant que vous jouez, votre temps est enregistré (voir la section Stats ci-de
 
 Il y a environ 10000 puzzles fournis avec l'application. Ceux que vous avez déjà résolu n'apparaîtront plus. Vous pouvez voir votre progression sous le puzzle.
 
-## Constraintes
+## Contraintes
 
 ### Motif interdit
 
@@ -24,13 +24,13 @@ Si vous voyez un motif au dessus de la grille qui a un fond violet, vous devez r
 
 ### Taille du groupe
 
-Si une case contient un nombre, elle doit faire partie d'un groupe de cases de la même couleur, adajcentes orthogonalement et la taille de ce groupe doit correspondre au nombre.
+Si une case contient un nombre, elle doit faire partie d'un groupe de cases de la même couleur, adjacentes orthogonalement et la taille de ce groupe doit correspondre au nombre.
 
 ### Parité
 
 Si une case contient une flèche, il doit y avoir le même nombre de cases noires et de cases blanches devant la flèche. Si c'est une double flèche, cette règle vaut pour les deux côtés.
 
-### Groupes avec des letters
+### Groupes de lettres
 
 Les lettres identiques doivent faire partie du même groupe. Un groupe ne doit pas contenir de lettres différentes.
 

@@ -3,6 +3,7 @@ import random
 from ..utils import to_rows, to_columns
 from .base import CellCentricConstraint
 from ..constants import EMPTY
+from ..errors import CannotApplyConstraint
 
 
 class ParityConstraint(CellCentricConstraint):
@@ -104,6 +105,11 @@ class ParityConstraint(CellCentricConstraint):
             odd = len([v for (c, r, v) in side if v!= EMPTY and v % 2 != 0])
             empty = empty_cells.count(True)
             size_per_parity = int(len(side) / 2)
+            if even > size_per_parity or odd > size_per_parity:
+                raise CannotApplyConstraint(
+                    f"Parity constraint at {self.parameters['indices'][0]} violated: "
+                    f"even={even}, odd={odd}, max={size_per_parity}"
+                )
             value = None
             if size_per_parity - even == empty:
                 value = [v for v in puzzle.domain if v % 2 == 0][0]

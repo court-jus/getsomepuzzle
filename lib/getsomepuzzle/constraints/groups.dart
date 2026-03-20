@@ -102,8 +102,22 @@ class GroupSize extends CellsCentricConstraint {
       } else if (myGroup.length < size && groupFreeNeighbors.isEmpty) {
         return Move(0, 0, this, isImpossible: this);
       }
-      // TODO: If extending in a direction would merge me with another group and create a "too big group",
+      // If extending in a direction would merge me with another group and create a "too big group",
       // then add a boundary in that direction, it is forbidden to grow there
+      final margin = size - myGroup.length;
+      final sameColorGroupCells = groups
+          .where((grp) =>
+              grp.any((cell) => puzzle.cellValues[cell] == myColor) &&
+              !grp.any((cell) => myGroup.contains(cell)) &&
+              grp.length >= margin)
+          .expand((grp) => grp)
+          .toSet();
+      for (final boundary in groupFreeNeighbors) {
+        final boundaryNeighbors = puzzle.getNeighbors(boundary);
+        if (boundaryNeighbors.any((nei) => sameColorGroupCells.contains(nei))) {
+          return Move(boundary, myOpposite, this);
+        }
+      }
     }
     return null;
   }
@@ -159,8 +173,6 @@ class LetterGroup extends CellsCentricConstraint {
         myGroups.add(group);
       }
     }
-    // There should be only one group that covers all my indices
-    if (myGroups.length != 1) return false;
     // There should be no other letter in mygroup
     final myGroup = myGroups[0];
     final Set<String> lettersInMyGroup = {};
@@ -173,6 +185,10 @@ class LetterGroup extends CellsCentricConstraint {
       }
     }
     if (lettersInMyGroup.length != 1) return false;
+    // If the puzzle is incomplete, disconnection is allowed
+    if (!puzzle.complete) return true;
+    // Only when complete: there should be exactly one group covering all my indices
+    if (myGroups.length != 1) return false;
     return true;
   }
 

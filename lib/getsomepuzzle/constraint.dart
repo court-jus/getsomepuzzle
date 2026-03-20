@@ -89,6 +89,33 @@ class Motif extends Constraint {
     }
     return false;
   }
+
+  static List<int> findMotifPositions(
+    List<List<int>> searchMotif,
+    Puzzle puzzle,
+  ) {
+    final int mow = searchMotif[0].length;
+    final int pta = puzzle.width - mow;
+    final RegExp motifRe = RegExp(
+      searchMotif
+          .map(
+            (line) =>
+                line.map((c) => c.toString()).join("").replaceAll("0", "."),
+          )
+          .join("." * pta),
+    );
+    final puzzleStr = puzzle.cellValues.map((c) => c.toString()).join("");
+    final List<int> positions = [];
+    for (var idx = 0; idx < puzzleStr.length; idx++) {
+      if ((puzzle.width - (idx % puzzle.width)) < mow) {
+        continue;
+      }
+      if (motifRe.matchAsPrefix(puzzleStr, idx) != null) {
+        positions.add(idx);
+      }
+    }
+    return positions;
+  }
 }
 
 class CellsCentricConstraint extends Constraint {
