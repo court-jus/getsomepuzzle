@@ -165,4 +165,31 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsLiveCheckTypeComplete => 'Attendre';
+
+  @override
+  String hintDeducedFrom(String constraintName) {
+    return 'Cette cellule peut être déduite grâce à la contrainte : $constraintName';
+  }
+
+  @override
+  String get hintImpossible =>
+      'Une contrainte est violée — une erreur a été commise';
+
+  @override
+  String get constraintForbiddenPattern => 'motif interdit';
+
+  @override
+  String get constraintGroupSize => 'taille de groupe';
+
+  @override
+  String get constraintLetterGroup => 'groupe de lettres';
+
+  @override
+  String get constraintParity => 'parité';
+
+  @override
+  String get constraintQuantity => 'quantité';
+
+  @override
+  String get constraintSymmetry => 'symétrie';
 }

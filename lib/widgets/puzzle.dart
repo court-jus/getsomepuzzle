@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
@@ -13,7 +15,7 @@ import 'package:getsomepuzzle/widgets/textpuzzle.dart';
 const forbiddenColor = Color.fromARGB(255, 185, 86, 202);
 const mandatoryColor = Colors.lightBlue;
 
-class PuzzleWidget extends StatelessWidget {
+class PuzzleWidget extends StatefulWidget {
   const PuzzleWidget({
     super.key,
     required this.currentPuzzle,
@@ -22,6 +24,8 @@ class PuzzleWidget extends StatelessWidget {
     required this.onCellDragEnd,
     required this.cellSize,
     required this.locale,
+    this.hintText = "",
+    this.hintIsError = false,
   });
 
   final Puzzle currentPuzzle;
@@ -30,16 +34,73 @@ class PuzzleWidget extends StatelessWidget {
   final VoidCallback onCellDragEnd;
   final double cellSize;
   final String locale;
+  final String hintText;
+  final bool hintIsError;
+
+  @override
+  State<PuzzleWidget> createState() => _PuzzleWidgetState();
+}
+
+class _PuzzleWidgetState extends State<PuzzleWidget> {
+  final GlobalKey _constraintKey = GlobalKey();
+  final GlobalKey _cellKey = GlobalKey();
+  final GlobalKey _stackKey = GlobalKey();
+  Offset? _arrowStart;
+  Offset? _arrowEnd;
 
   void _handleCellTap(int idx, {bool secondary = false}) {
-    onCellTap(idx);
-    if (secondary) onCellTap(idx);
+    widget.onCellTap(idx);
+    if (secondary) widget.onCellTap(idx);
+  }
+
+  @override
+  void didUpdateWidget(PuzzleWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.hintText.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _computeArrowPositions();
+      });
+    } else {
+      _arrowStart = null;
+      _arrowEnd = null;
+    }
+  }
+
+  void _computeArrowPositions() {
+    final constraintBox =
+        _constraintKey.currentContext?.findRenderObject() as RenderBox?;
+    final cellBox =
+        _cellKey.currentContext?.findRenderObject() as RenderBox?;
+    final stackBox =
+        _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    if (constraintBox == null || cellBox == null || stackBox == null) {
+      if (_arrowStart != null || _arrowEnd != null) {
+        setState(() {
+          _arrowStart = null;
+          _arrowEnd = null;
+        });
+      }
+      return;
+    }
+    final constraintPos =
+        constraintBox.localToGlobal(Offset.zero, ancestor: stackBox);
+    final cellPos = cellBox.localToGlobal(Offset.zero, ancestor: stackBox);
+    final start = constraintPos +
+        Offset(constraintBox.size.width / 2, constraintBox.size.height / 2);
+    final end = cellPos +
+        Offset(cellBox.size.width / 2, cellBox.size.height / 2);
+    if (start != _arrowStart || end != _arrowEnd) {
+      setState(() {
+        _arrowStart = start;
+        _arrowEnd = end;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    double maxConstraintsInTopBarSize = cellSize;
-    int numberOfTopBarConstraints = currentPuzzle.constraints
+    double maxConstraintsInTopBarSize = widget.cellSize;
+    int numberOfTopBarConstraints = widget.currentPuzzle.constraints
         .where(
           (constraint) =>
               (constraint is Motif || constraint is QuantityConstraint),
@@ -50,106 +111,237 @@ class PuzzleWidget extends StatelessWidget {
         (totalWidth / numberOfTopBarConstraints) -
         2; // 2 pixels of spacing between items
     double topBarConstraintsSize = targetSize;
-    double adjustedCellSize = cellSize;
+    double adjustedCellSize = widget.cellSize;
     if (targetSize > maxConstraintsInTopBarSize) {
       topBarConstraintsSize = maxConstraintsInTopBarSize;
     }
     if (targetSize < minConstraintsInTopBarSize) {
-      // We need to put them on two or more rows and reduce the cells size
       topBarConstraintsSize = minConstraintsInTopBarSize;
       int constraintsPerRow = (totalWidth / topBarConstraintsSize).toInt();
       int numberOfRows = (numberOfTopBarConstraints / constraintsPerRow).ceil();
       double marginNeeded = (numberOfRows - 1) * topBarConstraintsSize;
-      adjustedCellSize -= marginNeeded / currentPuzzle.height;
+      adjustedCellSize -= marginNeeded / widget.currentPuzzle.height;
     }
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      spacing: 2,
+
+    // Find the highlighted constraint (for arrow source)
+    Constraint? highlightedConstraint;
+    for (var c in widget.currentPuzzle.constraints) {
+      if (c.isHighlighted) {
+        highlightedConstraint = c;
+        break;
+      }
+    }
+
+    // Find if the highlighted constraint is a cell-centric one
+    final bool constraintIsInTopBar = highlightedConstraint is Motif ||
+        highlightedConstraint is QuantityConstraint;
+
+    // For cell-centric constraints, find the constraint's home cell index
+    int? constraintCellIdx;
+    if (highlightedConstraint != null &&
+        !constraintIsInTopBar &&
+        highlightedConstraint is CellsCentricConstraint) {
+      constraintCellIdx = highlightedConstraint.indices.first;
+    }
+
+    return Stack(
+      key: _stackKey,
       children: [
-        Wrap(
-          direction: Axis.horizontal,
-          alignment: WrapAlignment.center,
+        Column(
+          mainAxisAlignment: MainAxisAlignment.start,
           spacing: 2,
-          runSpacing: 2,
           children: [
-            for (var constraint in currentPuzzle.constraints)
-              if (constraint is Motif)
-                MotifWidget(
-                  motif: constraint.motif,
-                  bgColor: constraint is ForbiddenMotif
-                      ? forbiddenColor
-                      : mandatoryColor,
-                  borderColor: constraint.isHighlighted
-                      ? highlightColor
-                      : (constraint.isValid ? Colors.green : Colors.red),
-                  isHighlighted: constraint.isHighlighted,
-                  cellSize: topBarConstraintsSize,
-                )
-              else if (constraint is QuantityConstraint)
-                QuantityWidget(
-                  value: constraint.value,
-                  count: constraint.count,
-                  actualCount: currentPuzzle.cellValues
-                      .where((val) => val == constraint.value)
-                      .length,
-                  bgColor: mandatoryColor,
-                  borderColor: constraint.isHighlighted
-                      ? highlightColor
-                      : (constraint.isValid ? Colors.green : Colors.red),
-                  cellSize: topBarConstraintsSize,
-                )
-              else if (constraint is HelpText)
-                SizedBox(
-                  width: totalWidth - 20,
-                  child: TextpuzzleWidget(
-                    textName: constraint.text,
-                    locale: locale,
+            if (widget.hintText.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  widget.hintText,
+                  style: TextStyle(
+                    color: widget.hintIsError ? Colors.deepOrange : highlightColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-          ],
-        ),
-        SizedBox(height: 10),
-        Table(
-          border: TableBorder.all(),
-          defaultColumnWidth: FixedColumnWidth(adjustedCellSize),
-          children: [
-            for (var (rowidx, row) in currentPuzzle.getRows().indexed)
-              TableRow(
-                children: [
-                  for (var (cellidx, cell) in row.indexed)
-                    CellWidget(
-                      value: cell.value,
-                      idx: rowidx * currentPuzzle.width + cellidx,
-                      readonly: cell.readonly,
-                      isHighlighted: cell.isHighlighted,
-                      constraints:
-                          currentPuzzle.cellConstraints[rowidx *
-                                  currentPuzzle.width +
-                              cellidx],
-                      cellSize: adjustedCellSize,
-                      onTap: () => {
-                        _handleCellTap(rowidx * currentPuzzle.width + cellidx),
-                      },
-                      onSecondaryTap: () => {
-                        _handleCellTap(
-                          rowidx * currentPuzzle.width + cellidx,
-                          secondary: true,
-                        ),
-                      },
-                      onDrag: (Offset offset) {
-                        final int targetRow = (rowidx + offset.dy).floor();
-                        final int targetCell = (cellidx + offset.dx).floor();
-                        onCellDrag(
-                          targetRow * currentPuzzle.width + targetCell,
-                        );
-                      },
-                      onDragEnd: onCellDragEnd,
-                    ),
-                ],
               ),
+            Wrap(
+              direction: Axis.horizontal,
+              alignment: WrapAlignment.center,
+              spacing: 2,
+              runSpacing: 2,
+              children: [
+                for (var constraint in widget.currentPuzzle.constraints)
+                  if (constraint is Motif)
+                    MotifWidget(
+                      key: (constraint.isHighlighted && constraintIsInTopBar)
+                          ? _constraintKey
+                          : null,
+                      motif: constraint.motif,
+                      bgColor: constraint is ForbiddenMotif
+                          ? forbiddenColor
+                          : mandatoryColor,
+                      borderColor: constraint.isHighlighted
+                          ? highlightColor
+                          : (constraint.isValid ? Colors.green : Colors.deepOrange),
+                      isHighlighted: constraint.isHighlighted,
+                      cellSize: topBarConstraintsSize,
+                    )
+                  else if (constraint is QuantityConstraint)
+                    QuantityWidget(
+                      key: (constraint.isHighlighted && constraintIsInTopBar)
+                          ? _constraintKey
+                          : null,
+                      value: constraint.value,
+                      count: constraint.count,
+                      actualCount: widget.currentPuzzle.cellValues
+                          .where((val) => val == constraint.value)
+                          .length,
+                      bgColor: mandatoryColor,
+                      borderColor: constraint.isHighlighted
+                          ? highlightColor
+                          : (constraint.isValid ? Colors.green : Colors.deepOrange),
+                      cellSize: topBarConstraintsSize,
+                    )
+                  else if (constraint is HelpText)
+                    SizedBox(
+                      width: totalWidth - 20,
+                      child: TextpuzzleWidget(
+                        textName: constraint.text,
+                        locale: widget.locale,
+                      ),
+                    ),
+              ],
+            ),
+            SizedBox(height: 10),
+            Table(
+              border: TableBorder.all(),
+              defaultColumnWidth: FixedColumnWidth(adjustedCellSize),
+              children: [
+                for (var (rowidx, row)
+                    in widget.currentPuzzle.getRows().indexed)
+                  TableRow(
+                    children: [
+                      for (var (cellidx, cell) in row.indexed)
+                        _buildCell(
+                          cell,
+                          rowidx,
+                          cellidx,
+                          adjustedCellSize,
+                          constraintIsInTopBar,
+                          constraintCellIdx,
+                        ),
+                    ],
+                  ),
+              ],
+            ),
           ],
         ),
+        if (_arrowStart != null && _arrowEnd != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _ArrowPainter(
+                  start: _arrowStart!,
+                  end: _arrowEnd!,
+                  color: highlightColor,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
+
+  Widget _buildCell(
+    dynamic cell,
+    int rowidx,
+    int cellidx,
+    double adjustedCellSize,
+    bool constraintIsInTopBar,
+    int? constraintCellIdx,
+  ) {
+    final idx = rowidx * widget.currentPuzzle.width + cellidx;
+
+    // Assign _cellKey to highlighted cell, _constraintKey to constraint's home cell
+    GlobalKey? cellKeyToUse;
+    if (cell.isHighlighted) {
+      cellKeyToUse = _cellKey;
+    }
+    if (!constraintIsInTopBar && constraintCellIdx == idx) {
+      cellKeyToUse = _constraintKey;
+    }
+
+    return CellWidget(
+      key: cellKeyToUse,
+      value: cell.value,
+      idx: idx,
+      readonly: cell.readonly,
+      isHighlighted: cell.isHighlighted,
+      constraints: widget.currentPuzzle.cellConstraints[idx],
+      cellSize: adjustedCellSize,
+      onTap: () => {_handleCellTap(idx)},
+      onSecondaryTap: () => {_handleCellTap(idx, secondary: true)},
+      onDrag: (Offset offset) {
+        final int targetRow = (rowidx + offset.dy).floor();
+        final int targetCell = (cellidx + offset.dx).floor();
+        widget.onCellDrag(
+          targetRow * widget.currentPuzzle.width + targetCell,
+        );
+      },
+      onDragEnd: widget.onCellDragEnd,
+    );
+  }
+}
+
+class _ArrowPainter extends CustomPainter {
+  final Offset start;
+  final Offset end;
+  final Color color;
+
+  _ArrowPainter({
+    required this.start,
+    required this.end,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
+
+    // Curve the arrow to the side that has more room
+    final midY = (start.dy + end.dy) / 2;
+    final curveAmount = (end.dx - start.dx).abs() * 0.3 + 20;
+    // Pick the side: if going left-to-right, curve left; if right-to-left, curve right
+    final side = start.dx <= end.dx ? -1.0 : 1.0;
+    final ctrlX1 = start.dx + side * curveAmount;
+    final ctrlX2 = end.dx + side * curveAmount;
+    final path = Path()
+      ..moveTo(start.dx, start.dy)
+      ..cubicTo(ctrlX1, midY, ctrlX2, midY, end.dx, end.dy);
+    canvas.drawPath(path, paint);
+
+    // Arrowhead: compute tangent from last control point to end
+    final arrowSize = 10.0;
+    final angle = atan2(end.dy - midY, end.dx - ctrlX2);
+    final p1 = end - Offset.fromDirection(angle - 0.4, arrowSize);
+    final p2 = end - Offset.fromDirection(angle + 0.4, arrowSize);
+    final arrowPath = Path()
+      ..moveTo(end.dx, end.dy)
+      ..lineTo(p1.dx, p1.dy)
+      ..lineTo(p2.dx, p2.dy)
+      ..close();
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ArrowPainter oldDelegate) =>
+      start != oldDelegate.start || end != oldDelegate.end;
 }

@@ -51,5 +51,13 @@
     "settingsLiveCheckType": "Erreurs",
     "settingsLiveCheckTypeAll": "Temps réel",
     "settingsLiveCheckTypeCount": "Décompte",
-    "settingsLiveCheckTypeComplete": "Attendre"
+    "settingsLiveCheckTypeComplete": "Attendre",
+    "hintDeducedFrom": "Cette cellule peut être déduite grâce à la contrainte : {constraintName}",
+    "hintImpossible": "Une contrainte est violée — une erreur a été commise",
+    "constraintForbiddenPattern": "motif interdit",
+    "constraintGroupSize": "taille de groupe",
+    "constraintLetterGroup": "groupe de lettres",
+    "constraintParity": "parité",
+    "constraintQuantity": "quantité",
+    "constraintSymmetry": "symétrie"
 }

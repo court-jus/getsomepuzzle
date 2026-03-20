@@ -51,5 +51,13 @@
     "settingsLiveCheckType": "Comprobación de errores",
     "settingsLiveCheckTypeAll": "Tiempo real",
     "settingsLiveCheckTypeCount": "Recuento",
-    "settingsLiveCheckTypeComplete": "Esperar"
+    "settingsLiveCheckTypeComplete": "Esperar",
+    "hintDeducedFrom": "Esta celda se puede deducir gracias a la restricción: {constraintName}",
+    "hintImpossible": "Una restricción está violada — se ha cometido un error",
+    "constraintForbiddenPattern": "patrón prohibido",
+    "constraintGroupSize": "tamaño de grupo",
+    "constraintLetterGroup": "grupo de letras",
+    "constraintParity": "paridad",
+    "constraintQuantity": "cantidad",
+    "constraintSymmetry": "simetría"
 }

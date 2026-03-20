@@ -9,6 +9,12 @@ import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/settings.dart';
@@ -99,6 +105,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool initialized = false;
   bool shouldChooseLocale = true;
   Move? helpMove;
+  String hintText = "";
+  bool hintIsError = false;
   int? firstDragValue;
   int? lastDragIdx;
   final log = Logger("HomePage");
@@ -203,6 +211,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle = currentMeta!.begin();
       paused = false;
       betweenPuzzles = false;
+      hintText = "";
       helpMe();
     });
   }
@@ -214,6 +223,7 @@ class _MyHomePageState extends State<MyHomePage> {
       topMessageColor = Colors.black;
       history = [];
       betweenPuzzles = false;
+      hintText = "";
       currentPuzzle!.restart();
       currentPuzzle!.clearConstraintsValidity();
       currentPuzzle!.clearHighlights();
@@ -226,6 +236,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (currentPuzzle == null || history.isEmpty) return;
     setState(() {
       betweenPuzzles = false;
+      hintText = "";
       currentPuzzle!.resetCell(history.removeLast());
       currentPuzzle!.clearConstraintsValidity();
       currentPuzzle!.clearHighlights();
@@ -240,15 +251,34 @@ class _MyHomePageState extends State<MyHomePage> {
     helpMove = currentPuzzle!.findAMove();
   }
 
+  String _constraintName(Constraint constraint) {
+    final l10n = AppLocalizations.of(context)!;
+    if (constraint is ForbiddenMotif) return l10n.constraintForbiddenPattern;
+    if (constraint is GroupSize) return l10n.constraintGroupSize;
+    if (constraint is LetterGroup) return l10n.constraintLetterGroup;
+    if (constraint is ParityConstraint) return l10n.constraintParity;
+    if (constraint is QuantityConstraint) return l10n.constraintQuantity;
+    if (constraint is SymmetryConstraint) return l10n.constraintSymmetry;
+    return "";
+  }
+
   void showHelpMove() {
     if (helpMove == null) return;
-    currentPuzzle!.clearHighlights();
-    if (helpMove!.isImpossible != null) {
-      helpMove!.isImpossible!.isValid = false;
-    } else {
-      helpMove!.givenBy.isHighlighted = true;
-      currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-    }
+    setState(() {
+      currentPuzzle!.clearHighlights();
+      if (helpMove!.isImpossible != null) {
+        helpMove!.isImpossible!.isValid = false;
+        hintText = AppLocalizations.of(context)!.hintImpossible;
+        hintIsError = true;
+      } else {
+        helpMove!.givenBy.isHighlighted = true;
+        currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
+        hintText = AppLocalizations.of(context)!.hintDeducedFrom(
+          _constraintName(helpMove!.givenBy),
+        );
+        hintIsError = false;
+      }
+    });
   }
 
   void handleCheck() {
@@ -272,6 +302,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
     currentPuzzle!.clearHighlights();
     setState(() {
+      hintText = "";
       currentPuzzle!.incrValue(idx);
       currentPuzzle!.clearConstraintsValidity();
       helpMove = null;
@@ -686,6 +717,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                   onCellDragEnd: handlePuzzleDragEnd,
                                   cellSize: cellSize,
                                   locale: locale,
+                                  hintText: hintText,
+                                  hintIsError: hintIsError,
                                 )
                               else
                                 Text(

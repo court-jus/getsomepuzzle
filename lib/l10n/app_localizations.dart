@@ -411,6 +411,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wait'**
   String get settingsLiveCheckTypeComplete;
+
+  /// Hint message shown when the player clicks the lightbulb to get a clue
+  ///
+  /// In en, this message translates to:
+  /// **'This cell can be deduced from the {constraintName} constraint'**
+  String hintDeducedFrom(String constraintName);
+
+  /// Hint message shown when the puzzle is in an impossible state
+  ///
+  /// In en, this message translates to:
+  /// **'A constraint is violated — a mistake was made'**
+  String get hintImpossible;
+
+  /// Name of the forbidden pattern constraint
+  ///
+  /// In en, this message translates to:
+  /// **'forbidden pattern'**
+  String get constraintForbiddenPattern;
+
+  /// Name of the group size constraint
+  ///
+  /// In en, this message translates to:
+  /// **'group size'**
+  String get constraintGroupSize;
+
+  /// Name of the letter group constraint
+  ///
+  /// In en, this message translates to:
+  /// **'letter group'**
+  String get constraintLetterGroup;
+
+  /// Name of the parity constraint
+  ///
+  /// In en, this message translates to:
+  /// **'parity'**
+  String get constraintParity;
+
+  /// Name of the quantity constraint
+  ///
+  /// In en, this message translates to:
+  /// **'quantity'**
+  String get constraintQuantity;
+
+  /// Name of the symmetry constraint
+  ///
+  /// In en, this message translates to:
+  /// **'symmetry'**
+  String get constraintSymmetry;
 }
 
 class _AppLocalizationsDelegate

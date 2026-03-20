@@ -207,5 +207,42 @@
     "settingsLiveCheckTypeComplete": "Wait",
     "@settingsLiveCheckTypeComplete": {
         "description": "The player wants to wait until puzzle completion to see errors"
+    },
+    "hintDeducedFrom": "This cell can be deduced from the {constraintName} constraint",
+    "@hintDeducedFrom": {
+        "description": "Hint message shown when the player clicks the lightbulb to get a clue",
+        "placeholders": {
+            "constraintName": {
+                "type": "String"
+            }
+        }
+    },
+    "hintImpossible": "A constraint is violated — a mistake was made",
+    "@hintImpossible": {
+        "description": "Hint message shown when the puzzle is in an impossible state"
+    },
+    "constraintForbiddenPattern": "forbidden pattern",
+    "@constraintForbiddenPattern": {
+        "description": "Name of the forbidden pattern constraint"
+    },
+    "constraintGroupSize": "group size",
+    "@constraintGroupSize": {
+        "description": "Name of the group size constraint"
+    },
+    "constraintLetterGroup": "letter group",
+    "@constraintLetterGroup": {
+        "description": "Name of the letter group constraint"
+    },
+    "constraintParity": "parity",
+    "@constraintParity": {
+        "description": "Name of the parity constraint"
+    },
+    "constraintQuantity": "quantity",
+    "@constraintQuantity": {
+        "description": "Name of the quantity constraint"
+    },
+    "constraintSymmetry": "symmetry",
+    "@constraintSymmetry": {
+        "description": "Name of the symmetry constraint"
     }
 }
