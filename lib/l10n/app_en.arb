@@ -244,5 +244,77 @@
     "constraintSymmetry": "symmetry",
     "@constraintSymmetry": {
         "description": "Name of the symmetry constraint"
+    },
+    "generate": "Generate",
+    "@generate": {
+        "description": "Menu label for the puzzle generator"
+    },
+    "generateTitle": "Generate puzzles",
+    "@generateTitle": {
+        "description": "Title of the puzzle generation page"
+    },
+    "generateWidth": "Width",
+    "@generateWidth": {
+        "description": "Label for the width selector in the generator"
+    },
+    "generateHeight": "Height",
+    "@generateHeight": {
+        "description": "Label for the height selector in the generator"
+    },
+    "generateRequiredRules": "Required rules",
+    "@generateRequiredRules": {
+        "description": "Label for the required rules selector"
+    },
+    "generateExcludedRules": "Excluded rules",
+    "@generateExcludedRules": {
+        "description": "Label for the excluded rules selector"
+    },
+    "generateMaxTime": "Max time",
+    "@generateMaxTime": {
+        "description": "Label for the max generation time selector"
+    },
+    "generateCount": "Puzzles",
+    "@generateCount": {
+        "description": "Label for the number of puzzles to generate"
+    },
+    "generateStart": "Generate",
+    "@generateStart": {
+        "description": "Label of the button that starts generation"
+    },
+    "generateStop": "Stop",
+    "@generateStop": {
+        "description": "Label of the button that stops generation"
+    },
+    "generateProgress": "Generated {current} / {total} puzzles",
+    "@generateProgress": {
+        "description": "Progress message during puzzle generation",
+        "placeholders": {
+            "current": { "type": "int" },
+            "total": { "type": "int" }
+        }
+    },
+    "generateComplete": "Generation complete!",
+    "@generateComplete": {
+        "description": "Message shown when generation is finished"
+    },
+    "generateConstraints": "Constraints",
+    "@generateConstraints": {
+        "description": "Label for the constraints progress display"
+    },
+    "generateFailed": "No puzzles could be generated with these parameters. Try different settings.",
+    "@generateFailed": {
+        "description": "Message shown when generation produced zero puzzles"
+    },
+    "generatePlay": "Play",
+    "@generatePlay": {
+        "description": "Button to play the generated puzzles"
+    },
+    "generateMore": "More",
+    "@generateMore": {
+        "description": "Button to generate more puzzles"
+    },
+    "noCustomPuzzles": "No custom puzzles yet. Use the Generate page to create some!",
+    "@noCustomPuzzles": {
+        "description": "Message shown when the custom collection is empty"
     }
 }

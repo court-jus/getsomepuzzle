@@ -44,6 +44,19 @@ Lorsqu'une case contient l'un de ces symboles, le groupe dont elle fait partie (
 
 La symétrie centrale (🞋) est équivalente à une rotation d'un demi-tour.
 
+## Puzzles personnalisés
+
+Vous pouvez générer vos propres puzzles directement depuis l'application. Ouvrez le menu et appuyez sur "Générer" pour accéder au générateur de puzzles.
+
+Le générateur vous permet de choisir :
+- **Taille de la grille** : largeur et hauteur (3 à 10)
+- **Règles obligatoires** : types de contraintes qui doivent apparaître dans le puzzle
+- **Règles exclues** : types de contraintes qui ne doivent pas apparaître
+- **Temps maximum** : durée maximale de génération
+- **Nombre de puzzles** : combien en créer d'un coup
+
+Les puzzles générés sont sauvegardés dans la collection "Custom", sélectionnable depuis la page Ouvrir. Cette collection est stockée localement sur votre appareil et persiste entre les sessions.
+
 ## Stats
 
 Le jeu enregistre le temps passé à résoudre un puzzle ainsi que le nombre d'erreurs. Ces données ne sont pas collectés automatiquement mais j'apprécierai que vous me les envoyiez, j'ai l'intention de m'en servir pour calculer la difficulté des puzzles.

@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
@@ -22,6 +23,7 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/between_puzzles.dart';
 import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
+import 'package:getsomepuzzle/widgets/generate_page.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
@@ -92,7 +94,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String locale = "en";
   String topMessage = "";
   Color topMessageColor = Colors.black;
-  List<String> bottomMessage = [];
+  List<Widget> bottomMessage = [];
   PuzzleData? currentMeta;
   Puzzle? currentPuzzle;
   Database? database;
@@ -124,9 +126,16 @@ class _MyHomePageState extends State<MyHomePage> {
       if (currentPuzzle == null) return;
       setState(() {
         bottomMessage = [
-          "${currentPuzzle!.width}x${currentPuzzle!.height} (${currentPuzzle!.width * currentPuzzle!.height})",
-          currentMeta!.stats.toString(),
-          "$dbSize",
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("${currentPuzzle!.width}x${currentPuzzle!.height} (${currentPuzzle!.width * currentPuzzle!.height}) "),
+              FaIcon(FontAwesomeIcons.brain, size: 12),
+              Text(" ${currentMeta!.cplx}"),
+            ],
+          ),
+          Text(currentMeta!.stats.toString()),
+          Text("$dbSize"),
         ];
       });
     });
@@ -204,8 +213,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void openPuzzle(PuzzleData puz) {
     setState(() {
-      Iterable<PuzzleData> db = database!.filter();
-      dbSize = db.length;
+      dbSize = database!.playlist.length;
 
       currentMeta = puz;
       currentPuzzle = currentMeta!.begin();
@@ -583,6 +591,23 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             if (database != null)
               ListTile(
+                leading: Icon(Icons.auto_fix_high),
+                title: Text(AppLocalizations.of(context)!.generate),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (context) => GeneratePage(
+                        database: database!,
+                        onPuzzleSelected: openPuzzle,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            if (database != null)
+              ListTile(
                 leading: Icon(Icons.newspaper),
                 title: Text(AppLocalizations.of(context)!.stats),
                 onTap: () {
@@ -741,7 +766,7 @@ class _MyHomePageState extends State<MyHomePage> {
               color: Colors.amber,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: bottomMessage.map((t) => Text(t)).toList(),
+                children: bottomMessage,
               ),
             )
           : null,

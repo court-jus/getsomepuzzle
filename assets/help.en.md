@@ -44,6 +44,19 @@ Whenever a cell contains one of those symbols, the group it belongs to must resp
 
 The central symmetry (🞋) is identical to a rotation by half a turn.
 
+## Custom puzzles
+
+You can generate your own puzzles directly from the app. Open the menu and tap "Generate" to access the puzzle generator.
+
+The generator lets you choose:
+- **Grid size**: width and height (3 to 10)
+- **Required rules**: constraint types that must appear in the puzzle
+- **Excluded rules**: constraint types that must not appear
+- **Max time**: how long to spend generating
+- **Number of puzzles**: how many to create at once
+
+Generated puzzles are saved in the "Custom" collection, which you can select from the Open page. This collection is stored locally on your device and persists between sessions.
+
 ## Stats
 
 The game records how much time has passed before a puzzle is solved and how many failures were made. This data is NOT collected automatically but if you solve a bunch of puzzles I hope you will send me your stats, I intend to sort the puzzles by difficulty and this would help a lot.

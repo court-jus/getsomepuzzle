@@ -192,4 +192,59 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get constraintSymmetry => 'symétrie';
+
+  @override
+  String get generate => 'Générer';
+
+  @override
+  String get generateTitle => 'Générer des puzzles';
+
+  @override
+  String get generateWidth => 'Largeur';
+
+  @override
+  String get generateHeight => 'Hauteur';
+
+  @override
+  String get generateRequiredRules => 'Règles obligatoires';
+
+  @override
+  String get generateExcludedRules => 'Règles exclues';
+
+  @override
+  String get generateMaxTime => 'Temps max';
+
+  @override
+  String get generateCount => 'Puzzles';
+
+  @override
+  String get generateStart => 'Générer';
+
+  @override
+  String get generateStop => 'Arrêter';
+
+  @override
+  String generateProgress(int current, int total) {
+    return 'Généré $current / $total puzzles';
+  }
+
+  @override
+  String get generateComplete => 'Génération terminée !';
+
+  @override
+  String get generateConstraints => 'Contraintes';
+
+  @override
+  String get generateFailed =>
+      'Aucun puzzle n\'a pu être généré avec ces paramètres. Essayez d\'autres réglages.';
+
+  @override
+  String get generatePlay => 'Jouer';
+
+  @override
+  String get generateMore => 'Encore';
+
+  @override
+  String get noCustomPuzzles =>
+      'Aucun puzzle personnalisé. Utilisez la page Générer pour en créer !';
 }

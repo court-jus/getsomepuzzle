@@ -459,6 +459,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'symmetry'**
   String get constraintSymmetry;
+
+  /// Menu label for the puzzle generator
+  ///
+  /// In en, this message translates to:
+  /// **'Generate'**
+  String get generate;
+
+  /// Title of the puzzle generation page
+  ///
+  /// In en, this message translates to:
+  /// **'Generate puzzles'**
+  String get generateTitle;
+
+  /// Label for the width selector in the generator
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get generateWidth;
+
+  /// Label for the height selector in the generator
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get generateHeight;
+
+  /// Label for the required rules selector
+  ///
+  /// In en, this message translates to:
+  /// **'Required rules'**
+  String get generateRequiredRules;
+
+  /// Label for the excluded rules selector
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded rules'**
+  String get generateExcludedRules;
+
+  /// Label for the max generation time selector
+  ///
+  /// In en, this message translates to:
+  /// **'Max time'**
+  String get generateMaxTime;
+
+  /// Label for the number of puzzles to generate
+  ///
+  /// In en, this message translates to:
+  /// **'Puzzles'**
+  String get generateCount;
+
+  /// Label of the button that starts generation
+  ///
+  /// In en, this message translates to:
+  /// **'Generate'**
+  String get generateStart;
+
+  /// Label of the button that stops generation
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get generateStop;
+
+  /// Progress message during puzzle generation
+  ///
+  /// In en, this message translates to:
+  /// **'Generated {current} / {total} puzzles'**
+  String generateProgress(int current, int total);
+
+  /// Message shown when generation is finished
+  ///
+  /// In en, this message translates to:
+  /// **'Generation complete!'**
+  String get generateComplete;
+
+  /// Label for the constraints progress display
+  ///
+  /// In en, this message translates to:
+  /// **'Constraints'**
+  String get generateConstraints;
+
+  /// Message shown when generation produced zero puzzles
+  ///
+  /// In en, this message translates to:
+  /// **'No puzzles could be generated with these parameters. Try different settings.'**
+  String get generateFailed;
+
+  /// Button to play the generated puzzles
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get generatePlay;
+
+  /// Button to generate more puzzles
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get generateMore;
+
+  /// Message shown when the custom collection is empty
+  ///
+  /// In en, this message translates to:
+  /// **'No custom puzzles yet. Use the Generate page to create some!'**
+  String get noCustomPuzzles;
 }
 
 class _AppLocalizationsDelegate

@@ -189,7 +189,21 @@ class Database {
       "default",
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("Puzzles"), Icon(UniconsLine.puzzle_piece)],
+        children: [Text("Collection 1"), Icon(UniconsLine.puzzle_piece)],
+      ),
+    ),
+    (
+      "try_me",
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text("Try me"), Icon(Icons.science)],
+      ),
+    ),
+    (
+      "custom",
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Text("Mes puzzles"), Icon(Icons.build)],
       ),
     ),
   ];
@@ -198,7 +212,7 @@ class Database {
         .where((e) => e.isNotEmpty && !e.startsWith("#"))
         .map((e) => PuzzleData(e))
         .toList();
-    maxCplx = puzzles.map((puz) => puz.cplx).max;
+    maxCplx = puzzles.isEmpty ? 0 : puzzles.map((puz) => puz.cplx).max;
   }
 
   void loadStats(List<String> stats) {
@@ -305,10 +319,14 @@ class Database {
     collection = collectionToLoad;
     prefs.setString("collectionToLoad", collection);
     String assetContent;
-    try {
-      assetContent = await rootBundle.loadString('assets/$collection.txt');
-    } catch (_) {
-      assetContent = await rootBundle.loadString('assets/tutorial.txt');
+    if (collection == "custom") {
+      assetContent = await _loadCustomCollection();
+    } else {
+      try {
+        assetContent = await rootBundle.loadString('assets/$collection.txt');
+      } catch (_) {
+        assetContent = await rootBundle.loadString('assets/tutorial.txt');
+      }
     }
     load(assetContent.split("\n"));
     await currentFilters.load();
@@ -385,9 +403,8 @@ class Database {
   PuzzleData? next() {
     if (playlist.isEmpty) {
       log.info("Playlist empty");
-      preparePlaylist();
+      return null;
     }
-    if (playlist.isEmpty) return null;
     final selection = playlist.removeAt(0);
     log.finer("${playlist.length} puzzles remaining in playlist");
     writeStats();
@@ -399,5 +416,54 @@ class Database {
         .where((puz) => puz.played)
         .map((puz) => puz.getStat())
         .toList();
+  }
+
+  Future<String> _loadCustomCollection() async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      final lines = prefs.getStringList("custom_puzzles") ?? [];
+      return lines.join("\n");
+    }
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final filePath = p.join(documentsDirectory.path, "getsomepuzzle", "custom.txt");
+    final file = File(filePath);
+    if (await file.exists()) {
+      return await file.readAsString();
+    }
+    return '';
+  }
+
+  Future<void> addToCustomCollection(String puzzleLine) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      final lines = prefs.getStringList("custom_puzzles") ?? [];
+      lines.add(puzzleLine);
+      await prefs.setStringList("custom_puzzles", lines);
+    } else {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final dirPath = p.join(documentsDirectory.path, "getsomepuzzle");
+      await Directory(dirPath).create(recursive: true);
+      final filePath = p.join(dirPath, "custom.txt");
+      final file = File(filePath);
+      await file.writeAsString('$puzzleLine\n', mode: FileMode.append);
+    }
+  }
+
+  Future<void> deleteFromCustomCollection(String puzzleLine) async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      final lines = prefs.getStringList("custom_puzzles") ?? [];
+      lines.remove(puzzleLine);
+      await prefs.setStringList("custom_puzzles", lines);
+    } else {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final filePath = p.join(documentsDirectory.path, "getsomepuzzle", "custom.txt");
+      final file = File(filePath);
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final lines = content.split('\n').where((l) => l.trim() != puzzleLine.trim()).toList();
+        await file.writeAsString(lines.join('\n'), mode: FileMode.writeOnly);
+      }
+    }
   }
 }

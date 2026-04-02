@@ -368,7 +368,7 @@ class _OpenPageState extends State<OpenPage> {
                           initialMax: widget.database.currentFilters.maxCplx,
                           minimum: 0,
                           maximum: widget.database.maxCplx,
-                          increment: 1,
+                          increment: 5,
                         ),
                       ],
                     ),
@@ -412,6 +412,20 @@ class _OpenPageState extends State<OpenPage> {
                       "${AppLocalizations.of(context)!.msgCountMatchingPuzzles}: $matchingCount",
                     ),
                     Divider(),
+                    if (widget.database.collection == "custom" &&
+                        widget.database.puzzles.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          AppLocalizations.of(context)!.noCustomPuzzles,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.grey,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     if (widget.database.filter().isNotEmpty)
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(

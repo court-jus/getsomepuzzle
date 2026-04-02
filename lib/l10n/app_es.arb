@@ -59,5 +59,22 @@
     "constraintLetterGroup": "grupo de letras",
     "constraintParity": "paridad",
     "constraintQuantity": "cantidad",
-    "constraintSymmetry": "simetría"
+    "constraintSymmetry": "simetría",
+    "generate": "Generar",
+    "generateTitle": "Generar puzzles",
+    "generateWidth": "Ancho",
+    "generateHeight": "Alto",
+    "generateRequiredRules": "Reglas obligatorias",
+    "generateExcludedRules": "Reglas excluidas",
+    "generateMaxTime": "Tiempo máx.",
+    "generateCount": "Puzzles",
+    "generateStart": "Generar",
+    "generateStop": "Detener",
+    "generateProgress": "Generados {current} / {total} puzzles",
+    "generateComplete": "¡Generación completada!",
+    "generateConstraints": "Restricciones",
+    "generateFailed": "No se pudieron generar puzzles con estos parámetros. Prueba con otros ajustes.",
+    "generatePlay": "Jugar",
+    "generateMore": "Más",
+    "noCustomPuzzles": "No hay puzzles personalizados. ¡Usa la página Generar para crear algunos!"
 }

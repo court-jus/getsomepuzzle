@@ -44,6 +44,19 @@ Cuando una celda contiene uno de estos símbolos, el grupo al que pertenece debe
 
 La simetría central (🞋) es equivalente a una rotación de medio giro.
 
+## Puzzles personalizados
+
+Puedes generar tus propios puzzles directamente desde la aplicación. Abre el menú y toca "Generar" para acceder al generador de puzzles.
+
+El generador te permite elegir:
+- **Tamaño de la cuadrícula**: ancho y alto (3 a 10)
+- **Reglas obligatorias**: tipos de restricciones que deben aparecer en el puzzle
+- **Reglas excluidas**: tipos de restricciones que no deben aparecer
+- **Tiempo máximo**: cuánto tiempo dedicar a la generación
+- **Número de puzzles**: cuántos crear de una vez
+
+Los puzzles generados se guardan en la colección "Custom", seleccionable desde la página Abrir. Esta colección se almacena localmente en tu dispositivo y se mantiene entre sesiones.
+
 ## Estadísticas
 
 El juego registra cuánto tiempo ha pasado antes de que un rompecabezas se resuelva y cuántos fallos se cometieron. Estos datos NO se recopilan automáticamente, pero si resuelves un montón de rompecabezas, espero que me envíes tus estadísticas. Pretendo ordenar los rompecabezas por dificultad y esto ayudaría mucho.
