@@ -28,7 +28,7 @@ If you are correct, another puzzle will start immediately. If you made a mistake
 
 If you are stuck, you can reset the puzzle to its initial state.
 
-There are about 5k puzzles bundled within the app and there are some python scripts to generate new puzzles.
+There are about 10k puzzles bundled within the app. You can also generate new puzzles from the app or from the command line.
 
 ## Constraints
 
@@ -52,3 +52,45 @@ Cells containing the same letter should be part of the same group. A group must 
 
 A black or white number over the puzzle, on a blue background indicates that the
 total number of cells of that color should match that number.
+
+## Generating puzzles
+
+### From the app
+
+Open the menu and tap **Generate**. You can configure the grid size, which constraint types to include or exclude, the number of puzzles and a time limit. Generated puzzles are saved to the **Mes puzzles** collection.
+
+### From the command line
+
+```bash
+dart run bin/generate.dart [options]
+```
+
+Options:
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-n, --count` | Number of puzzles to generate | 10 |
+| `-W, --min-width` | Minimum grid width | 4 |
+| `--max-width` | Maximum grid width | 7 |
+| `-H, --min-height` | Minimum grid height | 4 |
+| `--max-height` | Maximum grid height | 8 |
+| `-o, --output` | Output file (default: stdout) | |
+| `--ban` | Comma-separated rules to exclude | |
+| `--require` | Comma-separated rules to require | |
+
+Rule slugs: `FM` (forbidden motif), `PA` (parity), `GS` (group size), `LT` (letter group), `QA` (quantity), `SY` (symmetry).
+
+Examples:
+
+```bash
+# Generate 100 puzzles into a file
+dart run bin/generate.dart -n 100 -o puzzles.txt
+
+# Small puzzles only
+dart run bin/generate.dart -n 50 -W 3 --max-width 5 -H 3 --max-height 5
+
+# Only parity and forbidden motif constraints
+dart run bin/generate.dart -n 20 --ban LT,SY,GS,QA
+```
+
+The CLI shows progress on stderr and outputs puzzle lines to stdout (or the file specified with `-o`). You can interrupt with Ctrl+C without losing already generated puzzles.
