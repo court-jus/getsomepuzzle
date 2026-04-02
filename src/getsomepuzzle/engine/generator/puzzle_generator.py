@@ -130,23 +130,23 @@ def generate_once(running, width, height):
         pu = pg.generate(debug=debug)
         if pu is None:
             return None
-        solution, bp, _ = find_solution(running, pu, debug=debug)
-        if not bp:
+        solution, _, _ = find_solution(running, pu, debug=debug)
+        if solution is None:
             return None
     except RuntimeError:
         return None
     pu.apply_fixed_constraints(debug=debug)
     pu.clear_solutions()
     pu.remove_useless_rules(debug=debug)
-    solution, bp, _ = find_solution(running, pu, debug=debug)
+    solution, steps, _ = find_solution(running, pu, debug=debug)
     pu.clear_solutions()
-    if bp is None:
+    if solution is None:
         return None
     max_simplifications = 30
-    while bp and bp > 5 and max_simplifications > 0:
+    while steps > 5 and max_simplifications > 0:
         max_simplifications -= 1
         pu.simplify(solution, debug=debug)
-        solution, bp, _ = find_solution(running, pu, debug=debug)
+        solution, steps, _ = find_solution(running, pu, debug=debug)
     if len(find_solutions(pu, running, debug=debug)) != 1:
         return None
 

@@ -72,19 +72,14 @@ def buildapuzzle(width, height, ratio, verbose=False, progress=True, extra_text=
             constraint = all_constraints.pop(0)
             cloned = pu.clone()
             # First: apply previously added constraints
-            changed_step1 = True
-            while changed_step1:
-                changed_step1 = cloned.apply_constraints() or cloned.apply_with_force()
+            cloned.solve()
 
             # Then: try to apply the new constraint and see if it helps
+            ratio_before = cloned.compute_ratio()
             cloned.constraints.append(constraint)
-            changed_step2 = cloned.apply_constraints()
-            if changed_step2:
-                ratio = cloned.compute_ratio()
-                break
-            changed_step2 |= cloned.apply_with_force()
-            if changed_step2:
-                ratio = cloned.compute_ratio()
+            cloned.solve()
+            ratio = cloned.compute_ratio()
+            if ratio < ratio_before:
                 break
 
         # We found a constraint that is helpful, add it to the resulting puzzle
@@ -116,9 +111,7 @@ def buildapuzzle(width, height, ratio, verbose=False, progress=True, extra_text=
         return pu
 
     cloned = pu.clone()
-    changed = True
-    while changed:
-        changed = cloned.apply_constraints() or cloned.apply_with_force()
+    cloned.solve()
     for _, idx in cloned.free_cells():
         if verbose:
             print(f"Will fill cell {idx} and save to another file")

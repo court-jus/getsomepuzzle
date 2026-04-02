@@ -5,8 +5,7 @@ from .constraints.base import CellCentricConstraint
 from .constants import DOMAIN, DEFAULT_SIZE, EMPTY, MAX_FORCABLE
 from .errors import RuleConflictError, CannotApplyConstraint
 from .cell import Cell
-from .solver.puzzle_solver import find_solution, find_solutions
-from .utils import line_export
+from .utils import line_export, get_neighbors
 
 class Puzzle:
     def __init__(self, *, running, width=DEFAULT_SIZE, height=DEFAULT_SIZE, domain=None):
@@ -70,6 +69,20 @@ class Puzzle:
             return None, None
         return cells[0]
 
+    def mrv_free_cell(self):
+        """Pick the free cell with fewest options (MRV), breaking ties by most filled neighbors."""
+        cells = self.free_cells()
+        if not cells:
+            return None, None
+        def score(cell_and_idx):
+            cell, idx = cell_and_idx
+            neighbors = get_neighbors(self.state, self.width, self.height, idx)
+            filled_neighbors = sum(
+                1 for n in neighbors if n is not None and self.state[n].value != EMPTY
+            )
+            return (len(cell.options), -filled_neighbors)
+        return min(cells, key=score)
+
     def add_constraint(self, new_constraint, debug=False, auto_apply=True, auto_check=True):
         if debug:
             print("Trying to add", new_constraint, "to", [repr(c) for c in self.constraints])
@@ -89,7 +102,7 @@ class Puzzle:
             # Try to solve
             tmp = self.clone()
             tmp.constraints.append(new_constraint)
-            sol, bp, _ = find_solution(self.running, tmp, debug=debug)
+            sol, _ = tmp.solve_with_backtracking(running=self.running)
             if not sol:
                 raise RuleConflictError("Cannot add rule, it makes the puzzle unsolvable")
         self.constraints.append(new_constraint)
@@ -184,6 +197,78 @@ class Puzzle:
                         print(f"  It's OK to have {idx + 1} = {value}")
         return changed
 
+    def solve(self, explain=False, max_steps=20):
+        """Unified solving: apply_constraints + apply_with_force in a loop.
+        Returns True if solved, False if stuck.
+        Raises CannotApplyConstraint only on initial propagation failure
+        (before any force has been applied)."""
+        # Initial propagation — if this fails, the puzzle is truly unsolvable
+        self.apply_constraints(explain=explain)
+        if not self.free_cells():
+            return self.is_complete()
+        # Force + propagation loop
+        for step in range(max_steps):
+            try:
+                force_changed = self.apply_with_force(explain=explain)
+                if not self.free_cells():
+                    return self.is_complete()
+                changed = self.apply_constraints(explain=explain)
+                if not self.free_cells():
+                    return self.is_complete()
+                if not changed and not force_changed:
+                    break
+            except CannotApplyConstraint:
+                # Force + propagation created a contradiction — stuck, need backtracking
+                return False
+        return not self.free_cells() and self.is_complete()
+
+    def solve_with_backtracking(self, running=None, level=0, explain=False, max_steps=20):
+        """Full solver: propagation + force loop, then MRV backtracking if needed.
+        Returns (solution_puzzle, steps) or (None, steps)."""
+        st = self.clone()
+
+        # Try full solve (propagation + force) first
+        try:
+            solved = st.solve(explain=explain, max_steps=max_steps)
+        except CannotApplyConstraint:
+            return None, 0
+        if solved and st.is_complete():
+            return st, 0
+        # If force left the state corrupted, restart with propagation only
+        if not st.is_possible():
+            st = self.clone()
+            try:
+                st.apply_constraints()
+            except CannotApplyConstraint:
+                return None, 0
+            if st.is_complete():
+                return st, 0
+
+        # Backtracking with MRV heuristic
+        steps = 0
+        max_bt_steps = 100000
+        while steps <= max_bt_steps and (running is None or running.is_set()):
+            if st.is_complete():
+                return st, steps
+            steps += 1
+            cell, idx = st.mrv_free_cell()
+            if cell is None:
+                return None, steps
+            for option in list(cell.options):
+                clone = st.clone()
+                clone.state[idx].set_value(option)
+                sub_st, sub_steps = clone.solve_with_backtracking(
+                    running=running, level=level + 1, max_steps=max_steps,
+                )
+                steps += sub_steps
+                if sub_st is not None:
+                    return sub_st, steps
+                else:
+                    st.state[idx].options.remove(option)
+                    if not st.state[idx].options:
+                        return None, steps
+        return None, steps
+
     def reset_user_input(self):
         for cell in self.state:
             if cell.value != EMPTY and cell.options:
@@ -198,6 +283,7 @@ class Puzzle:
             print("Simplify: Set cell", idx, "to", cell.value)
 
     def remove_useless_rules(self, debug=False):
+        from .solver.puzzle_solver import find_solutions
         solutions = find_solutions(self, self.running, debug=False)
         if debug:
             print(f"Initially, we have {len(solutions)} solution:")
