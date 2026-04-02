@@ -1,9 +1,7 @@
 import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
@@ -41,26 +39,6 @@ class GroupSize extends CellsCentricConstraint {
       }
     }
     return result;
-  }
-
-  @override
-  Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
-    final fgcolor = isHighlighted
-        ? highlightColor
-        : (isValid ? defaultColor : Colors.redAccent);
-    return SizedBox(
-      width: cellSize / count,
-      height: cellSize / count,
-      child: Center(
-        child: Text(
-          toString(),
-          style: TextStyle(
-            fontSize: cellSize * cellSizeToFontSize / count,
-            color: fgcolor,
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -173,26 +151,6 @@ class LetterGroup extends CellsCentricConstraint {
       }
     }
     return result;
-  }
-
-  @override
-  Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
-    final fgcolor = isHighlighted
-        ? highlightColor
-        : (isValid ? defaultColor : Colors.redAccent);
-    return SizedBox(
-      width: cellSize / count,
-      height: cellSize / count,
-      child: Center(
-        child: Text(
-          letter,
-          style: TextStyle(
-            fontSize: cellSize * cellSizeToFontSize / count,
-            color: fgcolor,
-          ),
-        ),
-      ),
-    );
   }
 
   @override

@@ -1,11 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
-
-// Arrows for the parity constraint appear smaller so we add a zoom factor
-const fontSizeRatio = 40.0 / 36.0;
 
 class ParityConstraint extends CellsCentricConstraint {
   String side = "";
@@ -65,35 +60,6 @@ class ParityConstraint extends CellsCentricConstraint {
       }
     }
     return result;
-  }
-
-  @override
-  Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
-    final Map<String, IconData> icons = {
-      "left": Icons.arrow_circle_left_outlined,
-      "right": Icons.arrow_circle_right_outlined,
-      "horizontal": Icons.swap_horizontal_circle_outlined,
-      "vertical": Icons.swap_vert_circle_outlined,
-      "top": Icons.arrow_circle_up_outlined,
-      "bottom": Icons.arrow_circle_down_outlined,
-    };
-    final fgcolor = isHighlighted
-        ? highlightColor
-        : (isValid ? defaultColor : Colors.redAccent);
-    if (icons.containsKey(side)) {
-      return SizedBox(
-        width: cellSize / count,
-        height: cellSize / count,
-        child: Center(
-          child: Icon(
-            icons[side],
-            size: cellSize * cellSizeToFontSize * fontSizeRatio / count,
-            color: fgcolor,
-          ),
-        ),
-      );
-    }
-    return Text("");
   }
 
   @override

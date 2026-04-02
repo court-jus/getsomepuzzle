@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint_to_flutter.dart';
 
 const bgColors = {
   0: Color.fromARGB(255, 192, 235, 241),
@@ -60,7 +61,8 @@ class CellWidget extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               for (final constraint in constraints!)
-                constraint.toWidget(
+                constraintToFlutter(
+                  constraint,
                   constraint.isHighlighted
                       ? highlightColor
                       : (fgColors[value] ?? Colors.black),

@@ -1,7 +1,5 @@
 import 'package:collection/collection.dart';
-import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
 class Constraint {
@@ -15,16 +13,6 @@ class Constraint {
 
   String toHuman() {
     return toString();
-  }
-
-  Widget toWidget(Color defaultColor, double cellSize, {int count = 1}) {
-    return SizedBox(
-      width: cellSize / count,
-      height: cellSize / count,
-      child: Center(
-        child: Text(toString(), style: TextStyle(fontSize: cellSize * cellSizeToFontSize / count)),
-      ),
-    );
   }
 
   String serialize() {
