@@ -27,6 +27,10 @@ class Constraint {
     );
   }
 
+  String serialize() {
+    return '';
+  }
+
   bool verify(Puzzle puzzle) {
     return true;
   }
@@ -40,12 +44,7 @@ class Constraint {
   }
 
   Move? apply(Puzzle puzzle) {
-    final clone = Puzzle(puzzle.lineRepresentation);
-    clone.constraints = puzzle.constraints;
-    for (var cell in puzzle.cellValues.indexed) {
-      if (cell.$2 == 0) continue;
-      clone.setValue(cell.$1, cell.$2);
-    }
+    final clone = puzzle.clone();
     for (var cell in clone.cellValues.indexed) {
       if (cell.$2 != 0) continue;
       for (var value in puzzle.domain) {

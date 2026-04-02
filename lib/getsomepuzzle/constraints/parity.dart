@@ -27,9 +27,44 @@ class ParityConstraint extends CellsCentricConstraint {
   }
 
   @override
+  String serialize() => 'PA:${indices.first}.$side';
+
+  @override
   String toHuman() {
     final idx = indices.first + 1;
     return "$idx = ${toString()}";
+  }
+
+  /// Generate all valid parity constraint parameters for a given grid size.
+  static List<String> generateAllParameters(int width, int height) {
+    final List<String> result = [];
+    for (int idx = 0; idx < width * height; idx++) {
+      final ridx = idx ~/ width;
+      final cidx = idx % width;
+      final leftSize = cidx;
+      final rightSize = width - 1 - cidx;
+      final topSize = ridx;
+      final bottomSize = height - 1 - ridx;
+      if (leftSize % 2 == 0 && leftSize > 0) {
+        result.add('$idx.left');
+      }
+      if (rightSize % 2 == 0 && rightSize > 0) {
+        result.add('$idx.right');
+      }
+      if (leftSize % 2 == 0 && rightSize % 2 == 0 && rightSize > 0 && leftSize > 0) {
+        result.add('$idx.horizontal');
+      }
+      if (topSize % 2 == 0 && topSize > 0) {
+        result.add('$idx.top');
+      }
+      if (bottomSize % 2 == 0 && bottomSize > 0) {
+        result.add('$idx.bottom');
+      }
+      if (topSize % 2 == 0 && bottomSize % 2 == 0 && bottomSize > 0 && topSize > 0) {
+        result.add('$idx.vertical');
+      }
+    }
+    return result;
   }
 
   @override

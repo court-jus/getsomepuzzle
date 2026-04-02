@@ -28,6 +28,25 @@ class Cell {
     value = 0;
     options = domain.toList();
   }
+
+  bool get isFree => value == 0 && options.isNotEmpty;
+
+  bool get isPossible => value != 0 || options.isNotEmpty;
+
+  /// Sets value and clears options — used by the solver/generator.
+  bool setForSolver(int val) {
+    if (value == val && options.isEmpty) return false;
+    value = val;
+    options = [];
+    return true;
+  }
+
+  Cell clone() {
+    final c = Cell(0, idx, domain, readonly);
+    c.value = value;
+    c.options = options.toList();
+    return c;
+  }
 }
 
 class Move {

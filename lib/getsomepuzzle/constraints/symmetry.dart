@@ -27,6 +27,9 @@ class SymmetryConstraint extends CellsCentricConstraint {
   }
 
   @override
+  String serialize() => 'SY:${indices.first}.$axis';
+
+  @override
   String toString() {
     return axisRepresentation[axis] ?? "🕱";
   }
@@ -55,6 +58,16 @@ class SymmetryConstraint extends CellsCentricConstraint {
         child: icon,
       ),
     );
+  }
+
+  static List<String> generateAllParameters(int width, int height) {
+    final List<String> result = [];
+    for (int idx = 0; idx < width * height; idx++) {
+      for (int axis = 1; axis <= 5; axis++) {
+        result.add('$idx.$axis');
+      }
+    }
+    return result;
   }
 
   @override

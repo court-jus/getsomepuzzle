@@ -14,8 +14,22 @@ class QuantityConstraint extends Constraint {
   }
 
   @override
+  String serialize() => 'QA:$value.$count';
+
+  @override
   String toString() {
     return "$value = $count";
+  }
+
+  static List<String> generateAllParameters(int width, int height, List<int> domain) {
+    final maxCount = width * height - 1;
+    final List<String> result = [];
+    for (int count = 1; count < maxCount; count++) {
+      for (final value in domain) {
+        result.add('$value.$count');
+      }
+    }
+    return result;
   }
 
   @override

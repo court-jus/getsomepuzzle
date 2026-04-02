@@ -9,6 +9,9 @@ class HelpText extends Constraint {
   }
 
   @override
+  String serialize() => 'TX:${text.replaceAll(" ", "∅")}';
+
+  @override
   String toString() {
     return text;
   }

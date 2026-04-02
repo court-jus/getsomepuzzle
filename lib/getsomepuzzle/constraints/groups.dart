@@ -1,9 +1,14 @@
+import 'dart:math';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+
+const _maxGroupSizeRatio = 0.5;
+const _maxGroupSizeAbsolute = 15;
 
 class GroupSize extends CellsCentricConstraint {
   int size = 0;
@@ -14,6 +19,9 @@ class GroupSize extends CellsCentricConstraint {
   }
 
   @override
+  String serialize() => 'GS:${indices.first}.$size';
+
+  @override
   String toString() {
     return size.toString();
   }
@@ -22,6 +30,17 @@ class GroupSize extends CellsCentricConstraint {
   String toHuman() {
     final idx = indices.first;
     return "${idx + 1} = $size";
+  }
+
+  static List<String> generateAllParameters(int width, int height) {
+    final maxSize = min(_maxGroupSizeAbsolute, max(1, (width * height * _maxGroupSizeRatio).toInt()));
+    final List<String> result = [];
+    for (int idx = 0; idx < width * height; idx++) {
+      for (int size = 1; size < maxSize; size++) {
+        result.add('$idx.$size');
+      }
+    }
+    return result;
   }
 
   @override
@@ -133,9 +152,27 @@ class LetterGroup extends CellsCentricConstraint {
   }
 
   @override
+  String serialize() => 'LT:$letter.${indices.join(".")}';
+
+  @override
   String toHuman() {
     final hIndices = indices.map((i) => i + 1);
     return "$hIndices = $letter";
+  }
+
+  static List<String> generateAllParameters(int width, int height) {
+    final size = width * height;
+    final maxLetters = max(1, size ~/ 5);
+    final List<String> result = [];
+    for (int idx1 = 0; idx1 < size; idx1++) {
+      for (int idx2 = 0; idx2 < size; idx2++) {
+        if (idx1 == idx2) continue;
+        for (int l = 0; l < maxLetters; l++) {
+          result.add('${String.fromCharCode(65 + l)}.$idx1.$idx2');
+        }
+      }
+    }
+    return result;
   }
 
   @override

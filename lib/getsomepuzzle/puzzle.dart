@@ -8,6 +8,15 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 
+/// Result of a single apply-and-set step in the shared loop.
+enum ApplyLoopResult { applied, complete, impossible, stuck }
+
+/// Exception thrown by the solver when a contradiction is detected.
+class SolverContradiction implements Exception {
+  final String message;
+  SolverContradiction([this.message = '']);
+}
+
 class Stats {
   int failures = 0;
   int duration = 0;
@@ -234,29 +243,42 @@ class Puzzle {
     return null;
   }
 
-  Move? applyAll() {
-    bool finished = false;
-    while (!finished) {
+  /// Shared loop: calls apply() repeatedly, sets values, tracks last move.
+  /// Returns (result, lastMove, changeCount).
+  (ApplyLoopResult, Move?, int) _applyLoop() {
+    int changes = 0;
+    Move? lastMove;
+    while (true) {
       final move = apply();
-      if (move == null) return null;
+      if (move == null) return (ApplyLoopResult.stuck, lastMove, changes);
+      lastMove = move;
       if (move.isImpossible != null) {
-        finished = true;
-        return Move(0, 0, move.givenBy, isImpossible: move.isImpossible);
+        return (ApplyLoopResult.impossible, move, changes);
       }
       setValue(move.idx, move.value);
+      changes++;
       if (complete) {
-        finished = true;
-        return Move(
-          0,
-          0,
-          move.givenBy,
-          isImpossible: check(saveResult: false).isNotEmpty
-              ? move.givenBy
-              : null,
-        );
+        final hasErrors = check(saveResult: false).isNotEmpty;
+        if (hasErrors) {
+          return (ApplyLoopResult.impossible, move, changes);
+        }
+        return (ApplyLoopResult.complete, move, changes);
       }
     }
-    return null;
+  }
+
+  Move? applyAll() {
+    final (result, lastMove, _) = _applyLoop();
+    switch (result) {
+      case ApplyLoopResult.stuck:
+        return null;
+      case ApplyLoopResult.impossible:
+        return Move(0, 0, lastMove!.givenBy, isImpossible: lastMove.isImpossible ?? lastMove.givenBy);
+      case ApplyLoopResult.complete:
+        return Move(0, 0, lastMove!.givenBy);
+      case ApplyLoopResult.applied:
+        return null; // should not happen, loop always reaches stuck/impossible/complete
+    }
   }
 
   Move? findAMove() {
@@ -276,11 +298,7 @@ class Puzzle {
     // to randomly set a cell's value and see if that leads to
     // an impossible to solve puzzle. It would mean that this
     // value is forbidden.
-    final clone = Puzzle(lineRepresentation);
-    clone.constraints = constraints;
-    for (var cell in cellValues.indexed) {
-      clone.setValue(cell.$1, cell.$2);
-    }
+    final clone = this.clone();
     for (var freeCell in clone.cells.indexed.where(
       (entry) => entry.$2.value == 0,
     )) {
@@ -315,6 +333,274 @@ class Puzzle {
     for (var cell in cells) {
       cell.isHighlighted = false;
     }
+  }
+
+  // --- Constructor for empty puzzles (no lineRepresentation parsing) ---
+  Puzzle.empty(this.width, this.height, this.domain) : lineRepresentation = '' {
+    cells = List.generate(
+      width * height,
+      (idx) => Cell(0, idx, domain, false),
+    );
+  }
+
+  Puzzle clone() {
+    final p = Puzzle.empty(width, height, domain);
+    p.lineRepresentation = lineRepresentation;
+    p.cells = cells.map((c) => c.clone()).toList();
+    p.constraints = constraints.toList();
+    return p;
+  }
+
+  List<(Cell, int)> freeCells() {
+    return cells.indexed
+        .where((entry) => entry.$2.isFree)
+        .map((entry) => (entry.$2, entry.$1))
+        .toList();
+  }
+
+  double computeRatio() {
+    final values = cellValues;
+    return values.where((v) => v == 0).length / values.length;
+  }
+
+  bool isPossible() {
+    return cells.every((c) => c.isPossible);
+  }
+
+  /// Iterative constraint propagation (solver).
+  /// Calls apply() repeatedly and sets values.
+  /// When [autoCheck] is true, verify all constraints after each step
+  /// and throw on violation (like Python's auto_check=True).
+  /// Throws [SolverContradiction] on contradiction.
+  /// Returns the number of changes made.
+  int applyConstraintsPropagation({bool autoCheck = false}) {
+    int changes = 0;
+    while (true) {
+      final move = apply();
+      if (move == null) return changes;
+      if (move.isImpossible != null) {
+        throw SolverContradiction('Constraint returned impossible');
+      }
+      setValue(move.idx, move.value);
+      changes++;
+      if (autoCheck) {
+        final failed = check(saveResult: false);
+        if (failed.isNotEmpty) {
+          throw SolverContradiction('Constraint verification failed after apply');
+        }
+      }
+      if (complete) {
+        final failed = check(saveResult: false);
+        if (failed.isNotEmpty) {
+          throw SolverContradiction('Completed but constraints violated');
+        }
+        return changes;
+      }
+    }
+  }
+
+  /// For each free cell, try each value, clone + propagate with autoCheck.
+  /// If a value leads to contradiction, eliminate it.
+  /// Returns true if any progress was made.
+  bool applyWithForce() {
+    bool changed = false;
+    final free = freeCells();
+    for (final (cell, idx) in free) {
+      if (cell.options.length <= 1) continue;
+      for (final value in List<int>.from(cell.options)) {
+        final testPu = clone();
+        testPu.cells[idx].setForSolver(value);
+        try {
+          testPu.applyConstraintsPropagation(autoCheck: true);
+        } on SolverContradiction {
+          // This value leads to contradiction, remove it
+          cell.options.remove(value);
+          if (cell.options.length == 1) {
+            cell.setForSolver(cell.options[0]);
+            changed = true;
+          } else if (cell.options.isEmpty) {
+            throw SolverContradiction('Cell $idx has no options left');
+          }
+        }
+      }
+    }
+    return changed;
+  }
+
+  /// Like [applyWithForce] but stops after determining a single cell.
+  /// Returns true if one cell was determined by force.
+  bool applyWithForceSingle() {
+    final free = freeCells();
+    for (final (cell, idx) in free) {
+      if (cell.options.length <= 1) continue;
+      for (final value in List<int>.from(cell.options)) {
+        final testPu = clone();
+        testPu.cells[idx].setForSolver(value);
+        try {
+          testPu.applyConstraintsPropagation(autoCheck: true);
+        } on SolverContradiction {
+          cell.options.remove(value);
+          if (cell.options.length == 1) {
+            cell.setForSolver(cell.options[0]);
+            return true;
+          } else if (cell.options.isEmpty) {
+            throw SolverContradiction('Cell $idx has no options left');
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Compute puzzle complexity on a 0-100 scale.
+  ///
+  /// Three components:
+  /// - **Force rounds** (0-90): each round of forced deduction = 10 points,
+  ///   capped at 9 rounds. 100 if backtracking is needed.
+  /// - **Rule diversity** (0-4): number of distinct constraint types.
+  ///   1 type=0, 2=1, 3=2, 4-5=3, 6+=4.
+  /// - **Emptiness** (0-6): proportion of free cells.
+  ///   Fully empty=6, 50% filled=3, fully filled=0.
+  int computeComplexity() {
+    final size = width * height;
+    final totalFree = freeCells().length;
+    if (totalFree == 0) return 0;
+
+    // Count distinct rule types (exclude HelpText)
+    final ruleTypes = constraints
+        .map((c) => c.serialize().split(':').first)
+        .where((s) => s.isNotEmpty && s != 'TX')
+        .toSet()
+        .length;
+
+    // Rule diversity: 1→0, 2→1, 3→2, 4-5→3, 6+→4
+    final int ruleDiversity;
+    if (ruleTypes <= 1) {
+      ruleDiversity = 0;
+    } else if (ruleTypes <= 3) {
+      ruleDiversity = ruleTypes - 1;
+    } else if (ruleTypes <= 5) {
+      ruleDiversity = 3;
+    } else {
+      ruleDiversity = 4;
+    }
+
+    // Emptiness: ratio of free cells, scaled to 0-6
+    final emptiness = (totalFree / size * 6).round();
+
+    // Force rounds
+    final test = clone();
+    try {
+      test.applyConstraintsPropagation();
+    } on SolverContradiction {
+      return 100;
+    }
+
+    int forceRounds = 0;
+    if (test.freeCells().isNotEmpty) {
+      for (int step = 0; step < 200; step++) {
+        try {
+          final forced = test.applyWithForceSingle();
+          if (!forced) break;
+          forceRounds++;
+          test.applyConstraintsPropagation();
+        } on SolverContradiction {
+          return 100;
+        }
+        if (test.freeCells().isEmpty) break;
+      }
+      // Needs backtracking
+      if (test.freeCells().isNotEmpty) return 100;
+    }
+
+    final forceScore = (forceRounds * 10).clamp(0, 90);
+    return (forceScore + ruleDiversity + emptiness).clamp(0, 100);
+  }
+
+  /// Unified solving: propagation + force loop.
+  /// Returns true if fully solved.
+  bool solve({int maxSteps = 20}) {
+    try {
+      applyConstraintsPropagation();
+    } on SolverContradiction {
+      return false;
+    }
+    if (freeCells().isEmpty) return complete && check(saveResult: false).isEmpty;
+    for (int step = 0; step < maxSteps; step++) {
+      try {
+        final forceChanged = applyWithForce();
+        if (freeCells().isEmpty) return complete && check(saveResult: false).isEmpty;
+        final propChanges = applyConstraintsPropagation();
+        if (freeCells().isEmpty) return complete && check(saveResult: false).isEmpty;
+        if (!forceChanged && propChanges == 0) break;
+      } on SolverContradiction {
+        return false;
+      }
+    }
+    return freeCells().isEmpty && complete && check(saveResult: false).isEmpty;
+  }
+
+  /// Full solver: propagation + force + MRV backtracking.
+  /// Returns (solved puzzle or null, steps).
+  (Puzzle?, int) solveWithBacktracking({int maxSteps = 100000, int level = 0}) {
+    final st = clone();
+    try {
+      final solved = st.solve();
+      if (solved && st.complete) return (st, 0);
+    } on SolverContradiction {
+      return (null, 0);
+    }
+    if (!st.isPossible()) {
+      // Force left state corrupted, retry with propagation only
+      final st2 = clone();
+      try {
+        st2.applyConstraintsPropagation();
+      } on SolverContradiction {
+        return (null, 0);
+      }
+      if (st2.freeCells().isEmpty && st2.complete) return (st2, 0);
+      return _backtrack(st2, maxSteps, level);
+    }
+    return _backtrack(st, maxSteps, level);
+  }
+
+  (Puzzle?, int) _backtrack(Puzzle st, int maxSteps, int level) {
+    int steps = 0;
+    while (steps <= maxSteps) {
+      if (st.freeCells().isEmpty && st.complete) return (st, steps);
+      steps++;
+      // MRV heuristic: pick cell with fewest options
+      final free = st.freeCells();
+      if (free.isEmpty) return (null, steps);
+      free.sort((a, b) => a.$1.options.length.compareTo(b.$1.options.length));
+      final (cell, idx) = free.first;
+      if (cell.options.isEmpty) return (null, steps);
+      for (final option in List<int>.from(cell.options)) {
+        final clone = st.clone();
+        clone.cells[idx].setForSolver(option);
+        final (subSt, subSteps) = clone.solveWithBacktracking(
+          maxSteps: maxSteps - steps,
+          level: level + 1,
+        );
+        steps += subSteps;
+        if (subSt != null) return (subSt, steps);
+        st.cells[idx].options.remove(option);
+        if (st.cells[idx].options.isEmpty) return (null, steps);
+      }
+    }
+    return (null, steps);
+  }
+
+  /// Export puzzle to the v2 line format.
+  String lineExport({int? cplx}) {
+    final domainStr = domain.map((v) => v.toString()).join('');
+    final valuesStr = cellValues.map((v) => v.toString()).join('');
+    final constraintsStr = constraints
+        .where((c) => c is! HelpText)
+        .map((c) => c.serialize())
+        .join(';');
+    final complexity = cplx ?? computeComplexity();
+    return 'v2_${domainStr}_${width}x${height}_${valuesStr}_${constraintsStr}_0:0_$complexity';
   }
 
   List<List<int>> toVirtualGroups() {
