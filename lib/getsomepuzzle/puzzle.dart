@@ -18,6 +18,29 @@ class SolverContradiction implements Exception {
   SolverContradiction([this.message = '']);
 }
 
+/// Method used to determine a cell value during solving.
+enum SolveMethod { propagation, force }
+
+/// One step in the step-by-step solving trace.
+class SolveStep {
+  final int cellIdx;
+  final int value;
+  final String constraint;
+  final SolveMethod method;
+
+  const SolveStep({
+    required this.cellIdx,
+    required this.value,
+    required this.constraint,
+    required this.method,
+  });
+
+  @override
+  String toString() {
+    return '${method.name}: cell $cellIdx = $value${constraint.isNotEmpty ? ' by $constraint' : ''}';
+  }
+}
+
 class Stats {
   int failures = 0;
   int duration = 0;
@@ -516,6 +539,68 @@ class Puzzle {
 
     final forceScore = (forceRounds * 10).clamp(0, 90);
     return (forceScore + ruleDiversity + emptiness).clamp(0, 100);
+  }
+
+  /// Step-by-step solving trace, returning each deduction made.
+  /// Does not modify the puzzle — works on a clone.
+  List<SolveStep> solveExplained() {
+    final steps = <SolveStep>[];
+    final test = clone();
+
+    // Propagation phase
+    while (true) {
+      final move = test.apply();
+      if (move == null) break;
+      if (move.isImpossible != null) break;
+      test.setValue(move.idx, move.value);
+      steps.add(SolveStep(
+        cellIdx: move.idx,
+        value: move.value,
+        constraint: move.givenBy.serialize(),
+        method: SolveMethod.propagation,
+      ));
+      if (test.complete) return steps;
+    }
+
+    // Force + propagation loop
+    for (int round = 0; round < 200; round++) {
+      // Force one cell
+      final beforeForce = test.freeCells().map((e) => e.$2).toSet();
+      try {
+        if (!test.applyWithForceSingle()) break;
+      } on SolverContradiction {
+        break;
+      }
+      // Find which cell was forced
+      final afterForce = test.freeCells().map((e) => e.$2).toSet();
+      final forced = beforeForce.difference(afterForce);
+      for (final idx in forced) {
+        steps.add(SolveStep(
+          cellIdx: idx,
+          value: test.cellValues[idx],
+          constraint: '',
+          method: SolveMethod.force,
+        ));
+      }
+      if (test.complete) return steps;
+
+      // Propagate after force
+      while (true) {
+        final move = test.apply();
+        if (move == null) break;
+        if (move.isImpossible != null) break;
+        test.setValue(move.idx, move.value);
+        steps.add(SolveStep(
+          cellIdx: move.idx,
+          value: move.value,
+          constraint: move.givenBy.serialize(),
+          method: SolveMethod.propagation,
+        ));
+        if (test.complete) return steps;
+      }
+    }
+
+    return steps;
   }
 
   /// Unified solving: propagation + force loop.
