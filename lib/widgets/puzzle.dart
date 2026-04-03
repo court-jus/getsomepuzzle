@@ -3,11 +3,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
 import 'package:getsomepuzzle/widgets/textpuzzle.dart';
@@ -69,10 +71,8 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
   void _computeArrowPositions() {
     final constraintBox =
         _constraintKey.currentContext?.findRenderObject() as RenderBox?;
-    final cellBox =
-        _cellKey.currentContext?.findRenderObject() as RenderBox?;
-    final stackBox =
-        _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    final cellBox = _cellKey.currentContext?.findRenderObject() as RenderBox?;
+    final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
     if (constraintBox == null || cellBox == null || stackBox == null) {
       if (_arrowStart != null || _arrowEnd != null) {
         setState(() {
@@ -82,13 +82,16 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       }
       return;
     }
-    final constraintPos =
-        constraintBox.localToGlobal(Offset.zero, ancestor: stackBox);
+    final constraintPos = constraintBox.localToGlobal(
+      Offset.zero,
+      ancestor: stackBox,
+    );
     final cellPos = cellBox.localToGlobal(Offset.zero, ancestor: stackBox);
-    final start = constraintPos +
+    final start =
+        constraintPos +
         Offset(constraintBox.size.width / 2, constraintBox.size.height / 2);
-    final end = cellPos +
-        Offset(cellBox.size.width / 2, cellBox.size.height / 2);
+    final end =
+        cellPos + Offset(cellBox.size.width / 2, cellBox.size.height / 2);
     if (start != _arrowStart || end != _arrowEnd) {
       setState(() {
         _arrowStart = start;
@@ -133,7 +136,8 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     }
 
     // Find if the highlighted constraint is a cell-centric one
-    final bool constraintIsInTopBar = highlightedConstraint is Motif ||
+    final bool constraintIsInTopBar =
+        highlightedConstraint is Motif ||
         highlightedConstraint is QuantityConstraint;
 
     // For cell-centric constraints, find the constraint's home cell index
@@ -144,111 +148,156 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       constraintCellIdx = highlightedConstraint.indices.first;
     }
 
-    return Stack(
-      key: _stackKey,
-      children: [
-        Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          spacing: 2,
+    final hasDF = widget.currentPuzzle.constraints.any(
+      (c) => c is DifferentFromConstraint,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gridHeight = adjustedCellSize * widget.currentPuzzle.height;
+        final gridWidth = adjustedCellSize * widget.currentPuzzle.width;
+
+        return Stack(
+          key: _stackKey,
+          clipBehavior: Clip.none,
           children: [
-            if (widget.hintText.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Text(
-                  widget.hintText,
-                  style: TextStyle(
-                    color: widget.hintIsError ? Colors.deepOrange : highlightColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            Wrap(
-              direction: Axis.horizontal,
-              alignment: WrapAlignment.center,
+            Column(
+              mainAxisAlignment: MainAxisAlignment.start,
               spacing: 2,
-              runSpacing: 2,
               children: [
-                for (var constraint in widget.currentPuzzle.constraints)
-                  if (constraint is Motif)
-                    MotifWidget(
-                      key: (constraint.isHighlighted && constraintIsInTopBar)
-                          ? _constraintKey
-                          : null,
-                      motif: constraint.motif,
-                      bgColor: constraint is ForbiddenMotif
-                          ? forbiddenColor
-                          : mandatoryColor,
-                      borderColor: constraint.isHighlighted
-                          ? highlightColor
-                          : (constraint.isValid ? Colors.green : Colors.deepOrange),
-                      isHighlighted: constraint.isHighlighted,
-                      cellSize: topBarConstraintsSize,
-                    )
-                  else if (constraint is QuantityConstraint)
-                    QuantityWidget(
-                      key: (constraint.isHighlighted && constraintIsInTopBar)
-                          ? _constraintKey
-                          : null,
-                      value: constraint.value,
-                      count: constraint.count,
-                      actualCount: widget.currentPuzzle.cellValues
-                          .where((val) => val == constraint.value)
-                          .length,
-                      bgColor: mandatoryColor,
-                      borderColor: constraint.isHighlighted
-                          ? highlightColor
-                          : (constraint.isValid ? Colors.green : Colors.deepOrange),
-                      cellSize: topBarConstraintsSize,
-                    )
-                  else if (constraint is HelpText)
-                    SizedBox(
-                      width: totalWidth - 20,
-                      child: TextpuzzleWidget(
-                        textName: constraint.text,
-                        locale: widget.locale,
-                      ),
+                if (widget.hintText.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-              ],
-            ),
-            SizedBox(height: 10),
-            Table(
-              border: TableBorder.all(),
-              defaultColumnWidth: FixedColumnWidth(adjustedCellSize),
-              children: [
-                for (var (rowidx, row)
-                    in widget.currentPuzzle.getRows().indexed)
-                  TableRow(
+                    child: Text(
+                      widget.hintText,
+                      style: TextStyle(
+                        color: widget.hintIsError
+                            ? Colors.deepOrange
+                            : highlightColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                Wrap(
+                  direction: Axis.horizontal,
+                  alignment: WrapAlignment.center,
+                  spacing: 2,
+                  runSpacing: 2,
+                  children: [
+                    for (var constraint in widget.currentPuzzle.constraints)
+                      if (constraint is Motif)
+                        MotifWidget(
+                          key:
+                              (constraint.isHighlighted && constraintIsInTopBar)
+                              ? _constraintKey
+                              : null,
+                          motif: constraint.motif,
+                          bgColor: constraint is ForbiddenMotif
+                              ? forbiddenColor
+                              : mandatoryColor,
+                          borderColor: constraint.isHighlighted
+                              ? highlightColor
+                              : (constraint.isValid
+                                    ? Colors.green
+                                    : Colors.deepOrange),
+                          isHighlighted: constraint.isHighlighted,
+                          cellSize: topBarConstraintsSize,
+                        )
+                      else if (constraint is QuantityConstraint)
+                        QuantityWidget(
+                          key:
+                              (constraint.isHighlighted && constraintIsInTopBar)
+                              ? _constraintKey
+                              : null,
+                          value: constraint.value,
+                          count: constraint.count,
+                          actualCount: widget.currentPuzzle.cellValues
+                              .where((val) => val == constraint.value)
+                              .length,
+                          bgColor: mandatoryColor,
+                          borderColor: constraint.isHighlighted
+                              ? highlightColor
+                              : (constraint.isValid
+                                    ? Colors.green
+                                    : Colors.deepOrange),
+                          cellSize: topBarConstraintsSize,
+                        )
+                      else if (constraint is HelpText)
+                        SizedBox(
+                          width: totalWidth - 20,
+                          child: TextpuzzleWidget(
+                            textName: constraint.text,
+                            locale: widget.locale,
+                          ),
+                        ),
+                  ],
+                ),
+                SizedBox(height: 10),
+                SizedBox(
+                  width: gridWidth,
+                  height: gridHeight,
+                  child: Stack(
                     children: [
-                      for (var (cellidx, cell) in row.indexed)
-                        _buildCell(
-                          cell,
-                          rowidx,
-                          cellidx,
-                          adjustedCellSize,
-                          constraintIsInTopBar,
-                          constraintCellIdx,
+                      Table(
+                        border: TableBorder.all(),
+                        defaultColumnWidth: FixedColumnWidth(adjustedCellSize),
+                        children: [
+                          for (var (rowidx, row)
+                              in widget.currentPuzzle.getRows().indexed)
+                            TableRow(
+                              children: [
+                                for (var (cellidx, cell) in row.indexed)
+                                  _buildCell(
+                                    cell,
+                                    rowidx,
+                                    cellidx,
+                                    adjustedCellSize,
+                                    constraintIsInTopBar,
+                                    constraintCellIdx,
+                                  ),
+                              ],
+                            ),
+                        ],
+                      ),
+                      if (hasDF)
+                        IgnorePointer(
+                          child: CustomPaint(
+                            painter: DifferentFromPainter(
+                              constraints: widget.currentPuzzle.constraints
+                                  .whereType<DifferentFromConstraint>()
+                                  .toList(),
+                              cellSize: adjustedCellSize,
+                              gridWidth: widget.currentPuzzle.width,
+                              defaultColor: Colors.black87,
+                              highlightColor: highlightColor,
+                            ),
+                          ),
                         ),
                     ],
                   ),
+                ),
               ],
             ),
-          ],
-        ),
-        if (_arrowStart != null && _arrowEnd != null)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _ArrowPainter(
-                  start: _arrowStart!,
-                  end: _arrowEnd!,
-                  color: highlightColor,
+            if (_arrowStart != null && _arrowEnd != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _ArrowPainter(
+                      start: _arrowStart!,
+                      end: _arrowEnd!,
+                      color: highlightColor,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -284,9 +333,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       onDrag: (Offset offset) {
         final int targetRow = (rowidx + offset.dy).floor();
         final int targetCell = (cellidx + offset.dx).floor();
-        widget.onCellDrag(
-          targetRow * widget.currentPuzzle.width + targetCell,
-        );
+        widget.onCellDrag(targetRow * widget.currentPuzzle.width + targetCell);
       },
       onDragEnd: widget.onCellDragEnd,
     );
@@ -298,11 +345,7 @@ class _ArrowPainter extends CustomPainter {
   final Offset end;
   final Color color;
 
-  _ArrowPainter({
-    required this.start,
-    required this.end,
-    required this.color,
-  });
+  _ArrowPainter({required this.start, required this.end, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {

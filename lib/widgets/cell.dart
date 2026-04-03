@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint_to_flutter.dart';
 
 const bgColors = {
@@ -26,6 +27,9 @@ class CellWidget extends StatelessWidget {
     required this.onDrag,
     required this.onDragEnd,
     this.constraints,
+    this.borderColor,
+    this.borderWidth,
+    this.cornerIndicatorValue,
   });
 
   // Attributes
@@ -39,6 +43,12 @@ class CellWidget extends StatelessWidget {
   final ValueChanged<Offset> onDrag;
   final VoidCallback onDragEnd;
   final double cellSize;
+  /// Custom border color (overrides default when set)
+  final Color? borderColor;
+  /// Custom border width (overrides default when set)
+  final double? borderWidth;
+  /// If set, draws a small colored triangle in the top-left corner
+  final int? cornerIndicatorValue;
 
   // Build UI
   @override
@@ -61,14 +71,15 @@ class CellWidget extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               for (final constraint in constraints!)
-                constraintToFlutter(
-                  constraint,
-                  constraint.isHighlighted
-                      ? highlightColor
-                      : (fgColors[value] ?? Colors.black),
-                  cellSize,
-                  count: widgetScale,
-                ),
+                if (constraint is! DifferentFromConstraint)
+                  constraintToFlutter(
+                    constraint,
+                    constraint.isHighlighted
+                        ? highlightColor
+                        : (fgColors[value] ?? Colors.black),
+                    cellSize,
+                    count: widgetScale,
+                  ),
             ],
           );
     return GestureDetector(
@@ -85,16 +96,60 @@ class CellWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           border: BoxBorder.all(
-            width: (readonly || isHighlighted) ? 6 : 1,
-            color: isHighlighted ? highlightColor : Colors.blueAccent,
+            width: borderWidth ?? ((readonly || isHighlighted) ? 6 : 1),
+            color: borderColor ?? (isHighlighted ? highlightColor : Colors.blueAccent),
           ),
         ),
         child: SizedBox(
           width: cellSize,
           height: cellSize,
-          child: Center(child: label),
+          child: Stack(
+            children: [
+              Center(child: label),
+              if (cornerIndicatorValue != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: CustomPaint(
+                    size: Size(cellSize * 0.4, cellSize * 0.4),
+                    painter: _CornerTrianglePainter(
+                      color: cornerIndicatorValue == 1 ? Colors.black : Colors.white,
+                      borderColor: Colors.grey,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _CornerTrianglePainter extends CustomPainter {
+  final Color color;
+  final Color borderColor;
+
+  _CornerTrianglePainter({required this.color, required this.borderColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CornerTrianglePainter oldDelegate) =>
+      color != oldDelegate.color;
 }

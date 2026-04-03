@@ -1,4 +1,14 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+
+double _textWidth(String text, TextStyle style) {
+  final tp = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: ui.TextDirection.ltr,
+  )..layout();
+  return tp.width;
+}
 
 class PlusMinusField extends StatefulWidget {
   const PlusMinusField({
@@ -9,6 +19,7 @@ class PlusMinusField extends StatefulWidget {
     this.minimum = 2,
     this.maximum = 10,
     this.increment = 1,
+    this.showReset = false,
   });
   final Function(int minValue, int maxValue) onChanged;
   final int initialMin;
@@ -16,6 +27,7 @@ class PlusMinusField extends StatefulWidget {
   final int minimum;
   final int maximum;
   final int increment;
+  final bool showReset;
 
   @override
   State<PlusMinusField> createState() => _PlusMinusFieldState();
@@ -63,8 +75,17 @@ class _PlusMinusFieldState extends State<PlusMinusField> {
     });
   }
 
+  void _reset() {
+    setState(() {
+      minValue = widget.minimum;
+      maxValue = widget.maximum;
+      widget.onChanged(minValue, maxValue);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDefault = minValue == widget.minimum && maxValue == widget.maximum;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -84,7 +105,10 @@ class _PlusMinusFieldState extends State<PlusMinusField> {
             onPressed: () => _increment(true, true),
           ),
         ),
-        Text("$minValue ⇔ $maxValue"),
+        SizedBox(
+          width: _textWidth('100 ⇔ 100', DefaultTextStyle.of(context).style) + 8,
+          child: Text("$minValue ⇔ $maxValue", textAlign: TextAlign.center),
+        ),
         Focus(
           descendantsAreFocusable: false,
           canRequestFocus: false,
@@ -101,6 +125,15 @@ class _PlusMinusFieldState extends State<PlusMinusField> {
             onPressed: () => _increment(false, true),
           ),
         ),
+        if (widget.showReset)
+          Focus(
+            descendantsAreFocusable: false,
+            canRequestFocus: false,
+            child: IconButton(
+              icon: Icon(Icons.restart_alt, color: isDefault ? Colors.grey : Colors.blue),
+              onPressed: isDefault ? null : _reset,
+            ),
+          ),
       ],
     );
   }

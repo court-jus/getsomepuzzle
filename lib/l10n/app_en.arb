@@ -316,5 +316,58 @@
     "noCustomPuzzles": "No custom puzzles yet. Use the Generate page to create some!",
     "@noCustomPuzzles": {
         "description": "Message shown when the custom collection is empty"
-    }
+    },
+    "create": "Create",
+    "createTitle": "Create a puzzle",
+    "createStart": "Start editing",
+    "createTest": "Test",
+    "createValidate": "Validate",
+    "createSave": "Save",
+    "createSaved": "Puzzle saved!",
+    "createSolvable": "Solvable",
+    "createNotSolvable": "Not solvable",
+    "createUniqueSolution": "Unique solution",
+    "createMultipleSolutions": "Multiple solutions",
+    "createNoSolution": "No solution",
+    "createComplexity": "Complexity",
+    "createNoConstraints": "Tap a cell to add a constraint",
+    "createAddConstraint": "Add a constraint",
+    "createChooseType": "Constraint type",
+    "createChooseSide": "Side",
+    "createChooseAxis": "Symmetry axis",
+    "createChooseSize": "Group size",
+    "createChooseLetter": "Letter",
+    "createChooseValue": "Value",
+    "createChooseCount": "Count",
+    "createMotifWidth": "Pattern width",
+    "createMotifHeight": "Pattern height",
+    "createLetterGroupMode": "Tap cells to add to group {letter}, then press Done",
+    "@createLetterGroupMode": {
+        "placeholders": {
+            "letter": { "type": "String" }
+        }
+    },
+    "createLetterGroupDone": "Done",
+    "createAddNew": "Add new constraint",
+    "createDeleteConstraint": "Delete a constraint",
+    "createConfirmDelete": "Delete this constraint?",
+    "createValidating": "Validating...",
+    "createSolutions": "Solutions",
+    "constraintDifferentFrom": "different from",
+    "@constraintDifferentFrom": {
+        "description": "Name of the different-from constraint"
+    },
+    "createPlaylist": "New playlist",
+    "deletePlaylist": "Delete playlist",
+    "importPlaylist": "Import from file",
+    "playlistName": "Playlist name",
+    "playlistCreated": "Playlist created",
+    "confirmDeletePlaylist": "Delete this playlist and all its puzzles?",
+    "targetPlaylist": "Save to",
+    "newPlaylist": "New playlist...",
+    "createFixedCellMode": "Fix cell color",
+    "createFixBlack": "Fix to black",
+    "createFixWhite": "Fix to white",
+    "createRemoveFixed": "Remove fixed color",
+    "createPasteHint": "Paste a puzzle representation to edit it"
 }

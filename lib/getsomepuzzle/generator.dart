@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
@@ -59,13 +60,18 @@ class PuzzleGenerator {
     final ratio = 0.8 + _rng.nextDouble() * 0.2; // 0.8 to 1.0
 
     // Build the allowed rule slugs
-    final allSlugs = {'FM', 'PA', 'GS', 'LT', 'QA', 'SY'};
+    final allSlugs = {'FM', 'PA', 'GS', 'LT', 'QA', 'SY', 'DF'};
     final allowedSlugs = allSlugs.difference(config.bannedRules);
+
+    // If required rules are specified, ensure at least one of each is added
+    final requiredSlugs = config.requiredRules.intersection(allowedSlugs);
 
     // 1. Create a random solved grid
     final solved = Puzzle.empty(width, height, _defaultDomain);
     for (int i = 0; i < size; i++) {
-      solved.cells[i].setForSolver(_defaultDomain[_rng.nextInt(_defaultDomain.length)]);
+      solved.cells[i].setForSolver(
+        _defaultDomain[_rng.nextInt(_defaultDomain.length)],
+      );
     }
     final solvedValues = solved.cellValues;
 
@@ -78,10 +84,24 @@ class PuzzleGenerator {
       pu.cells[indices[i]] = pu.cells[indices[i]]..readonly = true;
     }
 
+    // Collect readonly cell indices for DF constraint generation
+    final Set<int> readonlyIndices = {};
+    for (int i = 0; i < size; i++) {
+      if (pu.cells[i].readonly) {
+        readonlyIndices.add(i);
+      }
+    }
+
     // 3. Generate all valid constraints for the solved grid
     final List<Constraint> allConstraints = [];
     for (final slug in allowedSlugs) {
-      final params = _generateParamsForSlug(slug, width, height, _defaultDomain);
+      final params = _generateParamsForSlug(
+        slug,
+        width,
+        height,
+        _defaultDomain,
+        excludedIndices: slug == 'DF' ? readonlyIndices : null,
+      );
       for (final param in params) {
         final constraint = _createConstraint(slug, param);
         if (constraint == null) continue;
@@ -103,10 +123,14 @@ class PuzzleGenerator {
       'LT': 1019,
       'GS': 13312,
       'PA': 15032,
+      'DF': 500,
     };
     allConstraints.sort((a, b) {
       final sa = _slugOf(a);
       final sb = _slugOf(b);
+      final aRequired = requiredSlugs.contains(sa) ? -1 : 0;
+      final bRequired = requiredSlugs.contains(sb) ? -1 : 0;
+      if (aRequired != bRequired) return aRequired.compareTo(bRequired);
       return (globalUsage[sa] ?? 0).compareTo(globalUsage[sb] ?? 0);
     });
 
@@ -123,13 +147,15 @@ class PuzzleGenerator {
       bool found = false;
       while (allConstraints.isNotEmpty) {
         tried++;
-        onProgress?.call(GeneratorProgress(
-          puzzlesGenerated: 0,
-          totalRequested: config.count,
-          constraintsTried: tried,
-          constraintsTotal: total,
-          currentRatio: currentRatio,
-        ));
+        onProgress?.call(
+          GeneratorProgress(
+            puzzlesGenerated: 0,
+            totalRequested: config.count,
+            constraintsTried: tried,
+            constraintsTotal: total,
+            currentRatio: currentRatio,
+          ),
+        );
 
         final constraint = allConstraints.removeAt(0);
         final cloned = pu.clone();
@@ -207,7 +233,13 @@ class PuzzleGenerator {
     return solutions;
   }
 
-  static List<String> _generateParamsForSlug(String slug, int width, int height, List<int> domain) {
+  static List<String> _generateParamsForSlug(
+    String slug,
+    int width,
+    int height,
+    List<int> domain, {
+    Set<int>? excludedIndices,
+  }) {
     switch (slug) {
       case 'FM':
         return ForbiddenMotif.generateAllParameters(width, height, domain);
@@ -221,6 +253,12 @@ class PuzzleGenerator {
         return QuantityConstraint.generateAllParameters(width, height, domain);
       case 'SY':
         return SymmetryConstraint.generateAllParameters(width, height);
+      case 'DF':
+        return DifferentFromConstraint.generateAllParameters(
+          width,
+          height,
+          excludedIndices: excludedIndices,
+        );
       default:
         return [];
     }
@@ -240,6 +278,8 @@ class PuzzleGenerator {
         return QuantityConstraint(params);
       case 'SY':
         return SymmetryConstraint(params);
+      case 'DF':
+        return DifferentFromConstraint(params);
       default:
         return null;
     }
@@ -252,6 +292,7 @@ class PuzzleGenerator {
     if (c is LetterGroup) return 'LT';
     if (c is QuantityConstraint) return 'QA';
     if (c is SymmetryConstraint) return 'SY';
+    if (c is DifferentFromConstraint) return 'DF';
     return '';
   }
 }

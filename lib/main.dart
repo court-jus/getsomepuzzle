@@ -23,6 +23,7 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/between_puzzles.dart';
 import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
+import 'package:getsomepuzzle/widgets/create_page.dart';
 import 'package:getsomepuzzle/widgets/generate_page.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
@@ -111,6 +112,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool hintIsError = false;
   int? firstDragValue;
   int? lastDragIdx;
+  bool _testingFromEditor = false;
   final log = Logger("HomePage");
 
   @override
@@ -222,6 +224,22 @@ class _MyHomePageState extends State<MyHomePage> {
       hintText = "";
       helpMe();
     });
+  }
+
+  void _openCreatePage() {
+    setState(() => _testingFromEditor = false);
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => CreatePage(
+          database: database!,
+          onPuzzleSelected: openPuzzle,
+          onTestStarted: () {
+            setState(() => _testingFromEditor = true);
+          },
+        ),
+      ),
+    );
   }
 
   void restartPuzzle() {
@@ -477,6 +495,12 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         actions: [
+          if (_testingFromEditor && database != null)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: AppLocalizations.of(context)!.create,
+              onPressed: _openCreatePage,
+            ),
           if (currentPuzzle != null &&
               !shouldChooseLocale &&
               settings.validateType == ValidateType.manual)
@@ -604,6 +628,15 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                   );
+                },
+              ),
+            if (database != null)
+              ListTile(
+                leading: Icon(Icons.edit),
+                title: Text(AppLocalizations.of(context)!.create),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openCreatePage();
                 },
               ),
             if (database != null)

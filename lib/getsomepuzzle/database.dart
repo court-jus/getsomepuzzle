@@ -178,36 +178,72 @@ class Database {
   int maxCplx = 0;
   List<PuzzleData> playlist = [];
   final log = Logger("Database");
-  final List<(String, Widget)> collections = [
-    (
-      "tutorial",
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("Tutorial"), Icon(UniconsLine.baby_carriage)],
-      ),
-    ),
-    (
-      "default",
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("Collection 1"), Icon(UniconsLine.puzzle_piece)],
-      ),
-    ),
-    (
-      "try_me",
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("Try me"), Icon(Icons.science)],
-      ),
-    ),
-    (
-      "custom",
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [Text("Mes puzzles"), Icon(Icons.build)],
-      ),
-    ),
+  static const _builtInCollections = [
+    ("tutorial", "Tutorial", UniconsLine.baby_carriage),
+    ("default", "Collection 1", UniconsLine.puzzle_piece),
+    ("custom", "Mes puzzles", Icons.build),
   ];
+
+  List<String> userPlaylistNames = [];
+
+  List<(String, Widget)> get collections => [
+    for (final (key, label, icon) in _builtInCollections)
+      (
+        key,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [Text(label), Icon(icon)],
+        ),
+      ),
+    for (final name in userPlaylistNames)
+      (
+        'user_${slugify(name)}',
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [Text(name), Icon(Icons.playlist_play)],
+        ),
+      ),
+  ];
+
+  /// All playlist slugs available for saving puzzles (custom + user playlists).
+  List<(String, String)> get writablePlaylistOptions => [
+    ('custom', 'Mes puzzles'),
+    for (final name in userPlaylistNames) ('user_${slugify(name)}', name),
+  ];
+
+  static String slugify(String name) =>
+      name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+
+  Future<void> loadUserPlaylists() async {
+    final prefs = await SharedPreferences.getInstance();
+    userPlaylistNames = prefs.getStringList('user_playlists') ?? [];
+  }
+
+  Future<void> _saveUserPlaylists() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('user_playlists', userPlaylistNames);
+  }
+
+  Future<void> createUserPlaylist(String name) async {
+    if (userPlaylistNames.contains(name)) return;
+    userPlaylistNames.add(name);
+    await _saveUserPlaylists();
+  }
+
+  Future<void> deleteUserPlaylist(String name) async {
+    userPlaylistNames.remove(name);
+    await _saveUserPlaylists();
+    final slug = slugify(name);
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('playlist_${slug}_puzzles');
+    } else {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final filePath = p.join(documentsDirectory.path, 'getsomepuzzle', 'playlist_$slug.txt');
+      final file = File(filePath);
+      if (await file.exists()) await file.delete();
+    }
+  }
   void load(List<String> lines) {
     puzzles = lines
         .where((e) => e.isNotEmpty && !e.startsWith("#"))
@@ -315,9 +351,11 @@ class Database {
     }
     collection = collectionToLoad;
     prefs.setString("collectionToLoad", collection);
+    await loadUserPlaylists();
     String assetContent;
-    if (collection == "custom") {
-      assetContent = await _loadCustomCollection();
+    if (collection == 'custom' || collection.startsWith('user_')) {
+      final slug = collection == 'custom' ? 'custom' : collection.substring(5);
+      assetContent = await _loadPlaylist(slug);
     } else {
       try {
         assetContent = await rootBundle.loadString('assets/$collection.txt');
@@ -415,14 +453,20 @@ class Database {
         .toList();
   }
 
-  Future<String> _loadCustomCollection() async {
+  String _playlistFileName(String slug) =>
+      slug == 'custom' ? 'custom.txt' : 'playlist_$slug.txt';
+
+  String _playlistPrefsKey(String slug) =>
+      slug == 'custom' ? 'custom_puzzles' : 'playlist_${slug}_puzzles';
+
+  Future<String> _loadPlaylist(String slug) async {
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      final lines = prefs.getStringList("custom_puzzles") ?? [];
-      return lines.join("\n");
+      final lines = prefs.getStringList(_playlistPrefsKey(slug)) ?? [];
+      return lines.join('\n');
     }
     final documentsDirectory = await getApplicationDocumentsDirectory();
-    final filePath = p.join(documentsDirectory.path, "getsomepuzzle", "custom.txt");
+    final filePath = p.join(documentsDirectory.path, 'getsomepuzzle', _playlistFileName(slug));
     final file = File(filePath);
     if (await file.exists()) {
       return await file.readAsString();
@@ -430,37 +474,51 @@ class Database {
     return '';
   }
 
-  Future<void> addToCustomCollection(String puzzleLine) async {
+  /// Backward-compatible alias for addToPlaylist('custom', ...).
+  Future<void> addToCustomCollection(String puzzleLine) =>
+      addToPlaylist('custom', puzzleLine);
+
+  Future<void> addToPlaylist(String collectionKey, String puzzleLine) async {
+    final slug = collectionKey == 'custom' ? 'custom' : collectionKey.replaceFirst('user_', '');
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      final lines = prefs.getStringList("custom_puzzles") ?? [];
+      final lines = prefs.getStringList(_playlistPrefsKey(slug)) ?? [];
       lines.add(puzzleLine);
-      await prefs.setStringList("custom_puzzles", lines);
+      await prefs.setStringList(_playlistPrefsKey(slug), lines);
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
-      final dirPath = p.join(documentsDirectory.path, "getsomepuzzle");
+      final dirPath = p.join(documentsDirectory.path, 'getsomepuzzle');
       await Directory(dirPath).create(recursive: true);
-      final filePath = p.join(dirPath, "custom.txt");
+      final filePath = p.join(dirPath, _playlistFileName(slug));
       final file = File(filePath);
       await file.writeAsString('$puzzleLine\n', mode: FileMode.append);
     }
   }
 
-  Future<void> deleteFromCustomCollection(String puzzleLine) async {
+  Future<void> deleteFromPlaylist(String collectionKey, String puzzleLine) async {
+    final slug = collectionKey == 'custom' ? 'custom' : collectionKey.replaceFirst('user_', '');
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      final lines = prefs.getStringList("custom_puzzles") ?? [];
+      final lines = prefs.getStringList(_playlistPrefsKey(slug)) ?? [];
       lines.remove(puzzleLine);
-      await prefs.setStringList("custom_puzzles", lines);
+      await prefs.setStringList(_playlistPrefsKey(slug), lines);
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
-      final filePath = p.join(documentsDirectory.path, "getsomepuzzle", "custom.txt");
+      final filePath = p.join(documentsDirectory.path, 'getsomepuzzle', _playlistFileName(slug));
       final file = File(filePath);
       if (await file.exists()) {
         final content = await file.readAsString();
         final lines = content.split('\n').where((l) => l.trim() != puzzleLine.trim()).toList();
         await file.writeAsString(lines.join('\n'), mode: FileMode.writeOnly);
       }
+    }
+  }
+
+  /// Import puzzle lines from a file's content into a playlist.
+  Future<void> importToPlaylist(String collectionKey, String fileContent) async {
+    final lines = fileContent.split('\n').where((l) => l.trim().isNotEmpty && !l.startsWith('#')).toList();
+    for (final line in lines) {
+      await addToPlaylist(collectionKey, line.trim());
     }
   }
 }

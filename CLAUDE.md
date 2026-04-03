@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Get Some Puzzle is a cross-platform grid-based logic puzzle game built with Flutter (Dart) for the frontend and Python for puzzle generation. Players color cells black or white according to constraint rules (forbidden patterns, group sizes, parity, letter groups, quantity).
+Get Some Puzzle is a cross-platform grid-based logic puzzle game built with Flutter (Dart). Players color cells black or white according to constraint rules (forbidden patterns, group sizes, parity, letter groups, quantity).
 
 ## Build & Run Commands
 
@@ -41,7 +41,7 @@ flutter analyze
   - `database.dart` — `Database` class loads puzzles from `assets/default.txt`, `assets/tutorial.txt`, and local `custom.txt`, handles filtering (`Filters`), playlist management, and stats persistence
   - `constraint.dart` — Base `Constraint` and `CellsCentricConstraint` classes
   - `constraints/` — Implementations: `groups.dart`, `parity.dart`, `symmetry.dart`, `motif.dart`, `quantity.dart`, `other_solution.dart`
-  - `generator.dart` — In-app puzzle generator (Dart port of Python algorithm)
+  - `generator.dart` — In-app puzzle generator
   - `generator_worker.dart` — Background execution for generation (Isolate/web)
   - `settings.dart` — User preferences with enums: `ValidateType`, `ShowRating`, `ShareData`, `LiveCheckType`
 - **`widgets/`** — UI layer: puzzle grid, cell rendering, puzzle selection (`open_page.dart`), puzzle generation (`generate_page.dart`), settings, stats, help, between-puzzle rating screen
@@ -50,7 +50,7 @@ flutter analyze
 
 ### In-App Puzzle Generator (`lib/getsomepuzzle/generator*.dart`)
 
-The app includes a Dart port of the Python generation algorithm:
+The app includes a puzzle generation engine:
 - `generator.dart` — `PuzzleGenerator` class: generates puzzles using random grid fill + iterative constraint addition + solve loop. Also includes `findSolutions()` for uniqueness verification via backtracking.
 - `generator_worker.dart` — Platform-adaptive background execution: uses `Isolate` on native, chunked async on web.
 - `constraints/other_solution.dart` — `OtherSolutionConstraint`: excludes known solutions during uniqueness checking.
@@ -59,14 +59,12 @@ The `Puzzle` class (`puzzle.dart`) includes a full solver: `applyConstraintsProp
 
 Generated puzzles are stored in a "custom" collection at `ApplicationDocumentsDirectory/getsomepuzzle/custom.txt` (or `SharedPreferences` on web).
 
-### Python Puzzle Generator (`src/getsomepuzzle/`)
+### Dart CLI (`bin/generate.dart`)
 
-Separate Python engine for generating and solving puzzles:
-- `engine/puzzle.py` — Puzzle representation
-- `engine/generate.py` — Puzzle generation
-- `engine/solver/` — Solving algorithms
-- `engine/cli.py` / `engine/cli4.py` — CLI tools
-- `engine/constraints/` — Constraint implementations (parallel to Dart versions)
+Command-line tool for batch puzzle operations (pure Dart, no Flutter dependency):
+- Generate puzzles: `dart run bin/generate.dart -n 100 -o puzzles.txt`
+- Validate puzzles: `dart run bin/generate.dart --check assets/default.txt`
+- Sort by difficulty: `dart run bin/generate.dart --read-stats <stats_dir>`
 
 ### Puzzle Data Format
 

@@ -53,7 +53,7 @@ void _runGenerate(Map<String, dynamic> parsed) {
     sink?.close();
   }
 
-  ProcessSignal.sigint.watch().listen((_) {
+  final sigintSub = ProcessSignal.sigint.watch().listen((_) {
     finish();
     exit(0);
   });
@@ -93,7 +93,6 @@ void _runGenerate(Map<String, dynamic> parsed) {
 
       if (sink != null) {
         sink.writeln(line);
-        sink.flush();
       } else {
         stdout.writeln(line);
       }
@@ -106,6 +105,7 @@ void _runGenerate(Map<String, dynamic> parsed) {
     }
   }
 
+  sigintSub.cancel();
   finish();
 }
 
@@ -293,7 +293,8 @@ General:
   -h, --help              Show this help
 
 Rule slugs: FM (forbidden motif), PA (parity), GS (group size),
-            LT (letter group), QA (quantity), SY (symmetry)
+            LT (letter group), QA (quantity), SY (symmetry),
+            DF (different from)
 
 Examples:
   dart run bin/generate.dart -n 100 -o puzzles.txt

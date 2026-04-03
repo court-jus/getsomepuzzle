@@ -561,6 +561,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No custom puzzles yet. Use the Generate page to create some!'**
   String get noCustomPuzzles;
+
+  /// No description provided for @create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get create;
+
+  /// No description provided for @createTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a puzzle'**
+  String get createTitle;
+
+  /// No description provided for @createStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start editing'**
+  String get createStart;
+
+  /// No description provided for @createTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get createTest;
+
+  /// No description provided for @createValidate.
+  ///
+  /// In en, this message translates to:
+  /// **'Validate'**
+  String get createValidate;
+
+  /// No description provided for @createSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get createSave;
+
+  /// No description provided for @createSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Puzzle saved!'**
+  String get createSaved;
+
+  /// No description provided for @createSolvable.
+  ///
+  /// In en, this message translates to:
+  /// **'Solvable'**
+  String get createSolvable;
+
+  /// No description provided for @createNotSolvable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not solvable'**
+  String get createNotSolvable;
+
+  /// No description provided for @createUniqueSolution.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique solution'**
+  String get createUniqueSolution;
+
+  /// No description provided for @createMultipleSolutions.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple solutions'**
+  String get createMultipleSolutions;
+
+  /// No description provided for @createNoSolution.
+  ///
+  /// In en, this message translates to:
+  /// **'No solution'**
+  String get createNoSolution;
+
+  /// No description provided for @createComplexity.
+  ///
+  /// In en, this message translates to:
+  /// **'Complexity'**
+  String get createComplexity;
+
+  /// No description provided for @createNoConstraints.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a cell to add a constraint'**
+  String get createNoConstraints;
+
+  /// No description provided for @createAddConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a constraint'**
+  String get createAddConstraint;
+
+  /// No description provided for @createChooseType.
+  ///
+  /// In en, this message translates to:
+  /// **'Constraint type'**
+  String get createChooseType;
+
+  /// No description provided for @createChooseSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Side'**
+  String get createChooseSide;
+
+  /// No description provided for @createChooseAxis.
+  ///
+  /// In en, this message translates to:
+  /// **'Symmetry axis'**
+  String get createChooseAxis;
+
+  /// No description provided for @createChooseSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Group size'**
+  String get createChooseSize;
+
+  /// No description provided for @createChooseLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter'**
+  String get createChooseLetter;
+
+  /// No description provided for @createChooseValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get createChooseValue;
+
+  /// No description provided for @createChooseCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Count'**
+  String get createChooseCount;
+
+  /// No description provided for @createMotifWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern width'**
+  String get createMotifWidth;
+
+  /// No description provided for @createMotifHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern height'**
+  String get createMotifHeight;
+
+  /// No description provided for @createLetterGroupMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap cells to add to group {letter}, then press Done'**
+  String createLetterGroupMode(String letter);
+
+  /// No description provided for @createLetterGroupDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get createLetterGroupDone;
+
+  /// No description provided for @createAddNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Add new constraint'**
+  String get createAddNew;
+
+  /// No description provided for @createDeleteConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete a constraint'**
+  String get createDeleteConstraint;
+
+  /// No description provided for @createConfirmDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this constraint?'**
+  String get createConfirmDelete;
+
+  /// No description provided for @createValidating.
+  ///
+  /// In en, this message translates to:
+  /// **'Validating...'**
+  String get createValidating;
+
+  /// No description provided for @createSolutions.
+  ///
+  /// In en, this message translates to:
+  /// **'Solutions'**
+  String get createSolutions;
+
+  /// Name of the different-from constraint
+  ///
+  /// In en, this message translates to:
+  /// **'different from'**
+  String get constraintDifferentFrom;
+
+  /// No description provided for @createPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'New playlist'**
+  String get createPlaylist;
+
+  /// No description provided for @deletePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete playlist'**
+  String get deletePlaylist;
+
+  /// No description provided for @importPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from file'**
+  String get importPlaylist;
+
+  /// No description provided for @playlistName.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist name'**
+  String get playlistName;
+
+  /// No description provided for @playlistCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist created'**
+  String get playlistCreated;
+
+  /// No description provided for @confirmDeletePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this playlist and all its puzzles?'**
+  String get confirmDeletePlaylist;
+
+  /// No description provided for @targetPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to'**
+  String get targetPlaylist;
+
+  /// No description provided for @newPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'New playlist...'**
+  String get newPlaylist;
+
+  /// No description provided for @createFixedCellMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix cell color'**
+  String get createFixedCellMode;
+
+  /// No description provided for @createFixBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix to black'**
+  String get createFixBlack;
+
+  /// No description provided for @createFixWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix to white'**
+  String get createFixWhite;
+
+  /// No description provided for @createRemoveFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove fixed color'**
+  String get createRemoveFixed;
+
+  /// No description provided for @createPasteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a puzzle representation to edit it'**
+  String get createPasteHint;
 }
 
 class _AppLocalizationsDelegate

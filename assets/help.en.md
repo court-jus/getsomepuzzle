@@ -44,6 +44,10 @@ Whenever a cell contains one of those symbols, the group it belongs to must resp
 
 The central symmetry (🞋) is identical to a rotation by half a turn.
 
+### Different from (≠)
+
+When two cells are separated by the ≠ symbol, they must be different colors.
+
 ## Custom puzzles
 
 You can generate your own puzzles directly from the app. Open the menu and tap "Generate" to access the puzzle generator.

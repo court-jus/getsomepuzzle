@@ -1,0 +1,200 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
+
+/// Build a puzzle from a grid string (domain [1,2]).
+/// Each digit is a cell value (0=empty, 1=black, 2=white), rows separated by newlines.
+Puzzle _make(String grid) {
+  final rows = grid
+      .trim()
+      .split('\n')
+      .map((r) => r.trim())
+      .where((r) => r.isNotEmpty)
+      .toList();
+  final h = rows.length;
+  final w = rows.first.length;
+  final p = Puzzle.empty(w, h, [1, 2]);
+  for (int r = 0; r < h; r++) {
+    for (int c = 0; c < w; c++) {
+      final v = int.parse(rows[r][c]);
+      if (v != 0) {
+        p.cells[r * w + c].setForSolver(v);
+      }
+    }
+  }
+  return p;
+}
+
+void main() {
+  group('ForbiddenMotif.verify', () {
+    test('2x1 motif absent → valid', () {
+      // FM:12 (NB horizontal) absent from all-black grid
+      final p = _make('111\n111');
+      expect(ForbiddenMotif('12').verify(p), isTrue);
+    });
+
+    test('2x1 motif present → invalid', () {
+      // FM:12 present at (0,0)-(1,0): N then B
+      final p = _make('12\n11');
+      expect(ForbiddenMotif('12').verify(p), isFalse);
+    });
+
+    test('2x2 motif absent → valid', () {
+      // FM:12.21 absent: grid has no 2x2 block matching NB/BN
+      final p = _make('11\n11');
+      expect(ForbiddenMotif('12.21').verify(p), isTrue);
+    });
+
+    test('2x2 motif present → invalid', () {
+      // FM:12.21 present at (0,0): NB/BN
+      final p = _make('12\n21');
+      expect(ForbiddenMotif('12.21').verify(p), isFalse);
+    });
+
+    test('motif with wildcards (0) matches any value', () {
+      // FM:10 means N followed by anything → forbids N in any non-last column
+      // Grid NN: matches at pos 0 (N then N, wildcard=0 matches N)
+      final p = _make('11');
+      expect(ForbiddenMotif('10').verify(p), isFalse);
+    });
+
+    test('1x3 motif', () {
+      // FM:121 = NBN horizontal
+      final p = _make('121\n222');
+      expect(ForbiddenMotif('121').verify(p), isFalse);
+      final p2 = _make('112\n222');
+      expect(ForbiddenMotif('121').verify(p2), isTrue);
+    });
+  });
+
+  group('GroupSize.verify', () {
+    test('correct group size → valid', () {
+      // 121/121/222: groups of 1 at {0,3} and {2,5} (size 2 each),
+      // group of 2 at {1,4,6,7,8} (size 5)
+      final p = _make('121\n121\n222');
+      expect(GroupSize('0.2').verify(p), isTrue);
+      expect(GroupSize('1.5').verify(p), isTrue);
+      expect(GroupSize('2.2').verify(p), isTrue);
+    });
+
+    test('wrong group size → invalid', () {
+      final p = _make('121\n121\n222');
+      expect(GroupSize('0.1').verify(p), isFalse);
+      expect(GroupSize('1.2').verify(p), isFalse);
+      expect(GroupSize('0.3').verify(p), isFalse);
+    });
+  });
+
+  group('ParityConstraint.verify', () {
+    test('right: equal count → valid', () {
+      // 1221: idx 1 right=[2,1] → 1 odd, 1 even → valid
+      final p = _make('1221');
+      expect(ParityConstraint('1.right').verify(p), isTrue);
+    });
+
+    test('left: unequal count → invalid', () {
+      // 22212: idx 2, left side [2,2] → 0 odd, 2 even → invalid
+      final p = _make('22212');
+      expect(ParityConstraint('2.left').verify(p), isFalse);
+    });
+
+    test('top/bottom on column', () {
+      // 3x3: 111/222/111 → idx 8 (row 2, col 2), top has [1,2] → valid
+      final p = _make('111\n222\n111');
+      expect(ParityConstraint('8.top').verify(p), isTrue);
+      // 3x3: 111/222/111 → idx 0 (row 0, col 0), bottom has [2,1] → valid
+      expect(ParityConstraint('0.bottom').verify(p), isTrue);
+    });
+
+    test('vertical: both sides must be balanced', () {
+      // Column 1x5: 1,2,1,2,1 → idx 2, top=[1,2] bottom=[2,1] → both balanced → valid
+      final p = _make('1\n2\n1\n2\n1');
+      expect(ParityConstraint('2.vertical').verify(p), isTrue);
+      // 1,1,X,2,1: top=[1,1] → 2 odd, 0 even → invalid
+      final p2 = _make('1\n1\n1\n2\n1');
+      expect(ParityConstraint('2.vertical').verify(p2), isFalse);
+    });
+  });
+
+  group('Puzzle.getGroups', () {
+    test('2x2 with two groups', () {
+      final p = _make('11\n22');
+      final groups = p.getGroups();
+      expect(groups.length, 2);
+      expect(
+        groups.any((g) => g.length == 2 && g.contains(0) && g.contains(1)),
+        isTrue,
+      );
+      expect(
+        groups.any((g) => g.length == 2 && g.contains(2) && g.contains(3)),
+        isTrue,
+      );
+    });
+
+    test('3x3 with two groups of different sizes', () {
+      // 212/212/222 → value 2: {0,2,3,5,6,7,8} size 7, value 1: {1,4} size 2
+      final p = _make('212\n212\n222');
+      final groups = p.getGroups();
+      expect(groups.any((g) => g.length == 7), isTrue);
+      expect(
+        groups.any((g) => g.length == 2 && g.contains(1) && g.contains(4)),
+        isTrue,
+      );
+    });
+  });
+
+  group('DifferentFromConstraint.verify', () {
+    test('right: different values → valid', () {
+      // Cell (1,1)=N and cell (2,1)=B are different
+      final p = _make('12\n12');
+      expect(DifferentFromConstraint('0.right').verify(p), isTrue);
+    });
+
+    test('right: same values → invalid', () {
+      // Cell (1,1)=N and cell (2,1)=N are the same
+      final p = _make('11\n12');
+      expect(DifferentFromConstraint('0.right').verify(p), isFalse);
+    });
+
+    test('down: different values → valid', () {
+      // Cell (1,1)=N and cell (1,2)=B are different
+      final p = _make('12\n21');
+      expect(DifferentFromConstraint('0.down').verify(p), isTrue);
+    });
+
+    test('down: same values → invalid', () {
+      // Cell (1,1)=N and cell (1,2)=N are the same
+      final p = _make('12\n11');
+      expect(DifferentFromConstraint('0.down').verify(p), isFalse);
+    });
+  });
+
+  group('DifferentFromConstraint.generateAllParameters', () {
+    test('creates all valid positions', () {
+      // 2x2 grid: 4 possible DF constraints
+      // idx 0 → right (0,1), down (0,2)
+      // idx 1 → down (1,3)
+      // idx 2 → right (2,3)
+      final params = DifferentFromConstraint.generateAllParameters(2, 2);
+      expect(params, contains('0.right'));
+      expect(params, contains('0.down'));
+      expect(params, contains('1.down'));
+      expect(params, contains('2.right'));
+      expect(params.length, 4);
+    });
+
+    test('excludes specified indices', () {
+      // Exclude cells 0 and 1: no constraint can reference them
+      final params = DifferentFromConstraint.generateAllParameters(
+        2, 2, excludedIndices: {0, 1},
+      );
+      expect(params.contains('0.right'), isFalse);
+      expect(params.contains('0.down'), isFalse);
+      expect(params.contains('1.down'), isFalse);
+      expect(params, contains('2.right'));
+    });
+  });
+}

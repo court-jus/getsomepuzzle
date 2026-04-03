@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
@@ -109,6 +110,8 @@ class Puzzle {
         constraints.add(SymmetryConstraint(constraintAttr[1]));
       } else if (constraintAttr[0] == "TX") {
         constraints.add(HelpText(constraintAttr[1]));
+      } else if (constraintAttr[0] == "DF") {
+        constraints.add(DifferentFromConstraint(constraintAttr[1]));
       }
     }
   }
@@ -297,7 +300,12 @@ class Puzzle {
       case ApplyLoopResult.stuck:
         return null;
       case ApplyLoopResult.impossible:
-        return Move(0, 0, lastMove!.givenBy, isImpossible: lastMove.isImpossible ?? lastMove.givenBy);
+        return Move(
+          0,
+          0,
+          lastMove!.givenBy,
+          isImpossible: lastMove.isImpossible ?? lastMove.givenBy,
+        );
       case ApplyLoopResult.complete:
         return Move(0, 0, lastMove!.givenBy);
       case ApplyLoopResult.applied:
@@ -361,10 +369,7 @@ class Puzzle {
 
   // --- Constructor for empty puzzles (no lineRepresentation parsing) ---
   Puzzle.empty(this.width, this.height, this.domain) : lineRepresentation = '' {
-    cells = List.generate(
-      width * height,
-      (idx) => Cell(0, idx, domain, false),
-    );
+    cells = List.generate(width * height, (idx) => Cell(0, idx, domain, false));
   }
 
   Puzzle clone() {
@@ -410,7 +415,9 @@ class Puzzle {
       if (autoCheck) {
         final failed = check(saveResult: false);
         if (failed.isNotEmpty) {
-          throw SolverContradiction('Constraint verification failed after apply');
+          throw SolverContradiction(
+            'Constraint verification failed after apply',
+          );
         }
       }
       if (complete) {
@@ -553,12 +560,14 @@ class Puzzle {
       if (move == null) break;
       if (move.isImpossible != null) break;
       test.setValue(move.idx, move.value);
-      steps.add(SolveStep(
-        cellIdx: move.idx,
-        value: move.value,
-        constraint: move.givenBy.serialize(),
-        method: SolveMethod.propagation,
-      ));
+      steps.add(
+        SolveStep(
+          cellIdx: move.idx,
+          value: move.value,
+          constraint: move.givenBy.serialize(),
+          method: SolveMethod.propagation,
+        ),
+      );
       if (test.complete) return steps;
     }
 
@@ -575,12 +584,14 @@ class Puzzle {
       final afterForce = test.freeCells().map((e) => e.$2).toSet();
       final forced = beforeForce.difference(afterForce);
       for (final idx in forced) {
-        steps.add(SolveStep(
-          cellIdx: idx,
-          value: test.cellValues[idx],
-          constraint: '',
-          method: SolveMethod.force,
-        ));
+        steps.add(
+          SolveStep(
+            cellIdx: idx,
+            value: test.cellValues[idx],
+            constraint: '',
+            method: SolveMethod.force,
+          ),
+        );
       }
       if (test.complete) return steps;
 
@@ -590,12 +601,14 @@ class Puzzle {
         if (move == null) break;
         if (move.isImpossible != null) break;
         test.setValue(move.idx, move.value);
-        steps.add(SolveStep(
-          cellIdx: move.idx,
-          value: move.value,
-          constraint: move.givenBy.serialize(),
-          method: SolveMethod.propagation,
-        ));
+        steps.add(
+          SolveStep(
+            cellIdx: move.idx,
+            value: move.value,
+            constraint: move.givenBy.serialize(),
+            method: SolveMethod.propagation,
+          ),
+        );
         if (test.complete) return steps;
       }
     }
@@ -611,13 +624,16 @@ class Puzzle {
     } on SolverContradiction {
       return false;
     }
-    if (freeCells().isEmpty) return complete && check(saveResult: false).isEmpty;
+    if (freeCells().isEmpty)
+      return complete && check(saveResult: false).isEmpty;
     for (int step = 0; step < maxSteps; step++) {
       try {
         final forceChanged = applyWithForce();
-        if (freeCells().isEmpty) return complete && check(saveResult: false).isEmpty;
+        if (freeCells().isEmpty)
+          return complete && check(saveResult: false).isEmpty;
         final propChanges = applyConstraintsPropagation();
-        if (freeCells().isEmpty) return complete && check(saveResult: false).isEmpty;
+        if (freeCells().isEmpty)
+          return complete && check(saveResult: false).isEmpty;
         if (!forceChanged && propChanges == 0) break;
       } on SolverContradiction {
         return false;
@@ -653,7 +669,9 @@ class Puzzle {
   (Puzzle?, int) _backtrack(Puzzle st, int maxSteps, int level) {
     int steps = 0;
     while (steps <= maxSteps) {
-      if (st.freeCells().isEmpty && st.complete && st.check(saveResult: false).isEmpty) {
+      if (st.freeCells().isEmpty &&
+          st.complete &&
+          st.check(saveResult: false).isEmpty) {
         return (st, steps);
       }
       steps++;

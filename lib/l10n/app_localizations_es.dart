@@ -247,4 +247,144 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get noCustomPuzzles =>
       'No hay puzzles personalizados. ¡Usa la página Generar para crear algunos!';
+
+  @override
+  String get create => 'Crear';
+
+  @override
+  String get createTitle => 'Crear un puzzle';
+
+  @override
+  String get createStart => 'Comenzar';
+
+  @override
+  String get createTest => 'Probar';
+
+  @override
+  String get createValidate => 'Validar';
+
+  @override
+  String get createSave => 'Guardar';
+
+  @override
+  String get createSaved => '¡Puzzle guardado!';
+
+  @override
+  String get createSolvable => 'Resoluble';
+
+  @override
+  String get createNotSolvable => 'No resoluble';
+
+  @override
+  String get createUniqueSolution => 'Solución única';
+
+  @override
+  String get createMultipleSolutions => 'Soluciones múltiples';
+
+  @override
+  String get createNoSolution => 'Sin solución';
+
+  @override
+  String get createComplexity => 'Complejidad';
+
+  @override
+  String get createNoConstraints =>
+      'Toca una celda para agregar una restricción';
+
+  @override
+  String get createAddConstraint => 'Agregar una restricción';
+
+  @override
+  String get createChooseType => 'Tipo de restricción';
+
+  @override
+  String get createChooseSide => 'Lado';
+
+  @override
+  String get createChooseAxis => 'Eje de simetría';
+
+  @override
+  String get createChooseSize => 'Tamaño del grupo';
+
+  @override
+  String get createChooseLetter => 'Letra';
+
+  @override
+  String get createChooseValue => 'Valor';
+
+  @override
+  String get createChooseCount => 'Cantidad';
+
+  @override
+  String get createMotifWidth => 'Ancho del patrón';
+
+  @override
+  String get createMotifHeight => 'Alto del patrón';
+
+  @override
+  String createLetterGroupMode(String letter) {
+    return 'Toca celdas para el grupo $letter, luego presiona Listo';
+  }
+
+  @override
+  String get createLetterGroupDone => 'Listo';
+
+  @override
+  String get createAddNew => 'Agregar restricción';
+
+  @override
+  String get createDeleteConstraint => 'Eliminar una restricción';
+
+  @override
+  String get createConfirmDelete => '¿Eliminar esta restricción?';
+
+  @override
+  String get createValidating => 'Validando...';
+
+  @override
+  String get createSolutions => 'Soluciones';
+
+  @override
+  String get constraintDifferentFrom => 'diferente de';
+
+  @override
+  String get createPlaylist => 'Nueva playlist';
+
+  @override
+  String get deletePlaylist => 'Eliminar playlist';
+
+  @override
+  String get importPlaylist => 'Importar archivo';
+
+  @override
+  String get playlistName => 'Nombre de la playlist';
+
+  @override
+  String get playlistCreated => 'Playlist creada';
+
+  @override
+  String get confirmDeletePlaylist =>
+      '¿Eliminar esta playlist y todos sus puzzles?';
+
+  @override
+  String get targetPlaylist => 'Guardar en';
+
+  @override
+  String get newPlaylist => 'Nueva playlist...';
+
+  @override
+  String get createFixedCellMode => 'Fijar color de celda';
+
+  @override
+  String get createFixBlack => 'Fijar a negro';
+
+  @override
+  String get createFixWhite => 'Fijar a blanco';
+
+  @override
+  String get createRemoveFixed => 'Quitar color fijo';
+
+  @override
+  String get createPasteHint =>
+      'Pegar una representación de puzzle para editarlo';
 }

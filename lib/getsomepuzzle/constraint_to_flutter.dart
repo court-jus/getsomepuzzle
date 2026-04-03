@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
@@ -33,6 +34,9 @@ Widget constraintToFlutter(
   if (constraint is LetterGroup) {
     return _textWidget(constraint.letter, fgcolor, cellSize, count);
   }
+  if (constraint is DifferentFromConstraint) {
+    return _textWidget('≠', fgcolor, cellSize, count);
+  }
 
   // Default: use toString()
   return _textWidget(constraint.toString(), fgcolor, cellSize, count);
@@ -55,7 +59,11 @@ Widget _textWidget(String text, Color color, double cellSize, int count) {
 }
 
 Widget _parityWidget(
-    ParityConstraint constraint, Color fgcolor, double cellSize, int count) {
+  ParityConstraint constraint,
+  Color fgcolor,
+  double cellSize,
+  int count,
+) {
   const icons = {
     "left": Icons.arrow_circle_left_outlined,
     "right": Icons.arrow_circle_right_outlined,
@@ -81,15 +89,21 @@ Widget _parityWidget(
 }
 
 Widget _symmetryWidget(
-    SymmetryConstraint constraint, Color fgcolor, double cellSize, int count) {
+  SymmetryConstraint constraint,
+  Color fgcolor,
+  double cellSize,
+  int count,
+) {
   final double size = cellSize * cellSizeToFontSize / count;
-  Widget icon =
-      FaIcon(FontAwesomeIcons.circleDot, color: fgcolor, size: size);
+  Widget icon = FaIcon(FontAwesomeIcons.circleDot, color: fgcolor, size: size);
   if (constraint.axis == 1) {
     icon = FaIcon(FontAwesomeIcons.slash, color: fgcolor, size: size);
   } else if (constraint.axis == 2) {
-    icon =
-        FaIcon(FontAwesomeIcons.gripLinesVertical, color: fgcolor, size: size);
+    icon = FaIcon(
+      FontAwesomeIcons.gripLinesVertical,
+      color: fgcolor,
+      size: size,
+    );
   } else if (constraint.axis == 3) {
     icon = Transform.rotate(
       angle: pi / 2,

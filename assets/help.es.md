@@ -44,6 +44,10 @@ Cuando una celda contiene uno de estos símbolos, el grupo al que pertenece debe
 
 La simetría central (🞋) es equivalente a una rotación de medio giro.
 
+### Diferente de (≠)
+
+Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.
+
 ## Puzzles personalizados
 
 Puedes generar tus propios puzzles directamente desde la aplicación. Abre el menú y toca "Generar" para acceder al generador de puzzles.

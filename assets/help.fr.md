@@ -44,6 +44,10 @@ Lorsqu'une case contient l'un de ces symboles, le groupe dont elle fait partie (
 
 La symétrie centrale (🞋) est équivalente à une rotation d'un demi-tour.
 
+### Différent de (≠)
+
+Lorsque deux cellules sont séparées par le symbole ≠, elles doivent être de couleurs différentes.
+
 ## Puzzles personnalisés
 
 Vous pouvez générer vos propres puzzles directement depuis l'application. Ouvrez le menu et appuyez sur "Générer" pour accéder au générateur de puzzles.

@@ -1,5 +1,7 @@
 import 'dart:developer';
+import 'dart:io' as java_io;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
@@ -32,6 +34,7 @@ class _OpenPageState extends State<OpenPage> {
     ("PA", "Parity"),
     ("QA", "Quantity"),
     ("SY", "Symmetry"),
+    ("DF", "Different from"),
   ];
 
   @override
@@ -148,6 +151,119 @@ class _OpenPageState extends State<OpenPage> {
     Navigator.pop(context);
   }
 
+  void _showCreatePlaylistDialog() {
+    final loc = AppLocalizations.of(context)!;
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.createPlaylist),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(hintText: loc.playlistName),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isEmpty) return;
+              Navigator.pop(ctx);
+              await widget.database.createUserPlaylist(name);
+              final key = 'user_${Database.slugify(name)}';
+              chooseCollection(key);
+            },
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteCurrentPlaylist() {
+    final loc = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.deletePlaylist),
+        content: Text(loc.confirmDeletePlaylist),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              // Find the display name from the slug
+              final slug = collection.replaceFirst('user_', '');
+              final name = widget.database.userPlaylistNames.firstWhere(
+                (n) => Database.slugify(n) == slug,
+                orElse: () => slug,
+              );
+              await widget.database.deleteUserPlaylist(name);
+              chooseCollection('tutorial');
+            },
+            child: Text(
+              MaterialLocalizations.of(ctx).deleteButtonTooltip,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _importPlaylistFromFile() async {
+    final loc = AppLocalizations.of(context)!;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['txt'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.path == null) return;
+    final content = await java_io.File(file.path!).readAsString();
+    final lines = content.split('\n').where((l) => l.trim().isNotEmpty && !l.startsWith('#')).toList();
+    if (lines.isEmpty) return;
+    if (!mounted) return;
+
+    // Ask for playlist name
+    final controller = TextEditingController(text: file.name.replaceAll('.txt', ''));
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.importPlaylist),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(hintText: loc.playlistName),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+
+    await widget.database.createUserPlaylist(name);
+    final key = 'user_${Database.slugify(name)}';
+    await widget.database.importToPlaylist(key, content);
+    if (!mounted) return;
+    chooseCollection(key);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -174,14 +290,35 @@ class _OpenPageState extends State<OpenPage> {
                         Text(
                           AppLocalizations.of(context)!.labelSelectCollection,
                         ),
-                        DropdownButton<String>(
-                          value: collection,
-                          items: [
-                            for (final item in widget.database.collections)
-                              DropdownMenuItem(value: item.$1, child: item.$2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            DropdownButton<String>(
+                              value: collection,
+                              items: [
+                                for (final item in widget.database.collections)
+                                  DropdownMenuItem(value: item.$1, child: item.$2),
+                              ],
+                              onChanged: (newValue) =>
+                                  chooseCollection(newValue ?? "tutorial"),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add),
+                              tooltip: AppLocalizations.of(context)!.createPlaylist,
+                              onPressed: _showCreatePlaylistDialog,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.file_open),
+                              tooltip: AppLocalizations.of(context)!.importPlaylist,
+                              onPressed: _importPlaylistFromFile,
+                            ),
+                            if (collection.startsWith('user_'))
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                tooltip: AppLocalizations.of(context)!.deletePlaylist,
+                                onPressed: _deleteCurrentPlaylist,
+                              ),
                           ],
-                          onChanged: (newValue) =>
-                              chooseCollection(newValue ?? "tutorial"),
                         ),
                       ],
                     ),
@@ -308,6 +445,7 @@ class _OpenPageState extends State<OpenPage> {
                           },
                           initialMin: widget.database.currentFilters.minWidth,
                           initialMax: widget.database.currentFilters.maxWidth,
+                          showReset: true,
                         ),
                       ],
                     ),
@@ -325,6 +463,7 @@ class _OpenPageState extends State<OpenPage> {
                           },
                           initialMin: widget.database.currentFilters.minHeight,
                           initialMax: widget.database.currentFilters.maxHeight,
+                          showReset: true,
                         ),
                       ],
                     ),
@@ -347,6 +486,7 @@ class _OpenPageState extends State<OpenPage> {
                           minimum: 0,
                           maximum: 100,
                           increment: 5,
+                          showReset: true,
                         ),
                       ],
                     ),
@@ -367,8 +507,9 @@ class _OpenPageState extends State<OpenPage> {
                           initialMin: widget.database.currentFilters.minCplx,
                           initialMax: widget.database.currentFilters.maxCplx,
                           minimum: 0,
-                          maximum: widget.database.maxCplx,
+                          maximum: 100,
                           increment: 5,
+                          showReset: true,
                         ),
                       ],
                     ),

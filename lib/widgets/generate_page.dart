@@ -23,6 +23,7 @@ class _GeneratePageState extends State<GeneratePage> {
   int _maxTimeSeconds = 60;
   final Set<String> _requiredRules = {};
   final Set<String> _excludedRules = {};
+  String _targetPlaylist = 'custom';
 
   bool _isGenerating = false;
   bool _isDone = false;
@@ -44,6 +45,7 @@ class _GeneratePageState extends State<GeneratePage> {
     ('LT', 'Letter'),
     ('QA', 'Quantity'),
     ('SY', 'Symmetry'),
+    ('DF', 'Different from'),
   ];
 
   @override
@@ -92,7 +94,7 @@ class _GeneratePageState extends State<GeneratePage> {
             _currentRatio = progress.currentRatio;
           });
         case GeneratorPuzzleMessage(:final puzzleLine):
-          widget.database.addToCustomCollection(puzzleLine);
+          widget.database.addToPlaylist(_targetPlaylist, puzzleLine);
           _generatedLines.add(puzzleLine);
           setState(() {
             _generated++;
@@ -102,7 +104,7 @@ class _GeneratePageState extends State<GeneratePage> {
           _uiTimer?.cancel();
           // Reload custom collection so puzzles are available
           if (totalGenerated > 0) {
-            widget.database.loadPuzzlesFile('custom');
+            widget.database.loadPuzzlesFile(_targetPlaylist);
           }
           setState(() {
             _isGenerating = false;
@@ -111,6 +113,40 @@ class _GeneratePageState extends State<GeneratePage> {
           });
       }
     });
+  }
+
+  void _createNewPlaylist() {
+    final loc = AppLocalizations.of(context)!;
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.createPlaylist),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(hintText: loc.playlistName),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isEmpty) return;
+              Navigator.pop(ctx);
+              await widget.database.createUserPlaylist(name);
+              setState(() {
+                _targetPlaylist = 'user_${Database.slugify(name)}';
+              });
+            },
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
   }
 
   void _playGenerated() {
@@ -213,7 +249,36 @@ class _GeneratePageState extends State<GeneratePage> {
             _buildSliderRow(loc.generateCount, _count, 1, 50, (v) {
               setState(() => _count = v);
             }),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // Target playlist
+            Row(
+              children: [
+                SizedBox(width: 120, child: Text(loc.targetPlaylist)),
+                Expanded(
+                  child: DropdownButton<String>(
+                    value: _targetPlaylist,
+                    isExpanded: true,
+                    items: [
+                      for (final (key, label) in widget.database.writablePlaylistOptions)
+                        DropdownMenuItem(value: key, child: Text(label)),
+                      DropdownMenuItem(
+                        value: '__new__',
+                        child: Text(loc.newPlaylist, style: const TextStyle(fontStyle: FontStyle.italic)),
+                      ),
+                    ],
+                    onChanged: _isGenerating ? null : (v) {
+                      if (v == '__new__') {
+                        _createNewPlaylist();
+                      } else if (v != null) {
+                        setState(() => _targetPlaylist = v);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
             // Generate / Stop button
             if (!_isGenerating)

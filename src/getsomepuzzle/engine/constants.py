@@ -1,5 +1,0 @@
-DOMAIN = [1, 2]  # Like two colors
-DEFAULT_SIZE = 4  # 3x3
-MAX_STEPS = 100000
-EMPTY = 0
-MAX_FORCABLE = 16

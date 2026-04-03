@@ -78,7 +78,7 @@ Options:
 | `--ban` | Comma-separated rules to exclude | |
 | `--require` | Comma-separated rules to require | |
 
-Rule slugs: `FM` (forbidden motif), `PA` (parity), `GS` (group size), `LT` (letter group), `QA` (quantity), `SY` (symmetry).
+Rule slugs: `FM` (forbidden motif), `PA` (parity), `GS` (group size), `LT` (letter group), `QA` (quantity), `SY` (symmetry), `DF` (different from).
 
 Examples:
 

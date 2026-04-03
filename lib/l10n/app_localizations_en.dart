@@ -246,4 +246,142 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get noCustomPuzzles =>
       'No custom puzzles yet. Use the Generate page to create some!';
+
+  @override
+  String get create => 'Create';
+
+  @override
+  String get createTitle => 'Create a puzzle';
+
+  @override
+  String get createStart => 'Start editing';
+
+  @override
+  String get createTest => 'Test';
+
+  @override
+  String get createValidate => 'Validate';
+
+  @override
+  String get createSave => 'Save';
+
+  @override
+  String get createSaved => 'Puzzle saved!';
+
+  @override
+  String get createSolvable => 'Solvable';
+
+  @override
+  String get createNotSolvable => 'Not solvable';
+
+  @override
+  String get createUniqueSolution => 'Unique solution';
+
+  @override
+  String get createMultipleSolutions => 'Multiple solutions';
+
+  @override
+  String get createNoSolution => 'No solution';
+
+  @override
+  String get createComplexity => 'Complexity';
+
+  @override
+  String get createNoConstraints => 'Tap a cell to add a constraint';
+
+  @override
+  String get createAddConstraint => 'Add a constraint';
+
+  @override
+  String get createChooseType => 'Constraint type';
+
+  @override
+  String get createChooseSide => 'Side';
+
+  @override
+  String get createChooseAxis => 'Symmetry axis';
+
+  @override
+  String get createChooseSize => 'Group size';
+
+  @override
+  String get createChooseLetter => 'Letter';
+
+  @override
+  String get createChooseValue => 'Value';
+
+  @override
+  String get createChooseCount => 'Count';
+
+  @override
+  String get createMotifWidth => 'Pattern width';
+
+  @override
+  String get createMotifHeight => 'Pattern height';
+
+  @override
+  String createLetterGroupMode(String letter) {
+    return 'Tap cells to add to group $letter, then press Done';
+  }
+
+  @override
+  String get createLetterGroupDone => 'Done';
+
+  @override
+  String get createAddNew => 'Add new constraint';
+
+  @override
+  String get createDeleteConstraint => 'Delete a constraint';
+
+  @override
+  String get createConfirmDelete => 'Delete this constraint?';
+
+  @override
+  String get createValidating => 'Validating...';
+
+  @override
+  String get createSolutions => 'Solutions';
+
+  @override
+  String get constraintDifferentFrom => 'different from';
+
+  @override
+  String get createPlaylist => 'New playlist';
+
+  @override
+  String get deletePlaylist => 'Delete playlist';
+
+  @override
+  String get importPlaylist => 'Import from file';
+
+  @override
+  String get playlistName => 'Playlist name';
+
+  @override
+  String get playlistCreated => 'Playlist created';
+
+  @override
+  String get confirmDeletePlaylist =>
+      'Delete this playlist and all its puzzles?';
+
+  @override
+  String get targetPlaylist => 'Save to';
+
+  @override
+  String get newPlaylist => 'New playlist...';
+
+  @override
+  String get createFixedCellMode => 'Fix cell color';
+
+  @override
+  String get createFixBlack => 'Fix to black';
+
+  @override
+  String get createFixWhite => 'Fix to white';
+
+  @override
+  String get createRemoveFixed => 'Remove fixed color';
+
+  @override
+  String get createPasteHint => 'Paste a puzzle representation to edit it';
 }

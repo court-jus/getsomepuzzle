@@ -10,6 +10,9 @@ class StatEntry {
   final String? disliked;
   final int? pleasure;
 
+  @override
+  String toString() => '${finished ?? "unfinished"} ${duration}s ${failures}f $puzzleLine';
+
   const StatEntry({
     required this.finished,
     required this.duration,
