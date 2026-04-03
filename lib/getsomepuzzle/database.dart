@@ -7,6 +7,7 @@ import 'package:logging/logging.dart';
 
 import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/stats.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -215,38 +216,34 @@ class Database {
     maxCplx = puzzles.isEmpty ? 0 : puzzles.map((puz) => puz.cplx).max;
   }
 
-  void loadStats(List<String> stats) {
+  void loadStats(List<String> rawStats) {
     log.finest("loadStats");
-    final Map<String, List<String>> solvedPuzzles = {};
-    for (final stat in stats) {
-      log.finest("stat $stat");
-      final List<String> statFields = stat.split(" ");
-      log.finest("statFields $statFields");
-      if (statFields.length < 4) continue;
-      solvedPuzzles[statFields[3]] = statFields;
+    final Map<String, StatEntry> solvedPuzzles = {};
+    for (final line in rawStats) {
+      final entry = StatEntry.parse(line);
+      if (entry == null) continue;
+      solvedPuzzles[entry.puzzleLine] = entry;
     }
     log.finest("solved $solvedPuzzles");
     for (final puz in puzzles) {
-      if (!solvedPuzzles.containsKey(puz.lineRepresentation)) continue;
+      final entry = solvedPuzzles[puz.lineRepresentation];
+      if (entry == null) continue;
       puz.played = true;
-      final puzzleData = solvedPuzzles[puz.lineRepresentation];
-      if (puzzleData![0] != "unfinished") {
-        puz.finished = DateTime.tryParse(puzzleData[0]);
+      if (entry.finished != null) {
+        puz.finished = DateTime.tryParse(entry.finished!);
       }
-      if (puzzleData.length > 7 && puzzleData[7].isNotEmpty) {
-        puz.skipped = DateTime.tryParse(puzzleData[7]);
+      if (entry.skipped != null) {
+        puz.skipped = DateTime.tryParse(entry.skipped!);
       }
-      if (puzzleData.length > 9 && puzzleData[9].isNotEmpty) {
-        puz.liked = DateTime.tryParse(puzzleData[9]);
+      if (entry.liked != null) {
+        puz.liked = DateTime.tryParse(entry.liked!);
       }
-      if (puzzleData.length > 11 && puzzleData[11].isNotEmpty) {
-        puz.disliked = DateTime.tryParse(puzzleData[11]);
+      if (entry.disliked != null) {
+        puz.disliked = DateTime.tryParse(entry.disliked!);
       }
-      if (puzzleData.length > 12 && puzzleData[13].isNotEmpty) {
-        puz.pleasure = int.tryParse(puzzleData[13]);
-      }
-      puz.duration = int.parse(puzzleData[1].replaceAll("s", ""));
-      puz.failures = int.parse(puzzleData[2].replaceAll("f", ""));
+      puz.pleasure = entry.pleasure;
+      puz.duration = entry.duration;
+      puz.failures = entry.failures;
     }
   }
 

@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/stats.dart';
 
 void main(List<String> args) {
   final parsed = _parseArgs(args);
@@ -13,6 +14,8 @@ void main(List<String> args) {
       _runGenerate(parsed);
     case 'check':
       _runCheck(parsed['checkFile'] as String);
+    case 'read-stats':
+      _runReadStats(parsed['statsDir'] as String);
   }
 }
 
@@ -146,6 +149,42 @@ void _runCheck(String filePath) {
   if (invalid > 0) exit(1);
 }
 
+// --- Read-stats mode ---
+
+void _runReadStats(String dirPath) {
+  final dir = Directory(dirPath);
+  if (!dir.existsSync()) {
+    stderr.writeln('Directory not found: $dirPath');
+    exit(1);
+  }
+
+  final allLines = <String>[];
+  int filesRead = 0;
+  for (final entity in dir.listSync()) {
+    if (entity is! File) continue;
+    if (entity.path.endsWith('sorted_puzzles.txt')) continue;
+    filesRead++;
+    allLines.addAll(entity.readAsLinesSync());
+  }
+
+  stderr.writeln('Read $filesRead files');
+
+  final stats = aggregateStats(allLines);
+  final sorted = sortPuzzlesByDifficulty(stats);
+
+  for (final puzzle in sorted) {
+    stdout.writeln(puzzle);
+  }
+
+  stderr.writeln('Sorted ${sorted.length} puzzles by difficulty');
+  if (sorted.isNotEmpty) {
+    final easiest = stats[sorted.first]!;
+    final hardest = stats[sorted.last]!;
+    stderr.writeln('  easiest: level ${easiest.level} (${easiest.total} plays)');
+    stderr.writeln('  hardest: level ${hardest.level} (${hardest.total} plays)');
+  }
+}
+
 // --- Utilities ---
 
 String _fmt(Duration d) {
@@ -179,6 +218,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'banned': null,
     'required': null,
     'checkFile': null,
+    'statsDir': null,
   };
 
   for (int i = 0; i < args.length; i++) {
@@ -186,6 +226,9 @@ Map<String, dynamic> _parseArgs(List<String> args) {
       case '--check':
         result['mode'] = 'check';
         result['checkFile'] = args[++i];
+      case '--read-stats':
+        result['mode'] = 'read-stats';
+        result['statsDir'] = args[++i];
       case '-n':
       case '--count':
         result['count'] = int.parse(args[++i]);
@@ -234,6 +277,7 @@ Usage: dart run bin/generate.dart [options]
 Modes:
   (default)               Generate puzzles
   --check FILE            Validate puzzles from file (1 solution each)
+  --read-stats DIR        Aggregate play stats, output puzzles sorted by difficulty
 
 Generation options:
   -n, --count N           Number of puzzles to generate (default: 10)
@@ -254,5 +298,6 @@ Rule slugs: FM (forbidden motif), PA (parity), GS (group size),
 Examples:
   dart run bin/generate.dart -n 100 -o puzzles.txt
   dart run bin/generate.dart --check assets/try_me.txt
+  dart run bin/generate.dart --read-stats ~/Documents/getsomepuzzle/
 ''');
 }
