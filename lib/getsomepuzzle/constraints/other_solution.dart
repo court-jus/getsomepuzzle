@@ -1,3 +1,4 @@
+import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
@@ -19,5 +20,28 @@ class OtherSolutionConstraint extends Constraint {
       if (values[i] != solution[i]) return true;
     }
     return false;
+  }
+
+  @override
+  Move? apply(Puzzle puzzle) {
+    // If only one free cell remains, and setting it to the excluded
+    // solution's value would reproduce the banned solution, force
+    // the opposite value.
+    final free = <int>[];
+    bool allMatchSoFar = true;
+    for (int i = 0; i < puzzle.cellValues.length; i++) {
+      if (puzzle.cellValues[i] == 0) {
+        free.add(i);
+      } else if (puzzle.cellValues[i] != solution[i]) {
+        allMatchSoFar = false;
+      }
+    }
+    if (!allMatchSoFar) return null;
+    if (free.length == 1) {
+      final idx = free.first;
+      final opposite = puzzle.domain.firstWhere((v) => v != solution[idx]);
+      return Move(idx, opposite, this);
+    }
+    return null;
   }
 }

@@ -3,6 +3,7 @@ import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
@@ -591,6 +592,45 @@ class Puzzle {
       }
     }
     return (null, steps);
+  }
+
+  /// Count distinct solutions (up to [maxSolutions]).
+  int countSolutions({int maxSolutions = 2}) {
+    final solutions = <List<int>>[];
+    final test = clone();
+    for (int i = 0; i < maxSolutions; i++) {
+      final (sol, _) = test.solveWithBacktracking();
+      if (sol == null) break;
+      solutions.add(sol.cellValues);
+      // Exclude this solution and try again
+      test.constraints.add(OtherSolutionConstraint(sol.cellValues));
+      // Reset cells to re-solve from scratch
+      for (final cell in test.cells) {
+        if (!cell.readonly) {
+          cell.value = 0;
+          cell.options = cell.domain.toList();
+        }
+      }
+    }
+    return solutions.length;
+  }
+
+  /// Remove constraints that don't affect the number of solutions.
+  /// Iterates from last to first; if removing a constraint keeps
+  /// the same solution count, the constraint is useless.
+  void removeUselessRules() {
+    final initialCount = countSolutions();
+    int i = constraints.length;
+    while (i > 0) {
+      i--;
+      if (constraints[i] is HelpText) continue;
+      final removed = constraints.removeAt(i);
+      final newCount = countSolutions();
+      if (newCount != initialCount) {
+        // Constraint was needed, put it back
+        constraints.insert(i, removed);
+      }
+    }
   }
 
   /// Export puzzle to the v2 line format.
