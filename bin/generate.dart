@@ -2,10 +2,23 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
 void main(List<String> args) {
   final parsed = _parseArgs(args);
 
+  final mode = parsed['mode'] as String;
+  switch (mode) {
+    case 'generate':
+      _runGenerate(parsed);
+    case 'check':
+      _runCheck(parsed['checkFile'] as String);
+  }
+}
+
+// --- Generate mode ---
+
+void _runGenerate(Map<String, dynamic> parsed) {
   final count = parsed['count'] as int;
   final minWidth = parsed['minWidth'] as int;
   final maxWidth = parsed['maxWidth'] as int;
@@ -93,6 +106,48 @@ void main(List<String> args) {
   finish();
 }
 
+// --- Check mode ---
+
+void _runCheck(String filePath) {
+  final file = File(filePath);
+  if (!file.existsSync()) {
+    stderr.writeln('File not found: $filePath');
+    exit(1);
+  }
+  final lines = file.readAsLinesSync().where((l) => l.trim().isNotEmpty && !l.startsWith('#')).toList();
+  stderr.writeln('Checking ${lines.length} puzzles from $filePath...');
+
+  int valid = 0;
+  int invalid = 0;
+  final sw = Stopwatch()..start();
+
+  for (int i = 0; i < lines.length; i++) {
+    final line = lines[i].trim();
+    try {
+      final p = Puzzle(line);
+      final solutions = p.countSolutions();
+      if (solutions == 1) {
+        valid++;
+      } else {
+        invalid++;
+        stderr.writeln('  INVALID (${solutions} solutions): $line');
+      }
+    } catch (e) {
+      invalid++;
+      stderr.writeln('  ERROR: $line ($e)');
+    }
+    if ((i + 1) % 10 == 0) {
+      stderr.write('\r  ${i + 1}/${lines.length} checked...          ');
+    }
+  }
+
+  stderr.writeln('');
+  stderr.writeln('Done in ${_fmt(sw.elapsed)}: $valid valid, $invalid invalid out of ${lines.length}');
+  if (invalid > 0) exit(1);
+}
+
+// --- Utilities ---
+
 String _fmt(Duration d) {
   final m = d.inMinutes;
   final s = d.inSeconds % 60;
@@ -114,6 +169,7 @@ int _medianMs(List<int> durations) {
 
 Map<String, dynamic> _parseArgs(List<String> args) {
   final result = <String, dynamic>{
+    'mode': 'generate',
     'count': 10,
     'minWidth': 4,
     'maxWidth': 7,
@@ -122,10 +178,14 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'output': null,
     'banned': null,
     'required': null,
+    'checkFile': null,
   };
 
   for (int i = 0; i < args.length; i++) {
     switch (args[i]) {
+      case '--check':
+        result['mode'] = 'check';
+        result['checkFile'] = args[++i];
       case '-n':
       case '--count':
         result['count'] = int.parse(args[++i]);
@@ -171,23 +231,28 @@ void _printUsage() {
   stderr.writeln('''
 Usage: dart run bin/generate.dart [options]
 
-Options:
-  -n, --count N         Number of puzzles to generate (default: 10)
-  -W, --min-width N     Minimum grid width (default: 4)
-      --max-width N     Maximum grid width (default: 7)
-  -H, --min-height N    Minimum grid height (default: 4)
-      --max-height N    Maximum grid height (default: 8)
-  -o, --output FILE     Output file (default: stdout)
-      --ban RULES       Comma-separated rule slugs to exclude (e.g. FM,LT)
-      --require RULES   Comma-separated rule slugs to require (e.g. PA,GS)
-  -h, --help            Show this help
+Modes:
+  (default)               Generate puzzles
+  --check FILE            Validate puzzles from file (1 solution each)
+
+Generation options:
+  -n, --count N           Number of puzzles to generate (default: 10)
+  -W, --min-width N       Minimum grid width (default: 4)
+      --max-width N       Maximum grid width (default: 7)
+  -H, --min-height N      Minimum grid height (default: 4)
+      --max-height N      Maximum grid height (default: 8)
+  -o, --output FILE       Output file (default: stdout)
+      --ban RULES         Comma-separated rule slugs to exclude (e.g. FM,LT)
+      --require RULES     Comma-separated rule slugs to require (e.g. PA,GS)
+
+General:
+  -h, --help              Show this help
 
 Rule slugs: FM (forbidden motif), PA (parity), GS (group size),
             LT (letter group), QA (quantity), SY (symmetry)
 
 Examples:
   dart run bin/generate.dart -n 100 -o puzzles.txt
-  dart run bin/generate.dart -n 50 -W 3 --max-width 5 -H 3 --max-height 5
-  dart run bin/generate.dart -n 20 --ban LT,SY --require FM,PA
+  dart run bin/generate.dart --check assets/try_me.txt
 ''');
 }
