@@ -567,7 +567,9 @@ class Puzzle {
   (Puzzle?, int) _backtrack(Puzzle st, int maxSteps, int level) {
     int steps = 0;
     while (steps <= maxSteps) {
-      if (st.freeCells().isEmpty && st.complete) return (st, steps);
+      if (st.freeCells().isEmpty && st.complete && st.check(saveResult: false).isEmpty) {
+        return (st, steps);
+      }
       steps++;
       // MRV heuristic: pick cell with fewest options
       final free = st.freeCells();
