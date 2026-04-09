@@ -113,6 +113,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int? firstDragValue;
   int? lastDragIdx;
   bool _testingFromEditor = false;
+  Timer? _helpDebounce;
   final log = Logger("HomePage");
 
   @override
@@ -224,7 +225,7 @@ class _MyHomePageState extends State<MyHomePage> {
       paused = false;
       betweenPuzzles = false;
       hintText = "";
-      helpMe();
+      _scheduleHelpMe();
     });
   }
 
@@ -256,7 +257,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle!.clearConstraintsValidity();
       currentPuzzle!.clearHighlights();
       betweenPuzzles = false;
-      helpMe();
+      _scheduleHelpMe();
     });
   }
 
@@ -270,8 +271,19 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle!.clearHighlights();
       setTopMessage();
       betweenPuzzles = false;
-      helpMe();
+      _scheduleHelpMe();
     });
+  }
+
+  @override
+  void dispose() {
+    _helpDebounce?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleHelpMe() {
+    _helpDebounce?.cancel();
+    _helpDebounce = Timer(const Duration(milliseconds: 300), helpMe);
   }
 
   Future<void> helpMe() async {
@@ -334,7 +346,7 @@ class _MyHomePageState extends State<MyHomePage> {
       currentPuzzle!.incrValue(idx);
       currentPuzzle!.clearConstraintsValidity();
       helpMove = null;
-      helpMe();
+      _scheduleHelpMe();
       if (history.isEmpty || history.last != idx) history.add(idx);
       handleCheck();
     });
