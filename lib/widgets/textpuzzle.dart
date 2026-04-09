@@ -25,6 +25,14 @@ class _TextpuzzleWidgetState extends State<TextpuzzleWidget> {
     super.initState();
   }
 
+  @override
+  void didUpdateWidget(TextpuzzleWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.textName != widget.textName) {
+      loadText();
+    }
+  }
+
   Future<void> loadText() async {
     final markdown = await rootBundle.loadString(
       'assets/TX/${widget.locale}/${widget.textName}.md',
