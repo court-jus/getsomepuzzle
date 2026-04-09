@@ -63,15 +63,40 @@ class SymmetryConstraint extends CellsCentricConstraint {
     if (myValue == 0) return null;
     final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
     if (myGroup == null) return null;
+    final myOpposite = puzzle.domain.whereNot((e) => e == myValue).first;
     for (final cellidx in myGroup) {
       final sym = _computeSymmetry(puzzle, cellidx);
+      // This cell's symmetry is outside the boundaries of the puzzle
       if (sym == null) {
         return Move(0, 0, this, isImpossible: this);
       }
+      // This cell's symmetry is free
       if (puzzle.getValue(sym) == 0) {
         return Move(sym, myValue, this);
       }
     }
+    // Now, look for cells neighboring my group
+    for (var member in myGroup) {
+      final neighbors = puzzle.getNeighbors(member);
+      for (var neighbor in neighbors) {
+        if (puzzle.cellValues[neighbor] == myOpposite) {
+          // This cell is filled with my opposite color
+          // so its symmetry should be myOpposite too (if it exists)
+          final sym = _computeSymmetry(puzzle, neighbor);
+          if (sym != null) {
+            return Move(sym, myOpposite, this);
+          }
+        } else if (puzzle.cellValues[neighbor] == 0) {
+          // This cell is free. If its symmetry is not free, we know
+          // that it cannot be made part of our group
+          final sym = _computeSymmetry(puzzle, neighbor);
+          if (sym == null || puzzle.cellValues[sym] != 0) {
+            return Move(neighbor, myOpposite, this);
+          }
+        }
+      }
+    }
+
     return null;
   }
 
