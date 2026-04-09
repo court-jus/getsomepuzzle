@@ -337,11 +337,23 @@ class Puzzle {
       for (var value in clone.domain) {
         clone.setValue(freeCell.$1, value);
         Move? result = clone.applyAll();
+        // Check if the puzzle became unsolvable (constraint violation)
+        final unsolvableErrors = clone.check(saveResult: false);
+        if (unsolvableErrors.isNotEmpty) {
+          final opposite = clone.domain.whereNot((v) => v == value).first;
+          clone.setValue(freeCell.$1, opposite);
+          return Move(
+            freeCell.$1,
+            opposite,
+            unsolvableErrors.first,
+            isForce: true,
+          );
+        }
         if (result != null && result.isImpossible != null) {
           final opposite = clone.domain.whereNot((v) => v == value).first;
-          return Move(freeCell.$1, opposite, result.givenBy);
+          return Move(freeCell.$1, opposite, result.givenBy, isForce: true);
         } else if (result != null && result.isImpossible == null) {
-          return Move(freeCell.$1, value, result.givenBy);
+          return Move(freeCell.$1, value, result.givenBy, isForce: true);
         } else {
           for (var cell in cellValues.indexed) {
             clone.setValue(cell.$1, cell.$2);

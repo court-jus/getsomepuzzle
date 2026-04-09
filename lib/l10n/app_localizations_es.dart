@@ -172,6 +172,10 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get hintForce =>
+      'Esta celda se puede deducir combinando múltiples restricciones';
+
+  @override
   String get hintImpossible =>
       'Una restricción está violada — se ha cometido un error';
 

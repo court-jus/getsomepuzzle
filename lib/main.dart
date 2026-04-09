@@ -319,6 +319,10 @@ class _MyHomePageState extends State<MyHomePage> {
         helpMove!.isImpossible!.isValid = false;
         hintText = AppLocalizations.of(context)!.hintImpossible;
         hintIsError = true;
+      } else if (helpMove!.isForce) {
+        currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
+        hintText = AppLocalizations.of(context)!.hintForce;
+        hintIsError = false;
       } else {
         helpMove!.givenBy.isHighlighted = true;
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;

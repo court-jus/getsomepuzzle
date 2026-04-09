@@ -172,6 +172,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get hintForce =>
+      'This cell can be deduced by combining multiple constraints';
+
+  @override
   String get hintImpossible => 'A constraint is violated — a mistake was made';
 
   @override

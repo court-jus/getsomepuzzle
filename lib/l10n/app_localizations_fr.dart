@@ -172,6 +172,10 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get hintForce =>
+      'Cette cellule peut être déduite en combinant plusieurs contraintes';
+
+  @override
   String get hintImpossible =>
       'Une contrainte est violée — une erreur a été commise';
 

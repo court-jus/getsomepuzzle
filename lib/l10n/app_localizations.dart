@@ -418,6 +418,12 @@ abstract class AppLocalizations {
   /// **'This cell can be deduced from the {constraintName} constraint'**
   String hintDeducedFrom(String constraintName);
 
+  /// Hint message shown when a force step is required
+  ///
+  /// In en, this message translates to:
+  /// **'This cell can be deduced by combining multiple constraints'**
+  String get hintForce;
+
   /// Hint message shown when the puzzle is in an impossible state
   ///
   /// In en, this message translates to:

@@ -54,6 +54,13 @@ class Move {
   int value;
   Constraint givenBy;
   Constraint? isImpossible;
+  bool isForce;
 
-  Move(this.idx, this.value, this.givenBy, {this.isImpossible});
+  Move(
+    this.idx,
+    this.value,
+    this.givenBy, {
+    this.isImpossible,
+    this.isForce = false,
+  });
 }
