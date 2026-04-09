@@ -304,6 +304,15 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void showHelpMove() {
     if (helpMove == null) return;
+    if (hintText.isNotEmpty && !hintIsError) {
+      currentPuzzle!.clearHighlights();
+      hintText = "";
+      currentPuzzle!.setValue(helpMove!.idx, helpMove!.value);
+      history.add(helpMove!.idx);
+      _scheduleHelpMe();
+      return;
+    }
+
     setState(() {
       currentPuzzle!.clearHighlights();
       if (helpMove!.isImpossible != null) {
