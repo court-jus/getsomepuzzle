@@ -351,7 +351,7 @@ class _ArrowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 2.5
+      ..strokeWidth = 5
       ..style = PaintingStyle.stroke;
 
     // Curve the arrow to the side that has more room
@@ -367,12 +367,13 @@ class _ArrowPainter extends CustomPainter {
     canvas.drawPath(path, paint);
 
     // Arrowhead: compute tangent from last control point to end
-    final arrowSize = 10.0;
+    final arrowSize = 30.0;
     final angle = atan2(end.dy - midY, end.dx - ctrlX2);
-    final p1 = end - Offset.fromDirection(angle - 0.4, arrowSize);
-    final p2 = end - Offset.fromDirection(angle + 0.4, arrowSize);
+    final shiftedEnd = end + Offset.fromDirection(angle, arrowSize / 2);
+    final p1 = end - Offset.fromDirection(angle - 0.8, arrowSize / 2);
+    final p2 = end - Offset.fromDirection(angle + 0.8, arrowSize / 2);
     final arrowPath = Path()
-      ..moveTo(end.dx, end.dy)
+      ..moveTo(shiftedEnd.dx, shiftedEnd.dy)
       ..lineTo(p1.dx, p1.dy)
       ..lineTo(p2.dx, p2.dy)
       ..close();
