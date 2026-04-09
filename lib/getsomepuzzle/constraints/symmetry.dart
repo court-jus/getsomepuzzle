@@ -4,14 +4,13 @@ import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
 const Map<int, String> axisRepresentation = {
-    0: "🕱",
-    1: "⟍",
-    2: "|",
-    3: "⟋",
-    4: "―",
-    5: "🞋",
+  0: "🕱",
+  1: "⟍",
+  2: "|",
+  3: "⟋",
+  4: "―",
+  5: "🞋",
 };
-
 
 class SymmetryConstraint extends CellsCentricConstraint {
   int axis = 0;
@@ -84,7 +83,8 @@ class SymmetryConstraint extends CellsCentricConstraint {
     final int cy = (cellidx / puzzle.width).floor();
     final int dx = x - cx;
     final int dy = y - cy;
-    int sx = 0; int sy = 0;
+    int sx = 0;
+    int sy = 0;
     if (axis == 1) {
       // ⟍ symmetry
       sx = x - dy;
@@ -93,24 +93,23 @@ class SymmetryConstraint extends CellsCentricConstraint {
       // | symmetry
       sx = x + dx;
       sy = cy;
-    } else if(axis == 3) {
+    } else if (axis == 3) {
       // ⟋ symmetry
       sx = x + dy;
       sy = y + dx;
-    } else if(axis == 4) {
+    } else if (axis == 4) {
       // ― symmetry
       sx = cx;
       sy = y + dy;
-    } else if(axis == 5) {
+    } else if (axis == 5) {
       // 🞋 symmetry
       sx = x + dx;
       sy = y + dy;
     }
     final int newidx = sy * puzzle.width + sx;
     if (sx < 0 || sy < 0 || sx >= puzzle.width || sy >= puzzle.height) {
-        return null;
+      return null;
     }
     return newidx;
   }
-
 }

@@ -10,7 +10,11 @@ class GeneratePage extends StatefulWidget {
   final Database database;
   final void Function(PuzzleData puz)? onPuzzleSelected;
 
-  const GeneratePage({super.key, required this.database, this.onPuzzleSelected});
+  const GeneratePage({
+    super.key,
+    required this.database,
+    this.onPuzzleSelected,
+  });
 
   @override
   State<GeneratePage> createState() => _GeneratePageState();
@@ -190,7 +194,10 @@ class _GeneratePageState extends State<GeneratePage> {
             const SizedBox(height: 16),
 
             // Required rules
-            Text(loc.generateRequiredRules, style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              loc.generateRequiredRules,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             const SizedBox(height: 4),
             Wrap(
               spacing: 4,
@@ -203,19 +210,22 @@ class _GeneratePageState extends State<GeneratePage> {
                   onSelected: disabled || _isGenerating
                       ? null
                       : (v) => setState(() {
-                            if (v) {
-                              _requiredRules.add(r.$1);
-                            } else {
-                              _requiredRules.remove(r.$1);
-                            }
-                          }),
+                          if (v) {
+                            _requiredRules.add(r.$1);
+                          } else {
+                            _requiredRules.remove(r.$1);
+                          }
+                        }),
                 );
               }).toList(),
             ),
             const SizedBox(height: 12),
 
             // Excluded rules
-            Text(loc.generateExcludedRules, style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              loc.generateExcludedRules,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             const SizedBox(height: 4),
             Wrap(
               spacing: 4,
@@ -228,12 +238,12 @@ class _GeneratePageState extends State<GeneratePage> {
                   onSelected: disabled || _isGenerating
                       ? null
                       : (v) => setState(() {
-                            if (v) {
-                              _excludedRules.add(r.$1);
-                            } else {
-                              _excludedRules.remove(r.$1);
-                            }
-                          }),
+                          if (v) {
+                            _excludedRules.add(r.$1);
+                          } else {
+                            _excludedRules.remove(r.$1);
+                          }
+                        }),
                 );
               }).toList(),
             ),
@@ -260,20 +270,26 @@ class _GeneratePageState extends State<GeneratePage> {
                     value: _targetPlaylist,
                     isExpanded: true,
                     items: [
-                      for (final (key, label) in widget.database.writablePlaylistOptions)
+                      for (final (key, label)
+                          in widget.database.writablePlaylistOptions)
                         DropdownMenuItem(value: key, child: Text(label)),
                       DropdownMenuItem(
                         value: '__new__',
-                        child: Text(loc.newPlaylist, style: const TextStyle(fontStyle: FontStyle.italic)),
+                        child: Text(
+                          loc.newPlaylist,
+                          style: const TextStyle(fontStyle: FontStyle.italic),
+                        ),
                       ),
                     ],
-                    onChanged: _isGenerating ? null : (v) {
-                      if (v == '__new__') {
-                        _createNewPlaylist();
-                      } else if (v != null) {
-                        setState(() => _targetPlaylist = v);
-                      }
-                    },
+                    onChanged: _isGenerating
+                        ? null
+                        : (v) {
+                            if (v == '__new__') {
+                              _createNewPlaylist();
+                            } else if (v != null) {
+                              setState(() => _targetPlaylist = v);
+                            }
+                          },
                   ),
                 ),
               ],
@@ -358,7 +374,9 @@ class _GeneratePageState extends State<GeneratePage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => setState(() { _isDone = false; }),
+                        onPressed: () => setState(() {
+                          _isDone = false;
+                        }),
                         icon: const Icon(Icons.auto_fix_high),
                         label: Text(loc.generateMore),
                         style: ElevatedButton.styleFrom(
@@ -406,12 +424,13 @@ class _GeneratePageState extends State<GeneratePage> {
             max: max.toDouble(),
             divisions: max - min,
             label: '$value$suffix',
-            onChanged: _isGenerating
-                ? null
-                : (v) => onChanged(v.round()),
+            onChanged: _isGenerating ? null : (v) => onChanged(v.round()),
           ),
         ),
-        SizedBox(width: 40, child: Text('$value$suffix', textAlign: TextAlign.right)),
+        SizedBox(
+          width: 40,
+          child: Text('$value$suffix', textAlign: TextAlign.right),
+        ),
       ],
     );
   }

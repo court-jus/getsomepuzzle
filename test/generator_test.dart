@@ -107,14 +107,22 @@ void main() {
     // Generate valid constraints for this solution
     int validCount = 0;
     final List<Constraint> validConstraints = [];
-    for (final p in ForbiddenMotif.generateAllParameters(width, height, domain)) {
+    for (final p in ForbiddenMotif.generateAllParameters(
+      width,
+      height,
+      domain,
+    )) {
       final c = ForbiddenMotif(p);
       if (c.verify(solved)) {
         validConstraints.add(c);
         validCount++;
       }
     }
-    for (final p in QuantityConstraint.generateAllParameters(width, height, domain)) {
+    for (final p in QuantityConstraint.generateAllParameters(
+      width,
+      height,
+      domain,
+    )) {
       final c = QuantityConstraint(p);
       if (c.verify(solved)) {
         validConstraints.add(c);
@@ -147,7 +155,12 @@ void main() {
 
   test('generateOne returns a result (may be null for hard configs)', () {
     final result = PuzzleGenerator.generateOne(
-      GeneratorConfig(width: 3, height: 3, count: 1, maxTime: Duration(seconds: 5)),
+      GeneratorConfig(
+        width: 3,
+        height: 3,
+        count: 1,
+        maxTime: Duration(seconds: 5),
+      ),
     );
     print('generateOne 3x3 result: $result');
     // Don't assert non-null — 3x3 can legitimately fail

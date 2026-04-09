@@ -59,7 +59,9 @@ class GeneratorWorker {
     int generated = 0;
     final stopwatch = Stopwatch()..start();
 
-    while (generated < config.count && !_cancelled && stopwatch.elapsed < config.maxTime) {
+    while (generated < config.count &&
+        !_cancelled &&
+        stopwatch.elapsed < config.maxTime) {
       // Yield to event loop between attempts
       await Future.delayed(Duration.zero);
       if (_cancelled) break;
@@ -68,13 +70,17 @@ class GeneratorWorker {
         final line = PuzzleGenerator.generateOne(
           config,
           onProgress: (p) {
-            _controller?.add(GeneratorProgressMessage(GeneratorProgress(
-              puzzlesGenerated: generated,
-              totalRequested: config.count,
-              constraintsTried: p.constraintsTried,
-              constraintsTotal: p.constraintsTotal,
-              currentRatio: p.currentRatio,
-            )));
+            _controller?.add(
+              GeneratorProgressMessage(
+                GeneratorProgress(
+                  puzzlesGenerated: generated,
+                  totalRequested: config.count,
+                  constraintsTried: p.constraintsTried,
+                  constraintsTotal: p.constraintsTotal,
+                  currentRatio: p.currentRatio,
+                ),
+              ),
+            );
           },
           shouldStop: () => _cancelled || stopwatch.elapsed > config.maxTime,
         );
@@ -82,13 +88,17 @@ class GeneratorWorker {
         if (line != null) {
           generated++;
           _controller?.add(GeneratorPuzzleMessage(line));
-          _controller?.add(GeneratorProgressMessage(GeneratorProgress(
-            puzzlesGenerated: generated,
-            totalRequested: config.count,
-            constraintsTried: 0,
-            constraintsTotal: 0,
-            currentRatio: 0,
-          )));
+          _controller?.add(
+            GeneratorProgressMessage(
+              GeneratorProgress(
+                puzzlesGenerated: generated,
+                totalRequested: config.count,
+                constraintsTried: 0,
+                constraintsTotal: 0,
+                currentRatio: 0,
+              ),
+            ),
+          );
         }
       } catch (_) {
         // Generation failed for this attempt, retry
@@ -120,13 +130,17 @@ class GeneratorWorker {
       if (message is Map<String, dynamic>) {
         final type = message['type'] as String;
         if (type == 'progress') {
-          _controller?.add(GeneratorProgressMessage(GeneratorProgress(
-            puzzlesGenerated: message['generated'] as int,
-            totalRequested: message['total'] as int,
-            constraintsTried: message['tried'] as int,
-            constraintsTotal: message['totalConstraints'] as int,
-            currentRatio: message['ratio'] as double,
-          )));
+          _controller?.add(
+            GeneratorProgressMessage(
+              GeneratorProgress(
+                puzzlesGenerated: message['generated'] as int,
+                totalRequested: message['total'] as int,
+                constraintsTried: message['tried'] as int,
+                constraintsTotal: message['totalConstraints'] as int,
+                currentRatio: message['ratio'] as double,
+              ),
+            ),
+          );
         } else if (type == 'puzzle') {
           _controller?.add(GeneratorPuzzleMessage(message['line'] as String));
         } else if (type == 'done') {
@@ -190,18 +204,12 @@ void _isolateEntryPoint(_IsolateParams params) {
 
       if (line != null) {
         generated++;
-        params.sendPort.send({
-          'type': 'puzzle',
-          'line': line,
-        });
+        params.sendPort.send({'type': 'puzzle', 'line': line});
       }
     } catch (e) {
       // Generation failed for this attempt, retry
     }
   }
 
-  params.sendPort.send({
-    'type': 'done',
-    'generated': generated,
-  });
+  params.sendPort.send({'type': 'done', 'generated': generated});
 }

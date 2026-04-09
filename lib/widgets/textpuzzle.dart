@@ -26,7 +26,9 @@ class _TextpuzzleWidgetState extends State<TextpuzzleWidget> {
   }
 
   Future<void> loadText() async {
-    final markdown = await rootBundle.loadString('assets/TX/${widget.locale}/${widget.textName}.md');
+    final markdown = await rootBundle.loadString(
+      'assets/TX/${widget.locale}/${widget.textName}.md',
+    );
     setState(() {
       content = Markdown.fromString(markdown);
     });
@@ -36,12 +38,13 @@ class _TextpuzzleWidgetState extends State<TextpuzzleWidget> {
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 500
-        ),
+        constraints: BoxConstraints(maxWidth: 500),
         child: Container(
           padding: const EdgeInsets.all(8),
-          child: MarkdownTheme(data: mdTheme, child: MarkdownWidget(markdown: content))
+          child: MarkdownTheme(
+            data: mdTheme,
+            child: MarkdownWidget(markdown: content),
+          ),
         ),
       ),
     );

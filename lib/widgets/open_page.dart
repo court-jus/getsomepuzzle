@@ -25,7 +25,6 @@ class OpenPage extends StatefulWidget {
 class _OpenPageState extends State<OpenPage> {
   int matchingCount = 0;
   String collection = "tutorial";
-  
 
   static const List<(String, String)> existingRules = [
     ("LT", "Letter"),
@@ -228,12 +227,17 @@ class _OpenPageState extends State<OpenPage> {
     final file = result.files.first;
     if (file.path == null) return;
     final content = await java_io.File(file.path!).readAsString();
-    final lines = content.split('\n').where((l) => l.trim().isNotEmpty && !l.startsWith('#')).toList();
+    final lines = content
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty && !l.startsWith('#'))
+        .toList();
     if (lines.isEmpty) return;
     if (!mounted) return;
 
     // Ask for playlist name
-    final controller = TextEditingController(text: file.name.replaceAll('.txt', ''));
+    final controller = TextEditingController(
+      text: file.name.replaceAll('.txt', ''),
+    );
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -297,25 +301,37 @@ class _OpenPageState extends State<OpenPage> {
                               value: collection,
                               items: [
                                 for (final item in widget.database.collections)
-                                  DropdownMenuItem(value: item.$1, child: item.$2),
+                                  DropdownMenuItem(
+                                    value: item.$1,
+                                    child: item.$2,
+                                  ),
                               ],
                               onChanged: (newValue) =>
                                   chooseCollection(newValue ?? "tutorial"),
                             ),
                             IconButton(
                               icon: const Icon(Icons.add),
-                              tooltip: AppLocalizations.of(context)!.createPlaylist,
+                              tooltip: AppLocalizations.of(
+                                context,
+                              )!.createPlaylist,
                               onPressed: _showCreatePlaylistDialog,
                             ),
                             IconButton(
                               icon: const Icon(Icons.file_open),
-                              tooltip: AppLocalizations.of(context)!.importPlaylist,
+                              tooltip: AppLocalizations.of(
+                                context,
+                              )!.importPlaylist,
                               onPressed: _importPlaylistFromFile,
                             ),
                             if (collection.startsWith('user_'))
                               IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                tooltip: AppLocalizations.of(context)!.deletePlaylist,
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                tooltip: AppLocalizations.of(
+                                  context,
+                                )!.deletePlaylist,
                                 onPressed: _deleteCurrentPlaylist,
                               ),
                           ],
@@ -493,9 +509,7 @@ class _OpenPageState extends State<OpenPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          AppLocalizations.of(context)!.labelWidgetCplx,
-                        ),
+                        Text(AppLocalizations.of(context)!.labelWidgetCplx),
                         PlusMinusField(
                           onChanged: (minValue, maxValue) {
                             final value = RangeValues(

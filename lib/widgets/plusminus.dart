@@ -106,7 +106,8 @@ class _PlusMinusFieldState extends State<PlusMinusField> {
           ),
         ),
         SizedBox(
-          width: _textWidth('100 ⇔ 100', DefaultTextStyle.of(context).style) + 8,
+          width:
+              _textWidth('100 ⇔ 100', DefaultTextStyle.of(context).style) + 8,
           child: Text("$minValue ⇔ $maxValue", textAlign: TextAlign.center),
         ),
         Focus(
@@ -130,7 +131,10 @@ class _PlusMinusFieldState extends State<PlusMinusField> {
             descendantsAreFocusable: false,
             canRequestFocus: false,
             child: IconButton(
-              icon: Icon(Icons.restart_alt, color: isDefault ? Colors.grey : Colors.blue),
+              icon: Icon(
+                Icons.restart_alt,
+                color: isDefault ? Colors.grey : Colors.blue,
+              ),
               onPressed: isDefault ? null : _reset,
             ),
           ),

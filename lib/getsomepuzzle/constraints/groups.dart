@@ -31,7 +31,10 @@ class GroupSize extends CellsCentricConstraint {
   }
 
   static List<String> generateAllParameters(int width, int height) {
-    final maxSize = min(_maxGroupSizeAbsolute, max(1, (width * height * _maxGroupSizeRatio).toInt()));
+    final maxSize = min(
+      _maxGroupSizeAbsolute,
+      max(1, (width * height * _maxGroupSizeRatio).toInt()),
+    );
     final List<String> result = [];
     for (int idx = 0; idx < width * height; idx++) {
       for (int size = 1; size < maxSize; size++) {
@@ -103,10 +106,12 @@ class GroupSize extends CellsCentricConstraint {
       // then add a boundary in that direction, it is forbidden to grow there
       final margin = size - myGroup.length;
       final sameColorGroupCells = groups
-          .where((grp) =>
-              grp.any((cell) => puzzle.cellValues[cell] == myColor) &&
-              !grp.any((cell) => myGroup.contains(cell)) &&
-              grp.length >= margin)
+          .where(
+            (grp) =>
+                grp.any((cell) => puzzle.cellValues[cell] == myColor) &&
+                !grp.any((cell) => myGroup.contains(cell)) &&
+                grp.length >= margin,
+          )
           .expand((grp) => grp)
           .toSet();
       for (final boundary in groupFreeNeighbors) {

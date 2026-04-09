@@ -5,12 +5,17 @@ import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 void main() {
   test('Compute complexity for try_me sample and generate report', () {
     final file = File('assets/try_me.txt');
-    final lines = file.readAsLinesSync().where((l) => l.trim().isNotEmpty).toList();
+    final lines = file
+        .readAsLinesSync()
+        .where((l) => l.trim().isNotEmpty)
+        .toList();
 
     final report = StringBuffer();
     report.writeln('# Complexity Comparison Report');
     report.writeln('');
-    report.writeln('Sample of ${lines.length} puzzles from default.txt with computed complexity.');
+    report.writeln(
+      'Sample of ${lines.length} puzzles from default.txt with computed complexity.',
+    );
     report.writeln('');
     report.writeln('## Formula');
     report.writeln('');
@@ -20,13 +25,21 @@ void main() {
     report.writeln('');
     report.writeln('Where:');
     report.writeln('- `total_free_cells` = grid size minus pre-filled cells');
-    report.writeln('- `cells_by_force` = cells that could NOT be determined by constraint propagation alone');
-    report.writeln('- If the puzzle requires backtracking (force insufficient): new_cplx = 100');
+    report.writeln(
+      '- `cells_by_force` = cells that could NOT be determined by constraint propagation alone',
+    );
+    report.writeln(
+      '- If the puzzle requires backtracking (force insufficient): new_cplx = 100',
+    );
     report.writeln('');
     report.writeln('## Detailed Results');
     report.writeln('');
-    report.writeln('| # | Dims | Old | New | Free | Prop | Force | BT | Detail |');
-    report.writeln('|---|------|-----|-----|------|------|-------|----|--------|');
+    report.writeln(
+      '| # | Dims | Old | New | Free | Prop | Force | BT | Detail |',
+    );
+    report.writeln(
+      '|---|------|-----|-----|------|------|-------|----|--------|',
+    );
 
     int idx = 0;
     for (final line in lines) {
@@ -74,7 +87,9 @@ void main() {
       final bt = needsBT ? 'Y' : '';
       final detail = 'size=$size pf=$prefilled';
 
-      report.writeln('| $idx | $dims | $oldCplx | $newCplx | $totalFree | $cellsByProp | $cellsByForce | $bt | $detail |');
+      report.writeln(
+        '| $idx | $dims | $oldCplx | $newCplx | $totalFree | $cellsByProp | $cellsByForce | $bt | $detail |',
+      );
     }
 
     // Summary statistics
@@ -96,19 +111,34 @@ void main() {
     final brackets = <String, List<int>>{};
     for (final (old, newC) in pairs) {
       String bracket;
-      if (old == 0) bracket = '0';
-      else if (old <= 2) bracket = '1-2';
-      else if (old <= 5) bracket = '3-5';
-      else if (old <= 12) bracket = '6-12';
-      else if (old <= 25) bracket = '13-25';
-      else if (old <= 50) bracket = '26-50';
-      else bracket = '51-100';
+      if (old == 0) {
+        bracket = '0';
+      } else if (old <= 2)
+        bracket = '1-2';
+      else if (old <= 5)
+        bracket = '3-5';
+      else if (old <= 12)
+        bracket = '6-12';
+      else if (old <= 25)
+        bracket = '13-25';
+      else if (old <= 50)
+        bracket = '26-50';
+      else
+        bracket = '51-100';
       brackets.putIfAbsent(bracket, () => []).add(newC);
     }
 
     report.writeln('| Old bracket | Avg new | Min new | Max new | Count |');
     report.writeln('|-------------|---------|---------|---------|-------|');
-    for (final bracket in ['0', '1-2', '3-5', '6-12', '13-25', '26-50', '51-100']) {
+    for (final bracket in [
+      '0',
+      '1-2',
+      '3-5',
+      '6-12',
+      '13-25',
+      '26-50',
+      '51-100',
+    ]) {
       final vals = brackets[bracket];
       if (vals == null) continue;
       final avg = (vals.reduce((a, b) => a + b) / vals.length).round();

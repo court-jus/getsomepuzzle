@@ -11,7 +11,8 @@ class StatEntry {
   final int? pleasure;
 
   @override
-  String toString() => '${finished ?? "unfinished"} ${duration}s ${failures}f $puzzleLine';
+  String toString() =>
+      '${finished ?? "unfinished"} ${duration}s ${failures}f $puzzleLine';
 
   const StatEntry({
     required this.finished,

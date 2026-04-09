@@ -22,7 +22,9 @@ void main() {
     });
 
     test('parses unfinished puzzles', () {
-      final entry = StatEntry.parse('unfinished 0s 0f v2_12_3x3_000_FM:12_0:0_0 - ___');
+      final entry = StatEntry.parse(
+        'unfinished 0s 0f v2_12_3x3_000_FM:12_0:0_0 - ___',
+      );
       expect(entry, isNotNull);
       expect(entry!.finished, isNull);
     });
@@ -58,7 +60,11 @@ void main() {
         '2025-01-01T10:02:00 30s 1f puzzle_medium - ___',
       ]);
       // puzzle_easy: level=5, puzzle_medium: level=60, puzzle_hard: level=120
-      expect(sortPuzzlesByDifficulty(stats), ['puzzle_easy', 'puzzle_medium', 'puzzle_hard']);
+      expect(sortPuzzlesByDifficulty(stats), [
+        'puzzle_easy',
+        'puzzle_medium',
+        'puzzle_hard',
+      ]);
     });
   });
 }

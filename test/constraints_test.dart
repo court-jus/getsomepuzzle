@@ -189,7 +189,9 @@ void main() {
     test('excludes specified indices', () {
       // Exclude cells 0 and 1: no constraint can reference them
       final params = DifferentFromConstraint.generateAllParameters(
-        2, 2, excludedIndices: {0, 1},
+        2,
+        2,
+        excludedIndices: {0, 1},
       );
       expect(params.contains('0.right'), isFalse);
       expect(params.contains('0.down'), isFalse);

@@ -22,7 +22,9 @@ void main() {
       for (int i = 0; i < size; i++) {
         solved.cells[i].setForSolver(domain[rng.nextInt(2)]);
       }
-      print('\n=== Attempt $attempt: solution=${solved.cellValues}, prefilled=$prefilled ===');
+      print(
+        '\n=== Attempt $attempt: solution=${solved.cellValues}, prefilled=$prefilled ===',
+      );
 
       final pu = Puzzle.empty(width, height, domain);
       final indices = List.generate(size, (i) => i)..shuffle(rng);
@@ -34,7 +36,11 @@ void main() {
 
       // Generate constraints
       final List<Constraint> all = [];
-      for (final p in ForbiddenMotif.generateAllParameters(width, height, domain)) {
+      for (final p in ForbiddenMotif.generateAllParameters(
+        width,
+        height,
+        domain,
+      )) {
         final c = ForbiddenMotif(p);
         if (c.verify(solved)) all.add(c);
       }
@@ -46,7 +52,11 @@ void main() {
         final c = GroupSize(p);
         if (c.verify(solved)) all.add(c);
       }
-      for (final p in QuantityConstraint.generateAllParameters(width, height, domain)) {
+      for (final p in QuantityConstraint.generateAllParameters(
+        width,
+        height,
+        domain,
+      )) {
         final c = QuantityConstraint(p);
         if (c.verify(solved)) all.add(c);
       }
@@ -64,7 +74,9 @@ void main() {
       // Try solving with just first constraint
       var test = pu.clone();
       test.solve();
-      print('After first constraint solve: ratio=${test.computeRatio()}, cells=${test.cellValues}');
+      print(
+        'After first constraint solve: ratio=${test.computeRatio()}, cells=${test.cellValues}',
+      );
 
       // Generator loop
       double bestRatio = 1.0;

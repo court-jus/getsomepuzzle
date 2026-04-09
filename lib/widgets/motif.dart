@@ -28,10 +28,7 @@ class MotifWidget extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: bgColor,
-        border: BoxBorder.all(
-          color: borderColor,
-          width: isHighlighted ? 8 : 4,
-        ),
+        border: BoxBorder.all(color: borderColor, width: isHighlighted ? 8 : 4),
       ),
       child: SizedBox(
         width: cellSize,

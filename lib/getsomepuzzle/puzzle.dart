@@ -624,16 +624,19 @@ class Puzzle {
     } on SolverContradiction {
       return false;
     }
-    if (freeCells().isEmpty)
+    if (freeCells().isEmpty) {
       return complete && check(saveResult: false).isEmpty;
+    }
     for (int step = 0; step < maxSteps; step++) {
       try {
         final forceChanged = applyWithForce();
-        if (freeCells().isEmpty)
+        if (freeCells().isEmpty) {
           return complete && check(saveResult: false).isEmpty;
+        }
         final propChanges = applyConstraintsPropagation();
-        if (freeCells().isEmpty)
+        if (freeCells().isEmpty) {
           return complete && check(saveResult: false).isEmpty;
+        }
         if (!forceChanged && propChanges == 0) break;
       } on SolverContradiction {
         return false;

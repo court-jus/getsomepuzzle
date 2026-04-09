@@ -91,7 +91,12 @@ void main() {
 
   test('generateOne produces a 3x3 puzzle', () {
     final result = PuzzleGenerator.generateOne(
-      GeneratorConfig(width: 3, height: 3, count: 1, maxTime: Duration(seconds: 5)),
+      GeneratorConfig(
+        width: 3,
+        height: 3,
+        count: 1,
+        maxTime: Duration(seconds: 5),
+      ),
     );
     print('generateOne result: $result');
     if (result != null) {

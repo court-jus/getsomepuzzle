@@ -131,7 +131,9 @@ class _MyHomePageState extends State<MyHomePage> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("${currentPuzzle!.width}x${currentPuzzle!.height} (${currentPuzzle!.width * currentPuzzle!.height}) "),
+              Text(
+                "${currentPuzzle!.width}x${currentPuzzle!.height} (${currentPuzzle!.width * currentPuzzle!.height}) ",
+              ),
               FaIcon(FontAwesomeIcons.brain, size: 12),
               Text(" ${currentMeta!.cplx}"),
             ],
@@ -299,9 +301,9 @@ class _MyHomePageState extends State<MyHomePage> {
       } else {
         helpMove!.givenBy.isHighlighted = true;
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-        hintText = AppLocalizations.of(context)!.hintDeducedFrom(
-          _constraintName(helpMove!.givenBy),
-        );
+        hintText = AppLocalizations.of(
+          context,
+        )!.hintDeducedFrom(_constraintName(helpMove!.givenBy));
         hintIsError = false;
       }
     });

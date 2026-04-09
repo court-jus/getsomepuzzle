@@ -46,7 +46,10 @@ class ParityConstraint extends CellsCentricConstraint {
       if (rightSize % 2 == 0 && rightSize > 0) {
         result.add('$idx.right');
       }
-      if (leftSize % 2 == 0 && rightSize % 2 == 0 && rightSize > 0 && leftSize > 0) {
+      if (leftSize % 2 == 0 &&
+          rightSize % 2 == 0 &&
+          rightSize > 0 &&
+          leftSize > 0) {
         result.add('$idx.horizontal');
       }
       if (topSize % 2 == 0 && topSize > 0) {
@@ -55,7 +58,10 @@ class ParityConstraint extends CellsCentricConstraint {
       if (bottomSize % 2 == 0 && bottomSize > 0) {
         result.add('$idx.bottom');
       }
-      if (topSize % 2 == 0 && bottomSize % 2 == 0 && bottomSize > 0 && topSize > 0) {
+      if (topSize % 2 == 0 &&
+          bottomSize % 2 == 0 &&
+          bottomSize > 0 &&
+          topSize > 0) {
         result.add('$idx.vertical');
       }
     }

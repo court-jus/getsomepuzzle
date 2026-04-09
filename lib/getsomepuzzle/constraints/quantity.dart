@@ -21,7 +21,11 @@ class QuantityConstraint extends Constraint {
     return "$value = $count";
   }
 
-  static List<String> generateAllParameters(int width, int height, List<int> domain) {
+  static List<String> generateAllParameters(
+    int width,
+    int height,
+    List<int> domain,
+  ) {
     final maxCount = width * height - 1;
     final List<String> result = [];
     for (int count = 1; count < maxCount; count++) {

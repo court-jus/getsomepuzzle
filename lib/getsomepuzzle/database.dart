@@ -239,11 +239,16 @@ class Database {
       await prefs.remove('playlist_${slug}_puzzles');
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
-      final filePath = p.join(documentsDirectory.path, 'getsomepuzzle', 'playlist_$slug.txt');
+      final filePath = p.join(
+        documentsDirectory.path,
+        'getsomepuzzle',
+        'playlist_$slug.txt',
+      );
       final file = File(filePath);
       if (await file.exists()) await file.delete();
     }
   }
+
   void load(List<String> lines) {
     puzzles = lines
         .where((e) => e.isNotEmpty && !e.startsWith("#"))
@@ -466,7 +471,11 @@ class Database {
       return lines.join('\n');
     }
     final documentsDirectory = await getApplicationDocumentsDirectory();
-    final filePath = p.join(documentsDirectory.path, 'getsomepuzzle', _playlistFileName(slug));
+    final filePath = p.join(
+      documentsDirectory.path,
+      'getsomepuzzle',
+      _playlistFileName(slug),
+    );
     final file = File(filePath);
     if (await file.exists()) {
       return await file.readAsString();
@@ -479,7 +488,9 @@ class Database {
       addToPlaylist('custom', puzzleLine);
 
   Future<void> addToPlaylist(String collectionKey, String puzzleLine) async {
-    final slug = collectionKey == 'custom' ? 'custom' : collectionKey.replaceFirst('user_', '');
+    final slug = collectionKey == 'custom'
+        ? 'custom'
+        : collectionKey.replaceFirst('user_', '');
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
       final lines = prefs.getStringList(_playlistPrefsKey(slug)) ?? [];
@@ -495,8 +506,13 @@ class Database {
     }
   }
 
-  Future<void> deleteFromPlaylist(String collectionKey, String puzzleLine) async {
-    final slug = collectionKey == 'custom' ? 'custom' : collectionKey.replaceFirst('user_', '');
+  Future<void> deleteFromPlaylist(
+    String collectionKey,
+    String puzzleLine,
+  ) async {
+    final slug = collectionKey == 'custom'
+        ? 'custom'
+        : collectionKey.replaceFirst('user_', '');
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
       final lines = prefs.getStringList(_playlistPrefsKey(slug)) ?? [];
@@ -504,19 +520,32 @@ class Database {
       await prefs.setStringList(_playlistPrefsKey(slug), lines);
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
-      final filePath = p.join(documentsDirectory.path, 'getsomepuzzle', _playlistFileName(slug));
+      final filePath = p.join(
+        documentsDirectory.path,
+        'getsomepuzzle',
+        _playlistFileName(slug),
+      );
       final file = File(filePath);
       if (await file.exists()) {
         final content = await file.readAsString();
-        final lines = content.split('\n').where((l) => l.trim() != puzzleLine.trim()).toList();
+        final lines = content
+            .split('\n')
+            .where((l) => l.trim() != puzzleLine.trim())
+            .toList();
         await file.writeAsString(lines.join('\n'), mode: FileMode.writeOnly);
       }
     }
   }
 
   /// Import puzzle lines from a file's content into a playlist.
-  Future<void> importToPlaylist(String collectionKey, String fileContent) async {
-    final lines = fileContent.split('\n').where((l) => l.trim().isNotEmpty && !l.startsWith('#')).toList();
+  Future<void> importToPlaylist(
+    String collectionKey,
+    String fileContent,
+  ) async {
+    final lines = fileContent
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty && !l.startsWith('#'))
+        .toList();
     for (final line in lines) {
       await addToPlaylist(collectionKey, line.trim());
     }

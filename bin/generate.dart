@@ -29,7 +29,8 @@ void _runGenerate(Map<String, dynamic> parsed) {
   final maxHeight = parsed['maxHeight'] as int;
   final output = parsed['output'] as String?;
   final bannedRules = (parsed['banned'] as String?)?.split(',').toSet() ?? {};
-  final requiredRules = (parsed['required'] as String?)?.split(',').toSet() ?? {};
+  final requiredRules =
+      (parsed['required'] as String?)?.split(',').toSet() ?? {};
 
   final rng = Random();
   IOSink? sink;
@@ -45,10 +46,14 @@ void _runGenerate(Map<String, dynamic> parsed) {
 
   void finish() {
     stderr.writeln('');
-    stderr.writeln('Done: $generated puzzles in ${_fmt(totalSw.elapsed)} ($attempts attempts)');
+    stderr.writeln(
+      'Done: $generated puzzles in ${_fmt(totalSw.elapsed)} ($attempts attempts)',
+    );
     if (durations.isNotEmpty) {
-      stderr.writeln('  avg: ${_avgMs(durations)}ms, median: ${_medianMs(durations)}ms, '
-          'min: ${durations.reduce(min)}ms, max: ${durations.reduce(max)}ms');
+      stderr.writeln(
+        '  avg: ${_avgMs(durations)}ms, median: ${_medianMs(durations)}ms, '
+        'min: ${durations.reduce(min)}ms, max: ${durations.reduce(max)}ms',
+      );
     }
     sink?.close();
   }
@@ -63,7 +68,10 @@ void _runGenerate(Map<String, dynamic> parsed) {
     final width = minWidth + rng.nextInt(maxWidth - minWidth + 1);
     final height = minHeight + rng.nextInt(maxHeight - minHeight + 1);
 
-    if (!puzzleSw.isRunning) puzzleSw..reset()..start();
+    if (!puzzleSw.isRunning)
+      puzzleSw
+        ..reset()
+        ..start();
 
     final config = GeneratorConfig(
       width: width,
@@ -117,7 +125,10 @@ void _runCheck(String filePath) {
     stderr.writeln('File not found: $filePath');
     exit(1);
   }
-  final lines = file.readAsLinesSync().where((l) => l.trim().isNotEmpty && !l.startsWith('#')).toList();
+  final lines = file
+      .readAsLinesSync()
+      .where((l) => l.trim().isNotEmpty && !l.startsWith('#'))
+      .toList();
   stderr.writeln('Checking ${lines.length} puzzles from $filePath...');
 
   int valid = 0;
@@ -133,7 +144,7 @@ void _runCheck(String filePath) {
         valid++;
       } else {
         invalid++;
-        stderr.writeln('  INVALID (${solutions} solutions): $line');
+        stderr.writeln('  INVALID ($solutions solutions): $line');
       }
     } catch (e) {
       invalid++;
@@ -145,7 +156,9 @@ void _runCheck(String filePath) {
   }
 
   stderr.writeln('');
-  stderr.writeln('Done in ${_fmt(sw.elapsed)}: $valid valid, $invalid invalid out of ${lines.length}');
+  stderr.writeln(
+    'Done in ${_fmt(sw.elapsed)}: $valid valid, $invalid invalid out of ${lines.length}',
+  );
   if (invalid > 0) exit(1);
 }
 
@@ -180,8 +193,12 @@ void _runReadStats(String dirPath) {
   if (sorted.isNotEmpty) {
     final easiest = stats[sorted.first]!;
     final hardest = stats[sorted.last]!;
-    stderr.writeln('  easiest: level ${easiest.level} (${easiest.total} plays)');
-    stderr.writeln('  hardest: level ${hardest.level} (${hardest.total} plays)');
+    stderr.writeln(
+      '  easiest: level ${easiest.level} (${easiest.total} plays)',
+    );
+    stderr.writeln(
+      '  hardest: level ${hardest.level} (${hardest.total} plays)',
+    );
   }
 }
 

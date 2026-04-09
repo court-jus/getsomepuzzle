@@ -43,10 +43,13 @@ class CellWidget extends StatelessWidget {
   final ValueChanged<Offset> onDrag;
   final VoidCallback onDragEnd;
   final double cellSize;
+
   /// Custom border color (overrides default when set)
   final Color? borderColor;
+
   /// Custom border width (overrides default when set)
   final double? borderWidth;
+
   /// If set, draws a small colored triangle in the top-left corner
   final int? cornerIndicatorValue;
 
@@ -97,7 +100,9 @@ class CellWidget extends StatelessWidget {
           color: color,
           border: BoxBorder.all(
             width: borderWidth ?? ((readonly || isHighlighted) ? 6 : 1),
-            color: borderColor ?? (isHighlighted ? highlightColor : Colors.blueAccent),
+            color:
+                borderColor ??
+                (isHighlighted ? highlightColor : Colors.blueAccent),
           ),
         ),
         child: SizedBox(
@@ -113,7 +118,9 @@ class CellWidget extends StatelessWidget {
                   child: CustomPaint(
                     size: Size(cellSize * 0.4, cellSize * 0.4),
                     painter: _CornerTrianglePainter(
-                      color: cornerIndicatorValue == 1 ? Colors.black : Colors.white,
+                      color: cornerIndicatorValue == 1
+                          ? Colors.black
+                          : Colors.white,
                       borderColor: Colors.grey,
                     ),
                   ),
