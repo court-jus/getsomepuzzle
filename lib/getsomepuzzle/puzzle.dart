@@ -562,12 +562,23 @@ class Puzzle {
 
   /// Step-by-step solving trace, returning each deduction made.
   /// Does not modify the puzzle — works on a clone.
-  List<SolveStep> solveExplained() {
+  /// If [timeoutMs] is provided, stops after that many milliseconds.
+  List<SolveStep> solveExplained({int? timeoutMs}) {
     final steps = <SolveStep>[];
     final test = clone();
+    Stopwatch? stopwatch;
+    final timeout = timeoutMs;
+    if (timeout != null) {
+      stopwatch = Stopwatch()..start();
+    }
 
     // Propagation phase
     while (true) {
+      if (timeout != null &&
+          stopwatch != null &&
+          stopwatch.elapsedMilliseconds > timeout) {
+        return [];
+      }
       final move = test.apply();
       if (move == null) break;
       if (move.isImpossible != null) break;
@@ -580,11 +591,18 @@ class Puzzle {
           method: SolveMethod.propagation,
         ),
       );
-      if (test.complete) return steps;
+      if (test.complete) {
+        return steps;
+      }
     }
 
     // Force + propagation loop
     for (int round = 0; round < 200; round++) {
+      if (timeout != null &&
+          stopwatch != null &&
+          stopwatch.elapsedMilliseconds > timeout) {
+        return [];
+      }
       // Force one cell
       final beforeForce = test.freeCells().map((e) => e.$2).toSet();
       try {
@@ -605,10 +623,17 @@ class Puzzle {
           ),
         );
       }
-      if (test.complete) return steps;
+      if (test.complete) {
+        return steps;
+      }
 
       // Propagate after force
       while (true) {
+        if (timeout != null &&
+            stopwatch != null &&
+            stopwatch.elapsedMilliseconds > timeout) {
+          return [];
+        }
         final move = test.apply();
         if (move == null) break;
         if (move.isImpossible != null) break;
@@ -621,7 +646,9 @@ class Puzzle {
             method: SolveMethod.propagation,
           ),
         );
-        if (test.complete) return steps;
+        if (test.complete) {
+          return steps;
+        }
       }
     }
 

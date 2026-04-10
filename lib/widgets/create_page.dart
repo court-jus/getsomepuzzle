@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
@@ -110,13 +111,16 @@ class _CreatePageState extends State<CreatePage> {
 
   void _scheduleAutoSolve() {
     _solveDebounce?.cancel();
-    _solveDebounce = Timer(const Duration(milliseconds: 500), _autoSolve);
+    _solveDebounce = Timer(const Duration(milliseconds: 500), () {
+      _autoSolve();
+    });
   }
 
-  void _autoSolve() {
+  Future<void> _autoSolve() async {
     if (!mounted) return;
     final puzzle = _buildPuzzle();
-    final steps = puzzle.solveExplained();
+    final steps = await compute(_solvePuzzle, puzzle);
+    if (!mounted) return;
     final propCells = <int>{};
     final frcCells = <int>{};
     final values = <int, int>{};
@@ -134,6 +138,10 @@ class _CreatePageState extends State<CreatePage> {
       _solvedValues = values;
       _autoComplexity = puzzle.computeComplexity();
     });
+  }
+
+  static List<SolveStep> _solvePuzzle(Puzzle puzzle) {
+    return puzzle.solveExplained(timeoutMs: 10000);
   }
 
   void _addConstraint(Constraint c) {
