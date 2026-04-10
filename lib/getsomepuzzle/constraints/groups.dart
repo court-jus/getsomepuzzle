@@ -73,10 +73,27 @@ class GroupSize extends CellsCentricConstraint {
   Move? apply(Puzzle puzzle) {
     final groups = puzzle.getGroups();
     final idx = indices[0];
-    final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
-    if (myGroup == null) return null;
-    final myColor = puzzle.cellValues[myGroup.first];
+    final myColor = puzzle.cellValues[idx];
     final myOpposite = puzzle.domain.whereNot((v) => v == myColor).first;
+    final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
+    if (myColor == 0) {
+      final neighbors = puzzle.getNeighbors(idx);
+      for (var neighbor in neighbors) {
+        final neighborGroup = groups.firstWhereOrNull(
+          (grp) => grp.contains(neighbor),
+        );
+        if (neighborGroup != null && neighborGroup.length >= size) {
+          final neighborColor = puzzle.cellValues[neighbor];
+          if (neighborColor != 0) {
+            final oppositeColor = puzzle.domain
+                .whereNot((v) => v == neighborColor)
+                .first;
+            return Move(idx, oppositeColor, this);
+          }
+        }
+      }
+    }
+    if (myGroup == null) return null;
     if (myGroup.length == size) {
       // My group is finished, we can fill the neighbors
       for (var member in myGroup) {
