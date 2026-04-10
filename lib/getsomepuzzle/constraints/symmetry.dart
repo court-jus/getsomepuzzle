@@ -81,9 +81,9 @@ class SymmetryConstraint extends CellsCentricConstraint {
       for (var neighbor in neighbors) {
         if (puzzle.cellValues[neighbor] == myOpposite) {
           // This cell is filled with my opposite color
-          // so its symmetry should be myOpposite too (if it exists)
+          // so its symmetry should be myOpposite too (if it exists and is free)
           final sym = _computeSymmetry(puzzle, neighbor);
-          if (sym != null) {
+          if (sym != null && puzzle.cellValues[sym] == 0) {
             return Move(sym, myOpposite, this);
           }
         } else if (puzzle.cellValues[neighbor] == 0) {
