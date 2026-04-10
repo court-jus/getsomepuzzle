@@ -38,11 +38,23 @@ void _runGenerate(Map<String, dynamic> parsed) {
     sink = File(output).openWrite(mode: FileMode.append);
   }
 
+  // Load existing collection stats if output file exists
+  final usageStats = <String, int>{};
+  if (output != null && File(output).existsSync()) {
+    final existing = File(output).readAsLinesSync();
+    usageStats.addAll(PuzzleGenerator.computeUsageStats(existing));
+    stderr.writeln(
+      'Loaded ${existing.where((l) => l.trim().isNotEmpty).length} existing puzzles',
+    );
+    _printHistogram(usageStats);
+  }
+
   int generated = 0;
   int attempts = 0;
   final totalSw = Stopwatch()..start();
   final puzzleSw = Stopwatch();
   final durations = <int>[];
+  int histLines = 0; // number of histogram lines currently displayed
 
   void finish() {
     stderr.writeln('');
@@ -68,10 +80,11 @@ void _runGenerate(Map<String, dynamic> parsed) {
     final width = minWidth + rng.nextInt(maxWidth - minWidth + 1);
     final height = minHeight + rng.nextInt(maxHeight - minHeight + 1);
 
-    if (!puzzleSw.isRunning)
+    if (!puzzleSw.isRunning) {
       puzzleSw
         ..reset()
         ..start();
+    }
 
     final config = GeneratorConfig(
       width: width,
@@ -83,6 +96,7 @@ void _runGenerate(Map<String, dynamic> parsed) {
 
     final line = PuzzleGenerator.generateOne(
       config,
+      usageStats: usageStats,
       onProgress: (p) {
         stderr.write(
           '\r[${_fmt(totalSw.elapsed)}] $generated/$count '
@@ -105,16 +119,54 @@ void _runGenerate(Map<String, dynamic> parsed) {
         stdout.writeln(line);
       }
 
-      stderr.write(
-        '\r[${_fmt(totalSw.elapsed)}] $generated/$count '
-        '| avg ${_avgMs(durations)}ms, med ${_medianMs(durations)}ms'
-        '                                        \n',
+      // Update usage stats with the new puzzle
+      final newSlugs = line
+          .split('_')[4]
+          .split(';')
+          .map((c) => c.split(':').first)
+          .where((s) => s.isNotEmpty)
+          .toSet();
+      for (final slug in newSlugs) {
+        usageStats[slug] = (usageStats[slug] ?? 0) + 1;
+      }
+
+      // Clear previous histogram + progress line
+      if (histLines > 0) {
+        stderr.write('\x1B[${histLines + 1}A\x1B[J');
+      } else {
+        stderr.write('\r\x1B[K');
+      }
+
+      // Progress line
+      stderr.writeln(
+        '[${_fmt(totalSw.elapsed)}] $generated/$count '
+        '| avg ${_avgMs(durations)}ms, med ${_medianMs(durations)}ms',
       );
+
+      // Histogram
+      histLines = _printHistogram(usageStats);
     }
   }
 
   sigintSub.cancel();
   finish();
+}
+
+int _printHistogram(Map<String, int> stats) {
+  if (stats.isEmpty) return 0;
+  final sorted = stats.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  final maxVal = sorted.first.value;
+  const barWidth = 30;
+  int lines = 0;
+  for (final entry in sorted) {
+    final bar = maxVal > 0
+        ? '█' * ((entry.value / maxVal * barWidth).round())
+        : '';
+    stderr.writeln('  ${entry.key.padRight(3)} $bar ${entry.value}');
+    lines++;
+  }
+  return lines;
 }
 
 // --- Check mode ---

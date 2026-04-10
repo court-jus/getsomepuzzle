@@ -14,7 +14,7 @@ Si estás atascado, el ícono de la papelera restablece el rompecabezas a su est
 
 Mientras juegas, tu tiempo se registra (ver la sección de Estadísticas más abajo). Si lo necesitas, el juego se puede pausar y reanudar.
 
-Hay unos 5.000 rompecabezas incluidos en la aplicación. Cada vez que abras la aplicación, la colección se baraja y obtendrás rompecabezas aleatorios. Los rompecabezas que ya resolviste no volverán a aparecer, y verás tu progreso debajo del rompecabezas.
+Hay unos 10.000 rompecabezas incluidos en la aplicación. Cada vez que abras la aplicación, la colección se baraja y obtendrás rompecabezas aleatorios. Los rompecabezas que ya resolviste no volverán a aparecer, y verás tu progreso debajo del rompecabezas.
 
 ## Restricciones
 
@@ -50,16 +50,17 @@ Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores dif
 
 ## Puzzles personalizados
 
-Puedes generar tus propios puzzles directamente desde la aplicación. Abre el menú y toca "Generar" para acceder al generador de puzzles.
+### Generar puzzles
 
-El generador te permite elegir:
-- **Tamaño de la cuadrícula**: ancho y alto (3 a 10)
-- **Reglas obligatorias**: tipos de restricciones que deben aparecer en el puzzle
-- **Reglas excluidas**: tipos de restricciones que no deben aparecer
-- **Tiempo máximo**: cuánto tiempo dedicar a la generación
-- **Número de puzzles**: cuántos crear de una vez
+Abre el menú y toca "Generar" para acceder al generador. Puedes elegir el tamaño de la cuadrícula, qué tipos de restricciones incluir o excluir, y cuántos puzzles generar. También puedes elegir en qué playlist guardarlos.
 
-Los puzzles generados se guardan en la colección "Custom", seleccionable desde la página Abrir. Esta colección se almacena localmente en tu dispositivo y se mantiene entre sesiones.
+### Crear puzzles
+
+Abre el menú y toca "Crear" para diseñar tu propio puzzle. Puedes definir las dimensiones, fijar colores de celdas, agregar restricciones, y el editor te mostrará en tiempo real qué celdas son deducibles. Los bordes verdes indican deducción directa, los bordes naranjas indican deducción por eliminación.
+
+### Playlists
+
+Los puzzles generados y creados se guardan en playlists. La playlist por defecto es "Mis puzzles", pero puedes crear nuevas desde la página Abrir. También puedes importar puzzles desde un archivo.
 
 ## Estadísticas
 

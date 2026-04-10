@@ -1,10 +1,11 @@
 import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
@@ -48,11 +49,32 @@ class PuzzleGenerator {
   static final _rng = Random();
   static const _defaultDomain = [1, 2];
 
+  /// Count how many puzzles use each constraint type in a collection.
+  /// Each type is counted at most once per puzzle.
+  static Map<String, int> computeUsageStats(List<String> puzzleLines) {
+    final stats = {for (final s in constraintSlugs) s: 0};
+    for (final line in puzzleLines) {
+      if (line.trim().isEmpty || line.startsWith('#')) continue;
+      final fields = line.split('_');
+      if (fields.length < 5) continue;
+      final slugs = fields[4]
+          .split(';')
+          .map((c) => c.split(':').first)
+          .where((s) => s.isNotEmpty)
+          .toSet();
+      for (final slug in slugs) {
+        stats[slug] = (stats[slug] ?? 0) + 1;
+      }
+    }
+    return stats;
+  }
+
   /// Attempt to generate a single puzzle. Returns the line representation or null on failure.
   static String? generateOne(
     GeneratorConfig config, {
     void Function(GeneratorProgress)? onProgress,
     bool Function()? shouldStop,
+    Map<String, int>? usageStats,
   }) {
     final width = config.width;
     final height = config.height;
@@ -103,7 +125,7 @@ class PuzzleGenerator {
         excludedIndices: slug == 'DF' ? readonlyIndices : null,
       );
       for (final param in params) {
-        final constraint = _createConstraint(slug, param);
+        final constraint = createConstraint(slug, param);
         if (constraint == null) continue;
         // Check that the constraint is satisfied by the solved grid
         if (constraint.verify(solved)) {
@@ -115,23 +137,15 @@ class PuzzleGenerator {
     final total = allConstraints.length;
     allConstraints.shuffle(_rng);
 
-    // Sort by usage priority (less common first)
-    final Map<String, int> globalUsage = {
-      'FM': 15379,
-      'QA': 187,
-      'SY': 1442,
-      'LT': 1019,
-      'GS': 13312,
-      'PA': 15032,
-      'DF': 500,
-    };
+    // Sort by usage priority (less common types first)
+    final usage = usageStats ?? <String, int>{};
     allConstraints.sort((a, b) {
-      final sa = _slugOf(a);
-      final sb = _slugOf(b);
+      final sa = a.slug;
+      final sb = b.slug;
       final aRequired = requiredSlugs.contains(sa) ? -1 : 0;
       final bRequired = requiredSlugs.contains(sb) ? -1 : 0;
       if (aRequired != bRequired) return aRequired.compareTo(bRequired);
-      return (globalUsage[sa] ?? 0).compareTo(globalUsage[sb] ?? 0);
+      return (usage[sa] ?? 0).compareTo(usage[sb] ?? 0);
     });
 
     if (allConstraints.isEmpty) return null;
@@ -181,19 +195,19 @@ class PuzzleGenerator {
       allConstraints.shuffle(_rng);
       final Map<String, int> localUsage = {};
       for (final c in pu.constraints) {
-        final s = _slugOf(c);
+        final s = c.slug;
         localUsage[s] = (localUsage[s] ?? 0) + 1;
       }
       allConstraints.sort((a, b) {
-        final sa = _slugOf(a);
-        final sb = _slugOf(b);
+        final sa = a.slug;
+        final sb = b.slug;
         return (localUsage[sa] ?? 0).compareTo(localUsage[sb] ?? 0);
       });
     }
 
     // Check required rules are present
     if (config.requiredRules.isNotEmpty) {
-      final presentSlugs = pu.constraints.map((c) => _slugOf(c)).toSet();
+      final presentSlugs = pu.constraints.map((c) => c.slug).toSet();
       if (!config.requiredRules.every((r) => presentSlugs.contains(r))) {
         return null;
       }
@@ -262,37 +276,5 @@ class PuzzleGenerator {
       default:
         return [];
     }
-  }
-
-  static Constraint? _createConstraint(String slug, String params) {
-    switch (slug) {
-      case 'FM':
-        return ForbiddenMotif(params);
-      case 'PA':
-        return ParityConstraint(params);
-      case 'GS':
-        return GroupSize(params);
-      case 'LT':
-        return LetterGroup(params);
-      case 'QA':
-        return QuantityConstraint(params);
-      case 'SY':
-        return SymmetryConstraint(params);
-      case 'DF':
-        return DifferentFromConstraint(params);
-      default:
-        return null;
-    }
-  }
-
-  static String _slugOf(Constraint c) {
-    if (c is ForbiddenMotif) return 'FM';
-    if (c is ParityConstraint) return 'PA';
-    if (c is GroupSize) return 'GS';
-    if (c is LetterGroup) return 'LT';
-    if (c is QuantityConstraint) return 'QA';
-    if (c is SymmetryConstraint) return 'SY';
-    if (c is DifferentFromConstraint) return 'DF';
-    return '';
   }
 }

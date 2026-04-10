@@ -80,6 +80,10 @@ Fields: version, domain, dimensions, cell state, constraint definitions.
 - State management is via StatefulWidget (`setState`) — no external state management library
 - CI is GitHub Actions (`.github/workflows/ci.yml`) — manual trigger, builds APK/Windows/Web
 
+## Coding Rules
+
+- **Always run `dart format` after modifying Dart files**
+
 ## Testing Guidelines
 
 - Each test must be **necessary** (not a duplicate of another test), **clear** (title and code match exactly), and **well commented** (explain what is being tested and why)

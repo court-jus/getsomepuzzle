@@ -50,16 +50,17 @@ Lorsque deux cellules sont séparées par le symbole ≠, elles doivent être de
 
 ## Puzzles personnalisés
 
-Vous pouvez générer vos propres puzzles directement depuis l'application. Ouvrez le menu et appuyez sur "Générer" pour accéder au générateur de puzzles.
+### Générer des puzzles
 
-Le générateur vous permet de choisir :
-- **Taille de la grille** : largeur et hauteur (3 à 10)
-- **Règles obligatoires** : types de contraintes qui doivent apparaître dans le puzzle
-- **Règles exclues** : types de contraintes qui ne doivent pas apparaître
-- **Temps maximum** : durée maximale de génération
-- **Nombre de puzzles** : combien en créer d'un coup
+Ouvrez le menu et appuyez sur "Générer" pour accéder au générateur. Vous pouvez choisir la taille de la grille, les types de contraintes à inclure ou exclure, et le nombre de puzzles à générer. Vous pouvez également choisir dans quelle playlist les sauvegarder.
 
-Les puzzles générés sont sauvegardés dans la collection "Custom", sélectionnable depuis la page Ouvrir. Cette collection est stockée localement sur votre appareil et persiste entre les sessions.
+### Créer des puzzles
+
+Ouvrez le menu et appuyez sur "Créer" pour concevoir votre propre puzzle. Vous pouvez définir les dimensions, fixer la couleur de certaines cases, ajouter des contraintes, et l'éditeur vous montrera en temps réel quelles cases sont déductibles. Les bordures vertes indiquent une déduction directe, les bordures oranges indiquent une déduction par élimination.
+
+### Playlists
+
+Les puzzles générés et créés sont sauvegardés dans des playlists. La playlist par défaut est "Mes puzzles", mais vous pouvez en créer de nouvelles depuis la page Ouvrir. Vous pouvez aussi importer des puzzles depuis un fichier.
 
 ## Stats
 

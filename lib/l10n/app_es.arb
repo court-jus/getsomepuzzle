@@ -127,5 +127,6 @@
     "createFixBlack": "Fijar a negro",
     "createFixWhite": "Fijar a blanco",
     "createRemoveFixed": "Quitar color fijo",
-    "createPasteHint": "Pegar una representación de puzzle para editarlo"
+    "createPasteHint": "Pegar una representación de puzzle para editarlo",
+    "collectionMyPuzzles": "Mis puzzles"
 }

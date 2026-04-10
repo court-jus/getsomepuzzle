@@ -1114,7 +1114,9 @@ class _CreatePageState extends State<CreatePage> {
                       isExpanded: true,
                       items: [
                         for (final (key, label)
-                            in widget.database.writablePlaylistOptions)
+                            in widget.database.getWritablePlaylistOptions(
+                              loc.collectionMyPuzzles,
+                            ))
                           DropdownMenuItem(value: key, child: Text(label)),
                         DropdownMenuItem(
                           value: '__new__',

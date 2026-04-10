@@ -373,5 +373,9 @@
     "createFixBlack": "Fix to black",
     "createFixWhite": "Fix to white",
     "createRemoveFixed": "Remove fixed color",
-    "createPasteHint": "Paste a puzzle representation to edit it"
+    "createPasteHint": "Paste a puzzle representation to edit it",
+    "collectionMyPuzzles": "My puzzles",
+    "@collectionMyPuzzles": {
+        "description": "Label of the custom puzzles collection"
+    }
 }

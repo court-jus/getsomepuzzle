@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator_worker.dart';
@@ -42,15 +43,8 @@ class _GeneratePageState extends State<GeneratePage> {
   StreamSubscription<GeneratorMessage>? _subscription;
   Timer? _uiTimer;
 
-  static const List<(String, String)> _ruleOptions = [
-    ('FM', 'Forbidden motif'),
-    ('PA', 'Parity'),
-    ('GS', 'Group size'),
-    ('LT', 'Letter'),
-    ('QA', 'Quantity'),
-    ('SY', 'Symmetry'),
-    ('DF', 'Different from'),
-  ];
+  static List<(String, String)> get _ruleOptions =>
+      constraintRegistry.map((r) => (r.slug, r.label)).toList();
 
   @override
   void dispose() {
@@ -271,7 +265,9 @@ class _GeneratePageState extends State<GeneratePage> {
                     isExpanded: true,
                     items: [
                       for (final (key, label)
-                          in widget.database.writablePlaylistOptions)
+                          in widget.database.getWritablePlaylistOptions(
+                            loc.collectionMyPuzzles,
+                          ))
                         DropdownMenuItem(value: key, child: Text(label)),
                       DropdownMenuItem(
                         value: '__new__',

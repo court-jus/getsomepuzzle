@@ -3,6 +3,9 @@ import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
 class ParityConstraint extends CellsCentricConstraint {
+  @override
+  String get slug => 'PA';
+
   String side = "";
 
   ParityConstraint(String strParams) {

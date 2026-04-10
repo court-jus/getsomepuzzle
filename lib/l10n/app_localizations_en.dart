@@ -388,4 +388,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get createPasteHint => 'Paste a puzzle representation to edit it';
+
+  @override
+  String get collectionMyPuzzles => 'My puzzles';
 }

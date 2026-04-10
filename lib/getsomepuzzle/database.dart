@@ -178,16 +178,16 @@ class Database {
   int maxCplx = 0;
   List<PuzzleData> playlist = [];
   final log = Logger("Database");
-  static const _builtInCollections = [
-    ("tutorial", "Tutorial", UniconsLine.baby_carriage),
-    ("default", "Collection 1", UniconsLine.puzzle_piece),
-    ("custom", "Mes puzzles", Icons.build),
-  ];
+  static const _builtInCollectionKeys = {'tutorial', 'default', 'custom'};
 
   List<String> userPlaylistNames = [];
 
-  List<(String, Widget)> get collections => [
-    for (final (key, label, icon) in _builtInCollections)
+  List<(String, Widget)> getCollections(String customLabel) => [
+    for (final (key, label, icon) in [
+      ('tutorial', 'Tutorial', UniconsLine.baby_carriage),
+      ('default', 'Collection 1', UniconsLine.puzzle_piece),
+      ('custom', customLabel, Icons.build),
+    ])
       (
         key,
         Row(
@@ -206,8 +206,8 @@ class Database {
   ];
 
   /// All playlist slugs available for saving puzzles (custom + user playlists).
-  List<(String, String)> get writablePlaylistOptions => [
-    ('custom', 'Mes puzzles'),
+  List<(String, String)> getWritablePlaylistOptions(String customLabel) => [
+    ('custom', customLabel),
     for (final name in userPlaylistNames) ('user_${slugify(name)}', name),
   ];
 
@@ -349,9 +349,11 @@ class Database {
     String collectionToLoad = (fileToLoad == null)
         ? (prefs.getString("collectionToLoad") ?? "tutorial")
         : fileToLoad;
-    if (collections
-        .where((element) => element.$1 == collectionToLoad)
-        .isEmpty) {
+    final validKeys = {
+      ..._builtInCollectionKeys,
+      ...userPlaylistNames.map((name) => 'user_${slugify(name)}'),
+    };
+    if (!validKeys.contains(collectionToLoad)) {
       collectionToLoad = "tutorial";
     }
     collection = collectionToLoad;

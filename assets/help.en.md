@@ -14,7 +14,7 @@ If you are stuck, the "restart" icon resets the puzzle to its initial state.
 
 While playing, your timing is recorded (see the Stats section below). If needed, the game can be paused and resumed.
 
-There are about 5k puzzles bundled within the app. Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see your progress below the puzzle.
+There are about 10,000 puzzles bundled within the app. Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see your progress below the puzzle.
 
 ## Constraints
 
@@ -50,16 +50,17 @@ When two cells are separated by the ≠ symbol, they must be different colors.
 
 ## Custom puzzles
 
-You can generate your own puzzles directly from the app. Open the menu and tap "Generate" to access the puzzle generator.
+### Generating puzzles
 
-The generator lets you choose:
-- **Grid size**: width and height (3 to 10)
-- **Required rules**: constraint types that must appear in the puzzle
-- **Excluded rules**: constraint types that must not appear
-- **Max time**: how long to spend generating
-- **Number of puzzles**: how many to create at once
+Open the menu and tap "Generate" to access the puzzle generator. You can choose the grid size, which constraint types to include or exclude, and how many puzzles to generate. You can also choose which playlist to save them to.
 
-Generated puzzles are saved in the "Custom" collection, which you can select from the Open page. This collection is stored locally on your device and persists between sessions.
+### Creating puzzles
+
+Open the menu and tap "Create" to design your own puzzle. You can set the grid dimensions, fix cell colors, add constraints, and the editor will show you in real time which cells are solvable. Green borders mean the cell can be deduced by direct reasoning, orange borders mean it requires elimination.
+
+### Playlists
+
+Generated and created puzzles are saved to playlists. The default playlist is "My puzzles", but you can create your own playlists from the Open page. You can also import puzzles from a file.
 
 ## Stats
 

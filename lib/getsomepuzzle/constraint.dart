@@ -11,6 +11,8 @@ class Constraint {
     return "";
   }
 
+  String get slug => '';
+
   String toHuman() {
     return toString();
   }

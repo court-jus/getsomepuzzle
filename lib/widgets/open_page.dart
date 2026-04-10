@@ -4,6 +4,7 @@ import 'dart:io' as java_io;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/plusminus.dart';
@@ -26,15 +27,8 @@ class _OpenPageState extends State<OpenPage> {
   int matchingCount = 0;
   String collection = "tutorial";
 
-  static const List<(String, String)> existingRules = [
-    ("LT", "Letter"),
-    ("GS", "Group size"),
-    ("FM", "Forbidden motif"),
-    ("PA", "Parity"),
-    ("QA", "Quantity"),
-    ("SY", "Symmetry"),
-    ("DF", "Different from"),
-  ];
+  static List<(String, String)> get existingRules =>
+      constraintRegistry.map((r) => (r.slug, r.label)).toList();
 
   @override
   void initState() {
@@ -300,7 +294,12 @@ class _OpenPageState extends State<OpenPage> {
                             DropdownButton<String>(
                               value: collection,
                               items: [
-                                for (final item in widget.database.collections)
+                                for (final item
+                                    in widget.database.getCollections(
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.collectionMyPuzzles,
+                                    ))
                                   DropdownMenuItem(
                                     value: item.$1,
                                     child: item.$2,

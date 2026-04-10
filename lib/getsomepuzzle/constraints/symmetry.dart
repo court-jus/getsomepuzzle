@@ -13,6 +13,9 @@ const Map<int, String> axisRepresentation = {
 };
 
 class SymmetryConstraint extends CellsCentricConstraint {
+  @override
+  String get slug => 'SY';
+
   int axis = 0;
 
   SymmetryConstraint(String strParams) {

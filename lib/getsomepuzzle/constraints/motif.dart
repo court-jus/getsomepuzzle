@@ -6,6 +6,9 @@ import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 const _allowBigMotifs = false;
 
 class ForbiddenMotif extends Motif {
+  @override
+  String get slug => 'FM';
+
   ForbiddenMotif(String strMotif) {
     final strRows = strMotif.split(".");
     motif = strRows

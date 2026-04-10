@@ -837,6 +837,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Paste a puzzle representation to edit it'**
   String get createPasteHint;
+
+  /// Label of the custom puzzles collection
+  ///
+  /// In en, this message translates to:
+  /// **'My puzzles'**
+  String get collectionMyPuzzles;
 }
 
 class _AppLocalizationsDelegate

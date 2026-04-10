@@ -4,6 +4,9 @@ import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
 class QuantityConstraint extends Constraint {
+  @override
+  String get slug => 'QA';
+
   int value = 0;
   int count = 0;
 

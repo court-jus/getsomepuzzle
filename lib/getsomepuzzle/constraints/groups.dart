@@ -9,6 +9,9 @@ const _maxGroupSizeRatio = 0.5;
 const _maxGroupSizeAbsolute = 15;
 
 class GroupSize extends CellsCentricConstraint {
+  @override
+  String get slug => 'GS';
+
   int size = 0;
 
   GroupSize(String strParams) {
@@ -143,6 +146,9 @@ class GroupSize extends CellsCentricConstraint {
 }
 
 class LetterGroup extends CellsCentricConstraint {
+  @override
+  String get slug => 'LT';
+
   String letter = "";
 
   LetterGroup(String strParams) {

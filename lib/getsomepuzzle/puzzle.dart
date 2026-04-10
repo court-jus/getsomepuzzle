@@ -1,14 +1,9 @@
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 
 /// Result of a single apply-and-set step in the shared loop.
 enum ApplyLoopResult { applied, complete, impossible, stuck }
@@ -96,22 +91,13 @@ class Puzzle {
     final strConstraints = attributesStr[4].split(";");
     for (var strConstraint in strConstraints) {
       final constraintAttr = strConstraint.split(":");
-      if (constraintAttr[0] == "FM") {
-        constraints.add(ForbiddenMotif(constraintAttr[1]));
-      } else if (constraintAttr[0] == "PA") {
-        constraints.add(ParityConstraint(constraintAttr[1]));
-      } else if (constraintAttr[0] == "GS") {
-        constraints.add(GroupSize(constraintAttr[1]));
-      } else if (constraintAttr[0] == "LT") {
-        constraints.add(LetterGroup(constraintAttr[1]));
-      } else if (constraintAttr[0] == "QA") {
-        constraints.add(QuantityConstraint(constraintAttr[1]));
-      } else if (constraintAttr[0] == "SY") {
-        constraints.add(SymmetryConstraint(constraintAttr[1]));
-      } else if (constraintAttr[0] == "TX") {
-        constraints.add(HelpText(constraintAttr[1]));
-      } else if (constraintAttr[0] == "DF") {
-        constraints.add(DifferentFromConstraint(constraintAttr[1]));
+      final slug = constraintAttr[0];
+      final params = constraintAttr.length > 1 ? constraintAttr[1] : '';
+      if (slug == 'TX') {
+        constraints.add(HelpText(params));
+      } else {
+        final c = createConstraint(slug, params);
+        if (c != null) constraints.add(c);
       }
     }
   }

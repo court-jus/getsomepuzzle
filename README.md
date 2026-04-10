@@ -57,7 +57,7 @@ total number of cells of that color should match that number.
 
 ### From the app
 
-Open the menu and tap **Generate**. You can configure the grid size, which constraint types to include or exclude, the number of puzzles and a time limit. Generated puzzles are saved to the **Mes puzzles** collection.
+Open the menu and tap **Generate**. You can configure the grid size, which constraint types to include or exclude, the number of puzzles and a time limit. Generated puzzles are saved to the **My puzzles** collection.
 
 ### From the command line
 

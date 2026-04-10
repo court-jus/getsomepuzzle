@@ -3,6 +3,9 @@ import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
 class DifferentFromConstraint extends CellsCentricConstraint {
+  @override
+  String get slug => 'DF';
+
   final String direction;
 
   DifferentFromConstraint(String strParams)
