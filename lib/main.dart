@@ -288,6 +288,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> helpMe() async {
     if (currentPuzzle == null) return;
+    print(currentPuzzle!.lineRepresentation);
     helpMove = currentPuzzle!.findAMove();
   }
 
@@ -600,7 +601,6 @@ class _MyHomePageState extends State<MyHomePage> {
               leading: Icon(Icons.close),
               title: Text(AppLocalizations.of(context)!.closeMenu),
               onTap: () {
-                loadPuzzle();
                 Navigator.pop(context);
               },
             ),
