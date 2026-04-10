@@ -1,7 +1,4 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
@@ -95,26 +92,14 @@ Widget _symmetryWidget(
   int count,
 ) {
   final double size = cellSize * cellSizeToFontSize / count;
-  Widget icon = FaIcon(FontAwesomeIcons.circleDot, color: fgcolor, size: size);
-  if (constraint.axis == 1) {
-    icon = FaIcon(FontAwesomeIcons.slash, color: fgcolor, size: size);
-  } else if (constraint.axis == 2) {
-    icon = FaIcon(
-      FontAwesomeIcons.gripLinesVertical,
-      color: fgcolor,
-      size: size,
-    );
-  } else if (constraint.axis == 3) {
-    icon = Transform.rotate(
-      angle: pi / 2,
-      child: FaIcon(FontAwesomeIcons.slash, color: fgcolor, size: size),
-    );
-  } else if (constraint.axis == 4) {
-    icon = FaIcon(FontAwesomeIcons.gripLines, color: fgcolor, size: size);
-  }
   return SizedBox(
     width: cellSize / count,
     height: cellSize / count,
-    child: Center(child: icon),
+    child: Center(
+      child: Text(
+        axisRepresentation[constraint.axis] ?? '?',
+        style: TextStyle(color: fgcolor, fontSize: size),
+      ),
+    ),
   );
 }
