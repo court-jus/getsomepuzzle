@@ -146,6 +146,111 @@ void main() {
     });
   });
 
+  group('GroupSize.apply merge-too-big', () {
+    test('single group merge blocked', () {
+      // 3x3: 101 / 001 / 000
+      // GS at idx 0 (value=1), target=2. myGroup={0}, margin=1.
+      // Free neighbors: idx 1 and idx 3 (two exits, so single-exit rule doesn't fire).
+      // idx 1 touches group {2,5} (size 2, ≥ margin 1) → blocked.
+      final p = _make('''
+        101
+        001
+        000
+      ''');
+      final gs = GroupSize('0.2');
+      p.constraints.add(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 1);
+      expect(move.value, 2);
+    });
+
+    test('multi-group merge blocked', () {
+      // 3x3: 010 / 101 / 000
+      // GS at idx 3 (row1,col0, value=1), target=3. myGroup={3}, margin=2.
+      // Free neighbor idx 4 (center) touches two separate groups: {1} and {5}, each size 1.
+      // Each individually < margin (1 < 2), but sum = 2 ≥ margin → blocked.
+      // Coloring idx 4 as 1 would create a merged group of size 4 > target 3.
+      final p = _make('''
+        010
+        101
+        000
+      ''');
+      final gs = GroupSize('3.3');
+      p.constraints.add(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 4);
+      expect(move.value, 2);
+    });
+
+    test('merge within limit is not blocked', () {
+      // 3x3:
+      //   0 1 0
+      //   1 0 0
+      //   0 0 0
+      // GS at idx 3 (row1,col0, value=1), target=4. myGroup={3}, margin=3.
+      // Free neighbor idx 4 touches group {1} (size 1). Sum=1 < 3 → not blocked.
+      final p = _make('''
+        010
+        100
+        000
+      ''');
+      final gs = GroupSize('3.4');
+      p.constraints.add(gs);
+      final move = gs.apply(p);
+      // Should NOT return a merge-blocking move on idx 4
+      // (it might return null or a different deduction, but not blocking idx 4)
+      if (move != null) {
+        expect(move.idx != 4 || move.value != 2, isTrue);
+      }
+    });
+  });
+
+  group('GroupSize.apply reachability', () {
+    test('color eliminated when empty region too small', () {
+      // 3x4: 010 / 010 / 101 / 000
+      // GS:7.5 — cell 7 (row2,col1) must be in group of size 5. Cell 7 is empty.
+      // Empty region from 7: {0, 2, 3, 5, 7, 9, 10, 11} (8 cells).
+      // If color=2: adjacent groups of value 2 = none. Max = 8 + 0 = 8 ≥ 5 → OK.
+      // Wait — cells 6 and 8 are value 1 and block the path.
+      // Empty region from 7: neighbors of 7 are 4(val=1), 6(val=1), 8(val=1), 10(val=0).
+      // So from 7 only 10 is empty. From 10: neighbors 7(counted), 9(empty), 11(empty).
+      // From 9: neighbors 6(val=1), 10(counted). From 11: neighbors 8(val=1), 10(counted).
+      // Empty region = {7, 9, 10, 11} (4 cells).
+      // Color 2: no adjacent value-2 groups → max = 4 < 5 → impossible.
+      // Color 1: adjacent groups {1,4}(size 2), {6}(size 1), {8}(size 1) → max = 4 + 4 = 8 ≥ 5 → OK.
+      // → cell 7 forced to value 1.
+      final p = _make('''
+        010
+        010
+        101
+        000
+      ''');
+      final gs = GroupSize('7.5');
+      p.constraints.add(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 7);
+      expect(move.value, 1);
+    });
+
+    test('no deduction when both colors reachable', () {
+      // 3x3: 000 / 010 / 000
+      // GS:4.3 — cell 4 (center) empty, target=3.
+      // Empty region = all 8 empty cells. Both colors have max ≥ 3. No deduction.
+      final p = _make('''
+        000
+        010
+        000
+      ''');
+      final gs = GroupSize('4.3');
+      p.constraints.add(gs);
+      final move = gs.apply(p);
+      expect(move, isNull);
+    });
+  });
+
   group('DifferentFromConstraint.verify', () {
     test('right: different values → valid', () {
       // Cell (1,1)=N and cell (2,1)=B are different

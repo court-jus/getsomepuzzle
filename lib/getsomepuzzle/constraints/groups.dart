@@ -95,6 +95,49 @@ class GroupSize extends CellsCentricConstraint {
           }
         }
       }
+      // Reachability check: for each color, compute the max group size reachable
+      // from idx. Max = empty region size + sum of adjacent same-color groups.
+      // If unreachable for a color, that color is impossible.
+      final emptyRegion = <int>{idx};
+      final queue = [idx];
+      while (queue.isNotEmpty) {
+        final current = queue.removeLast();
+        for (final nei in puzzle.getNeighbors(current)) {
+          if (puzzle.cellValues[nei] == 0 && emptyRegion.add(nei)) {
+            queue.add(nei);
+          }
+        }
+      }
+      final Map<int, int> cellToGroup = {};
+      for (int gi = 0; gi < groups.length; gi++) {
+        for (final cell in groups[gi]) {
+          cellToGroup[cell] = gi;
+        }
+      }
+      int? forcedColor;
+      for (final color in puzzle.domain) {
+        final Set<int> counted = {};
+        int adjacentSize = 0;
+        for (final cell in emptyRegion) {
+          for (final nei in puzzle.getNeighbors(cell)) {
+            if (puzzle.cellValues[nei] == color) {
+              final gi = cellToGroup[nei];
+              if (gi != null && counted.add(gi)) {
+                adjacentSize += groups[gi].length;
+              }
+            }
+          }
+        }
+        if (emptyRegion.length + adjacentSize < size) {
+          if (forcedColor != null) {
+            return Move(0, 0, this, isImpossible: this);
+          }
+          forcedColor = puzzle.domain.whereNot((v) => v == color).first;
+        }
+      }
+      if (forcedColor != null) {
+        return Move(idx, forcedColor, this);
+      }
     }
     if (myGroup == null) return null;
     if (myGroup.length == size) {
@@ -122,21 +165,27 @@ class GroupSize extends CellsCentricConstraint {
       } else if (myGroup.length < size && groupFreeNeighbors.isEmpty) {
         return Move(0, 0, this, isImpossible: this);
       }
-      // If extending in a direction would merge me with another group and create a "too big group",
-      // then add a boundary in that direction, it is forbidden to grow there
+      // If extending in a direction would merge me with other groups and create a "too big group",
+      // then add a boundary in that direction, it is forbidden to grow there.
+      // We sum the sizes of ALL same-color groups touching the free neighbor,
+      // because coloring it would merge them all into one group.
       final margin = size - myGroup.length;
-      final sameColorGroupCells = groups
+      final sameColorGroups = groups
           .where(
             (grp) =>
                 grp.any((cell) => puzzle.cellValues[cell] == myColor) &&
-                !grp.any((cell) => myGroup.contains(cell)) &&
-                grp.length >= margin,
+                !grp.any((cell) => myGroup.contains(cell)),
           )
-          .expand((grp) => grp)
-          .toSet();
+          .toList();
       for (final boundary in groupFreeNeighbors) {
         final boundaryNeighbors = puzzle.getNeighbors(boundary);
-        if (boundaryNeighbors.any((nei) => sameColorGroupCells.contains(nei))) {
+        int mergedSize = 0;
+        for (final grp in sameColorGroups) {
+          if (boundaryNeighbors.any((nei) => grp.contains(nei))) {
+            mergedSize += grp.length;
+          }
+        }
+        if (mergedSize >= margin) {
           return Move(boundary, myOpposite, this);
         }
       }
