@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   push:
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
