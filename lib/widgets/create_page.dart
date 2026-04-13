@@ -24,8 +24,6 @@ const _bgColors = {
   1: Colors.black,
   2: Colors.white,
 };
-const _forbiddenColor = Color(0x40FF0000);
-const _mandatoryColor = Color(0x400000FF);
 
 class EditorState {
   final int width;
@@ -1188,12 +1186,7 @@ class _CreatePageState extends State<CreatePage> {
                 GestureDetector(
                   onTap: () => _onTopBarConstraintTap(constraint),
                   child: MotifWidget(
-                    motif: constraint.motif,
-                    bgColor: constraint is ForbiddenMotif
-                        ? _forbiddenColor
-                        : _mandatoryColor,
-                    borderColor: Colors.green,
-                    isHighlighted: false,
+                    constraint: constraint,
                     cellSize: topBarSize,
                   ),
                 )
@@ -1201,11 +1194,8 @@ class _CreatePageState extends State<CreatePage> {
                 GestureDetector(
                   onTap: () => _onTopBarConstraintTap(constraint),
                   child: QuantityWidget(
-                    value: constraint.value,
-                    count: constraint.count,
+                    constraint: constraint,
                     actualCount: 0,
-                    bgColor: _mandatoryColor,
-                    borderColor: Colors.green,
                     cellSize: topBarSize,
                   ),
                 ),

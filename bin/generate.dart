@@ -74,7 +74,6 @@ void _runGenerate(Map<String, dynamic> parsed) {
     finish();
     exit(0);
   });
-
   while (generated < count) {
     attempts++;
     final width = minWidth + rng.nextInt(maxWidth - minWidth + 1);

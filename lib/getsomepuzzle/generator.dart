@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
@@ -8,6 +9,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 
@@ -89,12 +91,17 @@ class PuzzleGenerator {
     final requiredSlugs = config.requiredRules.intersection(allowedSlugs);
 
     // 1. Create a random solved grid
-    final solved = Puzzle.empty(width, height, _defaultDomain);
-    for (int i = 0; i < size; i++) {
-      solved.cells[i].setForSolver(
-        _defaultDomain[_rng.nextInt(_defaultDomain.length)],
-      );
+    // In case we want a "SH" constraint, this step is different
+    bool hasSH = config.requiredRules.contains("SH");
+    if (!hasSH && usageStats != null && usageStats.containsKey("SH")) {
+      final lowestUsage = usageStats.values.reduce(min);
+      if (usageStats["SH"] == lowestUsage) {
+        hasSH = true;
+      }
     }
+    final solved = hasSH
+        ? _preFillSh(width, height)
+        : _preFillRegular(width, height);
     final solvedValues = solved.cellValues;
 
     // 2. Create puzzle with some pre-filled cells
@@ -105,6 +112,9 @@ class PuzzleGenerator {
       pu.cells[indices[i]].setForSolver(solvedValues[indices[i]]);
       pu.cells[indices[i]] = pu.cells[indices[i]]..readonly = true;
     }
+
+    // Force the SH constraint in the puzzle
+    pu.constraints.addAll(solved.constraints);
 
     // Collect readonly cell indices for DF constraint generation
     final Set<int> readonlyIndices = {};
@@ -136,7 +146,6 @@ class PuzzleGenerator {
 
     final total = allConstraints.length;
     allConstraints.shuffle(_rng);
-
     // Sort by usage priority (less common types first)
     final usage = usageStats ?? <String, int>{};
     allConstraints.sort((a, b) {
@@ -229,6 +238,93 @@ class PuzzleGenerator {
     }
 
     return pu.lineExport();
+  }
+
+  static Puzzle _preFillSh(int width, int height) {
+    final solved = Puzzle.empty(width, height, _defaultDomain);
+    final possibleMotifs = ShapeConstraint.generateAllParameters(width, height);
+    possibleMotifs.shuffle(_rng);
+    final puzzleSize = width * height;
+    final weights = possibleMotifs.map((m) {
+      final sc = ShapeConstraint(m);
+      final motifSize = sc.motifGridSize;
+      final base = ShapeConstraint.baseWeights[motifSize] ?? 1;
+      return base * pow(motifSize, puzzleSize * 0.05) * 0.2;
+    }).toList();
+
+    double totalWeight = weights.reduce((a, b) => a + b);
+    double r = _rng.nextDouble() * totalWeight;
+    double cumulative = 0;
+    String chosenMotif = '';
+    for (int i = 0; i < possibleMotifs.length; i++) {
+      cumulative += weights[i];
+      if (r <= cumulative) {
+        chosenMotif = possibleMotifs[i];
+        break;
+      }
+    }
+    final chosenConstraint = ShapeConstraint(chosenMotif);
+    chosenConstraint.variants.shuffle();
+    final chosenVariant = chosenConstraint.variants
+        .where(
+          (variant) => variant.length <= height && variant[0].length <= width,
+        )
+        .first;
+    int motifValue = 0;
+    final maxRowOffset = height - chosenVariant.length;
+    final maxColOffset = width - chosenVariant[0].length;
+    final rowOffset = maxRowOffset > 0 ? _rng.nextInt(maxRowOffset) : 0;
+    final colOffset = maxColOffset > 0 ? _rng.nextInt(maxColOffset) : 0;
+    for (var (ridx, row) in chosenVariant.indexed) {
+      for (var (cidx, value) in row.indexed) {
+        if (value != 0) {
+          solved.cells[(ridx + rowOffset) * width + (cidx + colOffset)]
+              .setForSolver(value);
+          motifValue = value;
+        }
+      }
+    }
+    final size = solved.width * solved.height;
+    final opposite = _defaultDomain.whereNot((i) => i == motifValue).first;
+    for (int i = 0; i < size; i++) {
+      if (!solved.cells[i].isFree) continue;
+      solved.cells[i].setForSolver(opposite);
+    }
+    solved.constraints.add(chosenConstraint);
+    var possiblePositions = ShapeConstraint.findAdditionalPositions(solved);
+    while (possiblePositions.isNotEmpty) {
+      final position =
+          possiblePositions[_rng.nextInt(possiblePositions.length)];
+      // 50% chance to add this position to the solved puzzle
+      if (_rng.nextDouble() > 0.5) {
+        final rowOffset = position.$1.$1;
+        final colOffset = position.$1.$2;
+        final variant = position.$2;
+        for (var (ridx, row) in variant.indexed) {
+          for (var (cidx, value) in row.indexed) {
+            if (value != 0) {
+              solved.cells[(ridx + rowOffset) * width + (cidx + colOffset)]
+                  .setForSolver(value);
+              motifValue = value;
+            }
+          }
+        }
+        // Recompute valid positions after grid changed
+        possiblePositions = ShapeConstraint.findAdditionalPositions(solved);
+      }
+    }
+    return solved;
+  }
+
+  static Puzzle _preFillRegular(int width, int height) {
+    final solved = Puzzle.empty(width, height, _defaultDomain);
+    final size = solved.width * solved.height;
+    for (int i = 0; i < size; i++) {
+      solved.cells[i].setForSolver(
+        _defaultDomain[_rng.nextInt(_defaultDomain.length)],
+      );
+    }
+    return solved;
   }
 
   /// Find up to [maxSolutions] distinct solutions for a puzzle.

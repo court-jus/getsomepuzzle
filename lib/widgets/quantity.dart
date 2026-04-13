@@ -1,38 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/widgets/motif.dart';
 
 const textColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
 
 class QuantityWidget extends StatelessWidget {
-  // Constructor
   const QuantityWidget({
     super.key,
-    required this.value,
-    required this.count,
+    required this.constraint,
     required this.actualCount,
-    required this.bgColor,
-    required this.borderColor,
     required this.cellSize,
   });
 
-  // Attributes
-  final int value;
-  final int count;
+  final QuantityConstraint constraint;
   final int actualCount;
-  final Color bgColor;
-  final Color borderColor;
   final double cellSize;
 
-  // Build UI
   @override
   Widget build(BuildContext context) {
+    final borderColor = constraint.isHighlighted
+        ? highlightColor
+        : (constraint.isValid ? Colors.green : Colors.deepOrange);
     final smallText = "$actualCount/";
-    final largeText = count.toString();
+    final largeText = constraint.count.toString();
     final smallFontSize = cellSize * cellSizeToFontSize / 3.5;
     final largeFontSize = cellSize * cellSizeToFontSize;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: bgColor,
+        color: mandatoryColor,
         border: BoxBorder.all(color: borderColor, width: 4),
       ),
       child: SizedBox(
@@ -49,7 +45,7 @@ class QuantityWidget extends StatelessWidget {
                   smallText,
                   style: TextStyle(
                     fontSize: smallFontSize,
-                    color: textColors[value],
+                    color: textColors[constraint.value],
                   ),
                 ),
               ),
@@ -58,7 +54,7 @@ class QuantityWidget extends StatelessWidget {
                 largeText,
                 style: TextStyle(
                   fontSize: largeFontSize,
-                  color: textColors[value],
+                  color: textColors[constraint.value],
                 ),
               ),
             ),

@@ -4,6 +4,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 
 /// Registry of all player-facing constraint types.
@@ -21,6 +22,7 @@ final constraintRegistry =
         label: 'Different from',
         fromParams: DifferentFromConstraint.new,
       ),
+      (slug: 'SH', label: 'Shape', fromParams: ShapeConstraint.new),
     ];
 
 /// All player-facing constraint slugs.

@@ -5,7 +5,6 @@ import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
@@ -13,9 +12,6 @@ import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
 import 'package:getsomepuzzle/widgets/textpuzzle.dart';
-
-const forbiddenColor = Color.fromARGB(255, 185, 86, 202);
-const mandatoryColor = Colors.lightBlue;
 
 class PuzzleWidget extends StatefulWidget {
   const PuzzleWidget({
@@ -196,16 +192,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               (constraint.isHighlighted && constraintIsInTopBar)
                               ? _constraintKey
                               : null,
-                          motif: constraint.motif,
-                          bgColor: constraint is ForbiddenMotif
-                              ? forbiddenColor
-                              : mandatoryColor,
-                          borderColor: constraint.isHighlighted
-                              ? highlightColor
-                              : (constraint.isValid
-                                    ? Colors.green
-                                    : Colors.deepOrange),
-                          isHighlighted: constraint.isHighlighted,
+                          constraint: constraint,
                           cellSize: topBarConstraintsSize,
                         )
                       else if (constraint is QuantityConstraint)
@@ -214,17 +201,10 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               (constraint.isHighlighted && constraintIsInTopBar)
                               ? _constraintKey
                               : null,
-                          value: constraint.value,
-                          count: constraint.count,
+                          constraint: constraint,
                           actualCount: widget.currentPuzzle.cellValues
                               .where((val) => val == constraint.value)
                               .length,
-                          bgColor: mandatoryColor,
-                          borderColor: constraint.isHighlighted
-                              ? highlightColor
-                              : (constraint.isValid
-                                    ? Colors.green
-                                    : Colors.deepOrange),
                           cellSize: topBarConstraintsSize,
                         )
                       else if (constraint is HelpText)
