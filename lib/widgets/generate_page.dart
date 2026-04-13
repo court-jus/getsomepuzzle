@@ -9,7 +9,7 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class GeneratePage extends StatefulWidget {
   final Database database;
-  final void Function(PuzzleData puz)? onPuzzleSelected;
+  final ValueChanged<PuzzleData>? onPuzzleSelected;
 
   const GeneratePage({
     super.key,

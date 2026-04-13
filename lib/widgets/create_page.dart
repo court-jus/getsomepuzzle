@@ -37,7 +37,7 @@ class EditorState {
 
 class CreatePage extends StatefulWidget {
   final Database database;
-  final void Function(PuzzleData puz)? onPuzzleSelected;
+  final ValueChanged<PuzzleData>? onPuzzleSelected;
   final VoidCallback? onTestStarted;
 
   /// Saved state from a previous editing session (survives navigation).

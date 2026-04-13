@@ -11,7 +11,7 @@ import 'package:getsomepuzzle/widgets/plusminus.dart';
 
 class OpenPage extends StatefulWidget {
   final Database database;
-  final dynamic Function(PuzzleData puz) onPuzzleSelected;
+  final ValueChanged<PuzzleData> onPuzzleSelected;
 
   const OpenPage({
     super.key,

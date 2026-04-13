@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class BetweenPuzzles extends StatelessWidget {
-  final Function(int) like;
-  final Function() loadPuzzle;
+  final ValueChanged<int> like;
+  final VoidCallback loadPuzzle;
 
   const BetweenPuzzles({
     super.key,

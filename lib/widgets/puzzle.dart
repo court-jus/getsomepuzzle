@@ -328,8 +328,8 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       isHighlighted: cell.isHighlighted,
       constraints: widget.currentPuzzle.cellConstraints[idx],
       cellSize: adjustedCellSize,
-      onTap: () => {_handleCellTap(idx)},
-      onSecondaryTap: () => {_handleCellTap(idx, secondary: true)},
+      onTap: () => _handleCellTap(idx),
+      onSecondaryTap: () => _handleCellTap(idx, secondary: true),
       onDrag: (Offset offset) {
         final int targetRow = (rowidx + offset.dy).floor();
         final int targetCell = (cellidx + offset.dx).floor();

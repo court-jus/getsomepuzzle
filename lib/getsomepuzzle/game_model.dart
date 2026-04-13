@@ -62,6 +62,11 @@ class GameModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Force a UI refresh (e.g. after external settings change).
+  void refresh() {
+    notifyListeners();
+  }
+
   void setTopMessage({String text = "", Color color = Colors.black}) {
     topMessage = text;
     topMessageColor = color;

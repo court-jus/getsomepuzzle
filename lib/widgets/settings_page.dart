@@ -4,7 +4,7 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class SettingsPage extends StatefulWidget {
   final Settings settings;
-  final dynamic Function(ChangeableSettings settings) onSettingsChange;
+  final ValueChanged<ChangeableSettings> onSettingsChange;
 
   const SettingsPage({
     super.key,

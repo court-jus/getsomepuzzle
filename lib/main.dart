@@ -23,6 +23,7 @@ import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
 import 'package:getsomepuzzle/widgets/create_page.dart';
 import 'package:getsomepuzzle/widgets/generate_page.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
+import 'package:getsomepuzzle/widgets/pause_overlay.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
@@ -82,7 +83,7 @@ class MyHomePage extends StatefulWidget {
   });
 
   final String title;
-  final Function setAppLocale;
+  final ValueChanged<String> setAppLocale;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -514,7 +515,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   MaterialPageRoute(
                     builder: (context) => SettingsPage(
                       settings: settings,
-                      onSettingsChange: settings.change,
+                      onSettingsChange: (newValue) {
+                        settings.change(newValue);
+                        game.refresh();
+                      },
                     ),
                   ),
                 );
@@ -565,52 +569,13 @@ class _MyHomePageState extends State<MyHomePage> {
                       alignment: AlignmentGeometry.center,
                       children: [
                         if (game.betweenPuzzles)
-                          Column(
-                            spacing: 16,
-                            children: [
-                              if (game.betweenPuzzles)
-                                BetweenPuzzles(
-                                  like: like,
-                                  loadPuzzle: loadPuzzle,
-                                )
-                              else if (game.paused)
-                                TextButton(
-                                  onPressed: togglePause,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: Colors.teal,
-                                      borderRadius: BorderRadius.circular(15),
-                                    ),
-                                    child: SizedBox(
-                                      width: contextWidth,
-                                      height: contextHeight,
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.pause,
-                                          size: cellSize * 3,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          )
+                          BetweenPuzzles(like: like, loadPuzzle: loadPuzzle)
                         else if (game.paused)
-                          TextButton(
-                            onPressed: togglePause,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Colors.teal,
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: SizedBox(
-                                width: contextWidth,
-                                height: contextHeight,
-                                child: Center(
-                                  child: Icon(Icons.pause, size: cellSize * 3),
-                                ),
-                              ),
-                            ),
+                          PauseOverlay(
+                            onResume: togglePause,
+                            width: contextWidth,
+                            height: contextHeight,
+                            iconSize: cellSize * 3,
                           )
                         else
                           Column(
