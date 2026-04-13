@@ -6,7 +6,6 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
@@ -29,6 +28,7 @@ import 'package:getsomepuzzle/widgets/open_page.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
+import 'package:getsomepuzzle/widgets/timer_bottom_bar.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -95,7 +95,6 @@ class _MyHomePageState extends State<MyHomePage> {
   String locale = "en";
   String topMessage = "";
   Color topMessageColor = Colors.black;
-  List<Widget> bottomMessage = [];
   PuzzleData? currentMeta;
   Puzzle? currentPuzzle;
   Database? database;
@@ -114,6 +113,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int? lastDragIdx;
   bool _testingFromEditor = false;
   Timer? _helpDebounce;
+  Timer? _saveTimer;
   final log = Logger("HomePage");
 
   @override
@@ -124,27 +124,7 @@ class _MyHomePageState extends State<MyHomePage> {
       WakelockPlus.enable();
     }
     initialize();
-    Timer.periodic(Duration(seconds: 1), (tmr) {
-      if (database == null) return;
-      if (currentPuzzle == null) return;
-      setState(() {
-        bottomMessage = [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "${currentPuzzle!.width}x${currentPuzzle!.height} (${currentPuzzle!.width * currentPuzzle!.height}) ",
-              ),
-              FaIcon(FontAwesomeIcons.brain, size: 12),
-              Text(" ${currentMeta!.cplx}"),
-            ],
-          ),
-          Text(currentMeta!.stats.toString()),
-          Text("$dbSize"),
-        ];
-      });
-    });
-    Timer.periodic(Duration(seconds: 60), (tmr) {
+    _saveTimer = Timer.periodic(Duration(seconds: 60), (tmr) {
       if (database == null) return;
       database!.writeStats();
     });
@@ -278,6 +258,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     _helpDebounce?.cancel();
+    _saveTimer?.cancel();
     super.dispose();
   }
 
@@ -821,13 +802,10 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       bottomNavigationBar: (initialized && !shouldChooseLocale)
-          ? BottomAppBar(
-              height: 40,
-              color: Colors.amber,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: bottomMessage,
-              ),
+          ? TimerBottomBar(
+              currentMeta: currentMeta,
+              currentPuzzle: currentPuzzle,
+              dbSize: dbSize,
             )
           : null,
     );
