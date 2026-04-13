@@ -5,10 +5,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
@@ -16,7 +14,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/settings.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/between_puzzles.dart';
@@ -91,28 +89,13 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  bool helpVisible = false;
+  final GameModel game = GameModel();
   String locale = "en";
-  String topMessage = "";
-  Color topMessageColor = Colors.black;
-  PuzzleData? currentMeta;
-  Puzzle? currentPuzzle;
   Database? database;
   Settings settings = Settings();
-  bool shouldCheck = false;
-  List<int> history = [];
-  int dbSize = 0;
-  bool paused = false;
-  bool betweenPuzzles = false;
   bool initialized = false;
   bool shouldChooseLocale = true;
-  Move? helpMove;
-  String hintText = "";
-  bool hintIsError = false;
-  int? firstDragValue;
-  int? lastDragIdx;
   bool _testingFromEditor = false;
-  Timer? _helpDebounce;
   Timer? _saveTimer;
   final log = Logger("HomePage");
 
@@ -123,11 +106,21 @@ class _MyHomePageState extends State<MyHomePage> {
     if (!kIsWeb && Platform.isAndroid) {
       WakelockPlus.enable();
     }
+    game.addListener(() {
+      if (mounted) setState(() {});
+    });
     initialize();
-    _saveTimer = Timer.periodic(Duration(seconds: 60), (tmr) {
+    _saveTimer = Timer.periodic(const Duration(seconds: 60), (tmr) {
       if (database == null) return;
       database!.writeStats();
     });
+  }
+
+  @override
+  void dispose() {
+    game.dispose();
+    _saveTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> initialize() async {
@@ -171,42 +164,26 @@ class _MyHomePageState extends State<MyHomePage> {
     saveChosenLocale(newLocale);
   }
 
-  void setTopMessage({String text = "", Color color = Colors.black}) {
-    setState(() {
-      topMessage = text;
-      topMessageColor = color;
-    });
-  }
+  // ---------------------------------------------------------------------------
+  // Puzzle lifecycle (thin wrappers around GameModel)
+  // ---------------------------------------------------------------------------
 
-  void loadPuzzle({bool skipped = false}) async {
+  void loadPuzzle({bool skipped = false}) {
     if (database == null) return;
-    if (currentMeta != null && skipped) {
-      currentMeta!.skipped = DateTime.now();
+    if (game.currentMeta != null && skipped) {
+      game.currentMeta!.skipped = DateTime.now();
     }
     final nextPuzzle = database!.next();
     log.fine("Found ${nextPuzzle?.lineRepresentation}");
     if (nextPuzzle != null) {
       openPuzzle(nextPuzzle);
     } else {
-      setState(() {
-        currentPuzzle = null;
-        history = [];
-        betweenPuzzles = false;
-      });
+      game.clearPuzzle();
     }
   }
 
   void openPuzzle(PuzzleData puz) {
-    setState(() {
-      dbSize = database!.playlist.length;
-
-      currentMeta = puz;
-      currentPuzzle = currentMeta!.begin();
-      paused = false;
-      betweenPuzzles = false;
-      hintText = "";
-      _scheduleHelpMe();
-    });
+    game.openPuzzle(puz, database!.playlist.length);
   }
 
   void _openCreatePage() {
@@ -225,53 +202,62 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void restartPuzzle() {
-    if (currentPuzzle == null) return;
-    setState(() {
-      setTopMessage();
-      topMessageColor = Colors.black;
-      history = [];
-      betweenPuzzles = false;
-      hintText = "";
-      currentPuzzle!.restart();
-      currentPuzzle!.clearConstraintsValidity();
-      currentPuzzle!.clearHighlights();
-      betweenPuzzles = false;
-      _scheduleHelpMe();
-    });
+  // ---------------------------------------------------------------------------
+  // Cell interaction (delegate to GameModel + side effects)
+  // ---------------------------------------------------------------------------
+
+  void handlePuzzleTap(int idx) {
+    if (game.handleTap(idx)) {
+      _handleCheck();
+    }
   }
 
-  void undo() {
-    if (currentPuzzle == null || history.isEmpty) return;
-    setState(() {
-      betweenPuzzles = false;
-      hintText = "";
-      currentPuzzle!.resetCell(history.removeLast());
-      currentPuzzle!.clearConstraintsValidity();
-      currentPuzzle!.clearHighlights();
-      setTopMessage();
-      betweenPuzzles = false;
-      _scheduleHelpMe();
-    });
+  void handlePuzzleDrag(int idx) {
+    game.handleDrag(idx);
   }
 
-  @override
-  void dispose() {
-    _helpDebounce?.cancel();
-    _saveTimer?.cancel();
-    super.dispose();
+  void handlePuzzleDragEnd() {
+    game.handleDragEnd();
+    _handleCheck();
   }
 
-  void _scheduleHelpMe() {
-    _helpDebounce?.cancel();
-    _helpDebounce = Timer(const Duration(milliseconds: 300), helpMe);
+  // ---------------------------------------------------------------------------
+  // Check / validation
+  // ---------------------------------------------------------------------------
+
+  void _handleCheck() {
+    game.handleCheck(settings, onPuzzleCompleted: _onPuzzleCompleted);
   }
 
-  Future<void> helpMe() async {
-    if (currentPuzzle == null) return;
-    print(currentPuzzle!.lineRepresentation);
-    helpMove = currentPuzzle!.findAMove();
+  void _onPuzzleCompleted() {
+    postMessage(
+      "played",
+      jsonEncode({"puzzle": game.currentMeta!.lineRepresentation}),
+      settings.shareData,
+    );
+    if (settings.showRating != ShowRating.yes) {
+      loadPuzzle();
+    }
   }
+
+  // ---------------------------------------------------------------------------
+  // Pause / resume
+  // ---------------------------------------------------------------------------
+
+  void togglePause() {
+    if (game.paused) {
+      game.resume();
+      if (game.currentPuzzle == null) {
+        loadPuzzle();
+      }
+    } else {
+      game.pause();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hint (l10n resolved here, state mutation in GameModel)
+  // ---------------------------------------------------------------------------
 
   String _constraintName(Constraint constraint) {
     final l10n = AppLocalizations.of(context)!;
@@ -285,203 +271,55 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void showHelpMove() {
-    if (helpMove == null) return;
-    if (hintText.isNotEmpty && !hintIsError) {
-      currentPuzzle!.clearHighlights();
-      hintText = "";
-      currentPuzzle!.setValue(helpMove!.idx, helpMove!.value);
-      history.add(helpMove!.idx);
-      _scheduleHelpMe();
+    if (game.helpMove == null) return;
+    if (game.hintText.isNotEmpty && !game.hintIsError) {
+      game.showHelpMove("");
       return;
     }
-
-    setState(() {
-      currentPuzzle!.clearHighlights();
-      if (helpMove!.isImpossible != null) {
-        helpMove!.isImpossible!.isValid = false;
-        hintText = AppLocalizations.of(context)!.hintImpossible;
-        hintIsError = true;
-      } else if (helpMove!.isForce) {
-        currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-        hintText = AppLocalizations.of(context)!.hintForce;
-        hintIsError = false;
-      } else {
-        helpMove!.givenBy.isHighlighted = true;
-        currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-        hintText = AppLocalizations.of(
-          context,
-        )!.hintDeducedFrom(_constraintName(helpMove!.givenBy));
-        hintIsError = false;
-      }
-    });
-  }
-
-  void handleCheck() {
-    if (settings.liveCheckType == LiveCheckType.all ||
-        settings.liveCheckType == LiveCheckType.count) {
-      shouldCheck = true;
-      autoCheck();
-      return;
-    }
-    if (settings.validateType == ValidateType.manual) return;
-    shouldCheck = currentPuzzle!.complete;
-    if (shouldCheck) {
-      Future.delayed(Duration(seconds: 1), autoCheck);
-    }
-  }
-
-  void handlePuzzleTap(int idx) {
-    if (currentPuzzle == null) return;
-    if (currentPuzzle!.cells[idx].readonly) {
-      return;
-    }
-    currentPuzzle!.clearHighlights();
-    setState(() {
-      hintText = "";
-      currentPuzzle!.incrValue(idx);
-      currentPuzzle!.clearConstraintsValidity();
-      helpMove = null;
-      _scheduleHelpMe();
-      if (history.isEmpty || history.last != idx) history.add(idx);
-      handleCheck();
-    });
-  }
-
-  void handlePuzzleDrag(int idx) {
-    if (currentPuzzle == null) return;
-    if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
-    if (lastDragIdx != null && idx == lastDragIdx) return;
-    setState(() {
-      lastDragIdx = idx;
-      if (firstDragValue == null) {
-        final myOpposite = currentPuzzle!.domain
-            .whereNot((e) => e == currentPuzzle!.cellValues[idx])
-            .first;
-        firstDragValue = myOpposite;
-        currentPuzzle!.setValue(idx, firstDragValue!);
-        if (history.isEmpty || history.last != idx) history.add(idx);
-      }
-      if (currentPuzzle!.cellValues[idx] != firstDragValue &&
-          currentPuzzle!.cellValues[idx] == 0) {
-        currentPuzzle!.setValue(idx, firstDragValue!);
-        if (history.isEmpty || history.last != idx) history.add(idx);
-      }
-    });
-  }
-
-  void handlePuzzleDragEnd() {
-    setState(() {
-      firstDragValue = null;
-      lastDragIdx = null;
-      handleCheck();
-    });
-  }
-
-  void autoCheck() {
-    if (!shouldCheck) return;
-    shouldCheck = false;
-    if (currentPuzzle == null) return;
-    checkPuzzle();
-  }
-
-  void checkPuzzle({bool manualCheck = false}) {
-    final shouldShowErrors =
-        settings.liveCheckType == LiveCheckType.all || currentPuzzle!.complete;
-    final failedConstraints = currentPuzzle!.check(
-      saveResult: shouldShowErrors,
-    );
-    if (failedConstraints.isEmpty) {
-      if (currentPuzzle!.complete &&
-          (manualCheck || settings.validateType != ValidateType.manual)) {
-        currentMeta!.stop();
-        postMessage(
-          "played",
-          jsonEncode({"puzzle": currentMeta!.lineRepresentation}),
-          settings.shareData,
-        );
-        setState(() {
-          if (settings.showRating == ShowRating.yes) {
-            betweenPuzzles = true;
-          } else {
-            loadPuzzle();
-          }
-        });
-      }
-    } else if (settings.liveCheckType == LiveCheckType.complete) {
-      currentMeta!.failures += 1;
-      currentMeta!.stats?.failures += 1;
-    }
-    setState(() {
-      if (failedConstraints.isNotEmpty) {
-        if (shouldShowErrors) {
-          setTopMessage(
-            text: "Some constraints are not valid.",
-            color: Colors.red,
-          );
-        } else {
-          setTopMessage(
-            text: "${failedConstraints.length} errors.",
-            color: Colors.red,
-          );
-        }
-      } else {
-        setTopMessage();
-      }
-    });
-  }
-
-  void pause() {
-    setState(() {
-      paused = true;
-      if (currentPuzzle != null) {
-        currentMeta!.stats?.pause();
-      }
-    });
-  }
-
-  void resume() {
-    setState(() {
-      paused = false;
-      if (currentPuzzle == null) {
-        loadPuzzle();
-      } else {
-        currentMeta!.stats?.resume();
-      }
-    });
-  }
-
-  void togglePause() {
-    if (paused) {
-      resume();
+    final l10n = AppLocalizations.of(context)!;
+    String resolvedHintText;
+    if (game.helpMove!.isImpossible != null) {
+      resolvedHintText = l10n.hintImpossible;
+    } else if (game.helpMove!.isForce) {
+      resolvedHintText = l10n.hintForce;
     } else {
-      pause();
+      resolvedHintText = l10n.hintDeducedFrom(
+        _constraintName(game.helpMove!.givenBy),
+      );
     }
+    game.showHelpMove(resolvedHintText);
   }
+
+  // ---------------------------------------------------------------------------
+  // Rating & report
+  // ---------------------------------------------------------------------------
 
   void like(int liked) {
-    if (currentMeta == null) return;
-    currentMeta!.pleasure = liked;
+    if (game.currentMeta == null) return;
+    game.like(liked);
     postMessage(
       "like",
-      jsonEncode({"puzzle": currentMeta!.lineRepresentation, "liked": liked}),
+      jsonEncode({
+        "puzzle": game.currentMeta!.lineRepresentation,
+        "liked": liked,
+      }),
       settings.shareData,
     );
-    if (liked > 0) {
-      currentMeta!.liked = DateTime.now();
-    } else if (liked < 0) {
-      currentMeta!.disliked = DateTime.now();
-    }
     loadPuzzle();
   }
 
   void report() {
-    if (currentMeta == null) return;
+    if (game.currentMeta == null) return;
     postMessage(
       "report",
-      jsonEncode({"puzzle": currentMeta!.lineRepresentation}),
+      jsonEncode({"puzzle": game.currentMeta!.lineRepresentation}),
       settings.shareData,
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -493,9 +331,9 @@ class _MyHomePageState extends State<MyHomePage> {
         128 // Some margin
         );
     double cellSize = 32.0;
-    if (currentPuzzle != null) {
-      double maxWidth = contextWidth / currentPuzzle!.width;
-      double maxHeight = contextHeight / (currentPuzzle!.height + 2);
+    if (game.currentPuzzle != null) {
+      double maxWidth = contextWidth / game.currentPuzzle!.width;
+      double maxHeight = contextHeight / (game.currentPuzzle!.height + 2);
       cellSize = min(maxWidth, maxHeight);
     }
 
@@ -510,7 +348,7 @@ class _MyHomePageState extends State<MyHomePage> {
               tooltip: AppLocalizations.of(context)!.create,
               onPressed: _openCreatePage,
             ),
-          if (currentPuzzle != null &&
+          if (game.currentPuzzle != null &&
               !shouldChooseLocale &&
               settings.validateType == ValidateType.manual)
             Tooltip(
@@ -525,35 +363,39 @@ class _MyHomePageState extends State<MyHomePage> {
                   disabledForegroundColor: Theme.of(
                     context,
                   ).colorScheme.secondaryFixedDim,
-                  // tooltip: AppLocalizations.of(context)!.manuallyValidatePuzzle,
                 ),
-                onPressed: (currentPuzzle!.complete && !betweenPuzzles)
-                    ? () => checkPuzzle(manualCheck: true)
+                onPressed:
+                    (game.currentPuzzle!.complete && !game.betweenPuzzles)
+                    ? () => game.checkPuzzle(
+                        settings,
+                        manualCheck: true,
+                        onPuzzleCompleted: _onPuzzleCompleted,
+                      )
                     : null,
                 icon: const Icon(Icons.check),
                 label: Text(
                   AppLocalizations.of(context)!.manuallyValidatePuzzle,
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-          if (currentPuzzle != null && !shouldChooseLocale)
+          if (game.currentPuzzle != null && !shouldChooseLocale)
             IconButton(
               icon: Icon(Icons.lightbulb),
               tooltip: AppLocalizations.of(context)!.tooltipClue,
-              onPressed: helpMove == null ? null : showHelpMove,
+              onPressed: game.helpMove == null ? null : showHelpMove,
             ),
-          if (currentPuzzle != null && !shouldChooseLocale)
+          if (game.currentPuzzle != null && !shouldChooseLocale)
             IconButton(
               icon: Icon(Icons.undo_outlined),
               tooltip: AppLocalizations.of(context)!.tooltipUndo,
-              onPressed: history.isEmpty ? null : undo,
+              onPressed: game.history.isEmpty ? null : game.undo,
             ),
-          if (currentPuzzle != null && !shouldChooseLocale)
+          if (game.currentPuzzle != null && !shouldChooseLocale)
             IconButton(
               icon: Icon(Icons.restart_alt_outlined),
               tooltip: AppLocalizations.of(context)!.restart,
-              onPressed: history.isEmpty ? null : restartPuzzle,
+              onPressed: game.history.isEmpty ? null : game.restart,
             ),
           if (database != null && !shouldChooseLocale)
             IconButton(
@@ -571,9 +413,9 @@ class _MyHomePageState extends State<MyHomePage> {
               decoration: const BoxDecoration(color: Colors.blue),
               child: Column(
                 children: [
-                  Text(widget.title, style: TextStyle(fontSize: 24)),
+                  Text(widget.title, style: const TextStyle(fontSize: 24)),
                   Text(versionText),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   Text('Ghislain "court-jus" Lévêque'),
                 ],
               ),
@@ -585,7 +427,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 Navigator.pop(context);
               },
             ),
-            Divider(),
+            const Divider(),
             ListTile(
               leading: Icon(Icons.bug_report),
               title: Text(AppLocalizations.of(context)!.report),
@@ -594,7 +436,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 Navigator.pop(context);
               },
             ),
-            Divider(),
+            const Divider(),
             if (database != null)
               ListTile(
                 leading: Icon(Icons.fiber_new),
@@ -661,7 +503,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   );
                 },
               ),
-            Divider(),
+            const Divider(),
             ListTile(
               leading: Icon(Icons.settings),
               title: Text(AppLocalizations.of(context)!.settings),
@@ -711,10 +553,10 @@ class _MyHomePageState extends State<MyHomePage> {
             spacing: 2,
             children: <Widget>[
               Text(
-                topMessage,
+                game.topMessage,
                 style: TextStyle(
                   fontSize: 16,
-                  color: topMessageColor,
+                  color: game.topMessageColor,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -722,18 +564,18 @@ class _MyHomePageState extends State<MyHomePage> {
                   ? Stack(
                       alignment: AlignmentGeometry.center,
                       children: [
-                        if (betweenPuzzles)
+                        if (game.betweenPuzzles)
                           Column(
                             spacing: 16,
                             children: [
-                              if (betweenPuzzles)
+                              if (game.betweenPuzzles)
                                 BetweenPuzzles(
                                   like: like,
                                   loadPuzzle: loadPuzzle,
                                 )
-                              else if (paused)
+                              else if (game.paused)
                                 TextButton(
-                                  onPressed: resume,
+                                  onPressed: togglePause,
                                   child: DecoratedBox(
                                     decoration: BoxDecoration(
                                       color: Colors.teal,
@@ -753,9 +595,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                 ),
                             ],
                           )
-                        else if (paused)
+                        else if (game.paused)
                           TextButton(
-                            onPressed: resume,
+                            onPressed: togglePause,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: Colors.teal,
@@ -775,16 +617,16 @@ class _MyHomePageState extends State<MyHomePage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              if (currentPuzzle != null)
+                              if (game.currentPuzzle != null)
                                 PuzzleWidget(
-                                  currentPuzzle: currentPuzzle!,
+                                  currentPuzzle: game.currentPuzzle!,
                                   onCellTap: handlePuzzleTap,
                                   onCellDrag: handlePuzzleDrag,
                                   onCellDragEnd: handlePuzzleDragEnd,
                                   cellSize: cellSize,
                                   locale: locale,
-                                  hintText: hintText,
-                                  hintIsError: hintIsError,
+                                  hintText: game.hintText,
+                                  hintIsError: game.hintIsError,
                                 )
                               else
                                 Text(
@@ -795,7 +637,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ],
                     )
                   : (shouldChooseLocale
-                        ? Initiallocalechooser(selectLocale: toggleLocale)
+                        ? InitialLocaleChooser(selectLocale: toggleLocale)
                         : Text("Loading...")),
             ],
           ),
@@ -803,9 +645,9 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       bottomNavigationBar: (initialized && !shouldChooseLocale)
           ? TimerBottomBar(
-              currentMeta: currentMeta,
-              currentPuzzle: currentPuzzle,
-              dbSize: dbSize,
+              currentMeta: game.currentMeta,
+              currentPuzzle: game.currentPuzzle,
+              dbSize: game.dbSize,
             )
           : null,
     );

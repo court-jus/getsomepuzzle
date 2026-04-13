@@ -277,11 +277,11 @@ class _OpenPageState extends State<OpenPage> {
                 minHeight: viewportConstraints.maxHeight,
               ),
               child: Container(
-                margin: EdgeInsets.all(8),
+                margin: const EdgeInsets.all(8),
                 child: Column(
                   children: [
                     Text(AppLocalizations.of(context)!.infoFilterCollection),
-                    Divider(),
+                    const Divider(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -347,7 +347,7 @@ class _OpenPageState extends State<OpenPage> {
                         ),
                       ],
                     ),
-                    Divider(),
+                    const Divider(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -432,7 +432,7 @@ class _OpenPageState extends State<OpenPage> {
                         ),
                       ],
                     ),
-                    Divider(),
+                    const Divider(),
                     TextField(
                       onChanged: (value) =>
                           selectPuzzle(PuzzleData(value), context, false),
@@ -444,7 +444,7 @@ class _OpenPageState extends State<OpenPage> {
                         ),
                       ),
                     ),
-                    Divider(),
+                    const Divider(),
                     Text(AppLocalizations.of(context)!.labelWidgetDimensions),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -561,11 +561,11 @@ class _OpenPageState extends State<OpenPage> {
                           )
                           .toList(),
                     ),
-                    Divider(),
+                    const Divider(),
                     Text(
                       "${AppLocalizations.of(context)!.msgCountMatchingPuzzles}: $matchingCount",
                     ),
-                    Divider(),
+                    const Divider(),
                     if (widget.database.collection == "custom" &&
                         widget.database.puzzles.isEmpty)
                       Padding(

@@ -67,7 +67,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 minHeight: viewportConstraints.maxHeight,
               ),
               child: Container(
-                margin: EdgeInsets.all(8),
+                margin: const EdgeInsets.all(8),
                 child: Column(
                   children: [
                     Row(

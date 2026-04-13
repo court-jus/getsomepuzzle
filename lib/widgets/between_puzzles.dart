@@ -18,11 +18,11 @@ class BetweenPuzzles extends StatelessWidget {
       children: [
         Text(
           AppLocalizations.of(context)!.msgPuzzleSolved,
-          style: TextStyle(fontSize: 48),
+          style: const TextStyle(fontSize: 48),
         ),
         Text(
           AppLocalizations.of(context)!.questionFunToPlay,
-          style: TextStyle(fontSize: 24),
+          style: const TextStyle(fontSize: 24),
         ),
         Wrap(
           direction: Axis.horizontal,

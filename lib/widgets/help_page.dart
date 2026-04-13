@@ -50,7 +50,7 @@ class _HelpPageState extends State<HelpPage> {
                 minHeight: viewportConstraints.maxHeight,
               ),
               child: Container(
-                margin: EdgeInsets.all(8),
+                margin: const EdgeInsets.all(8),
                 child: Column(
                   children: [
                     MarkdownTheme(

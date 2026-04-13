@@ -57,7 +57,7 @@ class _StatsPageState extends State<StatsPage> {
                     icon: Icon(Icons.copy),
                   ),
                   Container(
-                    margin: EdgeInsets.all(8),
+                    margin: const EdgeInsets.all(8),
                     child: Text(
                       stats.join("\n"),
                       style: Theme.of(context).textTheme.bodySmall!.copyWith(

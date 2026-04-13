@@ -237,7 +237,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                         ),
                   ],
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 SizedBox(
                   width: gridWidth,
                   height: gridHeight,

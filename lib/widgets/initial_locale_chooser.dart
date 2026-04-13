@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class Initiallocalechooser extends StatelessWidget {
-  const Initiallocalechooser({super.key, required this.selectLocale});
+class InitialLocaleChooser extends StatelessWidget {
+  const InitialLocaleChooser({super.key, required this.selectLocale});
   final Function selectLocale;
 
   @override

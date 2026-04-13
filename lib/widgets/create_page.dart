@@ -1029,7 +1029,7 @@ class _CreatePageState extends State<CreatePage> {
             ),
           ),
           const SizedBox(height: 24),
-          Divider(),
+          const Divider(),
           TextField(
             decoration: InputDecoration(
               hintText: loc.createPasteHint,
