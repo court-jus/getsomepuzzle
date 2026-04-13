@@ -213,7 +213,7 @@ class _OpenPageState extends State<OpenPage> {
 
   Future<void> _importPlaylistFromFile() async {
     final loc = AppLocalizations.of(context)!;
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['txt'],
     );
