@@ -22,6 +22,10 @@ Hay unos 10.000 rompecabezas incluidos en la aplicación. Cada vez que abras la 
 
 Si ves un patrón encima de los rompecabezas con un fondo púrpura, debes llenar tu cuadrícula de modo que ese patrón NO aparezca en ninguna parte.
 
+### Restricción de forma
+
+Si ves un patrón encima de los rompecabezas con un fondo azul claro y que está inclinado 45°, todos los grupos de ese color deben tener esa forma exacta (las rotaciones y simetrías están permitidas).
+
 ### Tamaño del grupo
 
 Si una celda contiene un número, debe formar parte de un grupo de celdas ortogonalmente adyacentes del mismo color y el tamaño de ese grupo debe coincidir con el número.

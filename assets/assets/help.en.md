@@ -22,6 +22,10 @@ There are about 10,000 puzzles bundled within the app. Each time you run the app
 
 If you see a pattern above the puzzles that has a purple background, you must fill your grid so that this pattern does NOT appear anywhere.
 
+### Shape constraint
+
+If you see a pattern above the puzzles that has a light blue background and is rotated 45°, all groups of that color must have that exact shape (rotations and mirrors are allowed).
+
 ### Group size
 
 If a cell contains a number, it must be part of a group of orthogonally connected cells of the same color and that group's size must match the number.

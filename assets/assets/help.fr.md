@@ -22,6 +22,10 @@ Il y a environ 10000 puzzles fournis avec l'application. Ceux que vous avez déj
 
 Si vous voyez un motif au dessus de la grille qui a un fond violet, vous devez remplir votre grille sans que ce motif n'apparaisse dans la grille.
 
+### Contrainte de forme
+
+Si vous voyez un motif au dessus de la grille qui a un fond bleu clair et qui est incliné à 45°, tous les groupes de cette couleur doivent avoir cette forme exacte (les rotations et symétries sont autorisées).
+
 ### Taille du groupe
 
 Si une case contient un nombre, elle doit faire partie d'un groupe de cases de la même couleur, adjacentes orthogonalement et la taille de ce groupe doit correspondre au nombre.
