@@ -12,6 +12,7 @@ import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
 import 'package:getsomepuzzle/widgets/textpuzzle.dart';
+import 'package:getsomepuzzle/utils/platform_utils.dart';
 
 class PuzzleWidget extends StatefulWidget {
   const PuzzleWidget({
@@ -24,6 +25,8 @@ class PuzzleWidget extends StatefulWidget {
     required this.locale,
     this.hintText = "",
     this.hintIsError = false,
+    this.onCellRightDrag,
+    this.onCellRightDragEnd,
   });
 
   final Puzzle currentPuzzle;
@@ -34,6 +37,8 @@ class PuzzleWidget extends StatefulWidget {
   final String locale;
   final String hintText;
   final bool hintIsError;
+  final ValueChanged<int>? onCellRightDrag;
+  final VoidCallback? onCellRightDragEnd;
 
   @override
   State<PuzzleWidget> createState() => _PuzzleWidgetState();
@@ -309,13 +314,25 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       constraints: widget.currentPuzzle.cellConstraints[idx],
       cellSize: adjustedCellSize,
       onTap: () => _handleCellTap(idx),
-      onSecondaryTap: () => _handleCellTap(idx, secondary: true),
+      onSecondaryTap: isDesktopOrWeb
+          ? () => _handleCellTap(idx, secondary: true)
+          : null,
       onDrag: (Offset offset) {
         final int targetRow = (rowidx + offset.dy).floor();
         final int targetCell = (cellidx + offset.dx).floor();
         widget.onCellDrag(targetRow * widget.currentPuzzle.width + targetCell);
       },
       onDragEnd: widget.onCellDragEnd,
+      onRightDrag: widget.onCellRightDrag != null
+          ? (Offset offset) {
+              final int targetRow = (rowidx + offset.dy).floor();
+              final int targetCell = (cellidx + offset.dx).floor();
+              widget.onCellRightDrag!(
+                targetRow * widget.currentPuzzle.width + targetCell,
+              );
+            }
+          : null,
+      onRightDragEnd: widget.onCellRightDragEnd,
     );
   }
 }

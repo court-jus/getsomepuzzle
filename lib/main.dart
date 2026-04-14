@@ -28,6 +28,7 @@ import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
 import 'package:getsomepuzzle/widgets/timer_bottom_bar.dart';
+import 'package:getsomepuzzle/utils/platform_utils.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -219,6 +220,15 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void handlePuzzleDragEnd() {
     game.handleDragEnd();
+    _handleCheck();
+  }
+
+  void handlePuzzleRightDrag(int idx) {
+    game.handleRightDrag(idx);
+  }
+
+  void handlePuzzleRightDragEnd() {
+    game.handleRightDragEnd();
     _handleCheck();
   }
 
@@ -588,6 +598,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                   onCellTap: handlePuzzleTap,
                                   onCellDrag: handlePuzzleDrag,
                                   onCellDragEnd: handlePuzzleDragEnd,
+                                  onCellRightDrag: isDesktopOrWeb
+                                      ? handlePuzzleRightDrag
+                                      : null,
+                                  onCellRightDragEnd: isDesktopOrWeb
+                                      ? handlePuzzleRightDragEnd
+                                      : null,
                                   cellSize: cellSize,
                                   locale: locale,
                                   hintText: game.hintText,

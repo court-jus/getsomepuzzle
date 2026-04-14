@@ -1,10 +1,12 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint_to_flutter.dart';
+import 'package:getsomepuzzle/utils/platform_utils.dart';
 
 const bgColors = {
   0: Color.fromARGB(255, 192, 235, 241),
@@ -23,13 +25,15 @@ class CellWidget extends StatelessWidget {
     required this.isHighlighted,
     required this.cellSize,
     required this.onTap,
-    required this.onSecondaryTap,
     required this.onDrag,
     required this.onDragEnd,
+    this.onSecondaryTap,
     this.constraints,
     this.borderColor,
     this.borderWidth,
     this.cornerIndicatorValue,
+    this.onRightDrag,
+    this.onRightDragEnd,
   });
 
   // Attributes
@@ -39,7 +43,7 @@ class CellWidget extends StatelessWidget {
   final bool isHighlighted;
   final List<Constraint>? constraints;
   final VoidCallback onTap;
-  final VoidCallback onSecondaryTap;
+  final VoidCallback? onSecondaryTap;
   final ValueChanged<Offset> onDrag;
   final VoidCallback onDragEnd;
   final double cellSize;
@@ -53,6 +57,9 @@ class CellWidget extends StatelessWidget {
   /// If set, draws a small colored triangle in the top-left corner
   final int? cornerIndicatorValue;
 
+  final ValueChanged<Offset>? onRightDrag;
+  final VoidCallback? onRightDragEnd;
+
   // Build UI
   @override
   Widget build(BuildContext context) {
@@ -60,14 +67,9 @@ class CellWidget extends StatelessWidget {
 
     int widgetScale = 1;
     if (constraints != null) {
-      // 1: 1, 2: 2, 3: 2, 4: 2, 5: 3
       widgetScale = sqrt(constraints!.length).ceil();
     }
     final Widget emptyText = Text(" ");
-    // final Widget emptyText = Text(
-    //   idx.toString(),
-    //   style: TextStyle(color: (fgColors[value] ?? Colors.black)),
-    // );
     final Widget label = constraints == null
         ? emptyText
         : Wrap(
@@ -85,47 +87,85 @@ class CellWidget extends StatelessWidget {
                   ),
             ],
           );
-    return GestureDetector(
-      onTap: onTap,
-      onSecondaryTap: onSecondaryTap,
-      onVerticalDragUpdate: (details) {
-        final localPos = details.localPosition;
-        final offsetX = localPos.dx / cellSize;
-        final offsetY = localPos.dy / cellSize;
-        onDrag(Offset(offsetX.floor().toDouble(), offsetY.floor().toDouble()));
-      },
-      onVerticalDragEnd: (details) => onDragEnd(),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: color,
-          border: BoxBorder.all(
-            width: borderWidth ?? ((readonly || isHighlighted) ? 6 : 1),
-            color:
-                borderColor ??
-                (isHighlighted ? highlightColor : Colors.blueAccent),
+
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: isDesktopOrWeb
+          ? (event) {
+              if (event.kind == PointerDeviceKind.mouse &&
+                  event.buttons == kSecondaryMouseButton) {
+                final localPos = event.localPosition;
+                final offsetX = (localPos.dx / cellSize).floor();
+                final offsetY = (localPos.dy / cellSize).floor();
+                onRightDrag?.call(
+                  Offset(offsetX.toDouble(), offsetY.toDouble()),
+                );
+              }
+            }
+          : null,
+      onPointerMove: isDesktopOrWeb
+          ? (event) {
+              if (event.kind == PointerDeviceKind.mouse &&
+                  event.buttons == kSecondaryMouseButton) {
+                final localPos = event.localPosition;
+                final offsetX = (localPos.dx / cellSize).floor();
+                final offsetY = (localPos.dy / cellSize).floor();
+                onRightDrag?.call(
+                  Offset(offsetX.toDouble(), offsetY.toDouble()),
+                );
+              }
+            }
+          : null,
+      onPointerUp: isDesktopOrWeb
+          ? (event) {
+              if (event.kind == PointerDeviceKind.mouse) {
+                onRightDragEnd?.call();
+              }
+            }
+          : null,
+      child: GestureDetector(
+        onTap: onTap,
+        onVerticalDragUpdate: (details) {
+          final localPos = details.localPosition;
+          final offsetX = localPos.dx / cellSize;
+          final offsetY = localPos.dy / cellSize;
+          onDrag(
+            Offset(offsetX.floor().toDouble(), offsetY.floor().toDouble()),
+          );
+        },
+        onVerticalDragEnd: (details) => onDragEnd(),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: color,
+            border: BoxBorder.all(
+              width: borderWidth ?? ((readonly || isHighlighted) ? 6 : 1),
+              color:
+                  borderColor ??
+                  (isHighlighted ? highlightColor : Colors.blueAccent),
+            ),
           ),
-        ),
-        child: SizedBox(
-          width: cellSize,
-          height: cellSize,
-          child: Stack(
-            children: [
-              Center(child: label),
-              if (cornerIndicatorValue != null)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  child: CustomPaint(
-                    size: Size(cellSize * 0.4, cellSize * 0.4),
-                    painter: _CornerTrianglePainter(
-                      color: cornerIndicatorValue == 1
-                          ? Colors.black
-                          : Colors.white,
-                      borderColor: Colors.grey,
+          child: SizedBox(
+            width: cellSize,
+            height: cellSize,
+            child: Stack(
+              children: [
+                Center(child: label),
+                if (cornerIndicatorValue != null)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: CustomPaint(
+                      size: Size(cellSize * 0.4, cellSize * 0.4),
+                      painter: _CornerTrianglePainter(
+                        color: cornerIndicatorValue == 1
+                            ? Colors.black
+                            : Colors.white,
+                        borderColor: Colors.grey,
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

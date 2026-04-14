@@ -32,6 +32,8 @@ class GameModel extends ChangeNotifier {
   // --- Drag state ---
   int? firstDragValue;
   int? lastDragIdx;
+  int? firstRightDragValue;
+  int? lastRightDragIdx;
 
   Timer? _helpDebounce;
   final _log = Logger("GameModel");
@@ -167,6 +169,33 @@ class GameModel extends ChangeNotifier {
   void handleDragEnd() {
     firstDragValue = null;
     lastDragIdx = null;
+    notifyListeners();
+  }
+
+  void handleRightDrag(int idx) {
+    if (currentPuzzle == null) return;
+    if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
+    if (lastRightDragIdx != null && idx == lastRightDragIdx) return;
+    final currentValue = currentPuzzle!.cellValues[idx];
+    if (firstRightDragValue == null && currentValue == 1) return;
+    lastRightDragIdx = idx;
+    if (firstRightDragValue == null) {
+      firstRightDragValue = currentValue == 0 ? 2 : 0;
+      print("$idx $currentValue $firstRightDragValue");
+      final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
+      if (changed && (history.isEmpty || history.last != idx)) history.add(idx);
+    }
+    final oppositeValue = firstRightDragValue == 0 ? 2 : 0;
+    if (currentPuzzle!.cellValues[idx] == oppositeValue) {
+      final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
+      if (changed && (history.isEmpty || history.last != idx)) history.add(idx);
+    }
+    notifyListeners();
+  }
+
+  void handleRightDragEnd() {
+    firstRightDragValue = null;
+    lastRightDragIdx = null;
     notifyListeners();
   }
 
