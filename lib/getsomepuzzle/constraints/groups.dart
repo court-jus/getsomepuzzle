@@ -1,9 +1,9 @@
 import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 const _maxGroupSizeRatio = 0.5;
 const _maxGroupSizeAbsolute = 15;

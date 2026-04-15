@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/utils/share_stub.dart'
     if (dart.library.html) 'package:getsomepuzzle/utils/share_html.dart'

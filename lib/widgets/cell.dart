@@ -2,10 +2,10 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraint_to_flutter.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/to_flutter.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
 
 const bgColors = {

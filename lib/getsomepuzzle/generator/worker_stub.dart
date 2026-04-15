@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:getsomepuzzle/getsomepuzzle/generator.dart';
-import 'package:getsomepuzzle/getsomepuzzle/generator_messages.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
 
 class GeneratorWorker {
   Stream<GeneratorMessage> start(

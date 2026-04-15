@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:math';
 
-import 'package:getsomepuzzle/getsomepuzzle/generator.dart';
-import 'package:getsomepuzzle/getsomepuzzle/generator_messages.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
 
 class GeneratorWorker {
   StreamController<GeneratorMessage>? _controller;

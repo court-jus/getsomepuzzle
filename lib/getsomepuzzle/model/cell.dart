@@ -1,4 +1,4 @@
-import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 
 class Cell {
   int value = 0;

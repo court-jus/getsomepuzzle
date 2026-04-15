@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/database.dart';
-import 'package:getsomepuzzle/getsomepuzzle/generator.dart';
-import 'package:getsomepuzzle/getsomepuzzle/generator_worker.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class GeneratePage extends StatefulWidget {
