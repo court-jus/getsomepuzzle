@@ -1,6 +1,6 @@
 import 'package:collection/collection.dart';
-import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class Constraint {
   bool isValid = true;

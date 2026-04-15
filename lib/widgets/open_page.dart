@@ -4,8 +4,8 @@ import 'dart:io' as java_io;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/plusminus.dart';
 

@@ -2,13 +2,12 @@ import 'dart:async';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_rank_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_worker.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
-import 'package:getsomepuzzle/getsomepuzzle/settings.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 import 'package:logging/logging.dart';
 
 class GameModel extends ChangeNotifier {

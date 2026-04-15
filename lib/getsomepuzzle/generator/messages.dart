@@ -1,4 +1,4 @@
-import 'package:getsomepuzzle/getsomepuzzle/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 
 /// Message types sent from the worker to the UI or CLI.
 sealed class GeneratorMessage {}

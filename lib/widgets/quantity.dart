@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 
 const textColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
