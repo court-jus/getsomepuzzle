@@ -47,15 +47,12 @@ void _solvePuzzle(String line) {
   int step = 0;
   while (!p.complete) {
     Move? move;
-    Constraint? source;
+    CanApply? source;
     String? foundBy;
-    for (final constraint in p.constraints) {
-      move = constraint.apply(p);
-      if (move != null) {
-        source = constraint;
-        foundBy = "constraint";
-        break;
-      }
+    move = p.apply();
+    if (move != null) {
+      source = move.givenBy;
+      foundBy = (move.givenBy is Constraint ? "constraint" : "complicity");
     }
 
     if (move == null) {

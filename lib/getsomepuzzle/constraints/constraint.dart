@@ -2,7 +2,12 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-class Constraint {
+abstract class CanApply {
+  Move? apply(Puzzle puzzle);
+  String serialize();
+}
+
+class Constraint extends CanApply {
   bool isValid = true;
   bool isHighlighted = false;
 
@@ -17,6 +22,7 @@ class Constraint {
     return toString();
   }
 
+  @override
   String serialize() {
     return '';
   }
@@ -33,6 +39,7 @@ class Constraint {
     return verified;
   }
 
+  @override
   Move? apply(Puzzle puzzle) {
     final clone = puzzle.clone();
     for (var cell in clone.cellValues.indexed) {

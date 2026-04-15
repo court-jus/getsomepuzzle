@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_rank_worker.dart';
@@ -304,14 +305,20 @@ class GameModel extends ChangeNotifier {
     }
     currentPuzzle!.clearHighlights();
     if (helpMove!.isImpossible != null) {
-      helpMove!.isImpossible!.isValid = false;
+      final impossibleConstraint = helpMove!.isImpossible;
+      if (impossibleConstraint is Constraint) {
+        impossibleConstraint.isValid = false;
+      }
       hintText = resolvedHintText;
       hintIsError = true;
     } else {
       if (helpMove!.isForce) {
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
       } else {
-        helpMove!.givenBy.isHighlighted = true;
+        final givenBy = helpMove!.givenBy;
+        if (givenBy is Constraint) {
+          givenBy.isHighlighted = true;
+        }
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
       }
       hintText = resolvedHintText;

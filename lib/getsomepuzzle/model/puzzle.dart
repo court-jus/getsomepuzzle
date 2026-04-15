@@ -1,6 +1,9 @@
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.dart'
+    as complicities_registry;
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
@@ -75,6 +78,7 @@ class Puzzle {
   int height = 0;
   List<Cell> cells = [];
   List<Constraint> constraints = [];
+  List<Complicity> complicities = [];
   int? cachedComplexity;
   List<int>? cachedSolution;
 
@@ -111,6 +115,7 @@ class Puzzle {
             .toList();
       }
     }
+    detectComplicities();
   }
 
   void restart() {
@@ -120,6 +125,15 @@ class Puzzle {
         cell.options = cell.domain;
       }
     }
+  }
+
+  /// Scan the constraint list against the complicity registry
+  /// and populate [complicities] with those that apply.
+  void detectComplicities() {
+    complicities = [
+      for (final c in complicities_registry.allComplicities)
+        if (c.isPresent(this)) c,
+    ];
   }
 
   List<int> get cellValues => cells.map((cell) => cell.value).toList();
@@ -264,6 +278,10 @@ class Puzzle {
       final move = c.apply(this);
       if (move != null) return move;
     }
+    for (var c in complicities) {
+      final move = c.apply(this);
+      if (move != null) return move;
+    }
     return null;
   }
 
@@ -386,6 +404,7 @@ class Puzzle {
     p.lineRepresentation = lineRepresentation;
     p.cells = cells.map((c) => c.clone()).toList();
     p.constraints = constraints.toList();
+    p.complicities = complicities.toList();
     return p;
   }
 

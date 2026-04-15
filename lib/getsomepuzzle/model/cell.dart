@@ -52,8 +52,8 @@ class Cell {
 class Move {
   int idx;
   int value;
-  Constraint givenBy;
-  Constraint? isImpossible;
+  CanApply givenBy;
+  CanApply? isImpossible;
   bool isForce;
 
   Move(

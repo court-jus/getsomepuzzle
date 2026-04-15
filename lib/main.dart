@@ -7,6 +7,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
@@ -273,7 +274,7 @@ class _MyHomePageState extends State<MyHomePage> {
   // Hint (l10n resolved here, state mutation in GameModel)
   // ---------------------------------------------------------------------------
 
-  String _constraintName(Constraint constraint) {
+  String _constraintName(CanApply constraint) {
     final l10n = AppLocalizations.of(context)!;
     if (constraint is ForbiddenMotif) return l10n.constraintForbiddenPattern;
     if (constraint is GroupSize) return l10n.constraintGroupSize;
@@ -281,6 +282,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (constraint is ParityConstraint) return l10n.constraintParity;
     if (constraint is QuantityConstraint) return l10n.constraintQuantity;
     if (constraint is SymmetryConstraint) return l10n.constraintSymmetry;
+    if (constraint is Complicity) return "FIXME: complicity";
     return "";
   }
 
