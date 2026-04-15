@@ -75,6 +75,8 @@ class Puzzle {
   int height = 0;
   List<Cell> cells = [];
   List<Constraint> constraints = [];
+  int? cachedComplexity;
+  List<int>? cachedSolution;
 
   Puzzle(this.lineRepresentation) {
     var attributesStr = lineRepresentation.split("_");
@@ -491,9 +493,15 @@ class Puzzle {
   /// - **Emptiness** (0-6): proportion of free cells.
   ///   Fully empty=6, 50% filled=3, fully filled=0.
   int computeComplexity() {
+    if (cachedComplexity != null) return cachedComplexity!;
+
     final size = width * height;
     final totalFree = freeCells().length;
-    if (totalFree == 0) return 0;
+    if (totalFree == 0) {
+      cachedSolution = cellValues;
+      cachedComplexity = 0;
+      return 0;
+    }
 
     // Count distinct rule types (exclude HelpText)
     final ruleTypes = constraints
@@ -522,6 +530,7 @@ class Puzzle {
     try {
       test.applyConstraintsPropagation();
     } on SolverContradiction {
+      cachedComplexity = 100;
       return 100;
     }
 
@@ -534,16 +543,22 @@ class Puzzle {
           forceRounds++;
           test.applyConstraintsPropagation();
         } on SolverContradiction {
+          cachedComplexity = 100;
           return 100;
         }
         if (test.freeCells().isEmpty) break;
       }
       // Needs backtracking
-      if (test.freeCells().isNotEmpty) return 100;
+      if (test.freeCells().isNotEmpty) {
+        cachedComplexity = 100;
+        return 100;
+      }
     }
 
+    cachedSolution = test.cellValues;
     final forceScore = (forceRounds * 10).clamp(0, 90);
-    return (forceScore + ruleDiversity + emptiness).clamp(0, 100);
+    cachedComplexity = (forceScore + ruleDiversity + emptiness).clamp(0, 100);
+    return cachedComplexity!;
   }
 
   /// Step-by-step solving trace, returning each deduction made.
@@ -765,15 +780,18 @@ class Puzzle {
   }
 
   /// Export puzzle to the v2 line format.
-  String lineExport({int? cplx}) {
+  /// When [compute] is false, skip complexity and solution computation.
+  String lineExport({bool compute = true}) {
     final domainStr = domain.map((v) => v.toString()).join('');
     final valuesStr = cellValues.map((v) => v.toString()).join('');
     final constraintsStr = constraints
         .where((c) => c is! HelpText)
         .map((c) => c.serialize())
         .join(';');
-    final complexity = cplx ?? computeComplexity();
-    return 'v2_${domainStr}_${width}x${height}_${valuesStr}_${constraintsStr}_0:0_$complexity';
+    final complexity = compute ? computeComplexity() : 0;
+    final sol = cachedSolution;
+    final solutionStr = sol != null ? '1:${sol.join('')}' : '0:0';
+    return 'v2_${domainStr}_${width}x${height}_${valuesStr}_${constraintsStr}_${solutionStr}_$complexity';
   }
 
   List<List<int>> toVirtualGroups() {

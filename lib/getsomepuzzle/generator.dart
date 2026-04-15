@@ -114,6 +114,7 @@ class PuzzleGenerator {
 
     // 2. Create puzzle with some pre-filled cells
     final pu = Puzzle.empty(width, height, _defaultDomain);
+    pu.cachedSolution = solvedValues;
     final prefilled = (size * (1 - ratio)).ceil();
     final indices = List.generate(size, (i) => i)..shuffle(_rng);
     for (int i = 0; i < prefilled && i < indices.length; i++) {

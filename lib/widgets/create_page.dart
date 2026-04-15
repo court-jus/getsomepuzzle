@@ -885,7 +885,7 @@ class _CreatePageState extends State<CreatePage> {
     if (widget.onPuzzleSelected == null) return;
     _saveState();
     final puzzle = _buildPuzzle();
-    final line = puzzle.lineExport(cplx: 0);
+    final line = puzzle.lineExport(compute: false);
     final puzzleData = PuzzleData(line);
     Navigator.pop(context);
     widget.onPuzzleSelected!(puzzleData);
@@ -895,8 +895,7 @@ class _CreatePageState extends State<CreatePage> {
   void _savePuzzle() async {
     final loc = AppLocalizations.of(context)!;
     final puzzle = _buildPuzzle();
-    final complexity = puzzle.computeComplexity();
-    final line = puzzle.lineExport(cplx: complexity);
+    final line = puzzle.lineExport();
     await widget.database.addToPlaylist(_targetPlaylist, line);
     await widget.database.loadPuzzlesFile(_targetPlaylist);
     if (!mounted) return;
