@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
   test('countSolutions detects the invalid puzzle found in try_me.txt', () {

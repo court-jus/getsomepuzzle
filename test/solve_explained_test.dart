@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
   test('solveExplained returns all steps for a propagation-only puzzle', () {

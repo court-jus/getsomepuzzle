@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
 import 'package:flutter/services.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
-import 'package:getsomepuzzle/getsomepuzzle/stats.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';

@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:math';
 
-import 'package:getsomepuzzle/getsomepuzzle/generator.dart';
-import 'package:getsomepuzzle/getsomepuzzle/generator_worker.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
-import 'package:getsomepuzzle/getsomepuzzle/stats.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
 Future<void> main(List<String> args) async {
   final parsed = _parseArgs(args);

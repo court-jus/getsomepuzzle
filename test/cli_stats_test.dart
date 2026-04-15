@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getsomepuzzle/getsomepuzzle/stats.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
 void main() {
   group('StatEntry.parse', () {

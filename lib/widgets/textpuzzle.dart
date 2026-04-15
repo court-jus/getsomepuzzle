@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_md/flutter_md.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 
 class TextpuzzleWidget extends StatefulWidget {
   const TextpuzzleWidget({

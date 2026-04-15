@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
   test('Complexity is 0 for propagation-only puzzles', () {

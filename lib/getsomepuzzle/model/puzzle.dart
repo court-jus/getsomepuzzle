@@ -1,7 +1,7 @@
 import 'package:collection/collection.dart';
-import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/settings.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class SettingsPage extends StatefulWidget {

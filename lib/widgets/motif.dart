@@ -1,10 +1,10 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 
 const _bgColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
 const forbiddenColor = Color.fromARGB(255, 185, 86, 202);
