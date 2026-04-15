@@ -16,6 +16,10 @@ import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 class GeneratorConfig {
   final int width;
   final int height;
+  final int? minWidth;
+  final int? maxWidth;
+  final int? minHeight;
+  final int? maxHeight;
   final Set<String> requiredRules;
   final Set<String> bannedRules;
   final Duration maxTime;
@@ -24,6 +28,10 @@ class GeneratorConfig {
   const GeneratorConfig({
     required this.width,
     required this.height,
+    this.minWidth,
+    this.maxWidth,
+    this.minHeight,
+    this.maxHeight,
     this.requiredRules = const {},
     this.bannedRules = const {},
     this.maxTime = const Duration(seconds: 60),

@@ -2,16 +2,17 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/stats.dart';
 
-void main(List<String> args) {
+Future<void> main(List<String> args) async {
   final parsed = _parseArgs(args);
 
   final mode = parsed['mode'] as String;
   switch (mode) {
     case 'generate':
-      _runGenerate(parsed);
+      await _runGenerate(parsed);
     case 'check':
       _runCheck(parsed['checkFile'] as String);
     case 'read-stats':
@@ -21,7 +22,7 @@ void main(List<String> args) {
 
 // --- Generate mode ---
 
-void _runGenerate(Map<String, dynamic> parsed) {
+Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final count = parsed['count'] as int;
   final minWidth = parsed['minWidth'] as int;
   final maxWidth = parsed['maxWidth'] as int;
@@ -32,7 +33,6 @@ void _runGenerate(Map<String, dynamic> parsed) {
   final requiredRules =
       (parsed['required'] as String?)?.split(',').toSet() ?? {};
 
-  final rng = Random();
   IOSink? sink;
   if (output != null) {
     sink = File(output).openWrite(mode: FileMode.append);
@@ -50,17 +50,17 @@ void _runGenerate(Map<String, dynamic> parsed) {
   }
 
   int generated = 0;
-  int attempts = 0;
   final totalSw = Stopwatch()..start();
-  final puzzleSw = Stopwatch();
   final durations = <int>[];
   int histLines = 0; // number of histogram lines currently displayed
+  int lastPuzzleMs = 0;
 
+  bool finished = false;
   void finish() {
+    if (finished) return;
+    finished = true;
     stderr.writeln('');
-    stderr.writeln(
-      'Done: $generated puzzles in ${_fmt(totalSw.elapsed)} ($attempts attempts)',
-    );
+    stderr.writeln('Done: $generated puzzles in ${_fmt(totalSw.elapsed)}');
     if (durations.isNotEmpty) {
       stderr.writeln(
         '  avg: ${_avgMs(durations)}ms, median: ${_medianMs(durations)}ms, '
@@ -70,84 +70,80 @@ void _runGenerate(Map<String, dynamic> parsed) {
     sink?.close();
   }
 
-  final sigintSub = ProcessSignal.sigint.watch().listen((_) {
+  final config = GeneratorConfig(
+    width: minWidth,
+    height: minHeight,
+    minWidth: minWidth,
+    maxWidth: maxWidth,
+    minHeight: minHeight,
+    maxHeight: maxHeight,
+    requiredRules: requiredRules,
+    bannedRules: bannedRules,
+    count: count,
+  );
+
+  final worker = GeneratorWorker();
+  final stream = worker.start(config, usageStats: usageStats);
+
+  ProcessSignal.sigint.watch().listen((_) {
+    worker.cancel();
     finish();
     exit(0);
   });
-  while (generated < count) {
-    attempts++;
-    final width = minWidth + rng.nextInt(maxWidth - minWidth + 1);
-    final height = minHeight + rng.nextInt(maxHeight - minHeight + 1);
 
-    if (!puzzleSw.isRunning) {
-      puzzleSw
-        ..reset()
-        ..start();
-    }
-
-    final config = GeneratorConfig(
-      width: width,
-      height: height,
-      requiredRules: requiredRules,
-      bannedRules: bannedRules,
-      count: 1,
-    );
-
-    final line = PuzzleGenerator.generateOne(
-      config,
-      usageStats: usageStats,
-      onProgress: (p) {
+  await for (final message in stream) {
+    switch (message) {
+      case GeneratorProgressMessage(:final progress):
         stderr.write(
           '\r[${_fmt(totalSw.elapsed)}] $generated/$count '
-          '| attempt $attempts, ${width}x$height, '
-          '${p.constraintsTried}/${p.constraintsTotal} constraints'
+          '| ${progress.constraintsTried}/${progress.constraintsTotal} constraints'
           '          ',
         );
-      },
-    );
+      case GeneratorPuzzleMessage(:final puzzleLine):
+        generated++;
+        final now = totalSw.elapsedMilliseconds;
+        durations.add(now - lastPuzzleMs);
+        lastPuzzleMs = now;
 
-    if (line != null) {
-      generated++;
-      puzzleSw.stop();
-      durations.add(puzzleSw.elapsedMilliseconds);
-      puzzleSw.reset();
+        if (sink != null) {
+          sink.writeln(puzzleLine);
+        } else {
+          stdout.writeln(puzzleLine);
+        }
 
-      if (sink != null) {
-        sink.writeln(line);
-      } else {
-        stdout.writeln(line);
-      }
+        // Update local usage stats for histogram display
+        final parts = puzzleLine.split('_');
+        if (parts.length >= 5) {
+          final newSlugs = parts[4]
+              .split(';')
+              .map((c) => c.split(':').first)
+              .where((s) => s.isNotEmpty)
+              .toSet();
+          for (final slug in newSlugs) {
+            usageStats[slug] = (usageStats[slug] ?? 0) + 1;
+          }
+        }
 
-      // Update usage stats with the new puzzle
-      final newSlugs = line
-          .split('_')[4]
-          .split(';')
-          .map((c) => c.split(':').first)
-          .where((s) => s.isNotEmpty)
-          .toSet();
-      for (final slug in newSlugs) {
-        usageStats[slug] = (usageStats[slug] ?? 0) + 1;
-      }
+        // Clear previous histogram + progress line
+        if (histLines > 0) {
+          stderr.write('\x1B[${histLines + 1}A\x1B[J');
+        } else {
+          stderr.write('\r\x1B[K');
+        }
 
-      // Clear previous histogram + progress line
-      if (histLines > 0) {
-        stderr.write('\x1B[${histLines + 1}A\x1B[J');
-      } else {
-        stderr.write('\r\x1B[K');
-      }
+        // Progress line
+        stderr.writeln(
+          '[${_fmt(totalSw.elapsed)}] $generated/$count '
+          '| avg ${_avgMs(durations)}ms, med ${_medianMs(durations)}ms',
+        );
 
-      // Progress line
-      stderr.writeln(
-        '[${_fmt(totalSw.elapsed)}] $generated/$count '
-        '| avg ${_avgMs(durations)}ms, med ${_medianMs(durations)}ms',
-      );
-
-      // Histogram
-      histLines = _printHistogram(usageStats);
+        // Histogram
+        histLines = _printHistogram(usageStats);
+      case GeneratorDoneMessage():
+        break;
     }
   }
 
-  sigintSub.cancel();
   finish();
 }
 
