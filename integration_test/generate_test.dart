@@ -19,8 +19,9 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // Open the drawer
-      final scaffoldState =
-          tester.state<ScaffoldState>(find.byType(Scaffold).first);
+      final scaffoldState = tester.state<ScaffoldState>(
+        find.byType(Scaffold).first,
+      );
       scaffoldState.openDrawer();
       await tester.pumpAndSettle();
 
@@ -31,7 +32,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // We should be on the generate page — the "Generate" button is visible
-      final generateButton = find.widgetWithIcon(ElevatedButton, Icons.auto_fix_high);
+      final generateButton = find.widgetWithIcon(
+        ElevatedButton,
+        Icons.auto_fix_high,
+      );
       expect(generateButton, findsOneWidget);
 
       // Tap "Generate" to start generation
@@ -58,10 +62,7 @@ void main() {
         findsOneWidget,
       );
       // The stop button should be gone
-      expect(
-        find.widgetWithIcon(ElevatedButton, Icons.stop),
-        findsNothing,
-      );
+      expect(find.widgetWithIcon(ElevatedButton, Icons.stop), findsNothing);
     });
 
     testWidgets('generation completes with count=1', (tester) async {
@@ -69,8 +70,9 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // Navigate to generate page
-      final scaffoldState =
-          tester.state<ScaffoldState>(find.byType(Scaffold).first);
+      final scaffoldState = tester.state<ScaffoldState>(
+        find.byType(Scaffold).first,
+      );
       scaffoldState.openDrawer();
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.auto_fix_high));
@@ -86,7 +88,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Start generation
-      final generateButton = find.widgetWithIcon(ElevatedButton, Icons.auto_fix_high);
+      final generateButton = find.widgetWithIcon(
+        ElevatedButton,
+        Icons.auto_fix_high,
+      );
       await tester.tap(generateButton);
 
       // Wait for generation to complete (up to 60s)
@@ -100,7 +105,11 @@ void main() {
         }
       }
 
-      expect(completed, isTrue, reason: 'Generation should complete within 60s');
+      expect(
+        completed,
+        isTrue,
+        reason: 'Generation should complete within 60s',
+      );
 
       // The "Play" button should be visible
       expect(find.byIcon(Icons.play_arrow), findsOneWidget);
