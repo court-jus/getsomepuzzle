@@ -68,6 +68,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       );
     }
     sink?.close();
+    exit(0);
   }
 
   final config = GeneratorConfig(
@@ -358,7 +359,7 @@ General:
 
 Rule slugs: FM (forbidden motif), PA (parity), GS (group size),
             LT (letter group), QA (quantity), SY (symmetry),
-            DF (different from)
+            DF (different from), CC (column count)
 
 Examples:
   dart run bin/generate.dart -n 100 -o puzzles.txt

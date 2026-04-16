@@ -1,3 +1,4 @@
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
@@ -23,6 +24,11 @@ final constraintRegistry =
         fromParams: DifferentFromConstraint.new,
       ),
       (slug: 'SH', label: 'Shape', fromParams: ShapeConstraint.new),
+      (
+        slug: 'CC',
+        label: 'Column count',
+        fromParams: ColumnCountConstraint.new,
+      ),
     ];
 
 /// All player-facing constraint slugs.

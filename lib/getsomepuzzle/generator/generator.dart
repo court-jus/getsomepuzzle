@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
@@ -92,7 +93,7 @@ class PuzzleGenerator {
     final ratio = 0.8 + _rng.nextDouble() * 0.2; // 0.8 to 1.0
 
     // Build the allowed rule slugs
-    final allSlugs = {'FM', 'PA', 'GS', 'LT', 'QA', 'SY', 'DF'};
+    final allSlugs = {'FM', 'PA', 'GS', 'LT', 'QA', 'SY', 'DF', 'CC'};
     final allowedSlugs = allSlugs.difference(config.bannedRules);
 
     // If required rules are specified, ensure at least one of each is added
@@ -377,6 +378,12 @@ class PuzzleGenerator {
           width,
           height,
           excludedIndices: excludedIndices,
+        );
+      case 'CC':
+        return ColumnCountConstraint.generateAllParameters(
+          width,
+          height,
+          domain,
         );
       default:
         return [];

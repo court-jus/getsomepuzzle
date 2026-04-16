@@ -3,12 +3,14 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/column_count.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
@@ -137,10 +139,19 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       }
     }
 
+    // Build a map of column index → ColumnCountConstraint for the column header row
+    final ccByColumn = <int, ColumnCountConstraint>{};
+    for (final c in widget.currentPuzzle.constraints) {
+      if (c is ColumnCountConstraint) {
+        ccByColumn[c.columnIdx] = c;
+      }
+    }
+
     // Find if the highlighted constraint is a cell-centric one
     final bool constraintIsInTopBar =
         highlightedConstraint is Motif ||
-        highlightedConstraint is QuantityConstraint;
+        highlightedConstraint is QuantityConstraint ||
+        highlightedConstraint is ColumnCountConstraint;
 
     // For cell-centric constraints, find the constraint's home cell index
     int? constraintCellIdx;
@@ -244,6 +255,31 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                   ],
                 ),
                 const SizedBox(height: 10),
+                if (ccByColumn.isNotEmpty)
+                  SizedBox(
+                    width: gridWidth,
+                    child: Row(
+                      children: [
+                        for (
+                          int col = 0;
+                          col < widget.currentPuzzle.width;
+                          col++
+                        )
+                          if (ccByColumn.containsKey(col))
+                            ColumnCountWidget(
+                              key:
+                                  (ccByColumn[col]!.isHighlighted &&
+                                      constraintIsInTopBar)
+                                  ? _constraintKey
+                                  : null,
+                              constraint: ccByColumn[col]!,
+                              cellSize: adjustedCellSize,
+                            )
+                          else
+                            SizedBox(width: adjustedCellSize),
+                      ],
+                    ),
+                  ),
                 SizedBox(
                   width: gridWidth,
                   height: gridHeight,
