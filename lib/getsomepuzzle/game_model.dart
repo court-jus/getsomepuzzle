@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/hint_rank_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/settings.dart';
@@ -33,8 +34,11 @@ class GameModel extends ChangeNotifier {
 
   // --- Hint constraint state ---
   HintWorker? _hintWorker;
+  HintRankWorker? _hintRankWorker;
+  Timer? _hintRankDebounce;
   List<String> availableHintConstraints = [];
   bool hintConstraintsReady = false;
+  int _usefulHintCount = 0;
 
   // --- Drag state ---
   int? firstDragValue;
@@ -68,6 +72,7 @@ class GameModel extends ChangeNotifier {
   /// Called after every mutation that changes which moves are available.
   void _onPuzzleChanged() {
     _scheduleHelpMe();
+    _scheduleHintRanking();
     notifyListeners();
   }
 
@@ -342,6 +347,7 @@ class GameModel extends ChangeNotifier {
 
     hintConstraintsReady = false;
     availableHintConstraints = [];
+    _usefulHintCount = 0;
 
     final existingConstraints = puzzle.constraints
         .map((c) => c.serialize())
@@ -362,27 +368,79 @@ class GameModel extends ChangeNotifier {
           readonlyIndices: readonlyIndices,
         )
         .then((result) {
+          result.shuffle();
           availableHintConstraints = result;
           hintConstraintsReady = true;
           _hintWorker = null;
-          notifyListeners();
+          _computeHintRanking();
         });
   }
 
   void cancelHintConstraintComputation() {
+    _cancelHintRanking();
     _hintWorker?.dispose();
     _hintWorker = null;
     hintConstraintsReady = false;
     availableHintConstraints = [];
+    _usefulHintCount = 0;
   }
 
-  /// Pick a random constraint from available ones and add it to the puzzle.
+  // ---------------------------------------------------------------------------
+  // Hint constraint ranking
+  // ---------------------------------------------------------------------------
+
+  void _scheduleHintRanking() {
+    if (!hintConstraintsReady || availableHintConstraints.isEmpty) return;
+    _hintRankDebounce?.cancel();
+    _hintRankDebounce = Timer(
+      const Duration(milliseconds: 300),
+      _computeHintRanking,
+    );
+  }
+
+  void _computeHintRanking() {
+    _hintRankWorker?.dispose();
+    _hintRankWorker = null;
+    final puzzle = currentPuzzle;
+    if (puzzle == null || availableHintConstraints.isEmpty) return;
+
+    _hintRankWorker = HintRankWorker();
+    _hintRankWorker!
+        .rank(
+          width: puzzle.width,
+          height: puzzle.height,
+          domain: puzzle.domain,
+          cellValues: puzzle.cellValues,
+          existingConstraints: puzzle.constraints
+              .map((c) => c.serialize())
+              .toList(),
+          candidateConstraints: availableHintConstraints,
+        )
+        .then((result) {
+          availableHintConstraints = result.ranked;
+          _usefulHintCount = result.usefulCount;
+          _hintRankWorker = null;
+          notifyListeners();
+        });
+  }
+
+  void _cancelHintRanking() {
+    _hintRankDebounce?.cancel();
+    _hintRankWorker?.dispose();
+    _hintRankWorker = null;
+  }
+
+  /// Pick the first useful constraint and add it to the puzzle.
   /// Returns true if a constraint was added.
   bool addHintConstraint() {
-    if (currentPuzzle == null || availableHintConstraints.isEmpty) return false;
+    if (currentPuzzle == null || _usefulHintCount <= 0) return false;
 
-    availableHintConstraints.shuffle();
-    final serialized = availableHintConstraints.removeLast();
+    // Clear previous highlights before adding a new one
+    currentPuzzle!.clearHighlights();
+
+    // Take the first useful constraint (ranking puts them at the front)
+    final serialized = availableHintConstraints.removeAt(0);
+    _usefulHintCount--;
 
     // Parse "SLUG:params" and create the constraint
     final colonIdx = serialized.indexOf(':');
@@ -393,13 +451,13 @@ class GameModel extends ChangeNotifier {
 
     constraint.isHighlighted = true;
     currentPuzzle!.constraints.add(constraint);
+    _scheduleHintRanking();
     notifyListeners();
     return true;
   }
 
   /// Whether the "add constraint" hint button should be enabled.
-  bool get canAddHintConstraint =>
-      hintConstraintsReady && availableHintConstraints.isNotEmpty;
+  bool get canAddHintConstraint => hintConstraintsReady && _usefulHintCount > 0;
 
   // ---------------------------------------------------------------------------
   // Help computation (debounced)
@@ -421,6 +479,7 @@ class GameModel extends ChangeNotifier {
   void dispose() {
     _helpDebounce?.cancel();
     _hintWorker?.dispose();
+    _cancelHintRanking();
     super.dispose();
   }
 }

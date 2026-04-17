@@ -237,6 +237,14 @@
     "@hintImpossible": {
         "description": "Hint message shown when the puzzle is in an impossible state"
     },
+    "hintConstraintAdded": "A new constraint has been added",
+    "@hintConstraintAdded": {
+        "description": "Hint message shown when a constraint is added as a hint"
+    },
+    "hintConstraintNone": "No more constraints available",
+    "@hintConstraintNone": {
+        "description": "Hint message shown when all constraints have been exhausted"
+    },
     "constraintForbiddenPattern": "forbidden pattern",
     "@constraintForbiddenPattern": {
         "description": "Name of the forbidden pattern constraint"
