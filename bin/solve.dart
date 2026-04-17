@@ -35,13 +35,13 @@ void _solvePuzzle(String line) {
   final p = Puzzle(line);
 
   print('Puzzle: $line');
-  print('Grille ${p.width}x${p.height}, contraintes:');
+  print('Grid ${p.width}x${p.height}, constraints:');
   for (final constraint in p.constraints) {
     print('  ${constraint.serialize()} — ${constraint.toHuman()}');
   }
   print('');
 
-  print('Etat initial:');
+  print('Initial state:');
   _printGrid(p);
 
   int step = 0;
@@ -61,7 +61,7 @@ void _solvePuzzle(String line) {
     if (move == null) {
       move = p.findAMove();
       if (move == null) {
-        print('Bloque — aucune deduction possible');
+        print('Stuck — no deduction possible');
         break;
       } else {
         foundBy = "findAMove";
@@ -69,17 +69,17 @@ void _solvePuzzle(String line) {
       }
     }
     if (move.isImpossible != null) {
-      print('IMPOSSIBLE detecte par ${source!.serialize()}');
+      print('IMPOSSIBLE detected by ${source!.serialize()}');
       break;
     }
 
     step++;
     final r = move.idx ~/ p.width;
     final c = move.idx % p.width;
-    final colorName = move.value == 1 ? 'NOIR' : 'BLANC';
+    final colorName = move.value == 1 ? 'BLACK' : 'WHITE';
     p.cells[move.idx].setForSolver(move.value);
     print(
-      'Etape $step: ($r,$c) = $colorName  [$foundBy - ${source!.serialize()}]',
+      'Step $step: ($r,$c) = $colorName  [$foundBy - ${source!.serialize()}]',
     );
   }
 
@@ -88,9 +88,9 @@ void _solvePuzzle(String line) {
     final allValid = p.constraints.every((constraint) => constraint.verify(p));
     print('Solution:');
     _printGrid(p);
-    print(allValid ? 'VALIDE' : 'INVALIDE');
+    print(allValid ? 'VALID' : 'INVALID');
   } else {
-    print('Etat final (incomplet):');
+    print('Final state (incomplete):');
     _printGrid(p);
   }
 }
@@ -104,8 +104,8 @@ void _printGrid(Puzzle p) {
         v == 0
             ? '.'
             : v == 1
-            ? 'N'
-            : 'B',
+            ? 'B'
+            : 'W',
       );
     }
     print('  ${row.join(" ")}');
