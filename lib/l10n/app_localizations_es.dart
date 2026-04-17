@@ -189,6 +189,12 @@ class AppLocalizationsEs extends AppLocalizations {
       'Una restricción está violada — se ha cometido un error';
 
   @override
+  String get hintConstraintAdded => 'Se ha añadido una nueva restricción';
+
+  @override
+  String get hintConstraintNone => 'No hay más restricciones disponibles';
+
+  @override
   String get constraintForbiddenPattern => 'patrón prohibido';
 
   @override

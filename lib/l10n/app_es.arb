@@ -58,6 +58,8 @@
     "hintDeducedFrom": "Esta celda se puede deducir gracias a la restricción: {constraintName}",
     "hintForce": "Esta celda se puede deducir combinando múltiples restricciones",
     "hintImpossible": "Una restricción está violada — se ha cometido un error",
+    "hintConstraintAdded": "Se ha añadido una nueva restricción",
+    "hintConstraintNone": "No hay más restricciones disponibles",
     "constraintForbiddenPattern": "patrón prohibido",
     "constraintGroupSize": "tamaño de grupo",
     "constraintLetterGroup": "grupo de letras",

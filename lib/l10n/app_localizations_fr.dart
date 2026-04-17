@@ -189,6 +189,12 @@ class AppLocalizationsFr extends AppLocalizations {
       'Une contrainte est violée — une erreur a été commise';
 
   @override
+  String get hintConstraintAdded => 'Une nouvelle contrainte a été ajoutée';
+
+  @override
+  String get hintConstraintNone => 'Plus de contraintes disponibles';
+
+  @override
   String get constraintForbiddenPattern => 'motif interdit';
 
   @override

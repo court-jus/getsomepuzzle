@@ -448,6 +448,18 @@ abstract class AppLocalizations {
   /// **'A constraint is violated — a mistake was made'**
   String get hintImpossible;
 
+  /// Hint message shown when a constraint is added as a hint
+  ///
+  /// In en, this message translates to:
+  /// **'A new constraint has been added'**
+  String get hintConstraintAdded;
+
+  /// Hint message shown when all constraints have been exhausted
+  ///
+  /// In en, this message translates to:
+  /// **'No more constraints available'**
+  String get hintConstraintNone;
+
   /// Name of the forbidden pattern constraint
   ///
   /// In en, this message translates to:

@@ -188,6 +188,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hintImpossible => 'A constraint is violated — a mistake was made';
 
   @override
+  String get hintConstraintAdded => 'A new constraint has been added';
+
+  @override
+  String get hintConstraintNone => 'No more constraints available';
+
+  @override
   String get constraintForbiddenPattern => 'forbidden pattern';
 
   @override

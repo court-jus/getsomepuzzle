@@ -149,6 +149,13 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       constraintCellIdx = highlightedConstraint.indices.first;
     }
 
+    // Only assign arrow keys when there's a highlighted cell (arrow endpoint).
+    // Without a highlighted cell, there's no arrow to draw, so no need for
+    // _constraintKey on a Table cell (avoids GlobalKey migration conflicts).
+    final hasHighlightedCell = widget.currentPuzzle.cells.any(
+      (c) => c.isHighlighted,
+    );
+
     final hasDF = widget.currentPuzzle.constraints.any(
       (c) => c is DifferentFromConstraint,
     );
@@ -244,6 +251,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                     adjustedCellSize,
                                     constraintIsInTopBar,
                                     constraintCellIdx,
+                                    hasHighlightedCell,
                                   ),
                               ],
                             ),
@@ -293,15 +301,20 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     double adjustedCellSize,
     bool constraintIsInTopBar,
     int? constraintCellIdx,
+    bool hasHighlightedCell,
   ) {
     final idx = rowidx * widget.currentPuzzle.width + cellidx;
 
-    // Assign _cellKey to highlighted cell, _constraintKey to constraint's home cell
+    // Assign _cellKey to highlighted cell, _constraintKey to constraint's home cell.
+    // Only assign _constraintKey when there's also a highlighted cell (arrow endpoint),
+    // otherwise the key can migrate between Table cells and cause GlobalKey conflicts.
     GlobalKey? cellKeyToUse;
     if (cell.isHighlighted) {
       cellKeyToUse = _cellKey;
     }
-    if (!constraintIsInTopBar && constraintCellIdx == idx) {
+    if (!constraintIsInTopBar &&
+        constraintCellIdx == idx &&
+        hasHighlightedCell) {
       cellKeyToUse = _constraintKey;
     }
 

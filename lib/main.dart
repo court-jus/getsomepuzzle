@@ -186,6 +186,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void openPuzzle(PuzzleData puz) {
     game.openPuzzle(puz, database!.playlist.length);
+    if (settings.hintType == HintType.addConstraint) {
+      game.startHintConstraintComputation();
+    }
   }
 
   void _openCreatePage() {
@@ -282,6 +285,10 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void showHelpMove() {
+    if (settings.hintType == HintType.addConstraint) {
+      _showHintConstraint();
+      return;
+    }
     if (game.helpMove == null) return;
     if (game.hintText.isNotEmpty && !game.hintIsError) {
       game.showHelpMove("");
@@ -299,6 +306,30 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
     game.showHelpMove(resolvedHintText);
+  }
+
+  void _showHintConstraint() {
+    final l10n = AppLocalizations.of(context)!;
+    if (game.addHintConstraint()) {
+      game.hintText = l10n.hintConstraintAdded;
+      game.hintIsError = false;
+    }
+  }
+
+  void _onHintTypeChanged() {
+    if (game.currentPuzzle == null) return;
+    if (settings.hintType == HintType.addConstraint) {
+      game.startHintConstraintComputation();
+    } else {
+      game.cancelHintConstraintComputation();
+    }
+  }
+
+  bool _isHintButtonEnabled() {
+    if (settings.hintType == HintType.addConstraint) {
+      return game.canAddHintConstraint;
+    }
+    return game.helpMove != null;
   }
 
   // ---------------------------------------------------------------------------
@@ -394,7 +425,7 @@ class _MyHomePageState extends State<MyHomePage> {
             IconButton(
               icon: Icon(Icons.lightbulb),
               tooltip: AppLocalizations.of(context)!.tooltipClue,
-              onPressed: game.helpMove == null ? null : showHelpMove,
+              onPressed: _isHintButtonEnabled() ? showHelpMove : null,
             ),
           if (game.currentPuzzle != null && !shouldChooseLocale)
             IconButton(
@@ -527,6 +558,9 @@ class _MyHomePageState extends State<MyHomePage> {
                       settings: settings,
                       onSettingsChange: (newValue) {
                         settings.change(newValue);
+                        if (newValue.hintType != null) {
+                          _onHintTypeChanged();
+                        }
                         game.refresh();
                       },
                     ),
