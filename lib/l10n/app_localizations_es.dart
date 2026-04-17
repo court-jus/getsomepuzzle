@@ -167,6 +167,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsLiveCheckTypeComplete => 'Esperar';
 
   @override
+  String get settingHintType => 'Pistas';
+
+  @override
+  String get settingHintTypeDeducibleCell => 'Celda deducible';
+
+  @override
+  String get settingHintTypeAddConstraint => 'Añadir restricción';
+
+  @override
   String hintDeducedFrom(String constraintName) {
     return 'Esta celda se puede deducir gracias a la restricción: $constraintName';
   }

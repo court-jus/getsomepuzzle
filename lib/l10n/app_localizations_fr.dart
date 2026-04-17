@@ -167,6 +167,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsLiveCheckTypeComplete => 'Attendre';
 
   @override
+  String get settingHintType => 'Astuces';
+
+  @override
+  String get settingHintTypeDeducibleCell => 'Cellule déductible';
+
+  @override
+  String get settingHintTypeAddConstraint => 'Ajout de contrainte';
+
+  @override
   String hintDeducedFrom(String constraintName) {
     return 'Cette cellule peut être déduite grâce à la contrainte : $constraintName';
   }

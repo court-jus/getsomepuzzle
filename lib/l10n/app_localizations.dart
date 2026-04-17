@@ -412,6 +412,24 @@ abstract class AppLocalizations {
   /// **'Wait'**
   String get settingsLiveCheckTypeComplete;
 
+  /// Setting label for hint mode
+  ///
+  /// In en, this message translates to:
+  /// **'Hints'**
+  String get settingHintType;
+
+  /// Hint mode: show which cell can be deduced
+  ///
+  /// In en, this message translates to:
+  /// **'Deducible cell'**
+  String get settingHintTypeDeducibleCell;
+
+  /// Hint mode: add a new constraint to make the puzzle easier
+  ///
+  /// In en, this message translates to:
+  /// **'Add constraint'**
+  String get settingHintTypeAddConstraint;
+
   /// Hint message shown when the player clicks the lightbulb to get a clue
   ///
   /// In en, this message translates to:

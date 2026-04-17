@@ -56,6 +56,15 @@ class _SettingsPageState extends State<SettingsPage> {
       )!.settingsLiveCheckTypeComplete,
     };
 
+    final Map<HintType, String> settingsHintType = {
+      HintType.deducibleCell: AppLocalizations.of(
+        context,
+      )!.settingHintTypeDeducibleCell,
+      HintType.addConstraint: AppLocalizations.of(
+        context,
+      )!.settingHintTypeAddConstraint,
+    };
+
     return Scaffold(
       appBar: AppBar(title: Text(AppLocalizations.of(context)!.settings)),
       body: LayoutBuilder(
@@ -144,6 +153,30 @@ class _SettingsPageState extends State<SettingsPage> {
                                 (slug) => DropdownMenuItem(
                                   value: slug,
                                   child: Text(settingsLiveCheckType[slug]!),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(AppLocalizations.of(context)!.settingHintType),
+                        DropdownButton<HintType>(
+                          value: widget.settings.hintType,
+                          onChanged: (newValue) {
+                            setState(() {
+                              widget.settings.change(
+                                ChangeableSettings(hintType: newValue),
+                              );
+                            });
+                          },
+                          items: HintType.values
+                              .map(
+                                (slug) => DropdownMenuItem(
+                                  value: slug,
+                                  child: Text(settingsHintType[slug]!),
                                 ),
                               )
                               .toList(),

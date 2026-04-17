@@ -9,22 +9,26 @@ enum ShareData { yes, no }
 
 enum LiveCheckType { all, count, complete }
 
+enum HintType { deducibleCell, addConstraint }
+
 class ChangeableSettings {
   ValidateType? validateType;
   ShowRating? showRating;
   LiveCheckType? liveCheckType;
   ShareData? shareData;
+  HintType? hintType;
 
   ChangeableSettings({
     this.validateType,
     this.showRating,
     this.liveCheckType,
     this.shareData,
+    this.hintType,
   });
 
   @override
   String toString() {
-    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Shar: ${shareData?.name}";
+    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Shar: ${shareData?.name}; Hint: ${hintType?.name}";
   }
 }
 
@@ -33,6 +37,7 @@ class Settings {
   ShowRating showRating;
   ShareData shareData;
   LiveCheckType liveCheckType;
+  HintType hintType;
 
   final log = Logger("Settings");
 
@@ -41,11 +46,12 @@ class Settings {
     this.showRating = ShowRating.yes,
     this.shareData = ShareData.yes,
     this.liveCheckType = LiveCheckType.complete,
+    this.hintType = HintType.deducibleCell,
   });
 
   @override
   String toString() {
-    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Shar: ${shareData.name}";
+    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Shar: ${shareData.name}; Hint: ${hintType.name}";
   }
 
   Future<void> load() async {
@@ -86,6 +92,14 @@ class Settings {
       case "no":
         shareData = ShareData.no;
     }
+    final String settingsHintType =
+        prefs.getString("settingsHintType") ?? "deducibleCell";
+    switch (settingsHintType) {
+      case "deducibleCell":
+        hintType = HintType.deducibleCell;
+      case "addConstraint":
+        hintType = HintType.addConstraint;
+    }
   }
 
   Future<void> save() async {
@@ -94,6 +108,7 @@ class Settings {
     prefs.setString("settingsLiveCheckType", liveCheckType.name);
     prefs.setString("settingsShowRating", showRating.name);
     prefs.setString("settingsShareData", shareData.name);
+    prefs.setString("settingsHintType", hintType.name);
   }
 
   void change(ChangeableSettings newValue) {
@@ -109,6 +124,9 @@ class Settings {
     }
     if (newValue.shareData != null) {
       shareData = newValue.shareData!;
+    }
+    if (newValue.hintType != null) {
+      hintType = newValue.hintType!;
     }
     save();
   }

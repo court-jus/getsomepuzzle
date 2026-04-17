@@ -208,6 +208,18 @@
     "@settingsLiveCheckTypeComplete": {
         "description": "The player wants to wait until puzzle completion to see errors"
     },
+    "settingHintType": "Hints",
+    "@settingHintType": {
+        "description": "Setting label for hint mode"
+    },
+    "settingHintTypeDeducibleCell": "Deducible cell",
+    "@settingHintTypeDeducibleCell": {
+        "description": "Hint mode: show which cell can be deduced"
+    },
+    "settingHintTypeAddConstraint": "Add constraint",
+    "@settingHintTypeAddConstraint": {
+        "description": "Hint mode: add a new constraint to make the puzzle easier"
+    },
     "hintDeducedFrom": "This cell can be deduced from the {constraintName} constraint",
     "@hintDeducedFrom": {
         "description": "Hint message shown when the player clicks the lightbulb to get a clue",
