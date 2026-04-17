@@ -102,6 +102,15 @@ class Puzzle {
         if (c != null) constraints.add(c);
       }
     }
+    if (attributesStr.length > 5) {
+      final solParts = attributesStr[5].split(':');
+      if (solParts[0] == '1' && solParts.length > 1) {
+        cachedSolution = solParts[1]
+            .split('')
+            .map((e) => int.parse(e))
+            .toList();
+      }
+    }
   }
 
   void restart() {

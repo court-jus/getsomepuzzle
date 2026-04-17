@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/hint_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/settings.dart';
 import 'package:logging/logging.dart';
@@ -28,6 +30,11 @@ class GameModel extends ChangeNotifier {
   // --- Visual feedback ---
   String topMessage = "";
   Color topMessageColor = Colors.black;
+
+  // --- Hint constraint state ---
+  HintWorker? _hintWorker;
+  List<String> availableHintConstraints = [];
+  bool hintConstraintsReady = false;
 
   // --- Drag state ---
   int? firstDragValue;
@@ -89,6 +96,7 @@ class GameModel extends ChangeNotifier {
   }
 
   void clearPuzzle() {
+    cancelHintConstraintComputation();
     currentPuzzle = null;
     history = [];
     betweenPuzzles = false;
@@ -322,6 +330,78 @@ class GameModel extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
+  // Hint constraint computation
+  // ---------------------------------------------------------------------------
+
+  /// Start computing valid hint constraints in a background Isolate.
+  /// Only works if the current puzzle has a cached solution.
+  void startHintConstraintComputation() {
+    cancelHintConstraintComputation();
+    final puzzle = currentPuzzle;
+    if (puzzle == null || puzzle.cachedSolution == null) return;
+
+    hintConstraintsReady = false;
+    availableHintConstraints = [];
+
+    final existingConstraints = puzzle.constraints
+        .map((c) => c.serialize())
+        .toSet();
+    final readonlyIndices = <int>{};
+    for (int i = 0; i < puzzle.cells.length; i++) {
+      if (puzzle.cells[i].readonly) readonlyIndices.add(i);
+    }
+
+    _hintWorker = HintWorker();
+    _hintWorker!
+        .compute(
+          width: puzzle.width,
+          height: puzzle.height,
+          domain: puzzle.domain,
+          solution: puzzle.cachedSolution!,
+          existingConstraints: existingConstraints,
+          readonlyIndices: readonlyIndices,
+        )
+        .then((result) {
+          availableHintConstraints = result;
+          hintConstraintsReady = true;
+          _hintWorker = null;
+          notifyListeners();
+        });
+  }
+
+  void cancelHintConstraintComputation() {
+    _hintWorker?.dispose();
+    _hintWorker = null;
+    hintConstraintsReady = false;
+    availableHintConstraints = [];
+  }
+
+  /// Pick a random constraint from available ones and add it to the puzzle.
+  /// Returns true if a constraint was added.
+  bool addHintConstraint() {
+    if (currentPuzzle == null || availableHintConstraints.isEmpty) return false;
+
+    availableHintConstraints.shuffle();
+    final serialized = availableHintConstraints.removeLast();
+
+    // Parse "SLUG:params" and create the constraint
+    final colonIdx = serialized.indexOf(':');
+    final slug = serialized.substring(0, colonIdx);
+    final params = serialized.substring(colonIdx + 1);
+    final constraint = createConstraint(slug, params);
+    if (constraint == null) return false;
+
+    constraint.isHighlighted = true;
+    currentPuzzle!.constraints.add(constraint);
+    notifyListeners();
+    return true;
+  }
+
+  /// Whether the "add constraint" hint button should be enabled.
+  bool get canAddHintConstraint =>
+      hintConstraintsReady && availableHintConstraints.isNotEmpty;
+
+  // ---------------------------------------------------------------------------
   // Help computation (debounced)
   // ---------------------------------------------------------------------------
 
@@ -340,6 +420,7 @@ class GameModel extends ChangeNotifier {
   @override
   void dispose() {
     _helpDebounce?.cancel();
+    _hintWorker?.dispose();
     super.dispose();
   }
 }
