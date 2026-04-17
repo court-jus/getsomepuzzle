@@ -211,15 +211,11 @@ void main() {
     test('color eliminated when empty region too small', () {
       // 3x4: 010 / 010 / 101 / 000
       // GS:7.5 — cell 7 (row2,col1) must be in group of size 5. Cell 7 is empty.
-      // Empty region from 7: {0, 2, 3, 5, 7, 9, 10, 11} (8 cells).
-      // If color=2: adjacent groups of value 2 = none. Max = 8 + 0 = 8 ≥ 5 → OK.
-      // Wait — cells 6 and 8 are value 1 and block the path.
-      // Empty region from 7: neighbors of 7 are 4(val=1), 6(val=1), 8(val=1), 10(val=0).
-      // So from 7 only 10 is empty. From 10: neighbors 7(counted), 9(empty), 11(empty).
-      // From 9: neighbors 6(val=1), 10(counted). From 11: neighbors 8(val=1), 10(counted).
-      // Empty region = {7, 9, 10, 11} (4 cells).
-      // Color 2: no adjacent value-2 groups → max = 4 < 5 → impossible.
-      // Color 1: adjacent groups {1,4}(size 2), {6}(size 1), {8}(size 1) → max = 4 + 4 = 8 ≥ 5 → OK.
+      // Flood-fill from c7 through empty-or-color cells.
+      // Color=2: c7 is blocked by three value-1 neighbors except c10.
+      //   Reachable = {7, 10, 9, 11} (4 cells) < 5 → impossible.
+      // Color=1: flood-fill spans the full grid via empty + value-1 cells.
+      //   Reachable = all 12 cells ≥ 5 → OK.
       // → cell 7 forced to value 1.
       final p = _make('''
         010
@@ -232,6 +228,32 @@ void main() {
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 7);
+      expect(move.value, 1);
+    });
+
+    test('multi-merge: groups reachable via intermediate empty cell', () {
+      // Regression for puzzle v2_12_3x3_000010001_GS:7.6 in state 121210101:
+      //   1 2 1
+      //   2 1 0
+      //   1 0 1
+      // GS:7.6 — c7 must be in a group of size 6. c7 is empty.
+      // Naive "empty region + adjacent same-color groups" underestimates:
+      //   c7's empty region is just {7} (c5 is not adjacent to c7), and
+      //   the three adjacent value-1 singletons {4},{6},{8} give only 1+3=4<6.
+      // Correct flood-fill through empty-or-color-1 reaches {7,4,6,8,5,2} = 6,
+      // because c5 (empty) bridges c4/c8 to c2 (value 1).
+      // Color=2 reachable = {7} alone → impossible. → c7 forced to value 1.
+      final p = _make('''
+        121
+        210
+        101
+      ''');
+      final gs = GroupSize('7.6');
+      p.constraints.add(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 7);
       expect(move.value, 1);
     });
 

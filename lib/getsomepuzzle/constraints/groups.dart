@@ -95,40 +95,24 @@ class GroupSize extends CellsCentricConstraint {
           }
         }
       }
-      // Reachability check: for each color, compute the max group size reachable
-      // from idx. Max = empty region size + sum of adjacent same-color groups.
-      // If unreachable for a color, that color is impossible.
-      final emptyRegion = <int>{idx};
-      final queue = [idx];
-      while (queue.isNotEmpty) {
-        final current = queue.removeLast();
-        for (final nei in puzzle.getNeighbors(current)) {
-          if (puzzle.cellValues[nei] == 0 && emptyRegion.add(nei)) {
-            queue.add(nei);
-          }
-        }
-      }
-      final Map<int, int> cellToGroup = {};
-      for (int gi = 0; gi < groups.length; gi++) {
-        for (final cell in groups[gi]) {
-          cellToGroup[cell] = gi;
-        }
-      }
+      // Reachability check: for each color, flood-fill from idx through cells
+      // that are empty OR already this color. The size of that connected
+      // component is the max group size idx could reach if colored this color.
+      // If it's < size for a color, that color is impossible.
       int? forcedColor;
       for (final color in puzzle.domain) {
-        final Set<int> counted = {};
-        int adjacentSize = 0;
-        for (final cell in emptyRegion) {
-          for (final nei in puzzle.getNeighbors(cell)) {
-            if (puzzle.cellValues[nei] == color) {
-              final gi = cellToGroup[nei];
-              if (gi != null && counted.add(gi)) {
-                adjacentSize += groups[gi].length;
-              }
+        final reachable = <int>{idx};
+        final queue = [idx];
+        while (queue.isNotEmpty) {
+          final current = queue.removeLast();
+          for (final nei in puzzle.getNeighbors(current)) {
+            final v = puzzle.cellValues[nei];
+            if ((v == 0 || v == color) && reachable.add(nei)) {
+              queue.add(nei);
             }
           }
         }
-        if (emptyRegion.length + adjacentSize < size) {
+        if (reachable.length < size) {
           if (forcedColor != null) {
             return Move(0, 0, this, isImpossible: this);
           }
