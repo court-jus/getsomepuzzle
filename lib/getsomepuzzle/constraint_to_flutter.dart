@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/widgets/symmetry.dart';
 
 // Arrows for the parity constraint appear smaller so we add a zoom factor
 const _parityFontSizeRatio = 40.0 / 36.0;
@@ -91,15 +92,10 @@ Widget _symmetryWidget(
   double cellSize,
   int count,
 ) {
-  final double size = cellSize * cellSizeToFontSize / count;
+  final double widgetSize = cellSize / count;
   return SizedBox(
-    width: cellSize / count,
-    height: cellSize / count,
-    child: Center(
-      child: Text(
-        axisRepresentation[constraint.axis] ?? '?',
-        style: TextStyle(color: fgcolor, fontSize: size),
-      ),
-    ),
+    width: widgetSize,
+    height: widgetSize,
+    child: SymmetryWidget(constraint: constraint, fgcolor: fgcolor, cellSize: widgetSize),
   );
 }

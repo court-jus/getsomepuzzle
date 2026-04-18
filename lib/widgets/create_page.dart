@@ -18,6 +18,7 @@ import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
+import 'package:getsomepuzzle/widgets/symmetry.dart';
 
 const _bgColors = {
   0: Color.fromARGB(255, 185, 86, 202),
@@ -693,9 +694,14 @@ class _CreatePageState extends State<CreatePage> {
             ),
             for (var axis = 1; axis <= 5; axis++)
               ListTile(
-                leading: Text(
-                  axisRepresentation[axis] ?? '',
-                  style: const TextStyle(fontSize: 24),
+                leading: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: SymmetryWidget(
+                    fgcolor: Colors.black,
+                    constraint: SymmetryConstraint('0.$axis'),
+                    cellSize: 32,
+                  ),
                 ),
                 title: Text('Axis $axis'),
                 onTap: () {
