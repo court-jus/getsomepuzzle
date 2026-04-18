@@ -360,6 +360,15 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
             }
           : null,
       onRightDragEnd: widget.onCellRightDragEnd,
+      getCellGroupSize: (cellIdx) {
+        final groups = widget.currentPuzzle.getGroups();
+        for (final grp in groups) {
+          if (grp.contains(cellIdx)) {
+            return grp.length;
+          }
+        }
+        return 0;
+      },
     );
   }
 }

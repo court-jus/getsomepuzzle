@@ -6,6 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/widgets/symmetry.dart';
+import 'package:getsomepuzzle/widgets/group_size.dart';
 
 // Arrows for the parity constraint appear smaller so we add a zoom factor
 const _parityFontSizeRatio = 40.0 / 36.0;
@@ -15,6 +16,7 @@ Widget constraintToFlutter(
   Color defaultColor,
   double cellSize, {
   int count = 1,
+  int actualGroupSize = 0,
 }) {
   final fgcolor = constraint.isHighlighted
       ? highlightColor
@@ -27,7 +29,13 @@ Widget constraintToFlutter(
     return _parityWidget(constraint, fgcolor, cellSize, count);
   }
   if (constraint is GroupSize) {
-    return _textWidget(constraint.toString(), fgcolor, cellSize, count);
+    return _groupSizeWidget(
+      constraint,
+      fgcolor,
+      cellSize,
+      count,
+      actualGroupSize,
+    );
   }
   if (constraint is LetterGroup) {
     return _textWidget(constraint.letter, fgcolor, cellSize, count);
@@ -96,6 +104,30 @@ Widget _symmetryWidget(
   return SizedBox(
     width: widgetSize,
     height: widgetSize,
-    child: SymmetryWidget(constraint: constraint, fgcolor: fgcolor, cellSize: widgetSize),
+    child: SymmetryWidget(
+      constraint: constraint,
+      fgcolor: fgcolor,
+      cellSize: widgetSize,
+    ),
+  );
+}
+
+Widget _groupSizeWidget(
+  GroupSize constraint,
+  Color fgcolor,
+  double cellSize,
+  int count,
+  int actualGroupSize,
+) {
+  final double widgetSize = cellSize / count;
+  return SizedBox(
+    width: widgetSize,
+    height: widgetSize,
+    child: GroupSizeWidget(
+      constraint: constraint,
+      fgcolor: fgcolor,
+      actualGroupSize: actualGroupSize,
+      cellSize: widgetSize,
+    ),
   );
 }

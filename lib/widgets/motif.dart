@@ -8,7 +8,6 @@ import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 
 const _bgColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
 const forbiddenColor = Color.fromARGB(255, 185, 86, 202);
-const mandatoryColor = Colors.lightBlue;
 
 class MotifWidget extends StatelessWidget {
   const MotifWidget({

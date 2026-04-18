@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 
-const mandatoryColor = Colors.lightBlue;
-
 class SymmetryWidget extends StatelessWidget {
   const SymmetryWidget({
     super.key,
@@ -47,6 +45,11 @@ class SymmetryPainter extends CustomPainter {
 
   final int axis;
   final Color color;
+  // 1: "⟍",
+  // 2: "|",
+  // 3: "⟋",
+  // 4: "―",
+  // 5: "🞋",
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -64,8 +67,8 @@ class SymmetryPainter extends CustomPainter {
         break;
       case 1:
         canvas.drawLine(
-          Offset(size.width - margin, margin),
-          Offset(margin, size.height - margin),
+          Offset(margin, margin),
+          Offset(size.width - margin, size.height - margin),
           paint,
         );
         break;
@@ -78,8 +81,8 @@ class SymmetryPainter extends CustomPainter {
         break;
       case 3:
         canvas.drawLine(
-          Offset(margin, margin),
-          Offset(size.width - margin, size.height - margin),
+          Offset(margin, size.height - margin),
+          Offset(size.width - margin, margin),
           paint,
         );
         break;

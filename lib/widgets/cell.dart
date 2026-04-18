@@ -34,6 +34,7 @@ class CellWidget extends StatelessWidget {
     this.cornerIndicatorValue,
     this.onRightDrag,
     this.onRightDragEnd,
+    this.getCellGroupSize,
   });
 
   // Attributes
@@ -60,6 +61,9 @@ class CellWidget extends StatelessWidget {
   final ValueChanged<Offset>? onRightDrag;
   final VoidCallback? onRightDragEnd;
 
+  /// Callback to get the actual group size for a cell (for GroupSize constraint)
+  final int Function(int idx)? getCellGroupSize;
+
   // Build UI
   @override
   Widget build(BuildContext context) {
@@ -84,6 +88,7 @@ class CellWidget extends StatelessWidget {
                         : (fgColors[value] ?? Colors.black),
                     cellSize,
                     count: widgetScale,
+                    actualGroupSize: getCellGroupSize?.call(idx) ?? 0,
                   ),
             ],
           );

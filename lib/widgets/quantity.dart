@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
-import 'package:getsomepuzzle/widgets/motif.dart';
 
 const textColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
-const oppositeColors = {0: Colors.transparent, 1: Colors.white, 2: Colors.black,};
+const oppositeColors = {
+  0: Colors.transparent,
+  1: Colors.white,
+  2: Colors.black,
+};
 
 class QuantityWidget extends StatelessWidget {
   const QuantityWidget({
@@ -51,7 +54,8 @@ class QuantityWidget extends StatelessWidget {
                 style: TextStyle(
                   fontSize: smallFontSize,
                   color: oppositeColors[constraint.value],
-                ))
+                ),
+              ),
             ),
             if (actualCount > 0)
               Positioned(
