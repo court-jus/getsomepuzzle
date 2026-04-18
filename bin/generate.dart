@@ -28,6 +28,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final maxWidth = parsed['maxWidth'] as int;
   final minHeight = parsed['minHeight'] as int;
   final maxHeight = parsed['maxHeight'] as int;
+  final maxTime = parsed['maxTime'] as int;
   final output = parsed['output'] as String?;
   final bannedRules = (parsed['banned'] as String?)?.split(',').toSet() ?? {};
   final requiredRules =
@@ -78,6 +79,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     maxWidth: maxWidth,
     minHeight: minHeight,
     maxHeight: maxHeight,
+    maxTime: Duration(seconds: maxTime),
     requiredRules: requiredRules,
     bannedRules: bannedRules,
     count: count,
@@ -279,6 +281,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'maxWidth': 7,
     'minHeight': 4,
     'maxHeight': 8,
+    'maxTime': 60,
     'output': null,
     'banned': null,
     'required': null,
@@ -307,6 +310,9 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['minHeight'] = int.parse(args[++i]);
       case '--max-height':
         result['maxHeight'] = int.parse(args[++i]);
+      case '-T':
+      case '--max-time':
+        result['maxTime'] = int.parse(args[++i]);
       case '-o':
       case '--output':
         result['output'] = args[++i];
@@ -350,6 +356,7 @@ Generation options:
       --max-width N       Maximum grid width (default: 7)
   -H, --min-height N      Minimum grid height (default: 4)
       --max-height N      Maximum grid height (default: 8)
+  -T, --max-time S        Maximum generation time (in seconds, default: 60)
   -o, --output FILE       Output file (default: stdout)
       --ban RULES         Comma-separated rule slugs to exclude (e.g. FM,LT)
       --require RULES     Comma-separated rule slugs to require (e.g. PA,GS)
