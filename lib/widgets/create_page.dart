@@ -1201,6 +1201,8 @@ class _CreatePageState extends State<CreatePage> {
                   child: QuantityWidget(
                     constraint: constraint,
                     actualCount: 0,
+                    oppositeActual: 0,
+                    oppositeTotal: (_width * _height) - constraint.value,
                     cellSize: topBarSize,
                   ),
                 ),

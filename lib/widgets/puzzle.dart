@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraint.dart';
@@ -217,6 +218,19 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                           actualCount: widget.currentPuzzle.cellValues
                               .where((val) => val == constraint.value)
                               .length,
+                          oppositeActual: widget.currentPuzzle.cellValues
+                              .where(
+                                (val) =>
+                                    val ==
+                                    widget.currentPuzzle.domain
+                                        .whereNot((v) => v == constraint.value)
+                                        .first,
+                              )
+                              .length,
+                          oppositeTotal:
+                              (widget.currentPuzzle.width *
+                                  widget.currentPuzzle.height) -
+                              constraint.count,
                           cellSize: topBarConstraintsSize,
                         )
                       else if (constraint is HelpText)

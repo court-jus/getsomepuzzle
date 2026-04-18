@@ -4,17 +4,22 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 
 const textColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
+const oppositeColors = {0: Colors.transparent, 1: Colors.white, 2: Colors.black,};
 
 class QuantityWidget extends StatelessWidget {
   const QuantityWidget({
     super.key,
     required this.constraint,
     required this.actualCount,
+    required this.oppositeActual,
+    required this.oppositeTotal,
     required this.cellSize,
   });
 
   final QuantityConstraint constraint;
   final int actualCount;
+  final int oppositeActual;
+  final int oppositeTotal;
   final double cellSize;
 
   @override
@@ -24,6 +29,7 @@ class QuantityWidget extends StatelessWidget {
         : (constraint.isValid ? Colors.green : Colors.deepOrange);
     final smallText = "$actualCount/";
     final largeText = constraint.count.toString();
+    final oppositeText = "$oppositeActual/$oppositeTotal";
     final smallFontSize = cellSize * cellSizeToFontSize / 3.5;
     final largeFontSize = cellSize * cellSizeToFontSize;
     return DecoratedBox(
@@ -37,6 +43,16 @@ class QuantityWidget extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
+            Positioned(
+              bottom: 0,
+              left: 8,
+              child: Text(
+                oppositeText,
+                style: TextStyle(
+                  fontSize: smallFontSize,
+                  color: oppositeColors[constraint.value],
+                ))
+            ),
             if (actualCount > 0)
               Positioned(
                 top: 0,
