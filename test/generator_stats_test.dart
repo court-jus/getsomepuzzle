@@ -40,15 +40,22 @@ void main() {
         width,
         height,
         domain,
+        null,
       )) {
         final c = ForbiddenMotif(p);
         if (c.verify(solved)) all.add(c);
       }
-      for (final p in ParityConstraint.generateAllParameters(width, height)) {
+      for (final p in ParityConstraint.generateAllParameters(width, height, [
+        1,
+        2,
+      ], null)) {
         final c = ParityConstraint(p);
         if (c.verify(solved)) all.add(c);
       }
-      for (final p in GroupSize.generateAllParameters(width, height)) {
+      for (final p in GroupSize.generateAllParameters(width, height, [
+        1,
+        2,
+      ], null)) {
         final c = GroupSize(p);
         if (c.verify(solved)) all.add(c);
       }
@@ -56,11 +63,15 @@ void main() {
         width,
         height,
         domain,
+        null,
       )) {
         final c = QuantityConstraint(p);
         if (c.verify(solved)) all.add(c);
       }
-      for (final p in SymmetryConstraint.generateAllParameters(width, height)) {
+      for (final p in SymmetryConstraint.generateAllParameters(width, height, [
+        1,
+        2,
+      ], null)) {
         final c = SymmetryConstraint(p);
         if (c.verify(solved)) all.add(c);
       }

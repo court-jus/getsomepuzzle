@@ -5,6 +5,7 @@ const cellSizeToFontSize = 44.0 / 64.0;
 const minConstraintsInTopBarSize = 60.0;
 const motifConstraintInTopBarFillRatio = 0.7;
 const highlightColor = Color(0xFF8B7D3C);
+const forbiddenColor = Color.fromARGB(255, 185, 86, 202);
 const mandatoryColor = Colors.lightBlue;
 
 final mdTheme = MarkdownThemeData(

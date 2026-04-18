@@ -408,5 +408,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'Pegar una representación de puzzle para editarlo';
 
   @override
+  String get constraintGroupCount => 'número de grupos';
+
+  @override
+  String get constraintColumnCount => 'células por columna';
+
+  @override
+  String get constraintShape => 'forma';
+
+  @override
   String get collectionMyPuzzles => 'Mis puzzles';
 }

@@ -1,17 +1,10 @@
 import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class GeneratorConfig {
@@ -93,7 +86,7 @@ class PuzzleGenerator {
     final ratio = 0.8 + _rng.nextDouble() * 0.2; // 0.8 to 1.0
 
     // Build the allowed rule slugs
-    final allSlugs = {'FM', 'PA', 'GS', 'LT', 'QA', 'SY', 'DF', 'CC'};
+    final allSlugs = constraintRegistry.map((entry) => entry.slug).toSet();
     final allowedSlugs = allSlugs.difference(config.bannedRules);
 
     // If required rules are specified, ensure at least one of each is added
@@ -123,7 +116,7 @@ class PuzzleGenerator {
       pu.cells[indices[i]] = pu.cells[indices[i]]..readonly = true;
     }
 
-    // Force the SH constraint in the puzzle
+    // Force the SH constraint in the puzzle if it was added by the preFill
     pu.constraints.addAll(solved.constraints);
 
     // Collect readonly cell indices for DF constraint generation
@@ -137,13 +130,15 @@ class PuzzleGenerator {
     // 3. Generate all valid constraints for the solved grid
     final List<Constraint> allConstraints = [];
     for (final slug in allowedSlugs) {
-      final params = _generateParamsForSlug(
-        slug,
-        width,
-        height,
-        _defaultDomain,
-        excludedIndices: slug == 'DF' ? readonlyIndices : null,
-      );
+      final params =
+          generateAllParameters(
+            slug,
+            width,
+            height,
+            _defaultDomain,
+            slug == 'DF' ? readonlyIndices : null,
+          ) ??
+          [];
       for (final param in params) {
         final constraint = createConstraint(slug, param);
         if (constraint == null) continue;
@@ -252,7 +247,12 @@ class PuzzleGenerator {
 
   static Puzzle _preFillSh(int width, int height) {
     final solved = Puzzle.empty(width, height, _defaultDomain);
-    final possibleMotifs = ShapeConstraint.generateAllParameters(width, height);
+    final possibleMotifs = ShapeConstraint.generateAllParameters(
+      width,
+      height,
+      _defaultDomain,
+      null,
+    );
     possibleMotifs.shuffle(_rng);
     final puzzleSize = width * height;
     final weights = possibleMotifs.map((m) {
@@ -351,42 +351,5 @@ class PuzzleGenerator {
       initial.constraints.add(OtherSolutionConstraint(foundSolution));
     }
     return solutions;
-  }
-
-  static List<String> _generateParamsForSlug(
-    String slug,
-    int width,
-    int height,
-    List<int> domain, {
-    Set<int>? excludedIndices,
-  }) {
-    switch (slug) {
-      case 'FM':
-        return ForbiddenMotif.generateAllParameters(width, height, domain);
-      case 'PA':
-        return ParityConstraint.generateAllParameters(width, height);
-      case 'GS':
-        return GroupSize.generateAllParameters(width, height);
-      case 'LT':
-        return LetterGroup.generateAllParameters(width, height);
-      case 'QA':
-        return QuantityConstraint.generateAllParameters(width, height, domain);
-      case 'SY':
-        return SymmetryConstraint.generateAllParameters(width, height);
-      case 'DF':
-        return DifferentFromConstraint.generateAllParameters(
-          width,
-          height,
-          excludedIndices: excludedIndices,
-        );
-      case 'CC':
-        return ColumnCountConstraint.generateAllParameters(
-          width,
-          height,
-          domain,
-        );
-      default:
-        return [];
-    }
   }
 }

@@ -175,7 +175,12 @@ class ShapeConstraint extends Motif {
   @override
   String serialize() => 'SH:$_originalParams';
 
-  static List<String> generateAllParameters(int width, int height) {
+  static List<String> generateAllParameters(
+    int width,
+    int height,
+    List<int> domain,
+    Set<int>? excludedIndices,
+  ) {
     final maxSize = width > height ? width : height;
     final possibleMotifs = [
       "1",

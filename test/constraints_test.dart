@@ -4,6 +4,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 
 /// Build a puzzle from a grid string (domain [1,2]).
 /// Each digit is a cell value (0=empty, 1=black, 2=white), rows separated by newlines.
@@ -305,7 +306,10 @@ void main() {
       // idx 0 → right (0,1), down (0,2)
       // idx 1 → down (1,3)
       // idx 2 → right (2,3)
-      final params = DifferentFromConstraint.generateAllParameters(2, 2);
+      final params = DifferentFromConstraint.generateAllParameters(2, 2, [
+        1,
+        2,
+      ], null);
       expect(params, contains('0.right'));
       expect(params, contains('0.down'));
       expect(params, contains('1.down'));
@@ -318,12 +322,64 @@ void main() {
       final params = DifferentFromConstraint.generateAllParameters(
         2,
         2,
-        excludedIndices: {0, 1},
+        [1, 2],
+        {0, 1},
       );
       expect(params.contains('0.right'), isFalse);
       expect(params.contains('0.down'), isFalse);
       expect(params.contains('1.down'), isFalse);
       expect(params, contains('2.right'));
+    });
+  });
+
+  group('GroupCountConstraint.verify', () {
+    test('correct group count → valid', () {
+      // 2x2: 2 black groups
+      // 1 0
+      // 0 1  → 2 isolated black cells = 2 groups
+      final p = _make('10\n01');
+      expect(GroupCountConstraint('1.2').verify(p), isTrue);
+    });
+
+    test('wrong group count → invalid', () {
+      // 2x2: 2 black groups but constraint asks for 1
+      final p = _make('10\n01');
+      expect(GroupCountConstraint('1.1').verify(p), isFalse);
+    });
+
+    test('incomplete puzzle with less groups than target → valid', () {
+      // 2x2 with 1 black cell filled, target is 2 groups
+      final p = _make('10\n00');
+      expect(GroupCountConstraint('1.2').verify(p), isTrue);
+    });
+
+    test('incomplete puzzle with more groups than target → invalid', () {
+      // 2x2 with 2 black groups but target is 1
+      final p = _make('10\n01');
+      expect(GroupCountConstraint('1.1').verify(p), isTrue);
+    });
+  });
+
+  group('GroupCountConstraint.generateAllParameters', () {
+    test('generates valid parameters', () {
+      final params = GroupCountConstraint.generateAllParameters(2, 2, [
+        1,
+        2,
+      ], null);
+      expect(params, contains('1.1'));
+      expect(params, contains('1.2'));
+      expect(params, contains('2.1'));
+      expect(params, contains('2.2'));
+    });
+
+    test('max count is ceil(width*height/2)', () {
+      // 3x3 = 9 cells → max 5 groups (ceil(9/2))
+      final params = GroupCountConstraint.generateAllParameters(3, 3, [
+        1,
+        2,
+      ], null);
+      expect(params, contains('1.5'));
+      expect(params, isNot(contains('1.6')));
     });
   });
 }

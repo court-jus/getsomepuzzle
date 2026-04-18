@@ -65,6 +65,8 @@
     "constraintLetterGroup": "grupo de letras",
     "constraintParity": "paridad",
     "constraintQuantity": "cantidad",
+    "constraintGroupCount": "número de grupos",
+    "constraintShape": "forma",
     "constraintSymmetry": "simetría",
     "generate": "Generar",
     "generateTitle": "Generar puzzles",
@@ -133,5 +135,9 @@
     "createFixWhite": "Fijar a blanco",
     "createRemoveFixed": "Quitar color fijo",
     "createPasteHint": "Pegar una representación de puzzle para editarlo",
-    "collectionMyPuzzles": "Mis puzzles"
+    "collectionMyPuzzles": "Mis puzzles",
+    "constraintColumnCount": "células por columna",
+    "@constraintColumnCount": {
+        "description": "Name of the column count constraint"
+    }
 }

@@ -405,5 +405,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createPasteHint => 'Paste a puzzle representation to edit it';
 
   @override
+  String get constraintGroupCount => 'group count';
+
+  @override
+  String get constraintColumnCount => 'cells per column';
+
+  @override
+  String get constraintShape => 'shape';
+
+  @override
   String get collectionMyPuzzles => 'My puzzles';
 }

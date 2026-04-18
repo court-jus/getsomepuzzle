@@ -6,12 +6,14 @@ import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/column_count.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
+import 'package:getsomepuzzle/widgets/group_count.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
 import 'package:getsomepuzzle/widgets/textpuzzle.dart';
@@ -242,6 +244,24 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               (widget.currentPuzzle.width *
                                   widget.currentPuzzle.height) -
                               constraint.count,
+                          cellSize: topBarConstraintsSize,
+                        )
+                      else if (constraint is GroupCountConstraint)
+                        GroupCountWidget(
+                          key:
+                              (constraint.isHighlighted && constraintIsInTopBar)
+                              ? _constraintKey
+                              : null,
+                          constraint: constraint,
+                          actualGroupCount: widget.currentPuzzle
+                              .getGroups()
+                              .where(
+                                (grp) =>
+                                    widget.currentPuzzle.cellValues[grp
+                                        .first] ==
+                                    constraint.color,
+                              )
+                              .length,
                           cellSize: topBarConstraintsSize,
                         )
                       else if (constraint is HelpText)

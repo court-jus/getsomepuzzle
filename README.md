@@ -78,7 +78,8 @@ Options:
 | `--ban` | Comma-separated rules to exclude | |
 | `--require` | Comma-separated rules to require | |
 
-Rule slugs: `FM` (forbidden motif), `PA` (parity), `GS` (group size), `LT` (letter group), `QA` (quantity), `SY` (symmetry), `DF` (different from).
+Rule slugs: `FM` (forbidden motif), `PA` (parity), `GS` (group size), `LT` (letter group), `QA` (quantity),
+`SY` (symmetry), `DF` (different from), `CC` (column count), `GC` (group count).
 
 Examples:
 
@@ -89,7 +90,7 @@ dart run bin/generate.dart -n 100 -o puzzles.txt
 # Small puzzles only
 dart run bin/generate.dart -n 50 -W 3 --max-width 5 -H 3 --max-height 5
 
-# Only parity and forbidden motif constraints
+# Generate puzzles without some rules
 dart run bin/generate.dart -n 20 --ban LT,SY,GS,QA
 ```
 

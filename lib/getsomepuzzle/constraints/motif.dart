@@ -39,6 +39,7 @@ class ForbiddenMotif extends Motif {
     int width,
     int height,
     List<int> domain,
+    Set<int>? excludedIndices,
   ) {
     final all11 = ['0', ...domain.map((v) => v.toString())];
     final all12 = [

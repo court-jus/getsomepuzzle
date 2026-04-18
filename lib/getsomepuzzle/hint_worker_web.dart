@@ -1,13 +1,6 @@
 import 'dart:async';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class HintWorker {
@@ -30,27 +23,18 @@ class HintWorker {
 
     final List<String> validConstraints = [];
 
-    final slugsAndParams = <String, List<String>>{
-      'FM': ForbiddenMotif.generateAllParameters(width, height, domain),
-      'PA': ParityConstraint.generateAllParameters(width, height),
-      'GS': GroupSize.generateAllParameters(width, height),
-      'LT': LetterGroup.generateAllParameters(width, height),
-      'QA': QuantityConstraint.generateAllParameters(width, height, domain),
-      'SY': SymmetryConstraint.generateAllParameters(width, height),
-      'DF': DifferentFromConstraint.generateAllParameters(
+    int processed = 0;
+    for (final entry in constraintRegistry) {
+      final allParameters = entry.generateAllParameters(
         width,
         height,
-        excludedIndices: readonlyIndices,
-      ),
-      'SH': ShapeConstraint.generateAllParameters(width, height),
-    };
-
-    int processed = 0;
-    for (final entry in slugsAndParams.entries) {
-      for (final param in entry.value) {
+        domain,
+        readonlyIndices,
+      );
+      for (final param in allParameters) {
         if (_cancelled) return validConstraints;
 
-        final constraint = createConstraint(entry.key, param);
+        final constraint = createConstraint(entry.slug, param);
         if (constraint == null) continue;
         final serialized = constraint.serialize();
         if (existingConstraints.contains(serialized)) continue;

@@ -868,6 +868,24 @@ abstract class AppLocalizations {
   /// **'Paste a puzzle representation to edit it'**
   String get createPasteHint;
 
+  /// Name of the group count constraint
+  ///
+  /// In en, this message translates to:
+  /// **'group count'**
+  String get constraintGroupCount;
+
+  /// Name of the column count constraint
+  ///
+  /// In en, this message translates to:
+  /// **'cells per column'**
+  String get constraintColumnCount;
+
+  /// Name of the shape constraint
+  ///
+  /// In en, this message translates to:
+  /// **'shape'**
+  String get constraintShape;
+
   /// Label of the custom puzzles collection
   ///
   /// In en, this message translates to:

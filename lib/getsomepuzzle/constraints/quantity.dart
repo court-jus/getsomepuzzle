@@ -28,6 +28,7 @@ class QuantityConstraint extends Constraint {
     int width,
     int height,
     List<int> domain,
+    Set<int>? excludedIndices,
   ) {
     final maxCount = width * height - 1;
     final List<String> result = [];

@@ -77,12 +77,24 @@ void main() {
   });
 
   test('generateAllParameters produce valid constraints', () {
-    expect(ForbiddenMotif.generateAllParameters(3, 3, [1, 2]), isNotEmpty);
-    expect(ParityConstraint.generateAllParameters(3, 3), isNotEmpty);
-    expect(GroupSize.generateAllParameters(3, 3), isNotEmpty);
-    expect(LetterGroup.generateAllParameters(3, 3), isNotEmpty);
-    expect(QuantityConstraint.generateAllParameters(3, 3, [1, 2]), isNotEmpty);
-    expect(SymmetryConstraint.generateAllParameters(3, 3), isNotEmpty);
+    expect(
+      ForbiddenMotif.generateAllParameters(3, 3, [1, 2], null),
+      isNotEmpty,
+    );
+    expect(
+      ParityConstraint.generateAllParameters(3, 3, [1, 2], null),
+      isNotEmpty,
+    );
+    expect(GroupSize.generateAllParameters(3, 3, [1, 2], null), isNotEmpty);
+    expect(LetterGroup.generateAllParameters(3, 3, [1, 2], null), isNotEmpty);
+    expect(
+      QuantityConstraint.generateAllParameters(3, 3, [1, 2], null),
+      isNotEmpty,
+    );
+    expect(
+      SymmetryConstraint.generateAllParameters(3, 3, [1, 2], null),
+      isNotEmpty,
+    );
   });
 
   test('generateOne produces a puzzle for a seeded 3x3 grid', () {
@@ -111,6 +123,7 @@ void main() {
       width,
       height,
       domain,
+      null,
     )) {
       final c = ForbiddenMotif(p);
       if (c.verify(solved)) {
@@ -122,6 +135,7 @@ void main() {
       width,
       height,
       domain,
+      null,
     )) {
       final c = QuantityConstraint(p);
       if (c.verify(solved)) {

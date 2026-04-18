@@ -394,6 +394,18 @@
     "createFixWhite": "Fix to white",
     "createRemoveFixed": "Remove fixed color",
     "createPasteHint": "Paste a puzzle representation to edit it",
+    "constraintGroupCount": "group count",
+    "@constraintGroupCount": {
+        "description": "Name of the group count constraint"
+    },
+    "constraintColumnCount": "cells per column",
+    "@constraintColumnCount": {
+        "description": "Name of the column count constraint"
+    },
+    "constraintShape": "shape",
+    "@constraintShape": {
+        "description": "Name of the shape constraint"
+    },
     "collectionMyPuzzles": "My puzzles",
     "@collectionMyPuzzles": {
         "description": "Label of the custom puzzles collection"

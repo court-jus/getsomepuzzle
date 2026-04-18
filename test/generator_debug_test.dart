@@ -48,15 +48,21 @@ void main() {
 
     // Generate valid constraints
     final List<Constraint> allConstraints = [];
-    for (final params in ForbiddenMotif.generateAllParameters(3, 3, [1, 2])) {
+    for (final params in ForbiddenMotif.generateAllParameters(3, 3, [
+      1,
+      2,
+    ], null)) {
       final c = ForbiddenMotif(params);
       if (c.verify(solved)) allConstraints.add(c);
     }
-    for (final params in ParityConstraint.generateAllParameters(3, 3)) {
+    for (final params in ParityConstraint.generateAllParameters(3, 3, [
+      1,
+      2,
+    ], null)) {
       final c = ParityConstraint(params);
       if (c.verify(solved)) allConstraints.add(c);
     }
-    for (final params in GroupSize.generateAllParameters(3, 3)) {
+    for (final params in GroupSize.generateAllParameters(3, 3, [1, 2], null)) {
       final c = GroupSize(params);
       if (c.verify(solved)) allConstraints.add(c);
     }

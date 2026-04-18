@@ -5,12 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
@@ -19,12 +23,8 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
 import 'package:getsomepuzzle/widgets/symmetry.dart';
-
-const _bgColors = {
-  0: Color.fromARGB(255, 185, 86, 202),
-  1: Colors.black,
-  2: Colors.white,
-};
+import 'package:getsomepuzzle/widgets/group_count.dart';
+import 'package:getsomepuzzle/widgets/column_count.dart';
 
 class EditorState {
   final int width;
@@ -396,6 +396,30 @@ class _CreatePageState extends State<CreatePage> {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.circle_outlined),
+              title: Text(loc.constraintColumnCount),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showColumnCountDialog(cellIdx);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: Text(loc.constraintGroupCount),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showGroupCountDialog();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.rotate_90_degrees_ccw),
+              title: Text(loc.constraintShape),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showShapeDialog();
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.flip),
               title: Text(loc.constraintSymmetry),
               onTap: () {
@@ -445,13 +469,18 @@ class _CreatePageState extends State<CreatePage> {
     _scheduleAutoSolve();
   }
 
-  // --- Forbidden Motif dialog ---
+  // --- Motif dialog (shared by Forbidden Motif and Shape) ---
 
-  void _showForbiddenMotifDialog() {
+  void _showMotifDialog({
+    required String titleText,
+    required Color backgroundColor,
+    required Constraint Function(String motifStr) constraintFactory,
+  }) {
     int motifWidth = 2;
     int motifHeight = 2;
     List<List<int>> grid = List.generate(3, (_) => List.filled(3, 0));
 
+    final bgColors = {0: backgroundColor, 1: Colors.black, 2: Colors.white};
     showDialog(
       context: context,
       builder: (ctx) {
@@ -459,7 +488,7 @@ class _CreatePageState extends State<CreatePage> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
-              title: Text(loc.constraintForbiddenPattern),
+              title: Text(titleText),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -512,17 +541,15 @@ class _CreatePageState extends State<CreatePage> {
                                   width: 50,
                                   height: 50,
                                   decoration: BoxDecoration(
-                                    color: _bgColors[grid[row][col]],
+                                    color: bgColors[grid[row][col]],
                                     border: Border.all(color: Colors.blueGrey),
                                   ),
                                 ),
                               ),
-                            // Fill remaining columns with empty SizedBox
                             for (var col = motifWidth; col < 3; col++)
                               const SizedBox(width: 50, height: 50),
                           ],
                         ),
-                      // Fill remaining rows
                       for (var row = motifHeight; row < 3; row++)
                         TableRow(
                           children: List.generate(
@@ -541,7 +568,6 @@ class _CreatePageState extends State<CreatePage> {
                 ),
                 TextButton(
                   onPressed: () {
-                    // Build motif string from grid
                     final motifRows = <String>[];
                     bool hasNonZero = false;
                     for (var row = 0; row < motifHeight; row++) {
@@ -555,7 +581,7 @@ class _CreatePageState extends State<CreatePage> {
                     if (!hasNonZero) return;
                     final motifStr = motifRows.join('.');
                     Navigator.pop(ctx);
-                    _addConstraint(ForbiddenMotif(motifStr));
+                    _addConstraint(constraintFactory(motifStr));
                   },
                   child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
                 ),
@@ -564,6 +590,15 @@ class _CreatePageState extends State<CreatePage> {
           },
         );
       },
+    );
+  }
+
+  void _showForbiddenMotifDialog() {
+    final loc = AppLocalizations.of(context)!;
+    _showMotifDialog(
+      titleText: loc.constraintForbiddenPattern,
+      backgroundColor: forbiddenColor,
+      constraintFactory: (str) => ForbiddenMotif(str),
     );
   }
 
@@ -885,6 +920,148 @@ class _CreatePageState extends State<CreatePage> {
     );
   }
 
+  void _showColumnCountDialog(int cellIdx) {
+    final loc = AppLocalizations.of(context)!;
+    final cidx = cellIdx % _width;
+    int color = 1;
+    int count = _height;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(loc.constraintColumnCount),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Text('${loc.createChooseValue}: '),
+                  DropdownButton<int>(
+                    value: color,
+                    items: [1, 2]
+                        .map(
+                          (v) => DropdownMenuItem(value: v, child: Text('$v')),
+                        )
+                        .toList(),
+                    onChanged: (v) => setDialogState(() => color = v!),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text('${loc.createChooseCount}: '),
+                  Expanded(
+                    child: Slider(
+                      value: count.toDouble(),
+                      min: 1,
+                      max: _height.toDouble(),
+                      divisions: max(1, _height - 1),
+                      label: '$count',
+                      onChanged: (v) => setDialogState(() => count = v.round()),
+                    ),
+                  ),
+                  Text('$count'),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _addConstraint(ColumnCountConstraint('$cidx.$color.$count'));
+              },
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Group count dialog ---
+
+  void _showGroupCountDialog() {
+    final loc = AppLocalizations.of(context)!;
+    int color = 1;
+    int count = (_width * _height / 2).ceil();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(loc.constraintGroupCount),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Text('${loc.createChooseValue}: '),
+                  DropdownButton<int>(
+                    value: color,
+                    items: [1, 2]
+                        .map(
+                          (v) => DropdownMenuItem(value: v, child: Text('$v')),
+                        )
+                        .toList(),
+                    onChanged: (v) => setDialogState(() => color = v!),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text('${loc.createChooseCount}: '),
+                  Expanded(
+                    child: Slider(
+                      value: count.toDouble(),
+                      min: 1,
+                      max: (_width * _height / 2).ceil().toDouble(),
+                      divisions: max(1, (_width * _height / 2).ceil() - 1),
+                      label: '$count',
+                      onChanged: (v) => setDialogState(() => count = v.round()),
+                    ),
+                  ),
+                  Text('$count'),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _addConstraint(GroupCountConstraint('$color.$count'));
+              },
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Shape dialog ---
+
+  void _showShapeDialog() {
+    final loc = AppLocalizations.of(context)!;
+    _showMotifDialog(
+      titleText: loc.constraintShape,
+      backgroundColor: mandatoryColor,
+      constraintFactory: (str) => ShapeConstraint(str),
+    );
+  }
+
   // --- Action buttons ---
 
   void _testPuzzle() {
@@ -1086,8 +1263,12 @@ class _CreatePageState extends State<CreatePage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Top bar: ForbiddenMotif + QuantityConstraint
+            // Top bar: ForbiddenMotif + QuantityConstraint + GroupCountConstraint
             _buildTopBar(),
+
+            // Column count row (above grid, aligned with columns)
+            const SizedBox(height: 10),
+            _buildColumnCountRow(),
 
             const SizedBox(height: 10),
 
@@ -1205,8 +1386,54 @@ class _CreatePageState extends State<CreatePage> {
                     oppositeTotal: (_width * _height) - constraint.value,
                     cellSize: topBarSize,
                   ),
+                )
+              else if (constraint is GroupCountConstraint)
+                GestureDetector(
+                  onTap: () => _onTopBarConstraintTap(constraint),
+                  child: GroupCountWidget(
+                    constraint: constraint,
+                    actualGroupCount: 0,
+                    cellSize: topBarSize,
+                  ),
                 ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildColumnCountRow() {
+    final ccConstraints = _constraints.whereType<ColumnCountConstraint>();
+    if (ccConstraints.isEmpty) return const SizedBox.shrink();
+
+    final ccByColumn = <int, ColumnCountConstraint>{};
+    for (final c in ccConstraints) {
+      ccByColumn[c.columnIdx] = c;
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cellSize = min(
+          (constraints.maxWidth - 2) / _width,
+          (MediaQuery.sizeOf(context).height * 0.5) / _height,
+        );
+        return SizedBox(
+          width: cellSize * _width,
+          child: Row(
+            children: [
+              for (int col = 0; col < _width; col++)
+                if (ccByColumn.containsKey(col))
+                  GestureDetector(
+                    onTap: () => _onTopBarConstraintTap(ccByColumn[col]!),
+                    child: ColumnCountWidget(
+                      constraint: ccByColumn[col]!,
+                      cellSize: cellSize,
+                    ),
+                  )
+                else
+                  SizedBox(width: cellSize),
+            ],
+          ),
         );
       },
     );

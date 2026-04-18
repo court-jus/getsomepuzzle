@@ -33,7 +33,12 @@ class GroupSize extends CellsCentricConstraint {
     return "${idx + 1} = $size";
   }
 
-  static List<String> generateAllParameters(int width, int height) {
+  static List<String> generateAllParameters(
+    int width,
+    int height,
+    List<int> domain,
+    Set<int>? excludedIndices,
+  ) {
     final maxSize = min(
       _maxGroupSizeAbsolute,
       max(1, (width * height * _maxGroupSizeRatio).toInt()),
@@ -199,7 +204,12 @@ class LetterGroup extends CellsCentricConstraint {
     return "$hIndices = $letter";
   }
 
-  static List<String> generateAllParameters(int width, int height) {
+  static List<String> generateAllParameters(
+    int width,
+    int height,
+    List<int> domain,
+    Set<int>? excludedIndices,
+  ) {
     final size = width * height;
     final maxLetters = max(1, size ~/ 5);
     final List<String> result = [];

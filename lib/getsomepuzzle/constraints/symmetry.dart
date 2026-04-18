@@ -31,7 +31,12 @@ class SymmetryConstraint extends CellsCentricConstraint {
     return axisRepresentation[axis] ?? "🕱";
   }
 
-  static List<String> generateAllParameters(int width, int height) {
+  static List<String> generateAllParameters(
+    int width,
+    int height,
+    List<int> domain,
+    Set<int>? excludedIndices,
+  ) {
     final List<String> result = [];
     for (int idx = 0; idx < width * height; idx++) {
       for (int axis = 1; axis <= 5; axis++) {

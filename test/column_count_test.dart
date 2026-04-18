@@ -122,12 +122,18 @@ void main() {
   group('ColumnCountConstraint.generateAllParameters', () {
     test('generates correct number of parameters', () {
       // 4 columns × 2 colors × (height-1) counts = 4 × 2 × 4 = 32
-      final params = ColumnCountConstraint.generateAllParameters(4, 5, [1, 2]);
+      final params = ColumnCountConstraint.generateAllParameters(4, 5, [
+        1,
+        2,
+      ], null);
       expect(params.length, 32);
     });
 
     test('all parameters are valid', () {
-      final params = ColumnCountConstraint.generateAllParameters(3, 4, [1, 2]);
+      final params = ColumnCountConstraint.generateAllParameters(3, 4, [
+        1,
+        2,
+      ], null);
       for (final p in params) {
         // Should parse without error
         final cc = ColumnCountConstraint(p);

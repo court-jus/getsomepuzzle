@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -342,6 +343,9 @@ Map<String, dynamic> _parseArgs(List<String> args) {
 }
 
 void _printUsage() {
+  final String rules = constraintRegistry
+      .map((regEntry) => "${regEntry.slug} (${regEntry.label})")
+      .join(", ");
   stderr.writeln('''
 Usage: dart run bin/generate.dart [options]
 
@@ -364,9 +368,7 @@ Generation options:
 General:
   -h, --help              Show this help
 
-Rule slugs: FM (forbidden motif), PA (parity), GS (group size),
-            LT (letter group), QA (quantity), SY (symmetry),
-            DF (different from), CC (column count)
+Rule slugs: $rules
 
 Examples:
   dart run bin/generate.dart -n 100 -o puzzles.txt

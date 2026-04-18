@@ -41,9 +41,10 @@ class DifferentFromConstraint extends CellsCentricConstraint {
 
   static List<String> generateAllParameters(
     int width,
-    int height, {
+    int height,
+    List<int> domain,
     Set<int>? excludedIndices,
-  }) {
+  ) {
     final List<String> result = [];
     final excluded = excludedIndices ?? {};
     for (int idx = 0; idx < width * height; idx++) {

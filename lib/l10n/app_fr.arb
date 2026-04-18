@@ -65,6 +65,8 @@
     "constraintLetterGroup": "groupe de lettres",
     "constraintParity": "parité",
     "constraintQuantity": "quantité",
+    "constraintGroupCount": "nombre de groupes",
+    "constraintShape": "forme",
     "constraintSymmetry": "symétrie",
     "generate": "Générer",
     "generateTitle": "Générer des puzzles",
@@ -110,7 +112,9 @@
     "createLetterGroupMode": "Touchez les cellules pour le groupe {letter}, puis appuyez sur Terminer",
     "@createLetterGroupMode": {
         "placeholders": {
-            "letter": { "type": "String" }
+            "letter": {
+                "type": "String"
+            }
         }
     },
     "createLetterGroupDone": "Terminer",
@@ -133,5 +137,9 @@
     "createFixWhite": "Fixer en blanc",
     "createRemoveFixed": "Retirer la couleur fixée",
     "createPasteHint": "Coller une représentation de puzzle pour l'éditer",
-    "collectionMyPuzzles": "Mes puzzles"
+    "collectionMyPuzzles": "Mes puzzles",
+    "constraintColumnCount": "cellules par colonne",
+    "@constraintColumnCount": {
+        "description": "Name of the column count constraint"
+    }
 }

@@ -34,7 +34,12 @@ class ParityConstraint extends CellsCentricConstraint {
   }
 
   /// Generate all valid parity constraint parameters for a given grid size.
-  static List<String> generateAllParameters(int width, int height) {
+  static List<String> generateAllParameters(
+    int width,
+    int height,
+    List<int> domain,
+    Set<int>? excludedIndices,
+  ) {
     final List<String> result = [];
     for (int idx = 0; idx < width * height; idx++) {
       final ridx = idx ~/ width;

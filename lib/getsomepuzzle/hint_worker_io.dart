@@ -2,13 +2,6 @@ import 'dart:async';
 import 'dart:isolate';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class HintWorker {
@@ -85,32 +78,15 @@ void _isolateEntryPoint(_HintParams params) {
 
   final List<String> validConstraints = [];
 
-  final slugsAndParams = <String, List<String>>{
-    'FM': ForbiddenMotif.generateAllParameters(
+  for (final entry in constraintRegistry) {
+    final allParameters = entry.generateAllParameters(
       params.width,
       params.height,
       params.domain,
-    ),
-    'PA': ParityConstraint.generateAllParameters(params.width, params.height),
-    'GS': GroupSize.generateAllParameters(params.width, params.height),
-    'LT': LetterGroup.generateAllParameters(params.width, params.height),
-    'QA': QuantityConstraint.generateAllParameters(
-      params.width,
-      params.height,
-      params.domain,
-    ),
-    'SY': SymmetryConstraint.generateAllParameters(params.width, params.height),
-    'DF': DifferentFromConstraint.generateAllParameters(
-      params.width,
-      params.height,
-      excludedIndices: readonlySet,
-    ),
-    'SH': ShapeConstraint.generateAllParameters(params.width, params.height),
-  };
-
-  for (final entry in slugsAndParams.entries) {
-    for (final param in entry.value) {
-      final constraint = createConstraint(entry.key, param);
+      readonlySet,
+    );
+    for (final param in allParameters) {
+      final constraint = createConstraint(entry.slug, param);
       if (constraint == null) continue;
       final serialized = constraint.serialize();
       if (existing.contains(serialized)) continue;

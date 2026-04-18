@@ -30,6 +30,7 @@ class ColumnCountConstraint extends Constraint {
     int width,
     int height,
     List<int> domain,
+    Set<int>? excludedIndices,
   ) {
     final List<String> result = [];
     for (int col = 0; col < width; col++) {
