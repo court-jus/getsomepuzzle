@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
   if (args.isEmpty) {

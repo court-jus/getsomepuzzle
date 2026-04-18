@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_rank_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';

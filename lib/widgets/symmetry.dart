@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 
 class SymmetryWidget extends StatelessWidget {

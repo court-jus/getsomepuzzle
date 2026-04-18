@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:getsomepuzzle/getsomepuzzle/constraint_registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class HintRankResult {
   final List<String> ranked;
