@@ -42,10 +42,7 @@ class GroupSizeWidget extends StatelessWidget {
                 left: 8,
                 child: Text(
                   smallText,
-                  style: TextStyle(
-                    fontSize: smallFontSize,
-                    color: fgcolor,
-                  ),
+                  style: TextStyle(fontSize: smallFontSize, color: fgcolor),
                 ),
               ),
             Center(
