@@ -1,4 +1,4 @@
-# Column count constraint
+# WIP: Column count constraint
 
 New constraint type "Column Count" (slug CC).
 

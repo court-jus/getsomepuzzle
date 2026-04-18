@@ -1,4 +1,4 @@
-# Group Size - Multi merge
+# DONE: Group Size - Multi merge
 
 With the puzzle "v2_12_3x3_000010001_PA:0.down;GS.1.1;GS:7.6_0:0_100",
 if the grid is partially solved in state "121210101", when the user

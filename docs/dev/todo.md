@@ -148,10 +148,6 @@ Leftover items from the Shape constraint review (c04166d..f7c6812).
 
 `shape.dart` `findAllCompletions` has 5 levels of nested loops/conditions. The merge logic is especially hard to follow. Extract the merge check into a separate method.
 
-### `bin/solve.dart` hard-coded FR strings
-
-Lines 64, 79, 82 contain FR strings ("Bloque", "NOIR", "BLANC", "Etape") in what is otherwise an English-only debug tool. Translate to English for consistency with the rest of the CLI. Low priority (debug-only tool).
-
 ### Remove `sh_puz.txt` from repo root
 
 Leftover 4-line test file committed at the repo root. Delete or move under an ignored path.

@@ -1,4 +1,4 @@
-# Constraints as hints
+# DONE: Constraints as hints
 
 When the player asks for help, `findAMove` is used to see what can be deduced, first by
 propagation then by a "force round".
