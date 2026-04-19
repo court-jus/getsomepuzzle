@@ -342,9 +342,17 @@ void main() {
       expect(GroupCountConstraint('1.2').verify(p), isTrue);
     });
 
+    test('wrong group count → valid', () {
+      // 2x2: 2 black groups but constraint asks for 1
+      // still valid because groups can merge
+      final p = _make('10\n01');
+      expect(GroupCountConstraint('1.1').verify(p), isTrue);
+    });
+
     test('wrong group count → invalid', () {
       // 2x2: 2 black groups but constraint asks for 1
-      final p = _make('10\n01');
+      // invalid because groups cannot merge
+      final p = _make('10\n22\n01');
       expect(GroupCountConstraint('1.1').verify(p), isFalse);
     });
 
