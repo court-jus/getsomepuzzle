@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 const Map<int, String> axisRepresentation = {
   0: "🕱",
@@ -48,7 +49,7 @@ class SymmetryConstraint extends CellsCentricConstraint {
 
   @override
   bool verify(Puzzle puzzle) {
-    final groups = puzzle.getGroups();
+    final groups = getGroups(puzzle);
     final idx = indices[0];
     final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
     if (myGroup == null) return true;
@@ -65,7 +66,7 @@ class SymmetryConstraint extends CellsCentricConstraint {
 
   @override
   Move? apply(Puzzle puzzle) {
-    final groups = puzzle.getGroups();
+    final groups = getGroups(puzzle);
     final idx = indices[0];
     final myValue = puzzle.getValue(idx);
     if (myValue == 0) return null;

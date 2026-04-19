@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 const _maxGroupSizeRatio = 0.5;
 const _maxGroupSizeAbsolute = 15;
@@ -54,7 +55,7 @@ class GroupSize extends CellsCentricConstraint {
 
   @override
   bool verify(Puzzle puzzle) {
-    final groups = puzzle.getGroups();
+    final groups = getGroups(puzzle);
     final idx = indices[0];
     final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
     if (myGroup == null) {
@@ -79,7 +80,7 @@ class GroupSize extends CellsCentricConstraint {
 
   @override
   Move? apply(Puzzle puzzle) {
-    final groups = puzzle.getGroups();
+    final groups = getGroups(puzzle);
     final idx = indices[0];
     final myColor = puzzle.cellValues[idx];
     final myOpposite = puzzle.domain.whereNot((v) => v == myColor).first;
@@ -231,7 +232,7 @@ class LetterGroup extends CellsCentricConstraint {
         .where((elem) => indices.contains(elem.$1))
         .map((elem) => elem.$2);
     if (myCellValues.contains(0)) return true;
-    final groups = puzzle.getGroups();
+    final groups = getGroups(puzzle);
     final List<List<int>> myGroups = [];
     for (final group in groups) {
       final intersect = group.toSet().intersection(indices.toSet());
@@ -281,7 +282,7 @@ class LetterGroup extends CellsCentricConstraint {
         return Move(member, myColor, this);
       }
     }
-    final allGroups = puzzle.getGroups();
+    final allGroups = getGroups(puzzle);
     final myGroupsJoined = allGroups
         .where((grp) => grp.toSet().intersection(indices.toSet()).isNotEmpty)
         .flattened;
@@ -342,7 +343,7 @@ class LetterGroup extends CellsCentricConstraint {
 
     // Now, find if other members of the letter group are disconnected and raise
     var foundVGroup = false;
-    for (var vgroup in puzzle.toVirtualGroups()) {
+    for (var vgroup in toVirtualGroups(puzzle)) {
       final notInVgroup = indices.whereNot((member) => vgroup.contains(member));
       if (notInVgroup.isEmpty) {
         foundVGroup = true;

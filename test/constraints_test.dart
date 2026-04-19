@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 /// Build a puzzle from a grid string (domain [1,2]).
 /// Each digit is a cell value (0=empty, 1=black, 2=white), rows separated by newlines.
@@ -123,7 +124,7 @@ void main() {
   group('Puzzle.getGroups', () {
     test('2x2 with two groups', () {
       final p = _make('11\n22');
-      final groups = p.getGroups();
+      final groups = getGroups(p);
       expect(groups.length, 2);
       expect(
         groups.any((g) => g.length == 2 && g.contains(0) && g.contains(1)),
@@ -138,7 +139,7 @@ void main() {
     test('3x3 with two groups of different sizes', () {
       // 212/212/222 → value 2: {0,2,3,5,6,7,8} size 7, value 1: {1,4} size 2
       final p = _make('212\n212\n222');
-      final groups = p.getGroups();
+      final groups = getGroups(p);
       expect(groups.any((g) => g.length == 7), isTrue);
       expect(
         groups.any((g) => g.length == 2 && g.contains(1) && g.contains(4)),

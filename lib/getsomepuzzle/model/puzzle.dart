@@ -157,45 +157,6 @@ class Puzzle {
     return result;
   }
 
-  List<List<int>> getGroups() {
-    final List<Set<int>> sameValues = [
-      for (var idx in Iterable.generate(cellValues.length))
-        getNeighborsSameValue(idx).toSet(),
-    ];
-    final Map<int, Set<int>> groups = {};
-    var groupCount = 0;
-    for (var others in sameValues) {
-      if (others.isEmpty) continue;
-      final existing = {
-        for (var item in groups.entries)
-          if (others.intersection(item.value).isNotEmpty) item.key: item.value,
-      };
-      if (existing.isEmpty) {
-        groupCount += 1;
-        groups[groupCount] = others;
-        continue;
-      }
-      // Merge the groups
-      final newIdx = existing.keys.toList()[0];
-      var newGrp = existing[newIdx]!.union(others);
-      final indicesRemove = existing.keys.where((i) => i != newIdx);
-      for (var indexRemove in indicesRemove) {
-        final removeGrp = existing[indexRemove];
-        if (removeGrp != null) {
-          groups.remove(indexRemove);
-          newGrp = newGrp.union(removeGrp);
-        }
-      }
-      groups[newIdx] = groups[newIdx]!.union(newGrp);
-    }
-    final List<List<int>> result = groups.values.map((grp) {
-      final indices = grp.toList();
-      indices.sort();
-      return indices;
-    }).toList();
-    return result;
-  }
-
   List<int> getNeighbors(int idx) {
     final maxidx = width * height - 1;
     final minidx = 0;
@@ -209,24 +170,6 @@ class Puzzle {
     if (bel <= maxidx) result.add(bel);
     if (lft >= minidx && lft ~/ width == ridx) result.add(lft);
     if (rgt <= maxidx && rgt ~/ width == ridx) result.add(rgt);
-    return result;
-  }
-
-  List<int> getNeighborsSameValue(int idx) {
-    final myValue = cellValues[idx];
-    if (myValue == 0) return [];
-    final List<int> result = [idx];
-    result.addAll(getNeighbors(idx).where((e) => cellValues[e] == myValue));
-    return result;
-  }
-
-  List<int> getNeighborsSameValueOrEmpty(int idx, int myValue) {
-    final List<int> result = [idx];
-    result.addAll(
-      getNeighbors(
-        idx,
-      ).where((e) => cellValues[e] == myValue || cellValues[e] == 0),
-    );
     return result;
   }
 
@@ -802,72 +745,4 @@ class Puzzle {
     final solutionStr = sol != null ? '1:${sol.join('')}' : '0:0';
     return 'v2_${domainStr}_${width}x${height}_${valuesStr}_${constraintsStr}_${solutionStr}_$complexity';
   }
-
-  List<List<int>> toVirtualGroups() {
-    final idxToExplore = cellValues.indexed.toList();
-    final Map<int, List<int>> explored = {};
-    final Map<int, Map<int, List<int>>> groupsPerValuePerCell = {};
-    while (idxToExplore.isNotEmpty) {
-      final exploring = idxToExplore.removeAt(0);
-      final exploreIdx = exploring.$1;
-      final value = exploring.$2;
-      final others = explored[value] ?? [];
-      if (others.contains(exploreIdx)) {
-        continue;
-      }
-      others.add(exploreIdx);
-      explored[value] = others;
-      final sameOrEmpty = getNeighborsSameValueOrEmpty(exploreIdx, value);
-      if (groupsPerValuePerCell[value] == null) {
-        groupsPerValuePerCell[value] = {};
-      }
-      if (groupsPerValuePerCell[value]![exploreIdx] == null) {
-        groupsPerValuePerCell[value]![exploreIdx] = [];
-      }
-      groupsPerValuePerCell[value]![exploreIdx]!.addAll(sameOrEmpty);
-      for (var neighbor in sameOrEmpty) {
-        if (neighbor != exploreIdx) {
-          idxToExplore.add((neighbor, value));
-        }
-      }
-    } // while
-    final Map<int, List<Set<int>>> setsPerValue = {};
-    for (var valueEntry in groupsPerValuePerCell.entries) {
-      final value = valueEntry.key;
-      final valueData = valueEntry.value;
-      for (var dataEntry in valueData.entries) {
-        final idx = dataEntry.key;
-        final newGroup = dataEntry.value.toSet();
-        if (setsPerValue[value] == null) {
-          setsPerValue[value] = [];
-        }
-        for (var existing in findAndPop(setsPerValue[value]!, idx)) {
-          newGroup.addAll(existing);
-        }
-        setsPerValue[value]!.add(newGroup);
-      }
-    }
-    return setsPerValue.values.flattenedToList
-        .map((grp) => grp.toList())
-        .toList();
-  }
-}
-
-List<Set<int>> findAndPop(List<Set<int>> setlist, int value) {
-  /*
-    Pops the sets in setlist that contains value.
-    */
-  final Set<int> indices = {};
-  for (var setEntry in setlist.indexed) {
-    final idx = setEntry.$1;
-    final candidate = setEntry.$2;
-    if (candidate.contains(value)) {
-      indices.add(idx);
-    }
-  }
-  final List<Set<int>> result = [];
-  for (var idx in indices.sorted((a, b) => a - b).reversed) {
-    result.add(setlist.removeAt(idx));
-  }
-  return result;
 }

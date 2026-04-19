@@ -25,7 +25,7 @@ constraint's color.
   - `int color` - the cell value to count groups for
   - `int count` - the required number of groups
 - Constructor parses `GC:2.5` -> `color=2`, `count=5`
-- Implement `verify(Puzzle)`: use `puzzle.getGroups()` and filter by color
+- Implement `verify(Puzzle)`: use `getGroups()` and filter by color
 - Implement `apply(Puzzle)`: deduction logic is **limited** because the number of groups can change as cells are filled
   - The only safe deductions can be made when the groups are bordered and cannot grow or if they are separated
     from each other by the opposite color and cannot merge.
@@ -58,7 +58,7 @@ constraint's color.
 - Pass `cellSize`, `constraint`, and `actualGroupCount` to `GroupCountWidget`
 - Calculate `actualGroupCount` at puzzle level (similar to `QuantityConstraint`):
   ```dart
-  actualGroupCount: widget.currentPuzzle.getGroups()
+  actualGroupCount: getGroups(widget.currentPuzzle)
       .where((grp) => widget.currentPuzzle.cellValues[grp.first] == constraint.color)
       .length,
   ```

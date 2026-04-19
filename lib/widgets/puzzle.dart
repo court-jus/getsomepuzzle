@@ -10,6 +10,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/column_count.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
@@ -253,8 +254,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               ? _constraintKey
                               : null,
                           constraint: constraint,
-                          actualGroupCount: widget.currentPuzzle
-                              .getGroups()
+                          actualGroupCount: getGroups(widget.currentPuzzle)
                               .where(
                                 (grp) =>
                                     widget.currentPuzzle.cellValues[grp
@@ -417,7 +417,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
           : null,
       onRightDragEnd: widget.onCellRightDragEnd,
       getCellGroupSize: (cellIdx) {
-        final groups = widget.currentPuzzle.getGroups();
+        final groups = getGroups(widget.currentPuzzle);
         for (final grp in groups) {
           if (grp.contains(cellIdx)) {
             return grp.length;

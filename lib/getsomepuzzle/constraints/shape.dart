@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 // ---------------------------------------------------------------------------
 // Shape utilities: rotation, mirror, normalization, comparison.
@@ -238,7 +239,7 @@ class ShapeConstraint extends Motif {
   // -------------------------------------------------------------------------
   @override
   Move? apply(Puzzle puzzle) {
-    final groups = puzzle.getGroups();
+    final groups = getGroups(puzzle);
     final opposite = puzzle.domain.whereNot((v) => v == color).first;
 
     for (final group in groups) {
@@ -365,7 +366,7 @@ class ShapeConstraint extends Motif {
     final completions = <Set<int>>[];
 
     // Pre-compute groups and cell→group index
-    final allGroups = puzzle.getGroups();
+    final allGroups = getGroups(puzzle);
     final cellToGroup = <int, List<int>>{};
     for (final g in allGroups) {
       for (final idx in g) {
@@ -447,7 +448,7 @@ class ShapeConstraint extends Motif {
 
   @override
   bool verify(Puzzle puzzle) {
-    final groups = puzzle.getGroups();
+    final groups = getGroups(puzzle);
 
     for (final group in groups) {
       // Only check groups of the constrained color.

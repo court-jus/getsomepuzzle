@@ -1,7 +1,7 @@
-import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 class GroupCountConstraint extends Constraint {
   @override
@@ -45,15 +45,8 @@ class GroupCountConstraint extends Constraint {
     return result;
   }
 
-  List<List<int>> _getColorGroups(Puzzle puzzle) {
-    return puzzle.getGroups().where((grp) {
-      if (grp.isEmpty) return false;
-      return puzzle.cellValues[grp.first] == color;
-    }).toList();
-  }
-
   int _getGroupCount(Puzzle puzzle) {
-    return _getColorGroups(puzzle).length;
+    return getColorGroups(puzzle, color).length;
   }
 
   @override
@@ -61,6 +54,13 @@ class GroupCountConstraint extends Constraint {
     final currentCount = _getGroupCount(puzzle);
     if (puzzle.complete) {
       return currentCount == count;
+    }
+    if (currentCount > count) {
+      // We have more groups than expected, see if they can merge
+      final minGroupsPossible = calculateMinGroups(puzzle, color);
+      if (minGroupsPossible > count) {
+        return false;
+      }
     }
     return true;
   }
