@@ -600,4 +600,84 @@ void main() {
       [1, 1],
     ]);
   });
+
+  group('ShapeConstraint.isCompleteFor', () {
+    test('open group → returns false', () {
+      // SH:111 = line of 3. Open group of 2 cells.
+      final p = _make('110\n000\n000');
+      final sh = ShapeConstraint('111');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isFalse);
+    });
+
+    test('closed group with valid shape → returns true', () {
+      // SH:111 = line of 3. Closed group of 3 cells forming a line.
+      // Grid: black line at top, white row below, all blocked around.
+      final p = _make('111\n222');
+      final sh = ShapeConstraint('111');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isTrue);
+    });
+
+    test('closed group with rotated valid shape → returns true', () {
+      // SH:111 = line of 3. Closed vertical line of 3 cells.
+      final p = _make('12\n12\n12');
+      final sh = ShapeConstraint('111');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isTrue);
+    });
+
+    test('multiple groups, all closed → returns true', () {
+      // SH:111 = line of 3. Two closed groups of 3 cells each.
+      final p = _make('111\n222\n111\n222');
+      final sh = ShapeConstraint('111');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isTrue);
+    });
+
+    test('all possible placements blocked → returns true', () {
+      // SH:111 = line of 3. Full grid, no empty cells.
+      // All placements would overlap with existing black cells.
+      final p = _make('111\n222');
+      final sh = ShapeConstraint('111');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isTrue);
+    });
+
+    test('can still place variant somewhere → returns false', () {
+      // SH:11 = line of 2. Grid with room for a new black line.
+      //   1 1 0
+      //   2 2 2
+      // Black group [0,1] is closed, but there's room for a new group at [2].
+      final p = _make('110\n222');
+      final sh = ShapeConstraint('11');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isFalse);
+    });
+
+    test('constraint violated → returns false', () {
+      // SH:111 = line of 3. Black group is an L (wrong shape).
+      final p = _make('112\n212\n222');
+      final sh = ShapeConstraint('111');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isFalse);
+    });
+
+    test('closed group with wrong size → returns false (via verify)', () {
+      // SH:111 = line of 3. Closed group with only 2 cells.
+      final p = _make('11\n22\n22');
+      final sh = ShapeConstraint('111');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isFalse);
+    });
+
+    test('white shape constraint ignores black groups', () {
+      // SH:222 = white groups must be lines of 3.
+      // Black groups can be any shape.
+      final p = _make('111\n222');
+      final sh = ShapeConstraint('222');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isTrue);
+    });
+  });
 }

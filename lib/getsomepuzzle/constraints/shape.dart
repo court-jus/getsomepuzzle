@@ -579,6 +579,59 @@ class ShapeConstraint extends Motif {
 
     return results;
   }
+
+  bool canPlaceAnyVariant(Puzzle puzzle) {
+    final oppositeColor = puzzle.domain.whereNot((i) => i == color).first;
+    final width = puzzle.width;
+    final height = puzzle.height;
+
+    for (final variant in variants) {
+      final varH = variant.length;
+      final varW = variant[0].length;
+
+      for (int row = 0; row <= height - varH; row++) {
+        for (int col = 0; col <= width - varW; col++) {
+          bool blockedByOpposite = false;
+          bool hasAtLeastOneEmpty = false;
+          for (int vr = 0; vr < varH; vr++) {
+            for (int vc = 0; vc < varW; vc++) {
+              if (variant[vr][vc] == 0) continue;
+              final cellValue =
+                  puzzle.cells[(row + vr) * width + (col + vc)].value;
+              if (cellValue == oppositeColor) {
+                blockedByOpposite = true;
+              } else if (cellValue == 0) {
+                hasAtLeastOneEmpty = true;
+              }
+            }
+          }
+          if (!blockedByOpposite && hasAtLeastOneEmpty) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+
+    final groups = getGroups(puzzle);
+
+    for (final group in groups) {
+      if (puzzle.cellValues[group.first] != color) continue;
+
+      final isClosed = !group.any(
+        (idx) => puzzle.getNeighbors(idx).any((n) => puzzle.cellValues[n] == 0),
+      );
+
+      if (!isClosed) return false;
+    }
+
+    if (canPlaceAnyVariant(puzzle)) return false;
+
+    return true;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 class Constraint {
   bool isValid = true;
   bool isHighlighted = false;
+  bool isComplete = false;
 
   @override
   String toString() {
@@ -32,6 +33,8 @@ class Constraint {
     }
     return verified;
   }
+
+  bool isCompleteFor(Puzzle puzzle) => false;
 
   Move? apply(Puzzle puzzle) {
     final clone = puzzle.clone();

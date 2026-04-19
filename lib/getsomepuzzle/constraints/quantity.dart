@@ -69,4 +69,11 @@ class QuantityConstraint extends Constraint {
     }
     return null;
   }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final myValues = puzzle.cellValues.where((val) => val == value).length;
+    return myValues == count || puzzle.complete;
+  }
 }

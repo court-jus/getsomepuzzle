@@ -175,7 +175,15 @@ class Puzzle {
 
   bool setValue(int idx, int value) {
     final cell = cells[idx];
-    return cell.setValue(value);
+    final result = cell.setValue(value);
+    updateConstraintStatus();
+    return result;
+  }
+
+  void updateConstraintStatus() {
+    for (final constraint in constraints) {
+      constraint.isComplete = constraint.isCompleteFor(this);
+    }
   }
 
   void resetCell(int idx) {

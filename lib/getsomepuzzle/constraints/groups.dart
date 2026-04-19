@@ -182,6 +182,22 @@ class GroupSize extends CellsCentricConstraint {
     }
     return null;
   }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final groups = getGroups(puzzle);
+    final idx = indices[0];
+    final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
+    if (myGroup == null) return false;
+    for (var member in myGroup) {
+      final freeNeighbors = puzzle
+          .getNeighbors(member)
+          .where((nei) => puzzle.cellValues[nei] == 0);
+      if (freeNeighbors.isNotEmpty) return false;
+    }
+    return myGroup.length == size;
+  }
 }
 
 class LetterGroup extends CellsCentricConstraint {
@@ -244,6 +260,10 @@ class LetterGroup extends CellsCentricConstraint {
     final myGroup = myGroups[0];
     final Set<String> lettersInMyGroup = {};
     for (final idx in myGroup) {
+      if (indices.contains(idx)) {
+        lettersInMyGroup.add(letter);
+        continue;
+      }
       final constraintsAtIdx = puzzle.cellConstraints[idx];
       if (constraintsAtIdx == null) continue;
       for (final constraint in constraintsAtIdx) {
@@ -354,6 +374,26 @@ class LetterGroup extends CellsCentricConstraint {
       return Move(0, 0, this, isImpossible: this);
     }
     return null;
+  }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final myCellValues = indices.map((i) => puzzle.cellValues[i]).toList();
+    if (myCellValues.contains(0)) return false;
+    final groups = getGroups(puzzle);
+    final myGroup = groups.firstWhereOrNull(
+      (grp) =>
+          grp.toSet().intersection(indices.toSet()).length == indices.length,
+    );
+    if (myGroup == null) return false;
+    for (final member in myGroup) {
+      final freeNeighbors = puzzle
+          .getNeighbors(member)
+          .where((nei) => puzzle.cellValues[nei] == 0);
+      if (freeNeighbors.isNotEmpty) return false;
+    }
+    return true;
   }
 }
 

@@ -103,4 +103,12 @@ class DifferentFromConstraint extends CellsCentricConstraint {
 
     return null;
   }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final idx = indices.first;
+    final nidx = getNeighborIndex(puzzle.width);
+    return puzzle.cellValues[idx] != 0 && puzzle.cellValues[nidx] != 0;
+  }
 }

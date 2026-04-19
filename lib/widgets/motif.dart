@@ -20,10 +20,11 @@ class MotifWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool shouldGrayOut = constraint.isComplete;
     final isShapeConstraint = constraint is ShapeConstraint;
-    final bgColor = constraint is ForbiddenMotif
-        ? forbiddenColor
-        : mandatoryColor;
+    final bgColor = shouldGrayOut
+        ? Colors.grey.withValues(alpha: 0.3)
+        : (constraint is ForbiddenMotif ? forbiddenColor : mandatoryColor);
     final borderColor = constraint.isHighlighted
         ? highlightColor
         : (constraint.isValid ? Colors.green : Colors.deepOrange);

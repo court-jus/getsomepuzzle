@@ -16,10 +16,15 @@ class ColumnCountWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = constraint.isHighlighted
-        ? highlightColor
-        : (constraint.isValid ? Colors.grey : Colors.redAccent);
-    final textColor = _textColors[constraint.color] ?? Colors.black;
+    final bool shouldGrayOut = constraint.isComplete;
+    final borderColor = shouldGrayOut
+        ? Colors.grey
+        : (constraint.isHighlighted
+              ? highlightColor
+              : (constraint.isValid ? Colors.grey : Colors.redAccent));
+    final textColor = shouldGrayOut
+        ? Colors.grey
+        : (_textColors[constraint.color] ?? Colors.black);
     final fontSize = cellSize * cellSizeToFontSize * 0.6;
     final circleSize = cellSize * 0.7;
 

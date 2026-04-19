@@ -18,9 +18,12 @@ Widget constraintToFlutter(
   int count = 1,
   int actualGroupSize = 0,
 }) {
-  final fgcolor = constraint.isHighlighted
-      ? highlightColor
-      : (constraint.isValid ? defaultColor : Colors.redAccent);
+  final bool shouldGrayOut = constraint.isComplete && constraint.isValid;
+  final fgcolor = shouldGrayOut
+      ? Colors.grey
+      : (constraint.isHighlighted
+            ? highlightColor
+            : (constraint.isValid ? defaultColor : Colors.redAccent));
 
   if (constraint is SymmetryConstraint) {
     return _symmetryWidget(constraint, fgcolor, cellSize, count);

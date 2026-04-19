@@ -146,4 +146,20 @@ class SymmetryConstraint extends CellsCentricConstraint {
     }
     return newidx;
   }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final groups = getGroups(puzzle);
+    final idx = indices[0];
+    final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
+    if (myGroup == null) return false;
+    for (final member in myGroup) {
+      final freeNeighbors = puzzle
+          .getNeighbors(member)
+          .where((nei) => puzzle.cellValues[nei] == 0);
+      if (freeNeighbors.isNotEmpty) return false;
+    }
+    return true;
+  }
 }

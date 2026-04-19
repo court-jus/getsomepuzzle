@@ -113,4 +113,13 @@ class GroupCountConstraint extends Constraint {
 
     return null;
   }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final currentCount = _getGroupCount(puzzle);
+    if (currentCount != count) return false;
+    final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
+    return candidates.isEmpty;
+  }
 }

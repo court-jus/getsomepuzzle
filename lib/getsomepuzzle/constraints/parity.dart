@@ -76,8 +76,13 @@ class ParityConstraint extends CellsCentricConstraint {
     return result;
   }
 
-  @override
-  bool verify(Puzzle puzzle) {
+  List<List<int>> _getSideValues(Puzzle puzzle) {
+    return _getSideCells(
+      puzzle,
+    ).map((side) => side.map((e) => e.$2.value).toList()).toList();
+  }
+
+  List<List<(int, Cell)>> _getSideCells(Puzzle puzzle) {
     final w = puzzle.width;
     final idx = indices[0];
     final ridx = idx ~/ w;
@@ -86,21 +91,27 @@ class ParityConstraint extends CellsCentricConstraint {
     final row = rows[ridx];
     final columns = puzzle.getColumns();
     final column = columns[cidx];
-    final rowValuesAndIndices = row.indexed.map((e) => (e.$1, e.$2.value));
-    final colValuesAndIndices = column.indexed.map((e) => (e.$1, e.$2.value));
-    final List<Iterable<int>> sides = [];
+    final rowValuesAndCells = row.indexed;
+    final colValuesAndCells = column.indexed;
+    final List<List<(int, Cell)>> sides = [];
     if (side == "left" || side == "horizontal") {
-      sides.add(rowValuesAndIndices.where((e) => e.$1 < cidx).map((e) => e.$2));
+      sides.add(rowValuesAndCells.where((e) => e.$1 < cidx).toList());
     }
     if (side == "right" || side == "horizontal") {
-      sides.add(rowValuesAndIndices.where((e) => e.$1 > cidx).map((e) => e.$2));
+      sides.add(rowValuesAndCells.where((e) => e.$1 > cidx).toList());
     }
     if (side == "top" || side == "vertical") {
-      sides.add(colValuesAndIndices.where((e) => e.$1 < ridx).map((e) => e.$2));
+      sides.add(colValuesAndCells.where((e) => e.$1 < ridx).toList());
     }
     if (side == "bottom" || side == "vertical") {
-      sides.add(colValuesAndIndices.where((e) => e.$1 > ridx).map((e) => e.$2));
+      sides.add(colValuesAndCells.where((e) => e.$1 > ridx).toList());
     }
+    return sides;
+  }
+
+  @override
+  bool verify(Puzzle puzzle) {
+    final sides = _getSideValues(puzzle);
     for (var side in sides) {
       if (side.contains(0)) {
         continue;
@@ -116,29 +127,7 @@ class ParityConstraint extends CellsCentricConstraint {
 
   @override
   Move? apply(Puzzle puzzle) {
-    final w = puzzle.width;
-    final idx = indices[0];
-    final ridx = idx ~/ w;
-    final cidx = idx % w;
-    final rows = puzzle.getRows();
-    final row = rows[ridx];
-    final columns = puzzle.getColumns();
-    final column = columns[cidx];
-    final rowValuesAndCells = row.indexed;
-    final colValuesAndCells = column.indexed;
-    final List<Iterable<(int, Cell)>> sides = [];
-    if (side == "left" || side == "horizontal") {
-      sides.add(rowValuesAndCells.where((e) => e.$1 < cidx));
-    }
-    if (side == "right" || side == "horizontal") {
-      sides.add(rowValuesAndCells.where((e) => e.$1 > cidx));
-    }
-    if (side == "top" || side == "vertical") {
-      sides.add(colValuesAndCells.where((e) => e.$1 < ridx));
-    }
-    if (side == "bottom" || side == "vertical") {
-      sides.add(colValuesAndCells.where((e) => e.$1 > ridx));
-    }
+    final sides = _getSideCells(puzzle);
     for (var side in sides) {
       final int even = side
           .where((v) => v.$2.value != 0 && v.$2.value % 2 == 0)
@@ -164,5 +153,15 @@ class ParityConstraint extends CellsCentricConstraint {
       }
     }
     return null;
+  }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final sides = _getSideValues(puzzle);
+    for (var side in sides) {
+      if (side.contains(0)) return false;
+    }
+    return true;
   }
 }

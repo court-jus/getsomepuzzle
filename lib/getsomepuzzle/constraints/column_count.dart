@@ -76,4 +76,11 @@ class ColumnCountConstraint extends Constraint {
     }
     return null;
   }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final column = puzzle.getColumns()[columnIdx];
+    return column.every((cell) => cell.value != 0);
+  }
 }

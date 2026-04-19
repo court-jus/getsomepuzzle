@@ -27,9 +27,13 @@ class QuantityWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool shouldGrayOut = constraint.isComplete;
     final borderColor = constraint.isHighlighted
         ? highlightColor
         : (constraint.isValid ? Colors.green : Colors.deepOrange);
+    final bgColor = shouldGrayOut
+        ? Colors.grey.withValues(alpha: 0.3)
+        : mandatoryColor;
     final smallText = "$actualCount/";
     final largeText = constraint.count.toString();
     final oppositeText = "$oppositeActual/$oppositeTotal";
@@ -37,7 +41,7 @@ class QuantityWidget extends StatelessWidget {
     final largeFontSize = cellSize * cellSizeToFontSize;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: mandatoryColor,
+        color: bgColor,
         border: BoxBorder.all(color: borderColor, width: 4),
       ),
       child: SizedBox(

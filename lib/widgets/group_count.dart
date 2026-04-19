@@ -21,6 +21,10 @@ class GroupCountWidget extends StatelessWidget {
     final borderColor = constraint.isHighlighted
         ? highlightColor
         : (constraint.isValid ? Colors.green : Colors.deepOrange);
+    final bool shouldGrayOut = constraint.isComplete;
+    final bgColor = shouldGrayOut
+        ? Colors.grey.withValues(alpha: 0.3)
+        : mandatoryColor;
     final smallText = "$actualGroupCount/";
     final largeText = constraint.count.toString();
     final smallFontSize = cellSize * cellSizeToFontSize / 3.5;
@@ -28,7 +32,7 @@ class GroupCountWidget extends StatelessWidget {
     final iconSize = cellSize * 0.4;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: mandatoryColor,
+        color: bgColor,
         border: BoxBorder.all(color: borderColor, width: 4),
       ),
       child: SizedBox(

@@ -65,6 +65,7 @@ class GameModel extends ChangeNotifier {
     _clearHint();
     betweenPuzzles = false;
     currentPuzzle?.clearConstraintsValidity();
+    currentPuzzle?.updateConstraintStatus();
     setTopMessage();
   }
 
@@ -119,6 +120,7 @@ class GameModel extends ChangeNotifier {
   void undo() {
     if (currentPuzzle == null || history.isEmpty) return;
     currentPuzzle!.resetCell(history.removeLast());
+    currentPuzzle!.updateConstraintStatus();
     _resetPuzzleState();
     _onPuzzleChanged();
   }

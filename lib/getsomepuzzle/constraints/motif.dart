@@ -152,4 +152,32 @@ class ForbiddenMotif extends Motif {
     }
     return null;
   }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final w = puzzle.width;
+    final h = puzzle.height;
+    final mh = motif.length;
+    final mw = motif[0].length;
+
+    for (int row = 0; row <= h - mh; row++) {
+      for (int col = 0; col <= w - mw; col++) {
+        bool placementStillPossible = true;
+        for (int mr = 0; mr < mh && placementStillPossible; mr++) {
+          for (int mc = 0; mc < mw && placementStillPossible; mc++) {
+            final motifValue = motif[mr][mc];
+            if (motifValue == 0) continue;
+            final gridIdx = (row + mr) * w + (col + mc);
+            final gridValue = puzzle.cellValues[gridIdx];
+            if (gridValue != 0 && gridValue != motifValue) {
+              placementStillPossible = false;
+            }
+          }
+        }
+        if (placementStillPossible) return false;
+      }
+    }
+    return true;
+  }
 }
