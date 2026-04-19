@@ -52,6 +52,14 @@ La symétrie centrale (🞋) est équivalente à une rotation d'un demi-tour.
 
 Lorsque deux cellules sont séparées par le symbole ≠, elles doivent être de couleurs différentes.
 
+### Nombre par colonne
+
+Un nombre dans un cercle au dessus d'une colonne indique combien de cellules de cette couleur doivent être dans cette colonne spécifique.
+
+### Nombre de groupes
+
+Un nombre dans un cadre avec une icône de lien indique combien de groupes (composantes connectées) de cette couleur doivent être dans la solution.
+
 ## Puzzles personnalisés
 
 ### Générer des puzzles

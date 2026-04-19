@@ -52,6 +52,14 @@ La simetría central (🞋) es equivalente a una rotación de medio giro.
 
 Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.
 
+### Número por columna
+
+Un número en un círculo encima de una columna indica cuántas celdas de ese color deben estar en esa columna específica.
+
+### Número de grupos
+
+Un número en un cuadro con un icono de enlace indica cuántos grupos (componentes conectados) de ese color deben estar en la solución.
+
 ## Puzzles personalizados
 
 ### Generar puzzles

@@ -354,10 +354,20 @@ void main() {
       expect(GroupCountConstraint('1.2').verify(p), isTrue);
     });
 
-    test('incomplete puzzle with more groups than target → invalid', () {
+    test('incomplete puzzle with more groups than target → valid', () {
       // 2x2 with 2 black groups but target is 1
       final p = _make('10\n01');
       expect(GroupCountConstraint('1.1').verify(p), isTrue);
+    });
+
+    test('incomplete puzzle without room for new groups → invalid', () {
+      final p = _make('20\n21');
+      expect(GroupCountConstraint('1.2').verify(p), isFalse);
+    });
+
+    test('incomplete puzzle with groups that cannot merge → invalid', () {
+      final p = _make('111\n222\n010');
+      expect(GroupCountConstraint('1.1').verify(p), isFalse);
     });
   });
 
@@ -381,6 +391,67 @@ void main() {
       ], null);
       expect(params, contains('1.5'));
       expect(params, isNot(contains('1.6')));
+    });
+  });
+
+  group('GroupCountConstraint.apply - too many groups', () {
+    test('contradiction when groups cannot merge enough', () {
+      final p = _make('100\n022\n021');
+      final gc = GroupCountConstraint('1.1'); // target: 1 group - impossible
+      p.constraints.add(gc);
+      final move = gc.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('force merge when single cell can merge groups', () {
+      // Only one cell can merge both groups → force color it black
+      final p = _make('100\n000\n120');
+      final gc = GroupCountConstraint('1.1');
+      p.constraints.add(gc);
+      final move = gc.apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 3);
+      expect(move.value, 1);
+    });
+  });
+
+  group('GroupCountConstraint.apply - not enough groups', () {
+    test('contradiction when not enough cells to create groups', () {
+      final p = _make('112\n122\n011');
+      final gc = GroupCountConstraint('2.3');
+      p.constraints.add(gc);
+      final move = gc.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('force fill when exactly remaining cells needed', () {
+      final p = _make('100');
+      final gc = GroupCountConstraint('1.2');
+      p.constraints.add(gc);
+      final move = gc.apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 2);
+      expect(move.value, 1);
+    });
+  });
+
+  group('GroupCountConstraint.apply - exact count', () {
+    test('force opposite when no new groups can be created', () {
+      // 2x2: 1 0 / 0 1 → 2 black groups (at 0 and 3)
+      // Empty cell idx 1: neighbor black=0 → would merge, not create new
+      // Empty cell idx 2: neighbor black=3 → would merge, not create new
+      // getFreeCellsWithoutNeighborColor = none
+      // current=2, target=2, candidates=0 → force opposite (color 2) on any cell that would merge
+      final p = _make('10\n01');
+      final gc = GroupCountConstraint('1.2');
+      p.constraints.add(gc);
+      final move = gc.apply(p);
+      expect(move, isNotNull);
+      // Any cell that would merge, force to white instead
+      expect(move!.idx, isIn([1, 2]));
+      expect(move.value, 2);
     });
   });
 }

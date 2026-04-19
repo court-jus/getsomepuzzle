@@ -52,6 +52,14 @@ The central symmetry (🞋) is identical to a rotation by half a turn.
 
 When two cells are separated by the ≠ symbol, they must be different colors.
 
+### Column count
+
+A number in a circle above a column indicates how many cells of that color must be in that specific column.
+
+### Group count
+
+A number in a box with a link icon indicates how many groups (connected components) of that color must be in the solution.
+
 ## Custom puzzles
 
 ### Generating puzzles

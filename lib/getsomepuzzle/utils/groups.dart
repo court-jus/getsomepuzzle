@@ -195,3 +195,42 @@ int calculateMinGroups(Puzzle puzzle, int color) {
   }
   return roots.length;
 }
+
+List<int> getFreeCellsWithoutNeighborColor(Puzzle puzzle, int color) {
+  final List<int> result = [];
+  for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
+    if (puzzle.cellValues[idx] != 0) continue;
+    final neighbors = puzzle.getNeighbors(idx);
+    if (!neighbors.any((n) => puzzle.cellValues[n] == color)) {
+      result.add(idx);
+    }
+  }
+  return result;
+}
+
+List<int> getCellsThatMergeColorGroups(Puzzle puzzle, int color) {
+  final List<int> result = [];
+  final groups = getColorGroups(puzzle, color);
+
+  for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
+    if (puzzle.cellValues[idx] != 0) continue;
+
+    final neighbors = puzzle.getNeighbors(idx);
+    final neighborGroups = <int>{};
+
+    for (final n in neighbors) {
+      if (puzzle.cellValues[n] != color) continue;
+      for (int g = 0; g < groups.length; g++) {
+        if (groups[g].contains(n)) {
+          neighborGroups.add(g);
+        }
+      }
+    }
+
+    if (neighborGroups.length > 1) {
+      result.add(idx);
+    }
+  }
+
+  return result;
+}

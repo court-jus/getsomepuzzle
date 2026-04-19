@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -62,11 +63,54 @@ class GroupCountConstraint extends Constraint {
         return false;
       }
     }
+    if (currentCount < count) {
+      // Look for free cells where we could put a 'color' cell without
+      // merging into an existing group
+      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
+      if (candidates.length + currentCount < count) {
+        return false;
+      }
+    }
     return true;
   }
 
   @override
   Move? apply(Puzzle puzzle) {
+    final currentCount = _getGroupCount(puzzle);
+
+    if (currentCount > count) {
+      final minGroupsPossible = calculateMinGroups(puzzle, color);
+      if (minGroupsPossible > count) {
+        return Move(0, 0, this, isImpossible: this);
+      }
+
+      final mergeableCells = getCellsThatMergeColorGroups(puzzle, color);
+      if (mergeableCells.length == 1) {
+        return Move(mergeableCells.first, color, this);
+      }
+    }
+
+    if (currentCount < count) {
+      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
+      if (candidates.length + currentCount < count) {
+        return Move(0, 0, this, isImpossible: this);
+      }
+      if (candidates.length + currentCount == count && candidates.isNotEmpty) {
+        return Move(candidates.first, color, this);
+      }
+    }
+
+    if (currentCount == count && !puzzle.complete) {
+      final opposite = puzzle.domain.firstWhereOrNull((c) => c != color)!;
+      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
+      if (candidates.isEmpty) {
+        final forcedCells = getCellsThatMergeColorGroups(puzzle, color);
+        if (forcedCells.isNotEmpty) {
+          return Move(forcedCells.first, opposite, this);
+        }
+      }
+    }
+
     return null;
   }
 }
