@@ -34,7 +34,7 @@ import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.5.2";
+const versionText = "Version 1.5.3";
 
 void main() {
   Logger.root.level = Level.ALL; // defaults to Level.INFO
