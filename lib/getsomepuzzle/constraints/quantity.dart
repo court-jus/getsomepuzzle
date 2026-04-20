@@ -73,7 +73,11 @@ class QuantityConstraint extends Constraint {
   @override
   bool isCompleteFor(Puzzle puzzle) {
     if (!verify(puzzle)) return false;
-    final myValues = puzzle.cellValues.where((val) => val == value).length;
-    return myValues == count || puzzle.complete;
+    // Complete only when apply() cannot fire again for any future state.
+    // QA keeps producing deductions whenever either myValues == count (force
+    // remaining to opposite) or count - myValues == freeCells (force
+    // remaining to value). Both states can be reached by future play as long
+    // as any free cell remains, so grayout is only safe once the grid is full.
+    return puzzle.complete;
   }
 }

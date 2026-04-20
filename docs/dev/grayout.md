@@ -81,7 +81,13 @@ Returns `false` - checking all shape variants is more expensive.
 
 **File:** `lib/getsomepuzzle/constraints/quantity.dart`
 
-Complete when all possible cells for the value are filled (max reached or puzzle complete).
+Complete only when the grid is fully filled. Unlike FM or SH, whose pattern
+becomes permanently unreachable once excluded, a Quantity constraint can
+always resume firing as cells are coloured: any move that brings the state
+to `myValues == count` or `count - myValues == freeCells` triggers forcing
+of the remaining cells. As long as any free cell remains, such a state can
+be reached by future play, so QA's grayout condition is equivalent to
+"puzzle complete" on top of `verify()`.
 
 #### 2.8 `GroupCountConstraint`
 

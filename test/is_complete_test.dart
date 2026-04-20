@@ -145,7 +145,16 @@ void main() {
       expect(c.isCompleteFor(p), isFalse);
     });
 
-    test('complete when count reached', () {
+    test('not complete when count reached but free cells remain', () {
+      // 1x2 grid, value=1 count=1: target reached but cell 1 is still free
+      // and apply() will force it to 2 → constraint is still producing
+      // deductions, must not gray out.
+      final p = _make('10');
+      final c = QuantityConstraint('1.1');
+      expect(c.isCompleteFor(p), isFalse);
+    });
+
+    test('complete when grid is full and valid', () {
       final p = _make('11');
       final c = QuantityConstraint('1.2');
       expect(c.isCompleteFor(p), isTrue);
