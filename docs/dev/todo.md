@@ -132,14 +132,6 @@ Run a session where the solver presents individual deduction steps to a human pl
 
 Leftover items from the Shape constraint review (c04166d..f7c6812).
 
-### `_preFillSh` builds a full `ShapeConstraint` just to read `motifGridSize`
-
-`generator.dart:258` instantiates `ShapeConstraint(m)` for every candidate motif, only to read `motifGridSize`. The constructor parses the motif and computes all rotations / canonical form. `motifGridSize` could be computed directly from the string (`rows × cols` from the dot-separated representation) without constructing the full object.
-
-### `_preFillSh` is monolithic (~70 lines)
-
-`generator.dart:252-324` mixes weighted motif selection, initial placement, opposite-color fill, and additional-position placement in one function. Extract three helpers: motif selection, initial placement, additional group placement.
-
 ### Deep nesting in `findAllCompletions`
 
 `shape.dart` `findAllCompletions` has 5 levels of nested loops/conditions. The merge logic is especially hard to follow. Extract the merge check into a separate method.

@@ -198,6 +198,32 @@ void main() {
     });
   });
 
+  group('ShapeConstraint.motifGridSizeOf', () {
+    test('matches the constructor-computed motifGridSize', () {
+      // For every candidate motif returned by `generateAllParameters`, the
+      // cheap static helper must agree with the full constructor. This is
+      // the invariant relied on by the generator's motif-picker.
+      final motifs = ShapeConstraint.generateAllParameters(5, 5, [1, 2], null);
+      for (final m in motifs) {
+        final viaCtor = ShapeConstraint(m).motifGridSize;
+        final viaHelper = ShapeConstraint.motifGridSizeOf(m);
+        expect(viaHelper, viaCtor, reason: 'motifGridSizeOf($m)');
+      }
+    });
+
+    test('single-row motifs', () {
+      expect(ShapeConstraint.motifGridSizeOf('1'), 1);
+      expect(ShapeConstraint.motifGridSizeOf('11'), 2);
+      expect(ShapeConstraint.motifGridSizeOf('11111'), 5);
+    });
+
+    test('multi-row motifs use rows × cols', () {
+      expect(ShapeConstraint.motifGridSizeOf('10.11'), 4);
+      expect(ShapeConstraint.motifGridSizeOf('111.010'), 6);
+      expect(ShapeConstraint.motifGridSizeOf('010.111.010'), 9);
+    });
+  });
+
   group('ShapeConstraint', () {
     test('parses black horizontal line', () {
       final c = ShapeConstraint('111');

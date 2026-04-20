@@ -224,6 +224,17 @@ class ShapeConstraint extends Motif {
     9: 2,
   };
 
+  /// Compute the total cell count (rows × columns, including zeros) of a
+  /// motif string without going through the full constructor — which would
+  /// parse, rotate, mirror, and normalize the shape. Useful when only the
+  /// bounding-box size is needed (e.g. for weighting candidate motifs).
+  static int motifGridSizeOf(String strParams) {
+    final firstDot = strParams.indexOf('.');
+    final cols = firstDot < 0 ? strParams.length : firstDot;
+    final rows = firstDot < 0 ? 1 : strParams.split('.').length;
+    return rows * cols;
+  }
+
   // -------------------------------------------------------------------------
   // apply(): deduce cell values from this constraint.
   //

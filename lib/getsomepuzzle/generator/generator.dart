@@ -251,6 +251,18 @@ class PuzzleGenerator {
 
   static Puzzle _preFillSh(int width, int height) {
     final solved = Puzzle.empty(width, height, _defaultDomain);
+    final chosenMotif = _pickShapeMotif(width, height);
+    final sc = ShapeConstraint(chosenMotif);
+    _placeInitialVariant(solved, sc);
+    _fillRemainingWithOpposite(solved, sc.color);
+    solved.constraints.add(sc);
+    _placeAdditionalVariants(solved);
+    return solved;
+  }
+
+  /// Pick one motif string via weighted random sampling, where the weight
+  /// depends on the motif's bounding-box size (`rows × cols`).
+  static String _pickShapeMotif(int width, int height) {
     final possibleMotifs = ShapeConstraint.generateAllParameters(
       width,
       height,
@@ -260,74 +272,72 @@ class PuzzleGenerator {
     possibleMotifs.shuffle(_rng);
     final puzzleSize = width * height;
     final weights = possibleMotifs.map((m) {
-      final sc = ShapeConstraint(m);
-      final motifSize = sc.motifGridSize;
+      final motifSize = ShapeConstraint.motifGridSizeOf(m);
       final base = ShapeConstraint.baseWeights[motifSize] ?? 1;
       return base * pow(motifSize, puzzleSize * 0.05) * 0.2;
     }).toList();
 
-    double totalWeight = weights.reduce((a, b) => a + b);
-    double r = _rng.nextDouble() * totalWeight;
+    final totalWeight = weights.reduce((a, b) => a + b);
+    final r = _rng.nextDouble() * totalWeight;
     double cumulative = 0;
-    String chosenMotif = '';
     for (int i = 0; i < possibleMotifs.length; i++) {
       cumulative += weights[i];
-      if (r <= cumulative) {
-        chosenMotif = possibleMotifs[i];
-        break;
-      }
+      if (r <= cumulative) return possibleMotifs[i];
     }
-    final chosenConstraint = ShapeConstraint(chosenMotif);
-    chosenConstraint.variants.shuffle();
-    final chosenVariant = chosenConstraint.variants
-        .where(
-          (variant) => variant.length <= height && variant[0].length <= width,
-        )
+    return possibleMotifs.last;
+  }
+
+  /// Paint one variant of [sc] onto [solved] at a random position that fits.
+  static void _placeInitialVariant(Puzzle solved, ShapeConstraint sc) {
+    sc.variants.shuffle();
+    final variant = sc.variants
+        .where((v) => v.length <= solved.height && v[0].length <= solved.width)
         .first;
-    int motifValue = 0;
-    final maxRowOffset = height - chosenVariant.length;
-    final maxColOffset = width - chosenVariant[0].length;
+    final maxRowOffset = solved.height - variant.length;
+    final maxColOffset = solved.width - variant[0].length;
     final rowOffset = maxRowOffset > 0 ? _rng.nextInt(maxRowOffset) : 0;
     final colOffset = maxColOffset > 0 ? _rng.nextInt(maxColOffset) : 0;
-    for (var (ridx, row) in chosenVariant.indexed) {
-      for (var (cidx, value) in row.indexed) {
-        if (value != 0) {
-          solved.cells[(ridx + rowOffset) * width + (cidx + colOffset)]
-              .setForSolver(value);
-          motifValue = value;
-        }
-      }
-    }
-    final size = solved.width * solved.height;
-    final opposite = _defaultDomain.whereNot((i) => i == motifValue).first;
-    for (int i = 0; i < size; i++) {
+    _paintVariant(solved, variant, rowOffset, colOffset);
+  }
+
+  /// Fill every still-free cell of [solved] with the color opposite [color].
+  static void _fillRemainingWithOpposite(Puzzle solved, int color) {
+    final opposite = _defaultDomain.whereNot((i) => i == color).first;
+    for (int i = 0; i < solved.width * solved.height; i++) {
       if (!solved.cells[i].isFree) continue;
       solved.cells[i].setForSolver(opposite);
     }
-    solved.constraints.add(chosenConstraint);
+  }
+
+  /// Repeatedly attempt to paint additional valid variant positions onto
+  /// [solved]. Each candidate position has a 50% chance of being accepted.
+  static void _placeAdditionalVariants(Puzzle solved) {
     var possiblePositions = ShapeConstraint.findAdditionalPositions(solved);
     while (possiblePositions.isNotEmpty) {
       final position =
           possiblePositions[_rng.nextInt(possiblePositions.length)];
-      // 50% chance to add this position to the solved puzzle
       if (_rng.nextDouble() > 0.5) {
-        final rowOffset = position.$1.$1;
-        final colOffset = position.$1.$2;
-        final variant = position.$2;
-        for (var (ridx, row) in variant.indexed) {
-          for (var (cidx, value) in row.indexed) {
-            if (value != 0) {
-              solved.cells[(ridx + rowOffset) * width + (cidx + colOffset)]
-                  .setForSolver(value);
-              motifValue = value;
-            }
-          }
-        }
-        // Recompute valid positions after grid changed
+        final (rowOffset, colOffset) = position.$1;
+        _paintVariant(solved, position.$2, rowOffset, colOffset);
         possiblePositions = ShapeConstraint.findAdditionalPositions(solved);
       }
     }
-    return solved;
+  }
+
+  /// Write non-zero cells of [variant] onto [solved] at (rowOffset, colOffset).
+  static void _paintVariant(
+    Puzzle solved,
+    List<List<int>> variant,
+    int rowOffset,
+    int colOffset,
+  ) {
+    for (final (ridx, row) in variant.indexed) {
+      for (final (cidx, value) in row.indexed) {
+        if (value == 0) continue;
+        solved.cells[(ridx + rowOffset) * solved.width + (cidx + colOffset)]
+            .setForSolver(value);
+      }
+    }
   }
 
   static Puzzle _preFillRegular(int width, int height) {
