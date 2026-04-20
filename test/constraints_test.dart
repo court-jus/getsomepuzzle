@@ -461,5 +461,34 @@ void main() {
       expect(move!.idx, isIn([1, 2]));
       expect(move.value, 2);
     });
+
+    test('no deduction on candidates even with no merge-cell present', () {
+      // 3x3: 1 0 0 / 0 0 0 / 0 0 0 — one black group at cell 0, target=1.
+      // Candidates exist (e.g., cell 8), merge-cells don't (only 1 group).
+      // Naive "force candidates to opposite" would be wrong: the full grid
+      // 1 1 1 / 1 1 1 / 1 1 1 is a valid completion (one connected black
+      // group) because coloring intermediate cells also rejoins the
+      // candidate to the existing group.
+      final p = _make('100\n000\n000');
+      final gc = GroupCountConstraint('1.1');
+      p.constraints.add(gc);
+      expect(gc.apply(p), isNull);
+    });
+
+    test('no deduction when candidates and merge-cells coexist', () {
+      // 3x3: 1 0 1 / 0 0 0 / 0 0 0 — two black groups {0} and {2}, target=2.
+      // Merge-cell: {1} (adjacent to both groups → merging them drops count to 1).
+      // Candidates: {4,6,7,8} (cells with no color-1 neighbor → creating a new
+      // group raises count to 3).
+      // Either effect alone would violate the target, but both can coexist
+      // in a valid completion (e.g., color cell 1 AND cell 8 → count stays 2).
+      // So GroupCountConstraint.apply must NOT force a deduction here — it
+      // should defer to force/backtracking.
+      final p = _make('101\n000\n000');
+      final gc = GroupCountConstraint('1.2');
+      p.constraints.add(gc);
+      final move = gc.apply(p);
+      expect(move, isNull);
+    });
   });
 }

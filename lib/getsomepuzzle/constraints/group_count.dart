@@ -103,6 +103,13 @@ class GroupCountConstraint extends Constraint {
     if (currentCount == count && !puzzle.complete) {
       final opposite = puzzle.domain.firstWhereOrNull((c) => c != color)!;
       final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
+      // The candidate set only shrinks over time (coloring cells can only add
+      // color neighbors, never remove them). If no candidate exists now, no
+      // new group can ever form → coloring a merge-cell would drop the count
+      // below target unrecoverably, so every merge-cell must be opposite.
+      // The symmetric deduction ("force candidates when no merge-cell exists")
+      // is NOT valid: merge-cells can appear later, so a newly-started group
+      // may still be fused back into an existing one.
       if (candidates.isEmpty) {
         final forcedCells = getCellsThatMergeColorGroups(puzzle, color);
         if (forcedCells.isNotEmpty) {

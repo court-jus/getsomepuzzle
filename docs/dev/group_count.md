@@ -38,7 +38,32 @@ Performs deductions based on current puzzle state. Four cases:
    - If `candidates + currentCount == count` → force color all candidates
 
 3. **Exact count** (`currentCount == count`):
-   - If no new groups can be created (`candidates == 0`) → force cells that would merge to opposite color
+
+   Two opposite effects are possible on free cells:
+   - Coloring a "candidate" (free cell with no color neighbor) locally adds a
+     new group → count goes up.
+   - Coloring a "merge-cell" (free cell adjacent to 2+ same-color groups)
+     fuses groups → count goes down.
+
+   These effects are **asymmetric** over time:
+   - The set of candidates only shrinks: coloring other cells can only add
+     color neighbors, never remove them.
+   - The set of merge-cells can grow: colouring a candidate creates a new
+     group, which can later make another free cell adjacent to two groups.
+
+   Consequently the only sound local deduction is:
+   - If `candidates` is empty → every merge-cell must be forced to opposite.
+     No new group can ever form, so a merge would drop the count below target
+     with no way to compensate.
+
+   The symmetric rule ("force candidates when no merge-cell exists") is
+   **not** valid: even when no merge-cell exists right now, colouring a
+   candidate can itself produce a merge-cell later (the new group may be
+   rejoined to an existing one via intermediate cells), bringing the count
+   back to target.
+
+   When `candidates` is non-empty, no local deduction is attempted; the
+   constraint defers to force/backtracking.
 
 4. **Complete puzzle** - handled by `verify()`
 
