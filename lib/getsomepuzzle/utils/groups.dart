@@ -27,6 +27,8 @@ List<int> getNeighborsSameValueOrEmpty(Puzzle puzzle, int idx, int myValue) {
 }
 
 List<List<int>> getGroups(Puzzle puzzle) {
+  final cached = puzzle.cachedGroups;
+  if (cached != null) return cached;
   final List<Set<int>> sameValues = [
     for (var idx in Iterable.generate(puzzle.cellValues.length))
       getNeighborsSameValue(puzzle, idx).toSet(),
@@ -62,6 +64,7 @@ List<List<int>> getGroups(Puzzle puzzle) {
     indices.sort();
     return indices;
   }).toList();
+  puzzle.cachedGroups = result;
   return result;
 }
 

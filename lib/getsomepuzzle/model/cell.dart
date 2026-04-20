@@ -8,6 +8,11 @@ class Cell {
   bool readonly = false;
   bool isHighlighted = false;
 
+  /// Invoked whenever `value` or `options` change. Puzzle wires this to its
+  /// group cache invalidation so that mutations via `puzzle.cells[i].setX`
+  /// remain cache-safe even when they bypass Puzzle's own mutators.
+  void Function()? onMutate;
+
   Cell(this.value, this.idx, this.domain, this.readonly) {
     options = domain.toList();
   }
@@ -21,12 +26,14 @@ class Cell {
     if (readonly) return false;
     if (value == newValue) return false;
     value = newValue;
+    onMutate?.call();
     return true;
   }
 
   void reset() {
     value = 0;
     options = domain.toList();
+    onMutate?.call();
   }
 
   bool get isFree => value == 0 && options.isNotEmpty;
@@ -38,6 +45,7 @@ class Cell {
     if (value == val && options.isEmpty) return false;
     value = val;
     options = [];
+    onMutate?.call();
     return true;
   }
 

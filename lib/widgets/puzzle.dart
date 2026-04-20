@@ -171,6 +171,10 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       (c) => c.isHighlighted,
     );
 
+    // Compute groups once per build so GC widgets and per-cell
+    // getCellGroupSize callbacks share a single O(N) flood-fill.
+    final groups = getGroups(widget.currentPuzzle);
+
     final hasDF = widget.currentPuzzle.constraints.any(
       (c) => c is DifferentFromConstraint,
     );
@@ -254,7 +258,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               ? _constraintKey
                               : null,
                           constraint: constraint,
-                          actualGroupCount: getGroups(widget.currentPuzzle)
+                          actualGroupCount: groups
                               .where(
                                 (grp) =>
                                     widget.currentPuzzle.cellValues[grp
@@ -322,6 +326,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                     constraintIsInTopBar,
                                     constraintCellIdx,
                                     hasHighlightedCell,
+                                    groups,
                                   ),
                               ],
                             ),
@@ -372,6 +377,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     bool constraintIsInTopBar,
     int? constraintCellIdx,
     bool hasHighlightedCell,
+    List<List<int>> groups,
   ) {
     final idx = rowidx * widget.currentPuzzle.width + cellidx;
 
@@ -417,7 +423,6 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
           : null,
       onRightDragEnd: widget.onCellRightDragEnd,
       getCellGroupSize: (cellIdx) {
-        final groups = getGroups(widget.currentPuzzle);
         for (final grp in groups) {
           if (grp.contains(cellIdx)) {
             return grp.length;

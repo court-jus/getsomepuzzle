@@ -73,10 +73,27 @@ class Puzzle {
   List<int> domain = [];
   int width = 0;
   int height = 0;
-  List<Cell> cells = [];
+  List<Cell> _cells = [];
   List<Constraint> constraints = [];
   int? cachedComplexity;
   List<int>? cachedSolution;
+
+  /// Cached result of `getGroups(this)`. Invalidated whenever any cell's
+  /// value or options change via `Cell.onMutate`.
+  List<List<int>>? cachedGroups;
+
+  List<Cell> get cells => _cells;
+  set cells(List<Cell> value) {
+    _cells = value;
+    for (final c in _cells) {
+      c.onMutate = _invalidateCaches;
+    }
+    _invalidateCaches();
+  }
+
+  void _invalidateCaches() {
+    cachedGroups = null;
+  }
 
   Puzzle(this.lineRepresentation) {
     var attributesStr = lineRepresentation.split("_");
@@ -120,6 +137,7 @@ class Puzzle {
         cell.options = cell.domain;
       }
     }
+    _invalidateCaches();
   }
 
   List<int> get cellValues => cells.map((cell) => cell.value).toList();
@@ -734,6 +752,7 @@ class Puzzle {
           cell.options = cell.domain.toList();
         }
       }
+      test._invalidateCaches();
     }
     return solutions.length;
   }
