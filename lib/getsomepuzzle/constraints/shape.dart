@@ -376,79 +376,63 @@ class ShapeConstraint extends Motif {
     final groupSet = group.toSet();
     final completions = <Set<int>>[];
 
-    // Pre-compute groups and cell→group index
-    final allGroups = getGroups(puzzle);
+    // Pre-compute cell→group index so we can look up the host group of any
+    // same-color cell that lands on a variant placement.
     final cellToGroup = <int, List<int>>{};
-    for (final g in allGroups) {
+    for (final g in getGroups(puzzle)) {
       for (final idx in g) {
         cellToGroup[idx] = g;
       }
     }
 
+    // Bounding box of the current group. Any variant placement must include
+    // this bbox, so we can tightly restrict the (topRow, topCol) ranges below.
+    final bbox = _bbox(group, puzzle.width);
+
     for (final variant in variants) {
       final varH = variant.length;
       final varW = variant[0].length;
 
-      // Try every grid position where the variant's top-left could be placed.
-      for (int topRow = 0; topRow <= puzzle.height - varH; topRow++) {
-        for (int topCol = 0; topCol <= puzzle.width - varW; topCol++) {
-          // Collect grid indices of the variant's occupied cells and check
-          // that each is either already in the group or free.
-          final variantCells = <int>{};
-          bool valid = true;
-          for (int r = 0; r < varH && valid; r++) {
-            for (int c = 0; c < varW && valid; c++) {
-              if (variant[r][c] == 0) continue;
-              final gridIdx = (topRow + r) * puzzle.width + (topCol + c);
-              variantCells.add(gridIdx);
+      // topRow/topCol must satisfy: topRow ≤ bbox.minRow and
+      // topRow + varH − 1 ≥ bbox.maxRow (idem for columns). Placements outside
+      // that range can't cover the group, so we don't even iterate them.
+      final rowStart = _max(0, bbox.maxRow - varH + 1);
+      final rowEnd = _min(puzzle.height - varH, bbox.minRow);
+      final colStart = _max(0, bbox.maxCol - varW + 1);
+      final colEnd = _min(puzzle.width - varW, bbox.minCol);
 
-              // Check if this cell is outside the current group
-              if (!groupSet.contains(gridIdx) &&
-                  puzzle.cellValues[gridIdx] != 0) {
-                // If same color, check if merge would be valid
-                if (puzzle.cellValues[gridIdx] == color) {
-                  final otherGroup = cellToGroup[gridIdx] ?? <int>[];
-                  if (otherGroup.isNotEmpty) {
-                    final mergedGroup = [...group, ...otherGroup];
-                    if (!_groupCanFitInSomeVariant(mergedGroup, puzzle)) {
-                      valid = false;
-                    }
-                  }
-                } else {
-                  // Different color - reject
-                  valid = false;
-                }
-              }
-            }
-          }
-          if (!valid) continue;
+      for (int topRow = rowStart; topRow <= rowEnd; topRow++) {
+        for (int topCol = colStart; topCol <= colEnd; topCol++) {
+          final variantCells = _variantCellsAt(
+            variant,
+            topRow,
+            topCol,
+            puzzle.width,
+          );
 
-          // The placement must cover every cell in the group.
+          // Bbox guarantees the group's bounding rectangle fits, but the
+          // variant shape may have holes — cell-level coverage is still needed.
           if (!groupSet.every(variantCells.contains)) continue;
 
-          // toFill should only include FREE cells, not cells that are already colored
-          final toFillCandidates = variantCells.difference(groupSet);
-          final toFill = toFillCandidates
-              .where((idx) => puzzle.cellValues[idx] == 0)
+          if (!_placementIsCompatible(
+            variantCells,
+            groupSet,
+            group,
+            cellToGroup,
+            puzzle,
+          )) {
+            continue;
+          }
+
+          final toFill = variantCells
+              .where(
+                (idx) => !groupSet.contains(idx) && puzzle.cellValues[idx] == 0,
+              )
               .toSet();
 
-          // Reject completions that would merge with another same-color group.
-          // If any cell we'd fill has a same-color neighbor outside the variant
-          // placement (and outside the current group), completing here would
-          // create a merged group larger than the shape.
-          bool wouldMerge = false;
-          for (final fillIdx in toFill) {
-            for (final nei in puzzle.getNeighbors(fillIdx)) {
-              if (puzzle.cellValues[nei] == color &&
-                  !groupSet.contains(nei) &&
-                  !variantCells.contains(nei)) {
-                wouldMerge = true;
-                break;
-              }
-            }
-            if (wouldMerge) break;
+          if (_mergesOutsidePlacement(toFill, variantCells, groupSet, puzzle)) {
+            continue;
           }
-          if (wouldMerge) continue;
 
           completions.add(toFill);
         }
@@ -456,6 +440,91 @@ class ShapeConstraint extends Motif {
     }
     return completions;
   }
+
+  /// Grid indices occupied by `variant` (non-zero cells) when placed with its
+  /// top-left corner at (`topRow`, `topCol`).
+  Set<int> _variantCellsAt(
+    List<List<int>> variant,
+    int topRow,
+    int topCol,
+    int width,
+  ) {
+    final cells = <int>{};
+    for (int r = 0; r < variant.length; r++) {
+      final row = variant[r];
+      for (int c = 0; c < row.length; c++) {
+        if (row[c] == 0) continue;
+        cells.add((topRow + r) * width + (topCol + c));
+      }
+    }
+    return cells;
+  }
+
+  /// A placement is compatible iff every cell it occupies (that isn't already
+  /// in the current group) is either empty or a same-color cell whose host
+  /// group could still fit in the shape after merging with ours.
+  /// Any opposite-color cell immediately rejects the placement.
+  bool _placementIsCompatible(
+    Set<int> variantCells,
+    Set<int> groupSet,
+    List<int> group,
+    Map<int, List<int>> cellToGroup,
+    Puzzle puzzle,
+  ) {
+    for (final idx in variantCells) {
+      if (groupSet.contains(idx)) continue;
+      final v = puzzle.cellValues[idx];
+      if (v == 0) continue;
+      if (v != color) return false;
+      final other = cellToGroup[idx];
+      if (other == null || other.isEmpty) continue;
+      if (!_groupCanFitInSomeVariant([...group, ...other], puzzle)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// True iff filling any cell of `toFill` would make the completed group
+  /// adjacent to another same-color group that isn't part of the placement —
+  /// which would create a merged group bigger than the shape.
+  bool _mergesOutsidePlacement(
+    Set<int> toFill,
+    Set<int> variantCells,
+    Set<int> groupSet,
+    Puzzle puzzle,
+  ) {
+    for (final fillIdx in toFill) {
+      for (final nei in puzzle.getNeighbors(fillIdx)) {
+        if (puzzle.cellValues[nei] == color &&
+            !groupSet.contains(nei) &&
+            !variantCells.contains(nei)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Bounding box of a group, in grid coordinates.
+  _Bbox _bbox(List<int> group, int width) {
+    int minRow = 1 << 30;
+    int maxRow = -1;
+    int minCol = 1 << 30;
+    int maxCol = -1;
+    for (final idx in group) {
+      final r = idx ~/ width;
+      final c = idx % width;
+      if (r < minRow) minRow = r;
+      if (r > maxRow) maxRow = r;
+      if (c < minCol) minCol = c;
+      if (c > maxCol) maxCol = c;
+    }
+    return _Bbox(minRow, minCol, maxRow, maxCol);
+  }
+
+  static int _max(int a, int b) => a > b ? a : b;
+  static int _min(int a, int b) => a < b ? a : b;
 
   @override
   bool verify(Puzzle puzzle) {
@@ -659,4 +728,13 @@ bool _groupOffsetsExistInVariant(
     }
   }
   return false;
+}
+
+/// Small value-type for a bounding box in grid coordinates.
+class _Bbox {
+  final int minRow;
+  final int minCol;
+  final int maxRow;
+  final int maxCol;
+  const _Bbox(this.minRow, this.minCol, this.maxRow, this.maxCol);
 }

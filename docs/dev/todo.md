@@ -128,10 +128,3 @@ Run a session where the solver presents individual deduction steps to a human pl
 2. Validate that force rounds correlate with perceived difficulty
 3. Tune complexity formula weights accordingly
 
-## Shape constraint cleanup
-
-Leftover items from the Shape constraint review (c04166d..f7c6812).
-
-### Deep nesting in `findAllCompletions`
-
-`shape.dart` `findAllCompletions` has 5 levels of nested loops/conditions. The merge logic is especially hard to follow. Extract the merge check into a separate method.

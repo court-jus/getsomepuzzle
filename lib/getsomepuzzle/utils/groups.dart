@@ -1,29 +1,15 @@
 import 'dart:collection';
 
-import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
-import 'package:getsomepuzzle/getsomepuzzle/utils/collections.dart';
 
-List<int> getNeighborsSameValue(Puzzle puzzle, int idx) {
+Set<int> getMyColorGroup(Puzzle puzzle, int idx) {
   final myValue = puzzle.cellValues[idx];
-  if (myValue == 0) return [];
+  if (myValue == 0) return {};
   final List<int> result = [idx];
   result.addAll(
     puzzle.getNeighbors(idx).where((e) => puzzle.cellValues[e] == myValue),
   );
-  return result;
-}
-
-List<int> getNeighborsSameValueOrEmpty(Puzzle puzzle, int idx, int myValue) {
-  final List<int> result = [idx];
-  result.addAll(
-    puzzle
-        .getNeighbors(idx)
-        .where(
-          (e) => puzzle.cellValues[e] == myValue || puzzle.cellValues[e] == 0,
-        ),
-  );
-  return result;
+  return result.toSet();
 }
 
 List<List<int>> getGroups(Puzzle puzzle) {
@@ -31,7 +17,7 @@ List<List<int>> getGroups(Puzzle puzzle) {
   if (cached != null) return cached;
   final List<Set<int>> sameValues = [
     for (var idx in Iterable.generate(puzzle.cellValues.length))
-      getNeighborsSameValue(puzzle, idx).toSet(),
+      getMyColorGroup(puzzle, idx),
   ];
   final Map<int, Set<int>> groups = {};
   var groupCount = 0;
@@ -75,55 +61,55 @@ List<List<int>> getColorGroups(Puzzle puzzle, int color) {
   }).toList();
 }
 
+/// Compute the "virtual groups" of a puzzle: for each value V in
+/// `{0} ∪ puzzle.domain`, the connected components of the subgraph of
+/// cells whose value is V or 0, anchored on cells whose value is exactly V.
+///
+/// Intuition: a virtual group of color V is the maximum set of cells that
+/// could end up in a single same-color group of color V after colouring
+/// some free cells with V. For V = 0 the anchors are free cells themselves,
+/// so the components are the connected regions of free cells.
+///
+/// A free cell may appear in multiple virtual groups (one per non-zero
+/// color it can reach, plus the free-only component). Each component is
+/// returned as a sorted `List<int>` of cell indices. The returned list
+/// aggregates components across all values; callers that need to know
+/// which value a component belongs to should inspect its cells.
+///
+/// Use case: checking whether a set of cells can all live in one same-color
+/// group (e.g. a letter group), given the current opposite-color obstacles.
 List<List<int>> toVirtualGroups(Puzzle puzzle) {
-  // Explore the puzzle to find all the groups that could be made possible
-  // by growing existing groups to free cells or cells of the same color
-  final idxToExplore = puzzle.cellValues.indexed.toList();
-  final Map<int, List<int>> explored = {};
-  final Map<int, Map<int, List<int>>> groupsPerValuePerCell = {};
-  while (idxToExplore.isNotEmpty) {
-    final exploring = idxToExplore.removeAt(0);
-    final exploreIdx = exploring.$1;
-    final value = exploring.$2;
-    final others = explored[value] ?? [];
-    if (others.contains(exploreIdx)) {
-      continue;
-    }
-    others.add(exploreIdx);
-    explored[value] = others;
-    final sameOrEmpty = getNeighborsSameValueOrEmpty(puzzle, exploreIdx, value);
-    if (groupsPerValuePerCell[value] == null) {
-      groupsPerValuePerCell[value] = {};
-    }
-    if (groupsPerValuePerCell[value]![exploreIdx] == null) {
-      groupsPerValuePerCell[value]![exploreIdx] = [];
-    }
-    groupsPerValuePerCell[value]![exploreIdx]!.addAll(sameOrEmpty);
-    for (var neighbor in sameOrEmpty) {
-      if (neighbor != exploreIdx) {
-        idxToExplore.add((neighbor, value));
-      }
-    }
-  } // while
-  final Map<int, List<Set<int>>> setsPerValue = {};
-  for (var valueEntry in groupsPerValuePerCell.entries) {
-    final value = valueEntry.key;
-    final valueData = valueEntry.value;
-    for (var dataEntry in valueData.entries) {
-      final idx = dataEntry.key;
-      final newGroup = dataEntry.value.toSet();
-      if (setsPerValue[value] == null) {
-        setsPerValue[value] = [];
-      }
-      for (var existing in findAndPop(setsPerValue[value]!, idx)) {
-        newGroup.addAll(existing);
-      }
-      setsPerValue[value]!.add(newGroup);
-    }
+  final result = <List<int>>[];
+  final values = <int>{0, ...puzzle.domain};
+  for (final v in values) {
+    _componentsAnchoredOnValue(puzzle, v, result);
   }
-  return setsPerValue.values.flattenedToList
-      .map((grp) => grp.toList())
-      .toList();
+  return result;
+}
+
+/// Append to [out] each connected component of cells whose value is [v] or
+/// 0, where every component is anchored by at least one cell whose value
+/// is exactly [v]. Components are discovered via BFS.
+void _componentsAnchoredOnValue(Puzzle puzzle, int v, List<List<int>> out) {
+  final cellValues = puzzle.cellValues;
+  final visited = <int>{};
+  for (int start = 0; start < cellValues.length; start++) {
+    if (cellValues[start] != v) continue;
+    if (visited.contains(start)) continue;
+    final component = <int>{start};
+    final queue = Queue<int>()..add(start);
+    while (queue.isNotEmpty) {
+      final cur = queue.removeFirst();
+      for (final nei in puzzle.getNeighbors(cur)) {
+        final nv = cellValues[nei];
+        if (nv != v && nv != 0) continue;
+        if (!component.add(nei)) continue;
+        queue.add(nei);
+      }
+    }
+    visited.addAll(component);
+    out.add(component.toList()..sort());
+  }
 }
 
 bool canMergeGroups(Puzzle puzzle, List<int> groupA, List<int> groupB) {

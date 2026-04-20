@@ -220,6 +220,25 @@ void main() {
       final c = ColumnCountConstraint('0.1.1');
       expect(c.isCompleteFor(p), isTrue);
     });
+
+    test('complete on target column even if other columns are empty', () {
+      // 3-col grid, only column 2 is full. isCompleteFor must only look at
+      // its own column, not the whole puzzle.
+      final p = _make('001\n002');
+      final c = ColumnCountConstraint('2.1.1');
+      expect(c.isCompleteFor(p), isTrue);
+    });
+
+    test(
+      'not complete when target column has holes though others are full',
+      () {
+        // Columns 0 and 2 are filled, column 1 is empty. A bug treating any
+        // filled column as completion would wrongly return true here.
+        final p = _make('101\n202');
+        final c = ColumnCountConstraint('1.1.1');
+        expect(c.isCompleteFor(p), isFalse);
+      },
+    );
   });
 
   group('Puzzle.clone constraint state isolation', () {

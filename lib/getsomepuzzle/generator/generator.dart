@@ -83,7 +83,11 @@ class PuzzleGenerator {
     final width = config.width;
     final height = config.height;
     final size = width * height;
-    final ratio = 0.8 + _rng.nextDouble() * 0.2; // 0.8 to 1.0
+    // Fraction of cells left empty for the player to deduce. Randomized in
+    // [0.8, 1.0] so most puzzles are fully deductive (ratio=1) but up to 20%
+    // of cells may be given as prefilled hints — variety without making
+    // generation trivial.
+    final ratio = 0.8 + _rng.nextDouble() * 0.2;
 
     // Build the allowed rule slugs
     final allSlugs = constraintRegistry.map((entry) => entry.slug).toSet();
@@ -271,10 +275,17 @@ class PuzzleGenerator {
     );
     possibleMotifs.shuffle(_rng);
     final puzzleSize = width * height;
+    // Weight candidate motifs by bounding-box size. Exponent `puzzleSize / 20`
+    // scales the size preference with the grid's area:
+    //   - small grid  (size≈5):  exp≈0.25, sizes stay roughly equal
+    //   - medium grid (size=20): exp=1, linear in motifSize
+    //   - large grid  (size≈40): exp≈2, big motifs dominate — they fit and
+    //     stay visually interesting, small motifs feel trivial.
+    // `base` is a per-size hand-tuned bias (see ShapeConstraint.baseWeights).
     final weights = possibleMotifs.map((m) {
       final motifSize = ShapeConstraint.motifGridSizeOf(m);
       final base = ShapeConstraint.baseWeights[motifSize] ?? 1;
-      return base * pow(motifSize, puzzleSize * 0.05) * 0.2;
+      return base * pow(motifSize, puzzleSize * 0.05);
     }).toList();
 
     final totalWeight = weights.reduce((a, b) => a + b);

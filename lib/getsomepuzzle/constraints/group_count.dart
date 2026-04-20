@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -102,9 +101,7 @@ class GroupCountConstraint extends Constraint {
           return Move(mergeCell, color, this);
         }
       }
-    }
-
-    if (currentCount < count) {
+    } else if (currentCount < count) {
       final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
       if (candidates.length + currentCount < count) {
         return Move(0, 0, this, isImpossible: this);
@@ -119,10 +116,8 @@ class GroupCountConstraint extends Constraint {
         }
         return Move(candidates.first, color, this);
       }
-    }
-
-    if (currentCount == count && !puzzle.complete) {
-      final opposite = puzzle.domain.firstWhereOrNull((c) => c != color)!;
+    } else if (currentCount == count && !puzzle.complete) {
+      final opposite = puzzle.domain.firstWhere((c) => c != color);
       final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
       if (candidates.isEmpty) {
         // Candidate set is monotone decreasing: empty now means empty
