@@ -333,6 +333,20 @@ void main() {
     });
   });
 
+  group('DifferentFromConstraint.toHuman', () {
+    test('right uses actual puzzle width, not a hardcoded approximation', () {
+      // Cell 2 (1-based: 3) right-of-constraint points at cell 3 (1-based: 4)
+      // on a 4-wide grid. The prior implementation hardcoded width=100,
+      // which would have produced "3 ≠ 4" only by luck (idx+1 for right).
+      // Here we verify the down direction where width matters.
+      final p = Puzzle.empty(4, 4, [1, 2]);
+      expect(DifferentFromConstraint('2.down').toHuman(p), '3 ≠ 7');
+      // For comparison: on a 5-wide grid, down from idx 2 is idx 7 → "3 ≠ 8".
+      final p5 = Puzzle.empty(5, 4, [1, 2]);
+      expect(DifferentFromConstraint('2.down').toHuman(p5), '3 ≠ 8');
+    });
+  });
+
   group('GroupCountConstraint.verify', () {
     test('correct group count → valid', () {
       // 2x2: 2 black groups
@@ -422,6 +436,59 @@ void main() {
       expect(move!.idx, 3);
       expect(move.value, 1);
     });
+
+    test('impossible when unique merge overshoots target', () {
+      // 7x4 grid: four isolated color-1 singletons around cell 9. Cell 9
+      // is the only free cell and the only merge-cell, adjacent to all 4
+      // groups. Colouring it merges all 4 → count drops from 4 to 1.
+      // Reachable counts = {4, 1}. Target 3 is unreachable, so apply()
+      // must flag isImpossible directly (not force a wrong merge first).
+      final p = _make(
+        '2212222\n'
+        '2101222\n'
+        '2212222\n'
+        '2222222',
+      );
+      final gc = GroupCountConstraint('1.3');
+      p.constraints.add(gc);
+      final move = gc.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('multi-step merge via flood-fill is NOT flagged impossible', () {
+      // Regression: two isolated color-1 cells (0 at (0,0) and 24 at (3,3))
+      // on a 7x4 grid with many free cells between them. There is NO free
+      // cell directly adjacent to both groups (they're too far apart), but
+      // they CAN merge via a chain of intermediate free cells colored with
+      // 1. Target GC:1.1 must be reachable — verify() returns true and
+      // apply() returns no isImpossible.
+      final p = Puzzle('v2_12_7x4_1000000000020000000000001000__0:0_0');
+      final gc = GroupCountConstraint('1.1');
+      p.constraints.add(gc);
+      expect(gc.verify(p), isTrue);
+      final move = gc.apply(p);
+      if (move != null) expect(move.isImpossible, isNull);
+    });
+
+    test(
+      'single direct merge-cell does NOT force when multi-step paths exist',
+      () {
+        // Regression: three color-1 groups — {0,1,7}, a big middle group, and
+        // a singleton {22}. Cell 23 is the ONLY direct merge-cell (adj to the
+        // singleton and the middle group), but the singleton can also reach
+        // the middle group via a multi-step path through cells 21, 14, 7, 0,
+        // 1, 2, 3. So cell 23 = 1 is not a forced deduction — apply must
+        // not return Move(23, 1).
+        final p = Puzzle('v2_12_7x4_1100111122121202111110101121__0:0_0');
+        final gc = GroupCountConstraint('1.1');
+        p.constraints.add(gc);
+        final move = gc.apply(p);
+        if (move != null) {
+          expect(move.idx != 23 || move.value != 1, isTrue);
+        }
+      },
+    );
   });
 
   group('GroupCountConstraint.apply - not enough groups', () {
@@ -441,6 +508,36 @@ void main() {
       final move = gc.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 2);
+      expect(move.value, 1);
+    });
+
+    test(
+      'impossible when candidates are adjacent and cannot all be isolated',
+      () {
+        // 1x3 state 000 + GC:1.3: all three cells are candidates, but they
+        // form a single path so colouring them all merges into 1 group, not 3.
+        // Target unreachable → impossible detected up-front.
+        final p = _make('000');
+        final gc = GroupCountConstraint('1.3');
+        p.constraints.add(gc);
+        final move = gc.apply(p);
+        expect(move, isNotNull);
+        expect(move!.isImpossible, isNotNull);
+      },
+    );
+
+    test('force fill when candidates are independent and count matches', () {
+      // 1x5 state 02020 + GC:1.3: candidates are cells 0, 2, 4 (separated
+      // by color-2 cells, pairwise non-adjacent). current + candidates = 3
+      // = target, so every candidate must become its own group → force the
+      // first one to black.
+      final p = _make('02020');
+      final gc = GroupCountConstraint('1.3');
+      p.constraints.add(gc);
+      final move = gc.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 0);
       expect(move.value, 1);
     });
   });
@@ -490,5 +587,23 @@ void main() {
       final move = gc.apply(p);
       expect(move, isNull);
     });
+
+    test(
+      'force candidate to opposite when colouring it makes target unreachable',
+      () {
+        // 3x3: 1 2 2 / 2 . 2 / 2 2 1 — cell 4 is the only free cell and the
+        // only candidate. Colouring cell 4 = 1 completes the puzzle with 3
+        // isolated color-1 groups ({0}, {4}, {8}); no merge-cell remains,
+        // so reachable = {3}. Target 2 is unreachable, so cell 4 must be 2.
+        final p = _make('122\n202\n221');
+        final gc = GroupCountConstraint('1.2');
+        p.constraints.add(gc);
+        final move = gc.apply(p);
+        expect(move, isNotNull);
+        expect(move!.isImpossible, isNull);
+        expect(move.idx, 4);
+        expect(move.value, 2);
+      },
+    );
   });
 }

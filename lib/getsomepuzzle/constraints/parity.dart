@@ -28,7 +28,7 @@ class ParityConstraint extends CellsCentricConstraint {
   String serialize() => 'PA:${indices.first}.$side';
 
   @override
-  String toHuman() {
+  String toHuman(Puzzle puzzle) {
     final idx = indices.first + 1;
     return "$idx = ${toString()}";
   }

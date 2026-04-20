@@ -2,9 +2,34 @@
 
 ## Overview
 
-During the playing phase, when a constraint becomes useless (fully satisfied with no further deductions possible AND still valid), it is grayed out to visually indicate it is complete.
+During the playing phase, when a constraint becomes useless, it is grayed out
+to visually indicate it is complete.
 
-**Important:** Only constraints that are both **valid** (`verify(puzzle) == true`) AND **complete** can be grayed out. Invalid constraints (those that have been violated) remain visible with their invalid styling.
+### Semantics: "no future deduction possible"
+
+A constraint is **complete** (greyable) when, from the current state, `apply()`
+will never return a non-null move **in any reachable future state** — no matter
+which cells the player colours next.
+
+This is the strict reading of "fully satisfied with no further deductions
+possible". The weaker reading — "`apply()` returns null right now" — is
+rejected because it causes grayout to flash in and out as the player plays
+(e.g., a Quantity constraint currently in a "waiting" state could reach its
+target on the next move and fire again).
+
+Under this semantics, two classes of constraints emerge:
+
+- **Monotone** constraints (`FM`, `GS`, `LT`, `SY`, `DF`, `CC`, `PA`): their
+  completion criterion is preserved by any future move. Once complete, they
+  stay complete. They gray out meaningfully mid-game.
+- **Non-monotone** constraints (`QA`, `GC`, `SH`): future play can revive
+  them. They can only be grayed out once no useful move can trigger them
+  again, which for `QA` and `SH` essentially means "puzzle complete", and
+  for `GC` means "target reached AND no future merge is possible".
+
+**Important:** Only constraints that are both **valid** (`verify(puzzle) ==
+true`) AND **complete** can be grayed out. Invalid constraints (those that
+have been violated) remain visible with their invalid styling.
 
 ## Implementation
 
@@ -75,7 +100,13 @@ Complete when the forbidden pattern can no longer appear anywhere in the grid. C
 
 **File:** `lib/getsomepuzzle/constraints/shape.dart`
 
-Returns `false` - checking all shape variants is more expensive.
+Complete only when the grid is fully filled. "All current groups closed" is
+not enough: any free cell still in the grid has no color neighbour (otherwise
+some group would have a free neighbour, contradicting "all closed"), so
+colouring it with `color` creates a new 1-cell group. For any shape larger
+than 1 cell, this new group doesn't match any variant → `apply` level 1
+fires `isImpossible`. So `SH` can only be considered permanently complete
+once no free cell remains.
 
 #### 2.7 `QuantityConstraint`
 
@@ -93,7 +124,14 @@ be reached by future play, so QA's grayout condition is equivalent to
 
 **File:** `lib/getsomepuzzle/constraints/group_count.dart`
 
-Complete when the target count is reached AND no more groups can be added (i.e., no free cells without a neighbor of the constrained color).
+Complete only when no future play can ever trigger `apply()` again:
+- `currentCount == count` (target reached), AND
+- `candidates.isEmpty` (no new groups can form — the candidate set is
+  monotone decreasing, so empty now means empty forever), AND
+- `calculateMinGroups(puzzle, color) == currentCount` (no merge is possible
+  now or in the future — `canMergeGroups` reachability only shrinks as
+  cells are coloured, so equality now guarantees equality forever; this
+  also implies no merge-cell can appear later).
 
 #### 2.9 `ColumnCountConstraint`
 

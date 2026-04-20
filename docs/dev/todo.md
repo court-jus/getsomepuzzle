@@ -105,10 +105,6 @@ When a puzzle has a SH constraint (e.g., `SH:111`), the shape implicitly constra
 - Could warn puzzle creators when both constraints are present for the same color.
 - Note: SH only constrains one color. A puzzle with `SH:111` still allows white groups of any size, so a `GS` on a white cell is NOT redundant.
 
-### Fix toHuman() to accept puzzle context
-
-`toHuman()` is defined on several constraints but never called. `DifferentFromConstraint.toHuman()` uses `getNeighborIndex(100)` as a width approximation, which is wrong. When we start using `toHuman()` (e.g., in the step-by-step explanation UI), change its signature to accept the puzzle width (or the full Puzzle object) so neighbor indices are computed correctly.
-
 ### Hint constraint: prioritize useful constraints — PARTIALLY DONE
 
 Ranking by propagation usefulness is implemented: candidates are tested with `applyConstraintsPropagation()` and sorted (useful first, non-useful at end). Ranking is recomputed after each player interaction (debounced 300ms) and after each hint addition.
@@ -147,7 +143,3 @@ Leftover items from the Shape constraint review (c04166d..f7c6812).
 ### Deep nesting in `findAllCompletions`
 
 `shape.dart` `findAllCompletions` has 5 levels of nested loops/conditions. The merge logic is especially hard to follow. Extract the merge check into a separate method.
-
-### Remove `sh_puz.txt` from repo root
-
-Leftover 4-line test file committed at the repo root. Delete or move under an ignored path.

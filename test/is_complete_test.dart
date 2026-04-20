@@ -185,6 +185,27 @@ void main() {
       final c = GroupCountConstraint('1.1');
       expect(c.isCompleteFor(p), isFalse);
     });
+
+    test('not complete when merge-cells still force deductions', () {
+      // Diagonal alternation 101\n010\n101 + GC:1.5: count already = target,
+      // no candidate cell exists, but every free cell borders multiple
+      // color-1 groups → apply() would force them to white. Constraint is
+      // still producing deductions, must not gray out.
+      final p = _make('101\n010\n101');
+      final c = GroupCountConstraint('1.5');
+      expect(c.isCompleteFor(p), isFalse);
+    });
+
+    test('not complete when a future merge would drop the count', () {
+      // 1x4 state 1001 + GC:1.2: current=target=2, no candidates, no
+      // merge-cells NOW. But the two groups can still merge through the
+      // empty gap (calculateMinGroups=1). If the user colours cell 1 with
+      // black, a merge-cell appears at cell 2 and apply() fires. Must not
+      // gray out in this state.
+      final p = _make('1001');
+      final c = GroupCountConstraint('1.2');
+      expect(c.isCompleteFor(p), isFalse);
+    });
   });
 
   group('ColumnCountConstraint.isCompleteFor', () {
@@ -198,6 +219,33 @@ void main() {
       final p = _make('1\n2');
       final c = ColumnCountConstraint('0.1.1');
       expect(c.isCompleteFor(p), isTrue);
+    });
+  });
+
+  group('Puzzle.clone constraint state isolation', () {
+    test('findAMove on a clone must not mutate isComplete on the original', () {
+      // Regression: findAMove clones the puzzle and calls setValue to probe
+      // hypothetical moves. Before deep-cloning constraints, the clone and
+      // the original shared Constraint objects, so updateConstraintStatus()
+      // during probing could flip the original's `isComplete` to `true`
+      // based on a hypothetical (not real) grid state, leaving the UI
+      // incorrectly grayed.
+      //
+      // Here we take a state where the real grid leaves SY group open,
+      // but where some probing state would make it bordered.
+      final p = Puzzle('v2_12_4x4_1000000000000000_SY:5.1_0:0_0');
+      final sy = p.constraints.whereType<SymmetryConstraint>().first;
+      p.updateConstraintStatus();
+      expect(sy.isComplete, isFalse);
+      // Run findAMove — internally it clones and mutates cells via
+      // setValue. Without deep-clone of constraints, this would flip
+      // sy.isComplete on the original.
+      p.findAMove();
+      expect(
+        sy.isComplete,
+        isFalse,
+        reason: 'findAMove on a clone must not mutate the original',
+      );
     });
   });
 

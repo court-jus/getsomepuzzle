@@ -229,9 +229,10 @@ void main() {
     });
 
     test('toHuman describes the constraint', () {
-      expect(ShapeConstraint('111').toHuman(), contains('black'));
-      expect(ShapeConstraint('222').toHuman(), contains('white'));
-      expect(ShapeConstraint('111').toHuman(), contains('shape'));
+      final p = Puzzle.empty(3, 3, [1, 2]);
+      expect(ShapeConstraint('111').toHuman(p), contains('black'));
+      expect(ShapeConstraint('222').toHuman(p), contains('white'));
+      expect(ShapeConstraint('111').toHuman(p), contains('shape'));
     });
 
     test('equivalent inputs produce same canonical shape', () {
@@ -650,6 +651,18 @@ void main() {
       //   2 2 2
       // Black group [0,1] is closed, but there's room for a new group at [2].
       final p = _make('110\n222');
+      final sh = ShapeConstraint('11');
+      p.constraints.add(sh);
+      expect(sh.isCompleteFor(p), isFalse);
+    });
+
+    test('no valid placement but free cell remains → returns false', () {
+      // SH:11 = line of 2. Grid 3x3 where every "11" placement is blocked
+      // by a 2, but cell 7 is still free. Under the "no future deduction"
+      // semantic, colouring cell 7 with 1 creates a 1-cell group that
+      // doesn't match any "11" variant → apply would fire level 1
+      // isImpossible. So SH is still active, not grayed out.
+      final p = _make('222\n222\n202');
       final sh = ShapeConstraint('11');
       p.constraints.add(sh);
       expect(sh.isCompleteFor(p), isFalse);

@@ -37,7 +37,7 @@ void _solvePuzzle(String line) {
   print('Puzzle: $line');
   print('Grid ${p.width}x${p.height}, constraints:');
   for (final constraint in p.constraints) {
-    print('  ${constraint.serialize()} — ${constraint.toHuman()}');
+    print('  ${constraint.serialize()} — ${constraint.toHuman(p)}');
   }
   print('');
 

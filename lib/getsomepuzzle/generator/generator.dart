@@ -242,6 +242,10 @@ class PuzzleGenerator {
       }
     }
 
+    // Reject puzzles that are not uniquely solvable.
+    // Propagation + force can miss alternate solutions that backtracking finds.
+    if (pu.countSolutions() != 1) return null;
+
     return pu.lineExport();
   }
 

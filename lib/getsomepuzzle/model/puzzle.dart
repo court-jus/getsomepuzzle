@@ -336,8 +336,25 @@ class Puzzle {
     final p = Puzzle.empty(width, height, domain);
     p.lineRepresentation = lineRepresentation;
     p.cells = cells.map((c) => c.clone()).toList();
-    p.constraints = constraints.toList();
+    // Deep-clone constraints: the mutable UI-state fields (`isValid`,
+    // `isHighlighted`, `isComplete`) must not be shared between the clone
+    // and the original, else exploratory solver work on the clone (force,
+    // backtracking, findAMove) leaks state into the original puzzle.
+    p.constraints = constraints.map(_cloneConstraint).toList();
     return p;
+  }
+
+  static Constraint _cloneConstraint(Constraint c) {
+    if (c is HelpText) return HelpText(c.text);
+    if (c is OtherSolutionConstraint) {
+      return OtherSolutionConstraint(List<int>.from(c.solution));
+    }
+    final serialized = c.serialize();
+    final colonIdx = serialized.indexOf(':');
+    if (colonIdx < 0) return c;
+    final slug = serialized.substring(0, colonIdx);
+    final params = serialized.substring(colonIdx + 1);
+    return createConstraint(slug, params) ?? c;
   }
 
   List<(Cell, int)> freeCells() {

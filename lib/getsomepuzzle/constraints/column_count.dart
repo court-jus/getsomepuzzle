@@ -24,7 +24,7 @@ class ColumnCountConstraint extends Constraint {
   String toString() => '$count';
 
   @override
-  String toHuman() => 'Col ${columnIdx + 1}: $count';
+  String toHuman(Puzzle puzzle) => 'Col ${columnIdx + 1}: $count';
 
   static List<String> generateAllParameters(
     int width,

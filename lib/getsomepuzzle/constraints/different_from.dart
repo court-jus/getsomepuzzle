@@ -28,11 +28,9 @@ class DifferentFromConstraint extends CellsCentricConstraint {
   }
 
   @override
-  String toHuman() {
+  String toHuman(Puzzle puzzle) {
     final idx = indices.first + 1;
-    final nidx =
-        getNeighborIndex(100) +
-        1; // Approximation, actual width used in verify/apply
+    final nidx = getNeighborIndex(puzzle.width) + 1;
     return "$idx ≠ $nidx";
   }
 

@@ -14,7 +14,7 @@ class Constraint {
 
   String get slug => '';
 
-  String toHuman() {
+  String toHuman(Puzzle puzzle) {
     return toString();
   }
 

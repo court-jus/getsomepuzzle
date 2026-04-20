@@ -29,9 +29,9 @@ class GroupSize extends CellsCentricConstraint {
   }
 
   @override
-  String toHuman() {
+  String toHuman(Puzzle puzzle) {
     final idx = indices.first;
-    return "${idx + 1} = $size";
+    return "Group at ${idx + 1} = $size";
   }
 
   static List<String> generateAllParameters(
@@ -216,7 +216,7 @@ class LetterGroup extends CellsCentricConstraint {
   String serialize() => 'LT:$letter.${indices.join(".")}';
 
   @override
-  String toHuman() {
+  String toHuman(Puzzle puzzle) {
     final hIndices = indices.map((i) => i + 1);
     return "$hIndices = $letter";
   }
