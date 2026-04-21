@@ -20,7 +20,7 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/between_puzzles.dart';
 import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
-import 'package:getsomepuzzle/widgets/create_page.dart';
+import 'package:getsomepuzzle/widgets/create_page/create_page.dart';
 import 'package:getsomepuzzle/widgets/generate_page.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
 import 'package:getsomepuzzle/widgets/pause_overlay.dart';
