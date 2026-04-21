@@ -286,6 +286,18 @@ abstract class AppLocalizations {
   /// **'Pause...'**
   String get tooltipPause;
 
+  /// Subtitle shown on the pause overlay when the game was paused because the idle timeout expired
+  ///
+  /// In en, this message translates to:
+  /// **'Paused due to inactivity'**
+  String get pausedDueToIdle;
+
+  /// Subtitle shown on the pause overlay when the game was paused because the window/tab/app lost focus
+  ///
+  /// In en, this message translates to:
+  /// **'Paused because the app lost focus'**
+  String get pausedDueToFocusLost;
+
   /// Tooltip displayed while the mouse is over the extra menu
   ///
   /// In en, this message translates to:
@@ -429,6 +441,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add constraint'**
   String get settingHintTypeAddConstraint;
+
+  /// Setting label for the idle auto-pause timeout
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-pause on inactivity'**
+  String get settingIdleTimeout;
+
+  /// Idle timeout value: feature disabled, never auto-pause
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get settingIdleTimeoutDisabled;
+
+  /// Idle timeout value: 5 seconds of inactivity triggers pause
+  ///
+  /// In en, this message translates to:
+  /// **'5 seconds'**
+  String get settingIdleTimeoutS5;
+
+  /// Idle timeout value: 10 seconds
+  ///
+  /// In en, this message translates to:
+  /// **'10 seconds'**
+  String get settingIdleTimeoutS10;
+
+  /// Idle timeout value: 30 seconds
+  ///
+  /// In en, this message translates to:
+  /// **'30 seconds'**
+  String get settingIdleTimeoutS30;
+
+  /// Idle timeout value: 1 minute
+  ///
+  /// In en, this message translates to:
+  /// **'1 minute'**
+  String get settingIdleTimeoutM1;
+
+  /// Idle timeout value: 2 minutes
+  ///
+  /// In en, this message translates to:
+  /// **'2 minutes'**
+  String get settingIdleTimeoutM2;
 
   /// Hint message shown when the player clicks the lightbulb to get a clue
   ///

@@ -65,6 +65,17 @@ class _SettingsPageState extends State<SettingsPage> {
       )!.settingHintTypeAddConstraint,
     };
 
+    final Map<IdleTimeout, String> settingsIdleTimeout = {
+      IdleTimeout.disabled: AppLocalizations.of(
+        context,
+      )!.settingIdleTimeoutDisabled,
+      IdleTimeout.s5: AppLocalizations.of(context)!.settingIdleTimeoutS5,
+      IdleTimeout.s10: AppLocalizations.of(context)!.settingIdleTimeoutS10,
+      IdleTimeout.s30: AppLocalizations.of(context)!.settingIdleTimeoutS30,
+      IdleTimeout.m1: AppLocalizations.of(context)!.settingIdleTimeoutM1,
+      IdleTimeout.m2: AppLocalizations.of(context)!.settingIdleTimeoutM2,
+    };
+
     return Scaffold(
       appBar: AppBar(title: Text(AppLocalizations.of(context)!.settings)),
       body: LayoutBuilder(
@@ -177,6 +188,30 @@ class _SettingsPageState extends State<SettingsPage> {
                                 (slug) => DropdownMenuItem(
                                   value: slug,
                                   child: Text(settingsHintType[slug]!),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(AppLocalizations.of(context)!.settingIdleTimeout),
+                        DropdownButton<IdleTimeout>(
+                          value: widget.settings.idleTimeout,
+                          onChanged: (newValue) {
+                            setState(() {
+                              widget.onSettingsChange(
+                                ChangeableSettings(idleTimeout: newValue),
+                              );
+                            });
+                          },
+                          items: IdleTimeout.values
+                              .map(
+                                (slug) => DropdownMenuItem(
+                                  value: slug,
+                                  child: Text(settingsIdleTimeout[slug]!),
                                 ),
                               )
                               .toList(),

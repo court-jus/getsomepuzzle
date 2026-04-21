@@ -11,6 +11,10 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 import 'package:logging/logging.dart';
 
+/// Why the game was automatically paused. Null means either the user paused
+/// manually (no subtitle needed) or the game is running.
+enum AutoPauseReason { idle, focusLost }
+
 class GameModel extends ChangeNotifier {
   // --- Puzzle state ---
   PuzzleData? currentMeta;
@@ -32,11 +36,23 @@ class GameModel extends ChangeNotifier {
   /// breaks completeness (clears a cell) or the puzzle transitions away.
   bool _stoppedForCompletion = false;
 
+  /// Non-null when `paused` was set automatically (idle timeout, app focus
+  /// lost). Used by the pause overlay to tell the user *why* they were
+  /// paused. Cleared by manual pause and resume.
+  AutoPauseReason? _autoPauseReason;
+  AutoPauseReason? get autoPauseReason => _autoPauseReason;
+
   /// Pending automatic check. Every cell mutation re-arms this timer from 0;
   /// when it fires we run `checkPuzzle` (which displays errors, increments
   /// failures and/or switches to the next puzzle). Cancelled on any mutation
   /// that invalidates the pending check (tap, drag, restart, undo, pause, …).
   Timer? _checkDebounce;
+
+  /// Fires an `autoPause(AutoPauseReason.idle)` after the configured idle
+  /// window elapses without any interaction. Callers pass the current
+  /// duration via [markInteraction] so the model does not need to know the
+  /// user's settings directly.
+  Timer? _idleTimer;
 
   // --- Visual feedback ---
   String topMessage = "";
@@ -103,18 +119,21 @@ class GameModel extends ChangeNotifier {
 
   void openPuzzle(PuzzleData puz, int playlistLength) {
     _cancelCheckDebounce();
+    _cancelIdleTimer();
     dbSize = playlistLength;
     currentMeta = puz;
     currentPuzzle = currentMeta!.begin();
     paused = false;
     betweenPuzzles = false;
     _stoppedForCompletion = false;
+    _autoPauseReason = null;
     hintText = "";
     _onPuzzleChanged();
   }
 
   void clearPuzzle() {
     _cancelCheckDebounce();
+    _cancelIdleTimer();
     cancelHintConstraintComputation();
     currentPuzzle = null;
     history = [];
@@ -148,19 +167,62 @@ class GameModel extends ChangeNotifier {
 
   void pause() {
     paused = true;
+    _autoPauseReason = null;
     _cancelCheckDebounce();
+    _cancelIdleTimer();
     currentMeta?.stats?.pause();
     notifyListeners();
   }
 
   void resume() {
     paused = false;
+    _autoPauseReason = null;
     // If the puzzle is still complete in manual mode, keep the stopwatch
     // frozen — the user must break completeness or validate.
     if (currentPuzzle != null && !_stoppedForCompletion) {
       currentMeta?.stats?.resume();
     }
     notifyListeners();
+  }
+
+  /// Pause the game from an automatic source (idle timeout, app focus lost).
+  /// Behaves like [pause] but records the reason so the pause overlay can
+  /// explain to the user why the game stopped. No-op if already paused —
+  /// the earliest reason wins, which avoids the focus-loss event that
+  /// follows an idle pause from overwriting the original cause.
+  void autoPause(AutoPauseReason reason) {
+    if (paused) return;
+    paused = true;
+    _autoPauseReason = reason;
+    _cancelCheckDebounce();
+    _cancelIdleTimer();
+    currentMeta?.stats?.pause();
+    notifyListeners();
+  }
+
+  /// Record a user interaction and re-arm the idle watchdog from 0. Pass
+  /// `settings.idleTimeoutDuration` as [duration]; null disables the feature.
+  /// After an idle auto-pause, interactions are ignored until [resume] runs —
+  /// this avoids a stray event from silently re-arming the clock while the
+  /// pause overlay is still showing.
+  void markInteraction(Duration? duration) {
+    if (_autoPauseReason == AutoPauseReason.idle) return;
+    _rearmIdleTimer(duration);
+  }
+
+  void _rearmIdleTimer(Duration? duration) {
+    _cancelIdleTimer();
+    if (duration == null) return;
+    if (currentPuzzle == null || paused || betweenPuzzles) return;
+    _idleTimer = Timer(duration, () {
+      _idleTimer = null;
+      autoPause(AutoPauseReason.idle);
+    });
+  }
+
+  void _cancelIdleTimer() {
+    _idleTimer?.cancel();
+    _idleTimer = null;
   }
 
   /// Freeze/unfreeze the stopwatch based on whether the puzzle is complete
@@ -540,6 +602,7 @@ class GameModel extends ChangeNotifier {
   void dispose() {
     _helpDebounce?.cancel();
     _cancelCheckDebounce();
+    _cancelIdleTimer();
     _hintWorker?.dispose();
     _cancelHintRanking();
     super.dispose();

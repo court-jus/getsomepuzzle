@@ -124,6 +124,14 @@
     "@tooltipPause": {
         "description": "Tooltip displayed while the mouse is over the pause menu"
     },
+    "pausedDueToIdle": "Paused due to inactivity",
+    "@pausedDueToIdle": {
+        "description": "Subtitle shown on the pause overlay when the game was paused because the idle timeout expired"
+    },
+    "pausedDueToFocusLost": "Paused because the app lost focus",
+    "@pausedDueToFocusLost": {
+        "description": "Subtitle shown on the pause overlay when the game was paused because the window/tab/app lost focus"
+    },
     "tooltipMore": "More...",
     "@tooltipMore": {
         "description": "Tooltip displayed while the mouse is over the extra menu"
@@ -219,6 +227,34 @@
     "settingHintTypeAddConstraint": "Add constraint",
     "@settingHintTypeAddConstraint": {
         "description": "Hint mode: add a new constraint to make the puzzle easier"
+    },
+    "settingIdleTimeout": "Auto-pause on inactivity",
+    "@settingIdleTimeout": {
+        "description": "Setting label for the idle auto-pause timeout"
+    },
+    "settingIdleTimeoutDisabled": "Disabled",
+    "@settingIdleTimeoutDisabled": {
+        "description": "Idle timeout value: feature disabled, never auto-pause"
+    },
+    "settingIdleTimeoutS5": "5 seconds",
+    "@settingIdleTimeoutS5": {
+        "description": "Idle timeout value: 5 seconds of inactivity triggers pause"
+    },
+    "settingIdleTimeoutS10": "10 seconds",
+    "@settingIdleTimeoutS10": {
+        "description": "Idle timeout value: 10 seconds"
+    },
+    "settingIdleTimeoutS30": "30 seconds",
+    "@settingIdleTimeoutS30": {
+        "description": "Idle timeout value: 30 seconds"
+    },
+    "settingIdleTimeoutM1": "1 minute",
+    "@settingIdleTimeoutM1": {
+        "description": "Idle timeout value: 1 minute"
+    },
+    "settingIdleTimeoutM2": "2 minutes",
+    "@settingIdleTimeoutM2": {
+        "description": "Idle timeout value: 2 minutes"
     },
     "hintDeducedFrom": "This cell can be deduced from the {constraintName} constraint",
     "@hintDeducedFrom": {

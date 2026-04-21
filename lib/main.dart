@@ -90,7 +90,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final GameModel game = GameModel();
   String locale = "en";
   Database? database;
@@ -104,6 +104,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Prevent screen sleep
     if (!kIsWeb && Platform.isAndroid) {
       WakelockPlus.enable();
@@ -120,9 +121,27 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     game.dispose();
     _saveTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (game.currentPuzzle == null || game.betweenPuzzles) return;
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        game.autoPause(AutoPauseReason.focusLost);
+      case AppLifecycleState.resumed:
+        // Do not auto-resume: requiring an explicit click avoids the timer
+        // silently ticking while the user is still getting back into it.
+        break;
+      case AppLifecycleState.detached:
+        break;
+    }
   }
 
   Future<void> initialize() async {
@@ -189,6 +208,13 @@ class _MyHomePageState extends State<MyHomePage> {
     if (settings.hintType == HintType.addConstraint) {
       game.startHintConstraintComputation();
     }
+    _markInteraction();
+  }
+
+  /// Record a user interaction and re-arm the idle auto-pause watchdog.
+  /// All tap/drag handlers and resume events call this.
+  void _markInteraction() {
+    game.markInteraction(settings.idleTimeoutDuration);
   }
 
   void _openCreatePage() {
@@ -213,25 +239,30 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void handlePuzzleTap(int idx) {
     if (game.handleTap(idx)) {
+      _markInteraction();
       _handleCheck();
     }
   }
 
   void handlePuzzleDrag(int idx) {
     game.handleDrag(idx);
+    _markInteraction();
   }
 
   void handlePuzzleDragEnd() {
     game.handleDragEnd();
+    _markInteraction();
     _handleCheck();
   }
 
   void handlePuzzleRightDrag(int idx) {
     game.handleRightDrag(idx);
+    _markInteraction();
   }
 
   void handlePuzzleRightDragEnd() {
     game.handleRightDragEnd();
+    _markInteraction();
     _handleCheck();
   }
 
@@ -261,11 +292,26 @@ class _MyHomePageState extends State<MyHomePage> {
   void togglePause() {
     if (game.paused) {
       game.resume();
+      _markInteraction();
       if (game.currentPuzzle == null) {
         loadPuzzle();
       }
     } else {
       game.pause();
+    }
+  }
+
+  /// Subtitle to display under the pause icon, or null for a manual pause
+  /// where the user already knows why the game is paused.
+  String? _pauseSubtitle(BuildContext context) {
+    final reason = game.autoPauseReason;
+    if (reason == null) return null;
+    final l10n = AppLocalizations.of(context)!;
+    switch (reason) {
+      case AutoPauseReason.idle:
+        return l10n.pausedDueToIdle;
+      case AutoPauseReason.focusLost:
+        return l10n.pausedDueToFocusLost;
     }
   }
 
@@ -561,6 +607,9 @@ class _MyHomePageState extends State<MyHomePage> {
                         if (newValue.hintType != null) {
                           _onHintTypeChanged();
                         }
+                        if (newValue.idleTimeout != null) {
+                          _markInteraction();
+                        }
                         game.refresh();
                       },
                     ),
@@ -620,6 +669,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             width: contextWidth,
                             height: contextHeight,
                             iconSize: cellSize * 3,
+                            subtitle: _pauseSubtitle(context),
                           )
                         else
                           Column(

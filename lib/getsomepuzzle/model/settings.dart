@@ -11,12 +11,15 @@ enum LiveCheckType { all, count, complete }
 
 enum HintType { deducibleCell, addConstraint }
 
+enum IdleTimeout { disabled, s5, s10, s30, m1, m2 }
+
 class ChangeableSettings {
   ValidateType? validateType;
   ShowRating? showRating;
   LiveCheckType? liveCheckType;
   ShareData? shareData;
   HintType? hintType;
+  IdleTimeout? idleTimeout;
 
   ChangeableSettings({
     this.validateType,
@@ -24,11 +27,12 @@ class ChangeableSettings {
     this.liveCheckType,
     this.shareData,
     this.hintType,
+    this.idleTimeout,
   });
 
   @override
   String toString() {
-    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Shar: ${shareData?.name}; Hint: ${hintType?.name}";
+    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Shar: ${shareData?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}";
   }
 }
 
@@ -38,6 +42,7 @@ class Settings {
   ShareData shareData;
   LiveCheckType liveCheckType;
   HintType hintType;
+  IdleTimeout idleTimeout;
 
   final log = Logger("Settings");
 
@@ -47,11 +52,31 @@ class Settings {
     this.shareData = ShareData.yes,
     this.liveCheckType = LiveCheckType.complete,
     this.hintType = HintType.deducibleCell,
+    this.idleTimeout = IdleTimeout.disabled,
   });
 
   @override
   String toString() {
-    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Shar: ${shareData.name}; Hint: ${hintType.name}";
+    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Shar: ${shareData.name}; Hint: ${hintType.name}; Idle: ${idleTimeout.name}";
+  }
+
+  /// Duration corresponding to the current [idleTimeout], or null when the
+  /// feature is disabled.
+  Duration? get idleTimeoutDuration {
+    switch (idleTimeout) {
+      case IdleTimeout.disabled:
+        return null;
+      case IdleTimeout.s5:
+        return const Duration(seconds: 5);
+      case IdleTimeout.s10:
+        return const Duration(seconds: 10);
+      case IdleTimeout.s30:
+        return const Duration(seconds: 30);
+      case IdleTimeout.m1:
+        return const Duration(minutes: 1);
+      case IdleTimeout.m2:
+        return const Duration(minutes: 2);
+    }
   }
 
   Future<void> load() async {
@@ -100,6 +125,12 @@ class Settings {
       case "addConstraint":
         hintType = HintType.addConstraint;
     }
+    final String settingsIdleTimeout =
+        prefs.getString("settingsIdleTimeout") ?? "disabled";
+    idleTimeout = IdleTimeout.values.firstWhere(
+      (e) => e.name == settingsIdleTimeout,
+      orElse: () => IdleTimeout.disabled,
+    );
   }
 
   Future<void> save() async {
@@ -109,6 +140,7 @@ class Settings {
     prefs.setString("settingsShowRating", showRating.name);
     prefs.setString("settingsShareData", shareData.name);
     prefs.setString("settingsHintType", hintType.name);
+    prefs.setString("settingsIdleTimeout", idleTimeout.name);
   }
 
   void change(ChangeableSettings newValue) {
@@ -127,6 +159,9 @@ class Settings {
     }
     if (newValue.hintType != null) {
       hintType = newValue.hintType!;
+    }
+    if (newValue.idleTimeout != null) {
+      idleTimeout = newValue.idleTimeout!;
     }
     save();
   }

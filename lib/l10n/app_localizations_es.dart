@@ -104,6 +104,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tooltipPause => 'Pausa...';
 
   @override
+  String get pausedDueToIdle => 'Pausado por inactividad';
+
+  @override
+  String get pausedDueToFocusLost =>
+      'Pausado porque la aplicación perdió el foco';
+
+  @override
   String get tooltipMore => 'Más...';
 
   @override
@@ -174,6 +181,27 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingHintTypeAddConstraint => 'Añadir restricción';
+
+  @override
+  String get settingIdleTimeout => 'Pausa auto por inactividad';
+
+  @override
+  String get settingIdleTimeoutDisabled => 'Desactivada';
+
+  @override
+  String get settingIdleTimeoutS5 => '5 segundos';
+
+  @override
+  String get settingIdleTimeoutS10 => '10 segundos';
+
+  @override
+  String get settingIdleTimeoutS30 => '30 segundos';
+
+  @override
+  String get settingIdleTimeoutM1 => '1 minuto';
+
+  @override
+  String get settingIdleTimeoutM2 => '2 minutos';
 
   @override
   String hintDeducedFrom(String constraintName) {
