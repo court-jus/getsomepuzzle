@@ -1,9 +1,13 @@
 /// A parsed stat line from the stats files.
 /// Format: finishedTimestamp durationS failuresF puzzleLine - SLD - extras
+/// The extras block contains: skipped - liked - disliked - pleasure - hintsH.
+/// The trailing `hintsH` field was added later — older lines without it
+/// parse with hints=0.
 class StatEntry {
   final String? finished;
   final int duration;
   final int failures;
+  final int hints;
   final String puzzleLine;
   final String? skipped;
   final String? liked;
@@ -19,6 +23,7 @@ class StatEntry {
     required this.duration,
     required this.failures,
     required this.puzzleLine,
+    this.hints = 0,
     this.skipped,
     this.liked,
     this.disliked,
@@ -33,10 +38,14 @@ class StatEntry {
     final duration = int.tryParse(fields[1].replaceAll('s', ''));
     final failures = int.tryParse(fields[2].replaceAll('f', ''));
     if (duration == null || failures == null) return null;
+    final hints = fields.length > 15
+        ? int.tryParse(fields[15].replaceAll('h', '')) ?? 0
+        : 0;
     return StatEntry(
       finished: finished,
       duration: duration,
       failures: failures,
+      hints: hints,
       puzzleLine: fields[3],
       skipped: fields.length > 7 && fields[7].isNotEmpty ? fields[7] : null,
       liked: fields.length > 9 && fields[9].isNotEmpty ? fields[9] : null,

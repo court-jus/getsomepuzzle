@@ -6,6 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/flags_selector.dart';
 
 class GeneratePage extends StatefulWidget {
   final Database database;
@@ -187,61 +188,21 @@ class _GeneratePageState extends State<GeneratePage> {
             }),
             const SizedBox(height: 16),
 
-            // Required rules
-            Text(
-              loc.generateRequiredRules,
-              style: Theme.of(context).textTheme.titleSmall,
+            Text(AppLocalizations.of(context)!.labelWidgetWantedrules),
+            FlagsSelector(
+              choices: _ruleOptions,
+              wanted: _requiredRules,
+              banned: _excludedRules,
+              apply: (value) {
+                print(value);
+                setState(() {
+                  _requiredRules.clear();
+                  _requiredRules.addAll(value.$1);
+                  _excludedRules.clear();
+                  _excludedRules.addAll(value.$2);
+                });
+              },
             ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 4,
-              children: _ruleOptions.map((r) {
-                final selected = _requiredRules.contains(r.$1);
-                final disabled = _excludedRules.contains(r.$1);
-                return FilterChip(
-                  label: Text(r.$2),
-                  selected: selected,
-                  onSelected: disabled || _isGenerating
-                      ? null
-                      : (v) => setState(() {
-                          if (v) {
-                            _requiredRules.add(r.$1);
-                          } else {
-                            _requiredRules.remove(r.$1);
-                          }
-                        }),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-
-            // Excluded rules
-            Text(
-              loc.generateExcludedRules,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 4,
-              children: _ruleOptions.map((r) {
-                final selected = _excludedRules.contains(r.$1);
-                final disabled = _requiredRules.contains(r.$1);
-                return FilterChip(
-                  label: Text(r.$2),
-                  selected: selected,
-                  onSelected: disabled || _isGenerating
-                      ? null
-                      : (v) => setState(() {
-                          if (v) {
-                            _excludedRules.add(r.$1);
-                          } else {
-                            _excludedRules.remove(r.$1);
-                          }
-                        }),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
 
             // Max time
             _buildSliderRow(loc.generateMaxTime, _maxTimeSeconds, 10, 300, (v) {

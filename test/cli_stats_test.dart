@@ -28,6 +28,25 @@ void main() {
       expect(entry, isNotNull);
       expect(entry!.finished, isNull);
     });
+
+    test('parses the optional hints field when present', () {
+      // Hints were added as a trailing `Nh` token after pleasure. Current
+      // format has 16 space-separated fields with hints at position 15.
+      final entry = StatEntry.parse(
+        '2025-01-01T10:00:00 60s 2f v2_12_3x3_000000000_FM:12_0:0_0 - _L_ -  - 2025-01-01T10:00:00 -  - 2 - 3h',
+      );
+      expect(entry, isNotNull);
+      expect(entry!.hints, 3);
+    });
+
+    test('defaults hints to 0 for older lines without the field', () {
+      // Lines written before the hints tracking must still parse cleanly.
+      final entry = StatEntry.parse(
+        '2025-01-01T10:00:00 60s 2f v2_12_3x3_000000000_FM:12_0:0_0 - _L_ -  - 2025-01-01T10:00:00 -  - 2',
+      );
+      expect(entry, isNotNull);
+      expect(entry!.hints, 0);
+    });
   });
 
   group('aggregateStats', () {

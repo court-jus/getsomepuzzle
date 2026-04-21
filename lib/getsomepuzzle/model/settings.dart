@@ -20,6 +20,8 @@ class ChangeableSettings {
   ShareData? shareData;
   HintType? hintType;
   IdleTimeout? idleTimeout;
+  int? playerLevel;
+  bool? autoLevel;
 
   ChangeableSettings({
     this.validateType,
@@ -28,6 +30,8 @@ class ChangeableSettings {
     this.shareData,
     this.hintType,
     this.idleTimeout,
+    this.playerLevel,
+    this.autoLevel,
   });
 
   @override
@@ -43,6 +47,8 @@ class Settings {
   LiveCheckType liveCheckType;
   HintType hintType;
   IdleTimeout idleTimeout;
+  int playerLevel;
+  bool autoLevel;
 
   final log = Logger("Settings");
 
@@ -53,6 +59,8 @@ class Settings {
     this.liveCheckType = LiveCheckType.complete,
     this.hintType = HintType.deducibleCell,
     this.idleTimeout = IdleTimeout.disabled,
+    this.playerLevel = 0,
+    this.autoLevel = true,
   });
 
   @override
@@ -131,6 +139,8 @@ class Settings {
       (e) => e.name == settingsIdleTimeout,
       orElse: () => IdleTimeout.disabled,
     );
+    playerLevel = prefs.getInt("settingsPlayerLevel") ?? 0;
+    autoLevel = prefs.getBool("settingsAutoLevel") ?? true;
   }
 
   Future<void> save() async {
@@ -141,10 +151,11 @@ class Settings {
     prefs.setString("settingsShareData", shareData.name);
     prefs.setString("settingsHintType", hintType.name);
     prefs.setString("settingsIdleTimeout", idleTimeout.name);
+    prefs.setInt("settingsPlayerLevel", playerLevel);
+    prefs.setBool("settingsAutoLevel", autoLevel);
   }
 
   void change(ChangeableSettings newValue) {
-    // print("change $newValue");
     if (newValue.validateType != null) {
       validateType = newValue.validateType!;
     }
@@ -162,6 +173,12 @@ class Settings {
     }
     if (newValue.idleTimeout != null) {
       idleTimeout = newValue.idleTimeout!;
+    }
+    if (newValue.playerLevel != null) {
+      playerLevel = newValue.playerLevel!;
+    }
+    if (newValue.autoLevel != null) {
+      autoLevel = newValue.autoLevel!;
     }
     save();
   }

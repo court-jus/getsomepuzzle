@@ -112,7 +112,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ],
                           onChanged: (newValue) {
                             setState(() {
-                              widget.settings.change(
+                              widget.onSettingsChange(
                                 ChangeableSettings(validateType: newValue),
                               );
                             });
@@ -128,7 +128,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           value: widget.settings.showRating,
                           onChanged: (newValue) {
                             setState(() {
-                              widget.settings.change(
+                              widget.onSettingsChange(
                                 ChangeableSettings(showRating: newValue),
                               );
                             });
@@ -154,7 +154,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           value: widget.settings.liveCheckType,
                           onChanged: (newValue) {
                             setState(() {
-                              widget.settings.change(
+                              widget.onSettingsChange(
                                 ChangeableSettings(liveCheckType: newValue),
                               );
                             });
@@ -178,7 +178,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           value: widget.settings.hintType,
                           onChanged: (newValue) {
                             setState(() {
-                              widget.settings.change(
+                              widget.onSettingsChange(
                                 ChangeableSettings(hintType: newValue),
                               );
                             });
@@ -226,7 +226,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           value: widget.settings.shareData,
                           onChanged: (newValue) {
                             setState(() {
-                              widget.settings.change(
+                              widget.onSettingsChange(
                                 ChangeableSettings(shareData: newValue),
                               );
                             });
@@ -239,6 +239,69 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                               )
                               .toList(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      AppLocalizations.of(context)!.settingDifficultyLevel,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              AppLocalizations.of(context)!.settingPlayerLevel,
+                            ),
+                            if (widget.settings.autoLevel) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                "(${AppLocalizations.of(context)!.settingPlayerLevelAuto})",
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(fontStyle: FontStyle.italic),
+                              ),
+                            ],
+                          ],
+                        ),
+                        SizedBox(
+                          width: 150,
+                          child: Slider(
+                            value: widget.settings.playerLevel.toDouble(),
+                            min: 0,
+                            max: 100,
+                            divisions: 100,
+                            label: widget.settings.playerLevel.toString(),
+                            onChanged: widget.settings.autoLevel
+                                ? null
+                                : (newValue) {
+                                    setState(() {
+                                      widget.onSettingsChange(
+                                        ChangeableSettings(
+                                          playerLevel: newValue.toInt(),
+                                        ),
+                                      );
+                                    });
+                                  },
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(AppLocalizations.of(context)!.settingAutoLevel),
+                        Switch(
+                          value: widget.settings.autoLevel,
+                          onChanged: (newValue) {
+                            setState(() {
+                              widget.onSettingsChange(
+                                ChangeableSettings(autoLevel: newValue),
+                              );
+                            });
+                          },
                         ),
                       ],
                     ),

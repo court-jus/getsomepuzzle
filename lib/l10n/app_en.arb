@@ -100,8 +100,8 @@
     "@labelWidgetFillRatio": {
         "description": "Label of the widget"
     },
-    "labelWidgetCplx": "Complexity",
-    "@labelWidgetCplx": {
+    "labelAdvancedFilters": "Advanced filters",
+    "@labelAdvancedFilters": {
         "description": "Label of the widget"
     },
     "labelWidgetWantedrules": "Wanted rules",
@@ -256,6 +256,55 @@
     "@settingIdleTimeoutM2": {
         "description": "Idle timeout value: 2 minutes"
     },
+    "settingDifficultyLevel": "Difficulty level",
+    "@settingDifficultyLevel": {
+        "description": "Section header for difficulty level settings"
+    },
+    "settingPlayerLevel": "My level",
+    "@settingPlayerLevel": {
+        "description": "Setting label for player's current level (0-100)"
+    },
+    "settingPlayerLevelAuto": "auto",
+    "@settingPlayerLevelAuto": {
+        "description": "Small label shown next to the player level when auto-adaptation is on"
+    },
+    "settingAutoLevel": "Auto-adapt",
+    "@settingAutoLevel": {
+        "description": "Setting label for automatic level adaptation"
+    },
+    "endOfPlaylistCongrats": "Congratulations! You've solved every puzzle at this level.",
+    "@endOfPlaylistCongrats": {
+        "description": "Message shown when the player has genuinely exhausted all puzzles at their level"
+    },
+    "endOfPlaylistFiltersBlocking": "There are still puzzles at this level, but your current filters exclude them.",
+    "@endOfPlaylistFiltersBlocking": {
+        "description": "Message shown when puzzles exist at the current level but are hidden by user filters"
+    },
+    "endOfPlaylistCurrentLevel": "Current level: {level}",
+    "@endOfPlaylistCurrentLevel": {
+        "description": "Caption displaying the player's current level",
+        "placeholders": {
+            "level": {
+                "type": "int"
+            }
+        }
+    },
+    "endOfPlaylistJumpTo": "Jump to level {level} (+{gap})",
+    "@endOfPlaylistJumpTo": {
+        "description": "Button label: jumps to the next populated level, showing the gap",
+        "placeholders": {
+            "level": {
+                "type": "int"
+            },
+            "gap": {
+                "type": "int"
+            }
+        }
+    },
+    "endOfPlaylistMaxLevel": "You've reached the top of the catalog.",
+    "@endOfPlaylistMaxLevel": {
+        "description": "Message shown when there is no higher level with puzzles available"
+    },
     "hintDeducedFrom": "This cell can be deduced from the {constraintName} constraint",
     "@hintDeducedFrom": {
         "description": "Hint message shown when the player clicks the lightbulb to get a clue",
@@ -349,8 +398,12 @@
     "@generateProgress": {
         "description": "Progress message during puzzle generation",
         "placeholders": {
-            "current": { "type": "int" },
-            "total": { "type": "int" }
+            "current": {
+                "type": "int"
+            },
+            "total": {
+                "type": "int"
+            }
         }
     },
     "generateComplete": "Generation complete!",
@@ -404,7 +457,9 @@
     "createLetterGroupMode": "Tap cells to add to group {letter}, then press Done",
     "@createLetterGroupMode": {
         "placeholders": {
-            "letter": { "type": "String" }
+            "letter": {
+                "type": "String"
+            }
         }
     },
     "createLetterGroupDone": "Done",

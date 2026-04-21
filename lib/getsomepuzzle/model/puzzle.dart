@@ -39,18 +39,20 @@ class SolveStep {
 
 class Stats {
   int failures = 0;
+  int hints = 0;
   int duration = 0;
   Stopwatch timer = Stopwatch();
 
   @override
   String toString() {
     // 2025-08-23T22:59:42 8s - 0f 3x3_000001020_GS:5.1;PA:6.top;PA:0.right;PA:2.left;FM:222_1:212121122
-    return "${(timer.elapsedMilliseconds / 1000).round()}s - ${failures}f";
+    return "${(timer.elapsedMilliseconds / 1000).round()}s - ${failures}f - ${hints}h";
   }
 
   void begin() {
     timer.start();
     failures = 0;
+    hints = 0;
   }
 
   void pause() {

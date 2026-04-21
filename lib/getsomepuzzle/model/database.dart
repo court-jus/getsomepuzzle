@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
@@ -25,6 +26,7 @@ class PuzzleData {
   bool played = false;
   int duration = 0;
   int failures = 0;
+  int hints = 0;
   Stats? stats;
   DateTime? started;
   DateTime? finished;
@@ -72,6 +74,7 @@ class PuzzleData {
       liked != null ? formatter.format(liked!) : "",
       disliked != null ? formatter.format(disliked!) : "",
       pleasure != null ? pleasure.toString() : "",
+      "${hints}h",
     ].join(" - ");
     return "$finishedForLog ${duration}s ${failures}f $lineRepresentation - $sld - $extraFields";
   }
@@ -95,6 +98,7 @@ class PuzzleData {
     finished = DateTime.now();
     duration = stats!.duration;
     failures = stats!.failures;
+    hints = stats!.hints;
   }
 }
 
@@ -105,8 +109,6 @@ class Filters {
   int maxHeight;
   int minFilled;
   int maxFilled;
-  int minCplx;
-  int maxCplx;
   Set<String> wantedRules;
   Set<String> bannedRules;
   Set<String> wantedFlags;
@@ -120,8 +122,6 @@ class Filters {
     this.maxHeight = 10,
     this.minFilled = 0,
     this.maxFilled = 100,
-    this.minCplx = 0,
-    this.maxCplx = 100,
     this.wantedRules = const {},
     this.bannedRules = const {},
     this.wantedFlags = const {},
@@ -137,8 +137,6 @@ class Filters {
       maxHeight = prefs.getInt("maxHeightFilter") ?? 10;
       minFilled = prefs.getInt("minPrefilledFilter") ?? 0;
       maxFilled = prefs.getInt("maxPrefilledFilter") ?? 100;
-      minCplx = prefs.getInt("minCplxFilter") ?? 0;
-      maxCplx = prefs.getInt("maxCplxFilter") ?? 100;
       wantedRules = (prefs.getStringList("wantedRulesFilter") ?? []).toSet();
       bannedRules = (prefs.getStringList("bannedRulesFilter") ?? []).toSet();
       wantedFlags = (prefs.getStringList("wantedFlagsFilter") ?? []).toSet();
@@ -146,6 +144,9 @@ class Filters {
           (prefs.getStringList("bannedFlagsFilter") ??
                   ["played", "skipped", "disliked"])
               .toSet();
+      // Cleanup of obsolete keys (cplx filter replaced by adaptive player level).
+      await prefs.remove("minCplxFilter");
+      await prefs.remove("maxCplxFilter");
     } on TypeError {
       save();
     } catch (e) {
@@ -161,8 +162,6 @@ class Filters {
     prefs.setInt("maxHeightFilter", maxHeight);
     prefs.setInt("minPrefilledFilter", minFilled);
     prefs.setInt("maxPrefilledFilter", maxFilled);
-    prefs.setInt("minCplxFilter", minCplx);
-    prefs.setInt("maxCplxFilter", maxCplx);
     prefs.setStringList("wantedRulesFilter", wantedRules.toList());
     prefs.setStringList("bannedRulesFilter", bannedRules.toList());
     prefs.setStringList("wantedFlagsFilter", wantedFlags.toList());
@@ -175,10 +174,16 @@ class Database {
   String collection = "tutorial";
   Filters currentFilters = Filters();
   bool shouldShuffle = false;
-  int maxCplx = 0;
   List<PuzzleData> playlist = [];
+  int playerLevel;
   final log = Logger("Database");
   static const _builtInCollectionKeys = {'tutorial', 'default', 'custom'};
+
+  Database({required this.playerLevel});
+
+  void setPlayerLevel(int newLevel) {
+    playerLevel = newLevel;
+  }
 
   List<String> userPlaylistNames = [];
 
@@ -254,7 +259,6 @@ class Database {
         .where((e) => e.isNotEmpty && !e.startsWith("#"))
         .map((e) => PuzzleData(e))
         .toList();
-    maxCplx = puzzles.isEmpty ? 0 : puzzles.map((puz) => puz.cplx).max;
   }
 
   void loadStats(List<String> rawStats) {
@@ -285,6 +289,7 @@ class Database {
       puz.pleasure = entry.pleasure;
       puz.duration = entry.duration;
       puz.failures = entry.failures;
+      puz.hints = entry.hints;
     }
   }
 
@@ -322,8 +327,6 @@ class Database {
 
       if (puz.filled > currentFilters.maxFilled) return false;
       if (puz.filled < currentFilters.minFilled) return false;
-      if (puz.cplx > currentFilters.maxCplx) return false;
-      if (puz.cplx < currentFilters.minCplx) return false;
       if (puz.width > currentFilters.maxWidth) return false;
       if (puz.width < currentFilters.minWidth) return false;
       if (puz.height > currentFilters.maxHeight) return false;
@@ -429,9 +432,11 @@ class Database {
   }
 
   void preparePlaylist() {
-    playlist = filter().toList();
     if (shouldShuffle) {
+      playlist = filter().toList();
       playlist.shuffle();
+    } else {
+      playlist = getPuzzlesByLevel(playerLevel);
     }
     log.info(
       "Playlist prepared with ${playlist.length} puzzles (shuffled: $shouldShuffle)",
@@ -451,6 +456,113 @@ class Database {
     log.finer("${playlist.length} puzzles remaining in playlist");
     writeStats();
     return selection;
+  }
+
+  /// Expected duration (seconds) for a puzzle of given `cplx` and `cells`,
+  /// adjusted by `failures`.
+  ///
+  /// Calibrated by log-linear regression on ~1300 real plays:
+  ///   log(dur) = -0.086 + 0.01356·cplx + 1.009·log(cells) + 0.504·failures
+  /// ≈ 0.92 · cells · exp(cplx/75) · 1.65^failures  (R²=0.45, MAPE=56%).
+  ///
+  /// `cplx` is clipped to 80: the complexity formula attributes 100 to any
+  /// puzzle needing backtracking, including those trivially guessed, which
+  /// biases the model at the high end.
+  static double _expectedDuration(int cplx, int cells, int failures) {
+    final clampedCplx = cplx.clamp(0, 80);
+    return 0.92 *
+        cells *
+        math.exp(clampedCplx / 75.0) *
+        math.pow(1.65, failures);
+  }
+
+  /// Compute the player's implicit level (in `cplx` units) from recent plays.
+  ///
+  /// Returns `fallback` when there are fewer than 10 usable samples — this
+  /// preserves a manually set level rather than snapping back to 0.
+  int computePlayerLevel({required int fallback}) {
+    final playedPuzzles = puzzles
+        .where(
+          (p) =>
+              p.played &&
+              p.finished != null &&
+              p.skipped == null &&
+              p.duration > 0,
+        )
+        .toList();
+    if (playedPuzzles.length < 10) {
+      log.info(
+        "computePlayerLevel: only ${playedPuzzles.length} usable samples, keeping stored level $fallback",
+      );
+      return fallback;
+    }
+    playedPuzzles.sort((a, b) => b.finished!.compareTo(a.finished!));
+    final toAnalyze = playedPuzzles.take(50).toList();
+
+    double weightedSum = 0;
+    double weightTotal = 0;
+    for (var i = 0; i < toAnalyze.length; i++) {
+      final puz = toAnalyze[i];
+      final cells = puz.width * puz.height;
+      if (cells <= 0) continue;
+      final expected = _expectedDuration(puz.cplx, cells, puz.failures);
+      // Clamp duration to neutralise puzzles left open for hours.
+      final clampedDur = puz.duration.clamp(1, (expected * 10).round());
+      // Invert _expectedDuration to get the cplx that would have predicted
+      // this duration — i.e. the player's implicit level for this play.
+      final levelI =
+          75 *
+          (math.log(clampedDur.toDouble()) -
+              math.log(cells.toDouble()) -
+              0.504 * puz.failures +
+              0.086);
+      // Exponential decay, half-life = 25 puzzles.
+      final weight = math.pow(0.5, i / 25.0).toDouble();
+      weightedSum += levelI * weight;
+      weightTotal += weight;
+    }
+    if (weightTotal <= 0) return fallback;
+    final level = (weightedSum / weightTotal).round().clamp(0, 100);
+    log.info("computePlayerLevel: ${toAnalyze.length} puzzles, level=$level");
+    return level;
+  }
+
+  /// Puzzles in a `[level-1, level+2]` window around `level`. Asymmetric on
+  /// purpose: nudges the player slightly upward while keeping one easier tier
+  /// for variety. Empty list means the player has exhausted their tier —
+  /// surfaced to the UI via `EndOfPlaylist`.
+  List<PuzzleData> getPuzzlesByLevel(int level) {
+    final candidates = filter()
+        .where((p) => p.cplx >= level - 1 && p.cplx <= level + 2)
+        .toList();
+    candidates.shuffle();
+    return candidates;
+  }
+
+  /// Whether any unplayed puzzle exists at `level` when user-configured
+  /// filters (size, rules) are ignored. Only the baseline exclusions
+  /// (played / skipped / disliked) still apply. Used by `EndOfPlaylist`
+  /// to distinguish "filters are hiding puzzles" from "really exhausted".
+  bool hasUnplayedAtLevelIgnoringFilters(int level) {
+    return puzzles.any(
+      (p) =>
+          !p.played &&
+          p.skipped == null &&
+          p.disliked == null &&
+          p.cplx >= level - 1 &&
+          p.cplx <= level + 2,
+    );
+  }
+
+  /// Smallest level strictly greater than `currentLevel` for which
+  /// `getPuzzlesByLevel` would return at least one candidate. Returns `null`
+  /// if the player has truly reached the top of the filtered catalog.
+  int? nextPopulatedLevel(int currentLevel) {
+    final filteredCplxs = filter().map((p) => p.cplx).toList();
+    for (int l = currentLevel + 1; l <= 100; l++) {
+      if (filteredCplxs.any((c) => c >= l - 1 && c <= l + 2)) return l;
+    }
+    return null;
   }
 
   List<String> getStats() {

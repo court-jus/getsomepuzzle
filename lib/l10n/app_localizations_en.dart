@@ -86,7 +86,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get labelWidgetFillRatio => 'Fill ratio';
 
   @override
-  String get labelWidgetCplx => 'Complexity';
+  String get labelAdvancedFilters => 'Advanced filters';
 
   @override
   String get labelWidgetWantedrules => 'Wanted rules';
@@ -201,6 +201,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingIdleTimeoutM2 => '2 minutes';
+
+  @override
+  String get settingDifficultyLevel => 'Difficulty level';
+
+  @override
+  String get settingPlayerLevel => 'My level';
+
+  @override
+  String get settingPlayerLevelAuto => 'auto';
+
+  @override
+  String get settingAutoLevel => 'Auto-adapt';
+
+  @override
+  String get endOfPlaylistCongrats =>
+      'Congratulations! You\'ve solved every puzzle at this level.';
+
+  @override
+  String get endOfPlaylistFiltersBlocking =>
+      'There are still puzzles at this level, but your current filters exclude them.';
+
+  @override
+  String endOfPlaylistCurrentLevel(int level) {
+    return 'Current level: $level';
+  }
+
+  @override
+  String endOfPlaylistJumpTo(int level, int gap) {
+    return 'Jump to level $level (+$gap)';
+  }
+
+  @override
+  String get endOfPlaylistMaxLevel => 'You\'ve reached the top of the catalog.';
 
   @override
   String hintDeducedFrom(String constraintName) {

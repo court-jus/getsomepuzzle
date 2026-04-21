@@ -9,12 +9,16 @@ class TimerBottomBar extends StatefulWidget {
   final PuzzleData? currentMeta;
   final Puzzle? currentPuzzle;
   final int dbSize;
+  final int playerLevel;
+  final bool autoLevel;
 
   const TimerBottomBar({
     super.key,
     required this.currentMeta,
     required this.currentPuzzle,
     required this.dbSize,
+    required this.playerLevel,
+    required this.autoLevel,
   });
 
   @override
@@ -60,7 +64,14 @@ class _TimerBottomBarState extends State<TimerBottomBar> {
             ],
           ),
           Text(widget.currentMeta!.stats.toString()),
-          Text("${widget.dbSize}"),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("Lv ${widget.playerLevel}${widget.autoLevel ? '*' : ''}"),
+              const SizedBox(width: 8),
+              Text("${widget.dbSize}"),
+            ],
+          ),
         ],
       ),
     );

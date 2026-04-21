@@ -253,8 +253,8 @@ abstract class AppLocalizations {
   /// Label of the widget
   ///
   /// In en, this message translates to:
-  /// **'Complexity'**
-  String get labelWidgetCplx;
+  /// **'Advanced filters'**
+  String get labelAdvancedFilters;
 
   /// Label of the widget
   ///
@@ -483,6 +483,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'2 minutes'**
   String get settingIdleTimeoutM2;
+
+  /// Section header for difficulty level settings
+  ///
+  /// In en, this message translates to:
+  /// **'Difficulty level'**
+  String get settingDifficultyLevel;
+
+  /// Setting label for player's current level (0-100)
+  ///
+  /// In en, this message translates to:
+  /// **'My level'**
+  String get settingPlayerLevel;
+
+  /// Small label shown next to the player level when auto-adaptation is on
+  ///
+  /// In en, this message translates to:
+  /// **'auto'**
+  String get settingPlayerLevelAuto;
+
+  /// Setting label for automatic level adaptation
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-adapt'**
+  String get settingAutoLevel;
+
+  /// Message shown when the player has genuinely exhausted all puzzles at their level
+  ///
+  /// In en, this message translates to:
+  /// **'Congratulations! You\'ve solved every puzzle at this level.'**
+  String get endOfPlaylistCongrats;
+
+  /// Message shown when puzzles exist at the current level but are hidden by user filters
+  ///
+  /// In en, this message translates to:
+  /// **'There are still puzzles at this level, but your current filters exclude them.'**
+  String get endOfPlaylistFiltersBlocking;
+
+  /// Caption displaying the player's current level
+  ///
+  /// In en, this message translates to:
+  /// **'Current level: {level}'**
+  String endOfPlaylistCurrentLevel(int level);
+
+  /// Button label: jumps to the next populated level, showing the gap
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to level {level} (+{gap})'**
+  String endOfPlaylistJumpTo(int level, int gap);
+
+  /// Message shown when there is no higher level with puzzles available
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve reached the top of the catalog.'**
+  String get endOfPlaylistMaxLevel;
 
   /// Hint message shown when the player clicks the lightbulb to get a clue
   ///

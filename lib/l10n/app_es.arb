@@ -25,7 +25,7 @@
     "labelWidgetWidth": "Largo",
     "labelWidgetHeight": "Alto",
     "labelWidgetFillRatio": "Relación de relleno",
-    "labelWidgetCplx": "Complejidad",
+    "labelAdvancedFilters": "Filtros avanzados",
     "labelWidgetWantedrules": "Reglas deseadas",
     "labelWidgetBannedrules": "Reglas prohibidas",
     "msgCountMatchingPuzzles": "Puzzles que coinciden con filtros",
@@ -64,6 +64,41 @@
     "settingIdleTimeoutS30": "30 segundos",
     "settingIdleTimeoutM1": "1 minuto",
     "settingIdleTimeoutM2": "2 minutos",
+    "settingDifficultyLevel": "Nivel de dificultad",
+    "@settingDifficultyLevel": {
+        "description": "Section header for difficulty level settings"
+    },
+    "settingPlayerLevel": "Mi nivel",
+    "@settingPlayerLevel": {
+        "description": "Setting label for player's current level (0-100)"
+    },
+    "settingPlayerLevelAuto": "auto",
+    "settingAutoLevel": "Adaptación automática",
+    "@settingAutoLevel": {
+        "description": "Setting label for automatic level adaptation"
+    },
+    "endOfPlaylistCongrats": "¡Felicidades! Has resuelto todos los puzzles de este nivel.",
+    "endOfPlaylistFiltersBlocking": "Quedan puzzles en este nivel, pero tus filtros actuales los excluyen.",
+    "endOfPlaylistCurrentLevel": "Nivel actual: {level}",
+    "@endOfPlaylistCurrentLevel": {
+        "placeholders": {
+            "level": {
+                "type": "int"
+            }
+        }
+    },
+    "endOfPlaylistJumpTo": "Saltar al nivel {level} (+{gap})",
+    "@endOfPlaylistJumpTo": {
+        "placeholders": {
+            "level": {
+                "type": "int"
+            },
+            "gap": {
+                "type": "int"
+            }
+        }
+    },
+    "endOfPlaylistMaxLevel": "Has alcanzado la cima del catálogo.",
     "hintDeducedFrom": "Esta celda se puede deducir gracias a la restricción: {constraintName}",
     "hintForce": "Esta celda se puede deducir combinando múltiples restricciones",
     "hintImpossible": "Una restricción está violada — se ha cometido un error",
@@ -121,7 +156,9 @@
     "createLetterGroupMode": "Toca celdas para el grupo {letter}, luego presiona Listo",
     "@createLetterGroupMode": {
         "placeholders": {
-            "letter": { "type": "String" }
+            "letter": {
+                "type": "String"
+            }
         }
     },
     "createLetterGroupDone": "Listo",

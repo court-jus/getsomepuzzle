@@ -25,7 +25,7 @@
     "labelWidgetWidth": "Largeur",
     "labelWidgetHeight": "Hauteur",
     "labelWidgetFillRatio": "Taux de remplissage",
-    "labelWidgetCplx": "Complexité",
+    "labelAdvancedFilters": "Filtres avancés",
     "labelWidgetWantedrules": "Règles désirées",
     "labelWidgetBannedrules": "Règles refusées",
     "msgCountMatchingPuzzles": "Nombre de puzzles correspondant",
@@ -64,6 +64,41 @@
     "settingIdleTimeoutS30": "30 secondes",
     "settingIdleTimeoutM1": "1 minute",
     "settingIdleTimeoutM2": "2 minutes",
+    "settingDifficultyLevel": "Niveau de difficulte",
+    "@settingDifficultyLevel": {
+        "description": "Section header for difficulty level settings"
+    },
+    "settingPlayerLevel": "Mon niveau",
+    "@settingPlayerLevel": {
+        "description": "Setting label for player's current level (0-100)"
+    },
+    "settingPlayerLevelAuto": "auto",
+    "settingAutoLevel": "Adaptation automatique",
+    "@settingAutoLevel": {
+        "description": "Setting label for automatic level adaptation"
+    },
+    "endOfPlaylistCongrats": "Félicitations ! Vous avez résolu tous les puzzles de ce niveau.",
+    "endOfPlaylistFiltersBlocking": "Il reste des puzzles à ce niveau, mais vos filtres actuels les excluent.",
+    "endOfPlaylistCurrentLevel": "Niveau actuel : {level}",
+    "@endOfPlaylistCurrentLevel": {
+        "placeholders": {
+            "level": {
+                "type": "int"
+            }
+        }
+    },
+    "endOfPlaylistJumpTo": "Passer au niveau {level} (+{gap})",
+    "@endOfPlaylistJumpTo": {
+        "placeholders": {
+            "level": {
+                "type": "int"
+            },
+            "gap": {
+                "type": "int"
+            }
+        }
+    },
+    "endOfPlaylistMaxLevel": "Vous avez atteint le sommet du catalogue.",
     "hintDeducedFrom": "Cette cellule peut être déduite grâce à la contrainte : {constraintName}",
     "hintForce": "Cette cellule peut être déduite en combinant plusieurs contraintes",
     "hintImpossible": "Une contrainte est violée — une erreur a été commise",

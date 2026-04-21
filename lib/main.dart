@@ -18,6 +18,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/between_puzzles.dart';
+import 'package:getsomepuzzle/widgets/end_of_playlist.dart';
 import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
 import 'package:getsomepuzzle/widgets/create_page/create_page.dart';
@@ -146,15 +147,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> initialize() async {
     var futures = <Future>[];
-    futures.add(initializeDatabase());
+    await settings.load();
+    futures.add(initializeDatabase(settings.playerLevel));
     futures.add(initializeLocale());
-    futures.add(settings.load());
     await Future.wait(futures);
     initialized = true;
   }
 
-  Future<void> initializeDatabase() async {
-    final db = Database();
+  Future<void> initializeDatabase(int playerLevel) async {
+    final db = Database(playerLevel: playerLevel);
     await db.loadPuzzlesFile();
     setState(() {
       database = db;
@@ -280,6 +281,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       jsonEncode({"puzzle": game.currentMeta!.lineRepresentation}),
       settings.shareData,
     );
+    if (settings.autoLevel && database != null) {
+      final newLevel = database!.computePlayerLevel(
+        fallback: settings.playerLevel,
+      );
+      if (newLevel != settings.playerLevel) {
+        settings.playerLevel = newLevel;
+        database!.setPlayerLevel(newLevel);
+        database!.preparePlaylist();
+        settings.save();
+      }
+    }
     if (settings.showRating != ShowRating.yes) {
       loadPuzzle();
     }
@@ -603,12 +615,34 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     builder: (context) => SettingsPage(
                       settings: settings,
                       onSettingsChange: (newValue) {
+                        final autoLevelTurnedOn =
+                            newValue.autoLevel == true && !settings.autoLevel;
+                        var levelChanged =
+                            (newValue.playerLevel != null &&
+                            newValue.playerLevel != settings.playerLevel);
                         settings.change(newValue);
                         if (newValue.hintType != null) {
                           _onHintTypeChanged();
                         }
                         if (newValue.idleTimeout != null) {
                           _markInteraction();
+                        }
+                        // Recompute immediately when auto is toggled on, so
+                        // the player doesn't have to finish a puzzle first.
+                        if (autoLevelTurnedOn && database != null) {
+                          final newLevel = database!.computePlayerLevel(
+                            fallback: settings.playerLevel,
+                          );
+                          if (newLevel != settings.playerLevel) {
+                            settings.playerLevel = newLevel;
+                            settings.save();
+                            levelChanged = true;
+                          }
+                        }
+                        if (levelChanged) {
+                          database?.setPlayerLevel(settings.playerLevel);
+                          database?.preparePlaylist();
+                          loadPuzzle();
                         }
                         game.refresh();
                       },
@@ -694,8 +728,29 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                   hintIsError: game.hintIsError,
                                 )
                               else
-                                Text(
-                                  AppLocalizations.of(context)!.infoNoPuzzle,
+                                EndOfPlaylist(
+                                  currentLevel: settings.playerLevel,
+                                  filtersBlocking:
+                                      database
+                                          ?.hasUnplayedAtLevelIgnoringFilters(
+                                            settings.playerLevel,
+                                          ) ??
+                                      false,
+                                  nextLevel: database?.nextPopulatedLevel(
+                                    settings.playerLevel,
+                                  ),
+                                  onJumpToLevel: (newLevel) {
+                                    settings.change(
+                                      ChangeableSettings(playerLevel: newLevel),
+                                    );
+                                    if (database != null) {
+                                      database!.setPlayerLevel(newLevel);
+                                      database!.preparePlaylist();
+                                      if (database!.playlist.isNotEmpty) {
+                                        loadPuzzle();
+                                      }
+                                    }
+                                  },
                                 ),
                             ],
                           ),
@@ -713,6 +768,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               currentMeta: game.currentMeta,
               currentPuzzle: game.currentPuzzle,
               dbSize: game.dbSize,
+              playerLevel: settings.playerLevel,
+              autoLevel: settings.autoLevel,
             )
           : null,
     );

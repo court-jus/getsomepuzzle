@@ -425,6 +425,11 @@ class GameModel extends ChangeNotifier {
       _onPuzzleChanged();
       return;
     }
+    // First reveal of this hint — count it as one "hint used".
+    if (currentMeta != null) {
+      currentMeta!.hints += 1;
+      currentMeta!.stats?.hints += 1;
+    }
     currentPuzzle!.clearHighlights();
     if (helpMove!.isImpossible != null) {
       helpMove!.isImpossible!.isValid = false;
@@ -574,6 +579,10 @@ class GameModel extends ChangeNotifier {
 
     constraint.isHighlighted = true;
     currentPuzzle!.constraints.add(constraint);
+    if (currentMeta != null) {
+      currentMeta!.hints += 1;
+      currentMeta!.stats?.hints += 1;
+    }
     _scheduleHintRanking();
     notifyListeners();
     return true;
