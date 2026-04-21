@@ -26,12 +26,17 @@ class GameModel extends ChangeNotifier {
   // --- Session state ---
   bool paused = false;
   bool betweenPuzzles = false;
-  bool shouldCheck = false;
 
   /// True when the stopwatch was silently paused because the puzzle is
   /// complete in manual-validation mode. Cleared as soon as the player
   /// breaks completeness (clears a cell) or the puzzle transitions away.
   bool _stoppedForCompletion = false;
+
+  /// Pending automatic check. Every cell mutation re-arms this timer from 0;
+  /// when it fires we run `checkPuzzle` (which displays errors, increments
+  /// failures and/or switches to the next puzzle). Cancelled on any mutation
+  /// that invalidates the pending check (tap, drag, restart, undo, pause, …).
+  Timer? _checkDebounce;
 
   // --- Visual feedback ---
   String topMessage = "";
@@ -97,6 +102,7 @@ class GameModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   void openPuzzle(PuzzleData puz, int playlistLength) {
+    _cancelCheckDebounce();
     dbSize = playlistLength;
     currentMeta = puz;
     currentPuzzle = currentMeta!.begin();
@@ -108,6 +114,7 @@ class GameModel extends ChangeNotifier {
   }
 
   void clearPuzzle() {
+    _cancelCheckDebounce();
     cancelHintConstraintComputation();
     currentPuzzle = null;
     history = [];
@@ -117,6 +124,7 @@ class GameModel extends ChangeNotifier {
 
   void restart() {
     if (currentPuzzle == null) return;
+    _cancelCheckDebounce();
     history = [];
     currentPuzzle!.restart();
     _clearCompletionFreeze();
@@ -126,6 +134,7 @@ class GameModel extends ChangeNotifier {
 
   void undo() {
     if (currentPuzzle == null || history.isEmpty) return;
+    _cancelCheckDebounce();
     currentPuzzle!.resetCell(history.removeLast());
     currentPuzzle!.updateConstraintStatus();
     _clearCompletionFreeze();
@@ -139,6 +148,7 @@ class GameModel extends ChangeNotifier {
 
   void pause() {
     paused = true;
+    _cancelCheckDebounce();
     currentMeta?.stats?.pause();
     notifyListeners();
   }
@@ -190,6 +200,7 @@ class GameModel extends ChangeNotifier {
   bool handleTap(int idx) {
     if (currentPuzzle == null) return false;
     if (currentPuzzle!.cells[idx].readonly) return false;
+    _cancelCheckDebounce();
     _clearHint();
     currentPuzzle!.incrValue(idx);
     currentPuzzle!.clearConstraintsValidity();
@@ -203,6 +214,7 @@ class GameModel extends ChangeNotifier {
     if (currentPuzzle == null) return;
     if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
     if (lastDragIdx != null && idx == lastDragIdx) return;
+    _cancelCheckDebounce();
     lastDragIdx = idx;
     if (firstDragValue == null) {
       final myOpposite = currentPuzzle!.domain
@@ -232,6 +244,7 @@ class GameModel extends ChangeNotifier {
     if (lastRightDragIdx != null && idx == lastRightDragIdx) return;
     final currentValue = currentPuzzle!.cellValues[idx];
     if (firstRightDragValue == null && currentValue == 1) return;
+    _cancelCheckDebounce();
     lastRightDragIdx = idx;
     if (firstRightDragValue == null) {
       firstRightDragValue = currentValue == 0 ? 2 : 0;
@@ -262,30 +275,18 @@ class GameModel extends ChangeNotifier {
     required void Function() onPuzzleCompleted,
   }) {
     _syncManualCompletionPause(settings);
-    if (settings.liveCheckType == LiveCheckType.all ||
-        settings.liveCheckType == LiveCheckType.count) {
-      shouldCheck = true;
-      _autoCheck(settings, onPuzzleCompleted: onPuzzleCompleted);
-      return;
-    }
     if (settings.validateType == ValidateType.manual) return;
-    shouldCheck = currentPuzzle!.complete;
-    if (shouldCheck) {
-      Future.delayed(
-        const Duration(seconds: 1),
-        () => _autoCheck(settings, onPuzzleCompleted: onPuzzleCompleted),
-      );
-    }
-  }
-
-  void _autoCheck(
-    Settings settings, {
-    required void Function() onPuzzleCompleted,
-  }) {
-    if (!shouldCheck) return;
-    shouldCheck = false;
-    if (currentPuzzle == null) return;
-    checkPuzzle(settings, onPuzzleCompleted: onPuzzleCompleted);
+    // Every mutation re-arms the debounce from 0: the player must let the
+    // puzzle sit for 1s before errors surface or the switch happens. This is
+    // why the existing errors are cleared synchronously on tap (via
+    // `clearConstraintsValidity`) — they only reappear if the next check,
+    // after the debounce, still finds them.
+    _checkDebounce?.cancel();
+    _checkDebounce = Timer(const Duration(seconds: 1), () {
+      _checkDebounce = null;
+      if (currentPuzzle == null) return;
+      checkPuzzle(settings, onPuzzleCompleted: onPuzzleCompleted);
+    });
   }
 
   void checkPuzzle(
@@ -298,17 +299,8 @@ class GameModel extends ChangeNotifier {
     final failedConstraints = currentPuzzle!.check(
       saveResult: shouldShowErrors,
     );
-    if (failedConstraints.isEmpty) {
-      if (currentPuzzle!.complete &&
-          (manualCheck || settings.validateType != ValidateType.manual)) {
-        currentMeta!.stop();
-        _stoppedForCompletion = false;
-        onPuzzleCompleted();
-        if (settings.showRating == ShowRating.yes) {
-          betweenPuzzles = true;
-        }
-      }
-    } else if (settings.liveCheckType == LiveCheckType.complete) {
+    if (failedConstraints.isNotEmpty &&
+        settings.liveCheckType == LiveCheckType.complete) {
       currentMeta!.failures += 1;
       currentMeta!.stats?.failures += 1;
     }
@@ -328,6 +320,32 @@ class GameModel extends ChangeNotifier {
       setTopMessage();
     }
     notifyListeners();
+
+    final shouldComplete =
+        failedConstraints.isEmpty &&
+        currentPuzzle!.complete &&
+        (manualCheck || settings.validateType != ValidateType.manual);
+    if (shouldComplete) {
+      _finalizeCompletion(settings, onPuzzleCompleted);
+    }
+  }
+
+  void _finalizeCompletion(
+    Settings settings,
+    void Function() onPuzzleCompleted,
+  ) {
+    currentMeta!.stop();
+    _stoppedForCompletion = false;
+    onPuzzleCompleted();
+    if (settings.showRating == ShowRating.yes) {
+      betweenPuzzles = true;
+    }
+    notifyListeners();
+  }
+
+  void _cancelCheckDebounce() {
+    _checkDebounce?.cancel();
+    _checkDebounce = null;
   }
 
   // ---------------------------------------------------------------------------
@@ -521,6 +539,7 @@ class GameModel extends ChangeNotifier {
   @override
   void dispose() {
     _helpDebounce?.cancel();
+    _cancelCheckDebounce();
     _hintWorker?.dispose();
     _cancelHintRanking();
     super.dispose();
