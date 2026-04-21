@@ -28,6 +28,11 @@ class GameModel extends ChangeNotifier {
   bool betweenPuzzles = false;
   bool shouldCheck = false;
 
+  /// True when the stopwatch was silently paused because the puzzle is
+  /// complete in manual-validation mode. Cleared as soon as the player
+  /// breaks completeness (clears a cell) or the puzzle transitions away.
+  bool _stoppedForCompletion = false;
+
   // --- Visual feedback ---
   String topMessage = "";
   Color topMessageColor = Colors.black;
@@ -97,6 +102,7 @@ class GameModel extends ChangeNotifier {
     currentPuzzle = currentMeta!.begin();
     paused = false;
     betweenPuzzles = false;
+    _stoppedForCompletion = false;
     hintText = "";
     _onPuzzleChanged();
   }
@@ -113,6 +119,7 @@ class GameModel extends ChangeNotifier {
     if (currentPuzzle == null) return;
     history = [];
     currentPuzzle!.restart();
+    _clearCompletionFreeze();
     _resetPuzzleState();
     _onPuzzleChanged();
   }
@@ -121,6 +128,7 @@ class GameModel extends ChangeNotifier {
     if (currentPuzzle == null || history.isEmpty) return;
     currentPuzzle!.resetCell(history.removeLast());
     currentPuzzle!.updateConstraintStatus();
+    _clearCompletionFreeze();
     _resetPuzzleState();
     _onPuzzleChanged();
   }
@@ -137,10 +145,41 @@ class GameModel extends ChangeNotifier {
 
   void resume() {
     paused = false;
-    if (currentPuzzle != null) {
+    // If the puzzle is still complete in manual mode, keep the stopwatch
+    // frozen — the user must break completeness or validate.
+    if (currentPuzzle != null && !_stoppedForCompletion) {
       currentMeta?.stats?.resume();
     }
     notifyListeners();
+  }
+
+  /// Freeze/unfreeze the stopwatch based on whether the puzzle is complete
+  /// while in manual-validation mode. No-op outside of manual mode.
+  void _syncManualCompletionPause(Settings settings) {
+    if (currentPuzzle == null) return;
+    if (settings.validateType != ValidateType.manual) {
+      // Leaving manual mode while frozen: unfreeze the stopwatch.
+      if (_stoppedForCompletion) {
+        currentMeta?.stats?.resume();
+        _stoppedForCompletion = false;
+      }
+      return;
+    }
+    if (currentPuzzle!.complete && !_stoppedForCompletion) {
+      currentMeta?.stats?.pause();
+      _stoppedForCompletion = true;
+    } else if (!currentPuzzle!.complete && _stoppedForCompletion) {
+      currentMeta?.stats?.resume();
+      _stoppedForCompletion = false;
+    }
+  }
+
+  /// Unfreeze the manual-completion stopwatch when a puzzle mutation is
+  /// guaranteed to leave the puzzle incomplete (restart / undo).
+  void _clearCompletionFreeze() {
+    if (!_stoppedForCompletion) return;
+    currentMeta?.stats?.resume();
+    _stoppedForCompletion = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -222,6 +261,7 @@ class GameModel extends ChangeNotifier {
     Settings settings, {
     required void Function() onPuzzleCompleted,
   }) {
+    _syncManualCompletionPause(settings);
     if (settings.liveCheckType == LiveCheckType.all ||
         settings.liveCheckType == LiveCheckType.count) {
       shouldCheck = true;
@@ -262,6 +302,7 @@ class GameModel extends ChangeNotifier {
       if (currentPuzzle!.complete &&
           (manualCheck || settings.validateType != ValidateType.manual)) {
         currentMeta!.stop();
+        _stoppedForCompletion = false;
         onPuzzleCompleted();
         if (settings.showRating == ShowRating.yes) {
           betweenPuzzles = true;
