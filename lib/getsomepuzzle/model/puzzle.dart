@@ -301,37 +301,38 @@ class Puzzle {
     return _forceOneCell();
   }
 
-  /// Try setting each free cell to each domain value on a clone; if a value
-  /// leads to contradiction, return the opposite as a forced move.
+  /// Try setting each free cell to each domain value on a fresh clone; if a
+  /// value leads to contradiction, return the opposite as a forced move.
   Move? _forceOneCell() {
-    final clone = this.clone();
-    for (var freeCell in clone.cells.indexed.where(
-      (entry) => entry.$2.value == 0,
-    )) {
-      for (var value in clone.domain) {
-        clone.setValue(freeCell.$1, value);
-        Move? result = clone.applyAll();
-        final unsolvableErrors = clone.check(saveResult: false);
-        if (unsolvableErrors.isNotEmpty) {
-          final opposite = clone.domain.whereNot((v) => v == value).first;
-          clone.setValue(freeCell.$1, opposite);
+    for (final (idx, cell) in cells.indexed) {
+      if (cell.value != 0) continue;
+      for (final value in domain) {
+        final clone = this.clone();
+        clone.setValue(idx, value);
+        final moves = clone.propagateToFixpoint();
+        final errors = clone.check(saveResult: false);
+        final opposite = domain.whereNot((v) => v == value).first;
+
+        if (errors.isNotEmpty) {
+          return Move(idx, opposite, errors.first, isForce: true);
+        }
+        if (moves == null) {
+          // Re-run apply once to recover the constraint that detected the
+          // impossibility — used by the UI hint display.
+          final diag = clone.apply();
           return Move(
-            freeCell.$1,
+            idx,
             opposite,
-            unsolvableErrors.first,
+            diag?.givenBy ?? clone.constraints.first,
             isForce: true,
           );
         }
-        if (result != null && result.isImpossible != null) {
-          final opposite = clone.domain.whereNot((v) => v == value).first;
-          return Move(freeCell.$1, opposite, result.givenBy, isForce: true);
-        } else if (result != null && result.isImpossible == null) {
-          return Move(freeCell.$1, value, result.givenBy, isForce: true);
-        } else {
-          for (var cell in cellValues.indexed) {
-            clone.setValue(cell.$1, cell.$2);
-          }
+        if (moves > 0 && clone.complete) {
+          // Propagation cascade solved everything → value is forced.
+          return Move(idx, value, clone.constraints.first, isForce: true);
         }
+        // Stuck with a valid state, or trivial completion (no propagation
+        // happened) — try next value with a fresh clone.
       }
     }
     return null;
