@@ -253,7 +253,7 @@ class LetterGroup extends CellsCentricConstraint {
   @override
   bool verify(Puzzle puzzle) {
     // If any of my cells are not filled yet, there's no need to check further
-    final letterIndices = getAllIndicesForLetter(puzzle);
+    final letterIndices = (getAllIndicesForLetter(puzzle).toSet().union(indices.toSet())).toList();
     final myCellValues = puzzle.cellValues.indexed
         .where((elem) => letterIndices.contains(elem.$1))
         .map((elem) => elem.$2);
