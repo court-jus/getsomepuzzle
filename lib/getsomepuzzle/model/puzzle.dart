@@ -641,33 +641,15 @@ class Puzzle {
     return steps;
   }
 
-  /// Unified solving: propagation + force loop.
+  /// Unified solving: loop `findAMove` until stuck, contradiction, or complete.
   /// Returns true if fully solved.
-  bool solve({int maxSteps = 20}) {
-    try {
-      applyConstraintsPropagation();
-    } on SolverContradiction {
-      return false;
+  bool solve({int maxSteps = 200}) {
+    for (int i = 0; i < maxSteps; i++) {
+      final m = findAMove(checkErrors: false);
+      if (m == null || m.isImpossible != null) break;
+      setValue(m.idx, m.value);
     }
-    if (freeCells().isEmpty) {
-      return complete && check(saveResult: false).isEmpty;
-    }
-    for (int step = 0; step < maxSteps; step++) {
-      try {
-        final forceChanged = applyWithForce();
-        if (freeCells().isEmpty) {
-          return complete && check(saveResult: false).isEmpty;
-        }
-        final propChanges = applyConstraintsPropagation();
-        if (freeCells().isEmpty) {
-          return complete && check(saveResult: false).isEmpty;
-        }
-        if (!forceChanged && propChanges == 0) break;
-      } on SolverContradiction {
-        return false;
-      }
-    }
-    return freeCells().isEmpty && complete && check(saveResult: false).isEmpty;
+    return complete && check(saveResult: false).isEmpty;
   }
 
   /// Full solver: propagation + force + MRV backtracking.
