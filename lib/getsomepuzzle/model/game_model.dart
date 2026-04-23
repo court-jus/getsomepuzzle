@@ -340,7 +340,6 @@ class GameModel extends ChangeNotifier {
     required void Function() onPuzzleCompleted,
   }) {
     _syncManualCompletionPause(settings);
-    if (settings.validateType == ValidateType.manual) return;
     // Every mutation re-arms the debounce from 0: the player must let the
     // puzzle sit for 1s before errors surface or the switch happens. This is
     // why the existing errors are cleared synchronously on tap (via
