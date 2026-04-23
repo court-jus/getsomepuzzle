@@ -87,6 +87,13 @@ class GameModel extends ChangeNotifier {
   /// Full reset of interaction state (hint, errors, between-puzzles).
   /// Used after undo / restart where both the view and the puzzle state change.
   void _resetPuzzleState() {
+    /// Unfreeze the manual-completion stopwatch when a puzzle mutation is
+    /// guaranteed to leave the puzzle incomplete (restart / undo).
+    if (_stoppedForCompletion) {
+      currentMeta?.stats?.resume();
+      _stoppedForCompletion = false;
+    }
+
     _clearHint();
     betweenPuzzles = false;
     currentPuzzle?.clearConstraintsValidity();
@@ -97,6 +104,7 @@ class GameModel extends ChangeNotifier {
   /// Schedule hint computation and notify the UI.
   /// Called after every mutation that changes which moves are available.
   void _onPuzzleChanged() {
+    _clearHint();
     _scheduleHelpMe();
     _scheduleHintRanking();
     notifyListeners();
@@ -146,7 +154,6 @@ class GameModel extends ChangeNotifier {
     _cancelCheckDebounce();
     history = [];
     currentPuzzle!.restart();
-    _clearCompletionFreeze();
     _resetPuzzleState();
     _onPuzzleChanged();
   }
@@ -156,7 +163,6 @@ class GameModel extends ChangeNotifier {
     _cancelCheckDebounce();
     currentPuzzle!.resetCell(history.removeLast());
     currentPuzzle!.updateConstraintStatus();
-    _clearCompletionFreeze();
     _resetPuzzleState();
     _onPuzzleChanged();
   }
@@ -243,14 +249,6 @@ class GameModel extends ChangeNotifier {
     }
   }
 
-  /// Unfreeze the manual-completion stopwatch when a puzzle mutation is
-  /// guaranteed to leave the puzzle incomplete (restart / undo).
-  void _clearCompletionFreeze() {
-    if (!_stoppedForCompletion) return;
-    currentMeta?.stats?.resume();
-    _stoppedForCompletion = false;
-  }
-
   // ---------------------------------------------------------------------------
   // Cell interaction
   // ---------------------------------------------------------------------------
@@ -260,7 +258,6 @@ class GameModel extends ChangeNotifier {
     if (currentPuzzle == null) return false;
     if (currentPuzzle!.cells[idx].readonly) return false;
     _cancelCheckDebounce();
-    _clearHint();
     currentPuzzle!.incrValue(idx);
     currentPuzzle!.clearConstraintsValidity();
     helpMove = null;
@@ -418,7 +415,6 @@ class GameModel extends ChangeNotifier {
   void showHelpMove(String resolvedHintText) {
     if (helpMove == null) return;
     if (hintText.isNotEmpty && !hintIsError) {
-      _clearHint();
       currentPuzzle!.setValue(helpMove!.idx, helpMove!.value);
       history.add(helpMove!.idx);
       _onPuzzleChanged();
