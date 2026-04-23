@@ -1,8 +1,6 @@
-class HintRankResult {
-  final List<String> ranked;
-  final int usefulCount;
-  HintRankResult(this.ranked, this.usefulCount);
-}
+import 'hint_rank_worker_core.dart';
+
+export 'hint_rank_worker_core.dart' show HintRankResult;
 
 class HintRankWorker {
   Future<HintRankResult> rank({

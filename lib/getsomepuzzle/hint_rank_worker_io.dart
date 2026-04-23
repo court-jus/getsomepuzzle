@@ -1,14 +1,9 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'hint_rank_worker_core.dart';
 
-class HintRankResult {
-  final List<String> ranked;
-  final int usefulCount;
-  HintRankResult(this.ranked, this.usefulCount);
-}
+export 'hint_rank_worker_core.dart' show HintRankResult;
 
 class HintRankWorker {
   Isolate? _isolate;
@@ -76,59 +71,18 @@ class _RankParams {
 }
 
 void _isolateEntryPoint(_RankParams params) {
-  // Reconstruct the puzzle in its current player state
-  final puzzle = Puzzle.empty(params.width, params.height, params.domain);
-  for (int i = 0; i < params.cellValues.length; i++) {
-    if (params.cellValues[i] != 0) {
-      puzzle.cells[i].setForSolver(params.cellValues[i]);
-    }
-  }
-  for (final cs in params.existingConstraints) {
-    final colonIdx = cs.indexOf(':');
-    if (colonIdx < 0) continue;
-    final slug = cs.substring(0, colonIdx);
-    final p = cs.substring(colonIdx + 1);
-    final c = createConstraint(slug, p);
-    if (c != null) puzzle.constraints.add(c);
-  }
-
-  // Compute baseline: how many cells get filled by propagation without any candidate
-  final baseline = puzzle.clone();
-  try {
-    baseline.applyConstraintsPropagation();
-  } on SolverContradiction {
-    // ignore
-  }
-  final baselineFilled = baseline.cellValues.where((v) => v != 0).length;
+  final (puzzle, baselineMoves) = prepareRanking(
+    width: params.width,
+    height: params.height,
+    domain: params.domain,
+    cellValues: params.cellValues,
+    existingConstraints: params.existingConstraints,
+  );
 
   final useful = <String>[];
   final notUseful = <String>[];
-
   for (final cs in params.candidateConstraints) {
-    final colonIdx = cs.indexOf(':');
-    if (colonIdx < 0) {
-      notUseful.add(cs);
-      continue;
-    }
-    final slug = cs.substring(0, colonIdx);
-    final p = cs.substring(colonIdx + 1);
-    final constraint = createConstraint(slug, p);
-    if (constraint == null) {
-      notUseful.add(cs);
-      continue;
-    }
-
-    // Clone the original puzzle (not the propagated one), add candidate,
-    // run full propagation, and check if more cells get filled than baseline.
-    final test = puzzle.clone();
-    test.constraints.add(constraint);
-    try {
-      test.applyConstraintsPropagation();
-    } on SolverContradiction {
-      // ignore
-    }
-    final testFilled = test.cellValues.where((v) => v != 0).length;
-    if (testFilled > baselineFilled) {
+    if (classifyCandidate(puzzle, cs, baselineMoves)) {
       useful.add(cs);
     } else {
       notUseful.add(cs);

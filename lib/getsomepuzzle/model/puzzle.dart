@@ -398,6 +398,27 @@ class Puzzle {
     return cells.every((c) => c.isPossible);
   }
 
+  /// Apply propagation-only deductions until stuck, complete, or contradiction.
+  /// Returns the number of setValue calls made, or `null` if a contradiction
+  /// was hit (meaning the current state is inconsistent — callers use this as
+  /// a rejection signal).
+  /// [verifyAfterEachMove] re-runs all constraints' `verify()` after each set,
+  /// to catch inter-constraint violations that per-constraint `apply()` misses.
+  int? propagateToFixpoint({bool verifyAfterEachMove = false}) {
+    int moves = 0;
+    while (true) {
+      final m = findAMove(checkErrors: false, tryForce: false);
+      if (m == null) return moves;
+      if (m.isImpossible != null) return null;
+      setValue(m.idx, m.value);
+      moves++;
+      if (verifyAfterEachMove && check(saveResult: false).isNotEmpty) {
+        return null;
+      }
+      if (complete) return moves;
+    }
+  }
+
   /// Iterative constraint propagation (solver).
   /// Calls apply() repeatedly and sets values.
   /// When [autoCheck] is true, verify all constraints after each step
