@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/widgets/neighbor_count.dart';
 import 'package:getsomepuzzle/widgets/symmetry.dart';
 import 'package:getsomepuzzle/widgets/group_size.dart';
 
@@ -45,6 +47,9 @@ Widget constraintToFlutter(
   }
   if (constraint is DifferentFromConstraint) {
     return _textWidget('≠', fgcolor, cellSize, count);
+  }
+  if (constraint is NeighborCountConstraint) {
+    return _neighborCountWidget(constraint, fgcolor, cellSize, count);
   }
 
   // Default: use toString()
@@ -130,6 +135,24 @@ Widget _groupSizeWidget(
       constraint: constraint,
       fgcolor: fgcolor,
       actualGroupSize: actualGroupSize,
+      cellSize: widgetSize,
+    ),
+  );
+}
+
+Widget _neighborCountWidget(
+  NeighborCountConstraint constraint,
+  Color fgcolor,
+  double cellSize,
+  int count,
+) {
+  final double widgetSize = cellSize / count;
+  return SizedBox(
+    width: widgetSize,
+    height: widgetSize,
+    child: NeighborCountWidget(
+      constraint: constraint,
+      fgcolor: fgcolor,
       cellSize: widgetSize,
     ),
   );
