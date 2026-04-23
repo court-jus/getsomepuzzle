@@ -5,15 +5,6 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
 
-/// Result of a single apply-and-set step in the shared loop.
-enum ApplyLoopResult { applied, complete, impossible, stuck }
-
-/// Exception thrown by the solver when a contradiction is detected.
-class SolverContradiction implements Exception {
-  final String message;
-  SolverContradiction([this.message = '']);
-}
-
 /// Method used to determine a cell value during solving.
 enum SolveMethod { propagation, force }
 
@@ -238,49 +229,6 @@ class Puzzle {
     return null;
   }
 
-  /// Shared loop: calls apply() repeatedly, sets values, tracks last move.
-  /// Returns (result, lastMove, changeCount).
-  (ApplyLoopResult, Move?, int) _applyLoop() {
-    int changes = 0;
-    Move? lastMove;
-    while (true) {
-      final move = apply();
-      if (move == null) return (ApplyLoopResult.stuck, lastMove, changes);
-      lastMove = move;
-      if (move.isImpossible != null) {
-        return (ApplyLoopResult.impossible, move, changes);
-      }
-      setValue(move.idx, move.value);
-      changes++;
-      if (complete) {
-        final hasErrors = check(saveResult: false).isNotEmpty;
-        if (hasErrors) {
-          return (ApplyLoopResult.impossible, move, changes);
-        }
-        return (ApplyLoopResult.complete, move, changes);
-      }
-    }
-  }
-
-  Move? applyAll() {
-    final (result, lastMove, _) = _applyLoop();
-    switch (result) {
-      case ApplyLoopResult.stuck:
-        return null;
-      case ApplyLoopResult.impossible:
-        return Move(
-          0,
-          0,
-          lastMove!.givenBy,
-          isImpossible: lastMove.isImpossible ?? lastMove.givenBy,
-        );
-      case ApplyLoopResult.complete:
-        return Move(0, 0, lastMove!.givenBy);
-      case ApplyLoopResult.applied:
-        return null; // should not happen, loop always reaches stuck/impossible/complete
-    }
-  }
-
   /// Next deducible move, or null if stuck. Does not mutate `this`.
   /// [checkErrors] returns a corrective move for invalid constraints (UI-only).
   /// [tryForce] enables the force fallback when propagation is stuck.
@@ -418,69 +366,6 @@ class Puzzle {
       }
       if (complete) return moves;
     }
-  }
-
-  /// Iterative constraint propagation (solver).
-  /// Calls apply() repeatedly and sets values.
-  /// When [autoCheck] is true, verify all constraints after each step
-  /// and throw on violation (like Python's auto_check=True).
-  /// Throws [SolverContradiction] on contradiction.
-  /// Returns the number of changes made.
-  int applyConstraintsPropagation({bool autoCheck = false}) {
-    int changes = 0;
-    while (true) {
-      final move = apply();
-      if (move == null) return changes;
-      if (move.isImpossible != null) {
-        throw SolverContradiction('Constraint returned impossible');
-      }
-      setValue(move.idx, move.value);
-      changes++;
-      if (autoCheck) {
-        final failed = check(saveResult: false);
-        if (failed.isNotEmpty) {
-          throw SolverContradiction(
-            'Constraint verification failed after apply',
-          );
-        }
-      }
-      if (complete) {
-        final failed = check(saveResult: false);
-        if (failed.isNotEmpty) {
-          throw SolverContradiction('Completed but constraints violated');
-        }
-        return changes;
-      }
-    }
-  }
-
-  /// For each free cell, try each value on a clone. If a value leads to
-  /// contradiction, eliminate it from the cell's options.
-  /// When [stopAfterFirst] is true, returns as soon as one cell is determined.
-  /// Returns true if any progress was made.
-  /// Throws [SolverContradiction] if any cell runs out of options.
-  bool applyWithForce({bool stopAfterFirst = false}) {
-    bool changed = false;
-    final free = freeCells();
-    for (final (cell, idx) in free) {
-      if (cell.options.length <= 1) continue;
-      for (final value in List<int>.from(cell.options)) {
-        final testPu = clone();
-        testPu.cells[idx].setForSolver(value);
-        if (testPu.propagateToFixpoint(verifyAfterEachMove: true) != null) {
-          continue;
-        }
-        cell.options.remove(value);
-        if (cell.options.length == 1) {
-          cell.setForSolver(cell.options[0]);
-          changed = true;
-          if (stopAfterFirst) return true;
-        } else if (cell.options.isEmpty) {
-          throw SolverContradiction('Cell $idx has no options left');
-        }
-      }
-    }
-    return changed;
   }
 
   /// Compute puzzle complexity on a 0-100 scale.
