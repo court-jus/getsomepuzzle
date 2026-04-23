@@ -560,72 +560,20 @@ class Puzzle {
     bool timedOut() =>
         stopwatch != null && stopwatch.elapsedMilliseconds > timeoutMs!;
 
-    // Propagation phase
-    while (true) {
+    for (int step = 0; step < 1000; step++) {
       if (timedOut()) return [];
-      final move = test.apply();
-      if (move == null) break;
-      if (move.isImpossible != null) break;
-      test.setValue(move.idx, move.value);
+      final m = test.findAMove(checkErrors: false);
+      if (m == null || m.isImpossible != null) break;
+      test.setValue(m.idx, m.value);
       steps.add(
         SolveStep(
-          cellIdx: move.idx,
-          value: move.value,
-          constraint: move.givenBy.serialize(),
-          method: SolveMethod.propagation,
+          cellIdx: m.idx,
+          value: m.value,
+          constraint: m.isForce ? '' : m.givenBy.serialize(),
+          method: m.isForce ? SolveMethod.force : SolveMethod.propagation,
         ),
       );
-      if (test.complete) {
-        return steps;
-      }
-    }
-
-    // Force + propagation loop
-    for (int round = 0; round < 200; round++) {
-      if (timedOut()) return [];
-      // Force one cell
-      final beforeForce = test.freeCells().map((e) => e.$2).toSet();
-      try {
-        if (!test.applyWithForce(stopAfterFirst: true)) break;
-      } on SolverContradiction {
-        break;
-      }
-      // Find which cell was forced
-      final afterForce = test.freeCells().map((e) => e.$2).toSet();
-      final forced = beforeForce.difference(afterForce);
-      for (final idx in forced) {
-        steps.add(
-          SolveStep(
-            cellIdx: idx,
-            value: test.cellValues[idx],
-            constraint: '',
-            method: SolveMethod.force,
-          ),
-        );
-      }
-      if (test.complete) {
-        return steps;
-      }
-
-      // Propagate after force
-      while (true) {
-        if (timedOut()) return [];
-        final move = test.apply();
-        if (move == null) break;
-        if (move.isImpossible != null) break;
-        test.setValue(move.idx, move.value);
-        steps.add(
-          SolveStep(
-            cellIdx: move.idx,
-            value: move.value,
-            constraint: move.givenBy.serialize(),
-            method: SolveMethod.propagation,
-          ),
-        );
-        if (test.complete) {
-          return steps;
-        }
-      }
+      if (test.complete) return steps;
     }
 
     return steps;
