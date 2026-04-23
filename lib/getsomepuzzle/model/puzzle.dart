@@ -453,10 +453,11 @@ class Puzzle {
     }
   }
 
-  /// For each free cell, try each value, clone + propagate with autoCheck.
-  /// If a value leads to contradiction, eliminate it.
+  /// For each free cell, try each value on a clone. If a value leads to
+  /// contradiction, eliminate it from the cell's options.
   /// When [stopAfterFirst] is true, returns as soon as one cell is determined.
   /// Returns true if any progress was made.
+  /// Throws [SolverContradiction] if any cell runs out of options.
   bool applyWithForce({bool stopAfterFirst = false}) {
     bool changed = false;
     final free = freeCells();
@@ -465,17 +466,16 @@ class Puzzle {
       for (final value in List<int>.from(cell.options)) {
         final testPu = clone();
         testPu.cells[idx].setForSolver(value);
-        try {
-          testPu.applyConstraintsPropagation(autoCheck: true);
-        } on SolverContradiction {
-          cell.options.remove(value);
-          if (cell.options.length == 1) {
-            cell.setForSolver(cell.options[0]);
-            changed = true;
-            if (stopAfterFirst) return true;
-          } else if (cell.options.isEmpty) {
-            throw SolverContradiction('Cell $idx has no options left');
-          }
+        if (testPu.propagateToFixpoint(verifyAfterEachMove: true) != null) {
+          continue;
+        }
+        cell.options.remove(value);
+        if (cell.options.length == 1) {
+          cell.setForSolver(cell.options[0]);
+          changed = true;
+          if (stopAfterFirst) return true;
+        } else if (cell.options.isEmpty) {
+          throw SolverContradiction('Cell $idx has no options left');
         }
       }
     }
