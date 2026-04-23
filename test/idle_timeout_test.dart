@@ -32,12 +32,13 @@ void main() {
     });
   });
 
-  group('GameModel.markInteraction arms the idle watchdog', () {
+  group('GameModel.rearmIdleTimer arms the idle watchdog', () {
     test('fires autoPause(idle) after the configured duration', () {
       fakeAsync((async) {
         final game = GameModel();
         game.openPuzzle(_fixture(), 1);
-        game.markInteraction(const Duration(seconds: 5));
+        game.idleTimeoutDuration = Duration(seconds: 5);
+        game.rearmIdleTimer();
 
         async.elapse(const Duration(seconds: 4));
         expect(game.paused, isFalse);
@@ -54,10 +55,11 @@ void main() {
       fakeAsync((async) {
         final game = GameModel();
         game.openPuzzle(_fixture(), 1);
-        game.markInteraction(const Duration(seconds: 5));
+        game.idleTimeoutDuration = Duration(seconds: 5);
+        game.rearmIdleTimer();
 
         async.elapse(const Duration(seconds: 4));
-        game.markInteraction(const Duration(seconds: 5));
+        game.rearmIdleTimer();
         async.elapse(const Duration(seconds: 4));
         expect(
           game.paused,
@@ -76,7 +78,8 @@ void main() {
       fakeAsync((async) {
         final game = GameModel();
         game.openPuzzle(_fixture(), 1);
-        game.markInteraction(null);
+        game.idleTimeoutDuration = null;
+        game.rearmIdleTimer();
         async.elapse(const Duration(minutes: 5));
         expect(game.paused, isFalse);
         game.dispose();
@@ -87,7 +90,8 @@ void main() {
       fakeAsync((async) {
         final game = GameModel();
         // currentPuzzle is null.
-        game.markInteraction(const Duration(seconds: 5));
+        game.idleTimeoutDuration = Duration(seconds: 5);
+        game.rearmIdleTimer();
         async.elapse(const Duration(seconds: 10));
         expect(game.paused, isFalse);
         game.dispose();
@@ -98,7 +102,8 @@ void main() {
       fakeAsync((async) {
         final game = GameModel();
         game.openPuzzle(_fixture(), 1);
-        game.markInteraction(const Duration(seconds: 5));
+        game.idleTimeoutDuration = Duration(seconds: 5);
+        game.rearmIdleTimer();
         async.elapse(const Duration(seconds: 2));
         game.pause();
         async.elapse(const Duration(seconds: 10));
@@ -109,17 +114,18 @@ void main() {
     });
 
     test(
-      'after idle auto-pause, subsequent markInteraction calls are ignored',
+      'after idle auto-pause, subsequent rearmIdleTimer calls are ignored',
       () {
         fakeAsync((async) {
           final game = GameModel();
           game.openPuzzle(_fixture(), 1);
-          game.markInteraction(const Duration(seconds: 5));
+          game.idleTimeoutDuration = Duration(seconds: 5);
+          game.rearmIdleTimer();
           async.elapse(const Duration(seconds: 6));
           expect(game.autoPauseReason, AutoPauseReason.idle);
 
           // An accidental tap must NOT re-arm the watchdog until resume runs.
-          game.markInteraction(const Duration(seconds: 5));
+          game.rearmIdleTimer();
           async.elapse(const Duration(seconds: 10));
           // Still idle-paused; no new timer fired anything.
           expect(game.autoPauseReason, AutoPauseReason.idle);
@@ -129,17 +135,18 @@ void main() {
       },
     );
 
-    test('resume allows markInteraction to arm a fresh watchdog', () {
+    test('resume allows rearmIdleTimer to arm a fresh watchdog', () {
       fakeAsync((async) {
         final game = GameModel();
         game.openPuzzle(_fixture(), 1);
-        game.markInteraction(const Duration(seconds: 5));
+        game.idleTimeoutDuration = Duration(seconds: 5);
+        game.rearmIdleTimer();
         async.elapse(const Duration(seconds: 6));
         expect(game.autoPauseReason, AutoPauseReason.idle);
 
         game.resume();
         expect(game.autoPauseReason, isNull);
-        game.markInteraction(const Duration(seconds: 5));
+        game.rearmIdleTimer();
         async.elapse(const Duration(seconds: 6));
         expect(game.autoPauseReason, AutoPauseReason.idle);
 

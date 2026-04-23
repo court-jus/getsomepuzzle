@@ -49,10 +49,9 @@ class GameModel extends ChangeNotifier {
   Timer? _checkDebounce;
 
   /// Fires an `autoPause(AutoPauseReason.idle)` after the configured idle
-  /// window elapses without any interaction. Callers pass the current
-  /// duration via [markInteraction] so the model does not need to know the
-  /// user's settings directly.
+  /// window elapses without any interaction.
   Timer? _idleTimer;
+  Duration? idleTimeoutDuration;
 
   // --- Visual feedback ---
   String topMessage = "";
@@ -101,6 +100,7 @@ class GameModel extends ChangeNotifier {
     _scheduleHelpMe();
     _scheduleHintRanking();
     notifyListeners();
+    rearmIdleTimer();
   }
 
   /// Force a UI refresh (e.g. after external settings change).
@@ -183,6 +183,7 @@ class GameModel extends ChangeNotifier {
       currentMeta?.stats?.resume();
     }
     notifyListeners();
+    rearmIdleTimer();
   }
 
   /// Pause the game from an automatic source (idle timeout, app focus lost).
@@ -205,16 +206,12 @@ class GameModel extends ChangeNotifier {
   /// After an idle auto-pause, interactions are ignored until [resume] runs —
   /// this avoids a stray event from silently re-arming the clock while the
   /// pause overlay is still showing.
-  void markInteraction(Duration? duration) {
+  void rearmIdleTimer() {
     if (_autoPauseReason == AutoPauseReason.idle) return;
-    _rearmIdleTimer(duration);
-  }
-
-  void _rearmIdleTimer(Duration? duration) {
     _cancelIdleTimer();
-    if (duration == null) return;
+    if (idleTimeoutDuration == null) return;
     if (currentPuzzle == null || paused || betweenPuzzles) return;
-    _idleTimer = Timer(duration, () {
+    _idleTimer = Timer(idleTimeoutDuration!, () {
       _idleTimer = null;
       autoPause(AutoPauseReason.idle);
     });
@@ -298,6 +295,7 @@ class GameModel extends ChangeNotifier {
     firstDragValue = null;
     lastDragIdx = null;
     notifyListeners();
+    _onPuzzleChanged();
   }
 
   void handleRightDrag(int idx) {
@@ -326,6 +324,7 @@ class GameModel extends ChangeNotifier {
     firstRightDragValue = null;
     lastRightDragIdx = null;
     notifyListeners();
+    _onPuzzleChanged();
   }
 
   // ---------------------------------------------------------------------------

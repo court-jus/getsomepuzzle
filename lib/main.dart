@@ -209,13 +209,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (settings.hintType == HintType.addConstraint) {
       game.startHintConstraintComputation();
     }
-    _markInteraction();
-  }
-
-  /// Record a user interaction and re-arm the idle auto-pause watchdog.
-  /// All tap/drag handlers and resume events call this.
-  void _markInteraction() {
-    game.markInteraction(settings.idleTimeoutDuration);
   }
 
   void _openCreatePage() {
@@ -240,30 +233,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   void handlePuzzleTap(int idx) {
     if (game.handleTap(idx)) {
-      _markInteraction();
       _handleCheck();
     }
   }
 
   void handlePuzzleDrag(int idx) {
     game.handleDrag(idx);
-    _markInteraction();
   }
 
   void handlePuzzleDragEnd() {
     game.handleDragEnd();
-    _markInteraction();
     _handleCheck();
   }
 
   void handlePuzzleRightDrag(int idx) {
     game.handleRightDrag(idx);
-    _markInteraction();
   }
 
   void handlePuzzleRightDragEnd() {
     game.handleRightDragEnd();
-    _markInteraction();
     _handleCheck();
   }
 
@@ -304,7 +292,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void togglePause() {
     if (game.paused) {
       game.resume();
-      _markInteraction();
       if (game.currentPuzzle == null) {
         loadPuzzle();
       }
@@ -625,7 +612,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           _onHintTypeChanged();
                         }
                         if (newValue.idleTimeout != null) {
-                          _markInteraction();
+                          game.rearmIdleTimer();
                         }
                         // Recompute immediately when auto is toggled on, so
                         // the player doesn't have to finish a puzzle first.
