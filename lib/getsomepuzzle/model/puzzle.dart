@@ -429,8 +429,9 @@ class Puzzle {
 
   /// For each free cell, try each value, clone + propagate with autoCheck.
   /// If a value leads to contradiction, eliminate it.
+  /// When [stopAfterFirst] is true, returns as soon as one cell is determined.
   /// Returns true if any progress was made.
-  bool applyWithForce() {
+  bool applyWithForce({bool stopAfterFirst = false}) {
     bool changed = false;
     final free = freeCells();
     for (final (cell, idx) in free) {
@@ -441,11 +442,11 @@ class Puzzle {
         try {
           testPu.applyConstraintsPropagation(autoCheck: true);
         } on SolverContradiction {
-          // This value leads to contradiction, remove it
           cell.options.remove(value);
           if (cell.options.length == 1) {
             cell.setForSolver(cell.options[0]);
             changed = true;
+            if (stopAfterFirst) return true;
           } else if (cell.options.isEmpty) {
             throw SolverContradiction('Cell $idx has no options left');
           }
@@ -453,31 +454,6 @@ class Puzzle {
       }
     }
     return changed;
-  }
-
-  /// Like [applyWithForce] but stops after determining a single cell.
-  /// Returns true if one cell was determined by force.
-  bool applyWithForceSingle() {
-    final free = freeCells();
-    for (final (cell, idx) in free) {
-      if (cell.options.length <= 1) continue;
-      for (final value in List<int>.from(cell.options)) {
-        final testPu = clone();
-        testPu.cells[idx].setForSolver(value);
-        try {
-          testPu.applyConstraintsPropagation(autoCheck: true);
-        } on SolverContradiction {
-          cell.options.remove(value);
-          if (cell.options.length == 1) {
-            cell.setForSolver(cell.options[0]);
-            return true;
-          } else if (cell.options.isEmpty) {
-            throw SolverContradiction('Cell $idx has no options left');
-          }
-        }
-      }
-    }
-    return false;
   }
 
   /// Compute puzzle complexity on a 0-100 scale.
@@ -535,7 +511,7 @@ class Puzzle {
     if (test.freeCells().isNotEmpty) {
       for (int step = 0; step < 200; step++) {
         try {
-          final forced = test.applyWithForceSingle();
+          final forced = test.applyWithForce(stopAfterFirst: true);
           if (!forced) break;
           forceRounds++;
           test.applyConstraintsPropagation();
@@ -564,19 +540,13 @@ class Puzzle {
   List<SolveStep> solveExplained({int? timeoutMs}) {
     final steps = <SolveStep>[];
     final test = clone();
-    Stopwatch? stopwatch;
-    final timeout = timeoutMs;
-    if (timeout != null) {
-      stopwatch = Stopwatch()..start();
-    }
+    final stopwatch = timeoutMs != null ? (Stopwatch()..start()) : null;
+    bool timedOut() =>
+        stopwatch != null && stopwatch.elapsedMilliseconds > timeoutMs!;
 
     // Propagation phase
     while (true) {
-      if (timeout != null &&
-          stopwatch != null &&
-          stopwatch.elapsedMilliseconds > timeout) {
-        return [];
-      }
+      if (timedOut()) return [];
       final move = test.apply();
       if (move == null) break;
       if (move.isImpossible != null) break;
@@ -596,15 +566,11 @@ class Puzzle {
 
     // Force + propagation loop
     for (int round = 0; round < 200; round++) {
-      if (timeout != null &&
-          stopwatch != null &&
-          stopwatch.elapsedMilliseconds > timeout) {
-        return [];
-      }
+      if (timedOut()) return [];
       // Force one cell
       final beforeForce = test.freeCells().map((e) => e.$2).toSet();
       try {
-        if (!test.applyWithForceSingle()) break;
+        if (!test.applyWithForce(stopAfterFirst: true)) break;
       } on SolverContradiction {
         break;
       }
@@ -627,11 +593,7 @@ class Puzzle {
 
       // Propagate after force
       while (true) {
-        if (timeout != null &&
-            stopwatch != null &&
-            stopwatch.elapsedMilliseconds > timeout) {
-          return [];
-        }
+        if (timedOut()) return [];
         final move = test.apply();
         if (move == null) break;
         if (move.isImpossible != null) break;

@@ -18,66 +18,11 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final Map<ValidateType, String> settingsValidateType = {
-      ValidateType.manual: AppLocalizations.of(
-        context,
-      )!.settingValidateTypeManual,
-      ValidateType.intermediate: AppLocalizations.of(
-        context,
-      )!.settingValidateTypeDefault,
-      ValidateType.automatic: AppLocalizations.of(
-        context,
-      )!.settingValidateTypeAutomatic,
-    };
-
-    final Map<ShowRating, String> settingsShowRating = {
-      ShowRating.yes: AppLocalizations.of(context)!.settingShowRatingYes,
-      ShowRating.no: AppLocalizations.of(context)!.settingShowRatingNo,
-    };
-
-    final Map<ShareData, String> settingsShareData = {
-      ShareData.yes: AppLocalizations.of(context)!.settingShareDataYes,
-      ShareData.no: AppLocalizations.of(context)!.settingShareDataNo,
-    };
-
-    final Map<LiveCheckType, String> settingsLiveCheckType = {
-      LiveCheckType.all: AppLocalizations.of(context)!.settingsLiveCheckTypeAll,
-      LiveCheckType.count: AppLocalizations.of(
-        context,
-      )!.settingsLiveCheckTypeCount,
-      LiveCheckType.complete: AppLocalizations.of(
-        context,
-      )!.settingsLiveCheckTypeComplete,
-    };
-
-    final Map<HintType, String> settingsHintType = {
-      HintType.deducibleCell: AppLocalizations.of(
-        context,
-      )!.settingHintTypeDeducibleCell,
-      HintType.addConstraint: AppLocalizations.of(
-        context,
-      )!.settingHintTypeAddConstraint,
-    };
-
-    final Map<IdleTimeout, String> settingsIdleTimeout = {
-      IdleTimeout.disabled: AppLocalizations.of(
-        context,
-      )!.settingIdleTimeoutDisabled,
-      IdleTimeout.s5: AppLocalizations.of(context)!.settingIdleTimeoutS5,
-      IdleTimeout.s10: AppLocalizations.of(context)!.settingIdleTimeoutS10,
-      IdleTimeout.s30: AppLocalizations.of(context)!.settingIdleTimeoutS30,
-      IdleTimeout.m1: AppLocalizations.of(context)!.settingIdleTimeoutM1,
-      IdleTimeout.m2: AppLocalizations.of(context)!.settingIdleTimeoutM2,
-    };
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context)!.settings)),
+      appBar: AppBar(title: Text(l10n.settings)),
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints viewportConstraints) {
           return SingleChildScrollView(
@@ -90,161 +35,108 @@ class _SettingsPageState extends State<SettingsPage> {
                 margin: const EdgeInsets.all(8),
                 child: Column(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(AppLocalizations.of(context)!.settingValidateType),
-                        DropdownButton<ValidateType>(
-                          value: widget.settings.validateType,
-                          items: [
-                            DropdownMenuItem(
-                              value: ValidateType.manual,
-                              child: Text(
-                                settingsValidateType[ValidateType.manual]!,
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: ValidateType.automatic,
-                              child: Text(
-                                settingsValidateType[ValidateType.automatic]!,
-                              ),
-                            ),
-                          ],
-                          onChanged: (newValue) {
-                            setState(() {
-                              widget.onSettingsChange(
-                                ChangeableSettings(validateType: newValue),
-                              );
-                            });
-                          },
-                        ),
+                    _EnumSettingRow<ValidateType>(
+                      label: l10n.settingValidateType,
+                      value: widget.settings.validateType,
+                      // ValidateType.intermediate is intentionally excluded.
+                      options: const [
+                        ValidateType.manual,
+                        ValidateType.automatic,
                       ],
+                      labels: {
+                        ValidateType.manual: l10n.settingValidateTypeManual,
+                        ValidateType.intermediate:
+                            l10n.settingValidateTypeDefault,
+                        ValidateType.automatic:
+                            l10n.settingValidateTypeAutomatic,
+                      },
+                      onChanged: (v) => setState(() {
+                        widget.onSettingsChange(
+                          ChangeableSettings(validateType: v),
+                        );
+                      }),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(AppLocalizations.of(context)!.settingShowRating),
-                        DropdownButton<ShowRating>(
-                          value: widget.settings.showRating,
-                          onChanged: (newValue) {
-                            setState(() {
-                              widget.onSettingsChange(
-                                ChangeableSettings(showRating: newValue),
-                              );
-                            });
-                          },
-                          items: ShowRating.values
-                              .map(
-                                (slug) => DropdownMenuItem(
-                                  value: slug,
-                                  child: Text(settingsShowRating[slug]!),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ],
+                    _EnumSettingRow<ShowRating>(
+                      label: l10n.settingShowRating,
+                      value: widget.settings.showRating,
+                      options: ShowRating.values,
+                      labels: {
+                        ShowRating.yes: l10n.settingShowRatingYes,
+                        ShowRating.no: l10n.settingShowRatingNo,
+                      },
+                      onChanged: (v) => setState(() {
+                        widget.onSettingsChange(
+                          ChangeableSettings(showRating: v),
+                        );
+                      }),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          AppLocalizations.of(context)!.settingsLiveCheckType,
-                        ),
-                        DropdownButton<LiveCheckType>(
-                          value: widget.settings.liveCheckType,
-                          onChanged: (newValue) {
-                            setState(() {
-                              widget.onSettingsChange(
-                                ChangeableSettings(liveCheckType: newValue),
-                              );
-                            });
-                          },
-                          items: LiveCheckType.values
-                              .map(
-                                (slug) => DropdownMenuItem(
-                                  value: slug,
-                                  child: Text(settingsLiveCheckType[slug]!),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ],
+                    _EnumSettingRow<LiveCheckType>(
+                      label: l10n.settingsLiveCheckType,
+                      value: widget.settings.liveCheckType,
+                      options: LiveCheckType.values,
+                      labels: {
+                        LiveCheckType.all: l10n.settingsLiveCheckTypeAll,
+                        LiveCheckType.count: l10n.settingsLiveCheckTypeCount,
+                        LiveCheckType.complete:
+                            l10n.settingsLiveCheckTypeComplete,
+                      },
+                      onChanged: (v) => setState(() {
+                        widget.onSettingsChange(
+                          ChangeableSettings(liveCheckType: v),
+                        );
+                      }),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(AppLocalizations.of(context)!.settingHintType),
-                        DropdownButton<HintType>(
-                          value: widget.settings.hintType,
-                          onChanged: (newValue) {
-                            setState(() {
-                              widget.onSettingsChange(
-                                ChangeableSettings(hintType: newValue),
-                              );
-                            });
-                          },
-                          items: HintType.values
-                              .map(
-                                (slug) => DropdownMenuItem(
-                                  value: slug,
-                                  child: Text(settingsHintType[slug]!),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ],
+                    _EnumSettingRow<HintType>(
+                      label: l10n.settingHintType,
+                      value: widget.settings.hintType,
+                      options: HintType.values,
+                      labels: {
+                        HintType.deducibleCell:
+                            l10n.settingHintTypeDeducibleCell,
+                        HintType.addConstraint:
+                            l10n.settingHintTypeAddConstraint,
+                      },
+                      onChanged: (v) => setState(() {
+                        widget.onSettingsChange(
+                          ChangeableSettings(hintType: v),
+                        );
+                      }),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(AppLocalizations.of(context)!.settingIdleTimeout),
-                        DropdownButton<IdleTimeout>(
-                          value: widget.settings.idleTimeout,
-                          onChanged: (newValue) {
-                            setState(() {
-                              widget.onSettingsChange(
-                                ChangeableSettings(idleTimeout: newValue),
-                              );
-                            });
-                          },
-                          items: IdleTimeout.values
-                              .map(
-                                (slug) => DropdownMenuItem(
-                                  value: slug,
-                                  child: Text(settingsIdleTimeout[slug]!),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ],
+                    _EnumSettingRow<IdleTimeout>(
+                      label: l10n.settingIdleTimeout,
+                      value: widget.settings.idleTimeout,
+                      options: IdleTimeout.values,
+                      labels: {
+                        IdleTimeout.disabled: l10n.settingIdleTimeoutDisabled,
+                        IdleTimeout.s5: l10n.settingIdleTimeoutS5,
+                        IdleTimeout.s10: l10n.settingIdleTimeoutS10,
+                        IdleTimeout.s30: l10n.settingIdleTimeoutS30,
+                        IdleTimeout.m1: l10n.settingIdleTimeoutM1,
+                        IdleTimeout.m2: l10n.settingIdleTimeoutM2,
+                      },
+                      onChanged: (v) => setState(() {
+                        widget.onSettingsChange(
+                          ChangeableSettings(idleTimeout: v),
+                        );
+                      }),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(AppLocalizations.of(context)!.settingShareData),
-                        DropdownButton<ShareData>(
-                          value: widget.settings.shareData,
-                          onChanged: (newValue) {
-                            setState(() {
-                              widget.onSettingsChange(
-                                ChangeableSettings(shareData: newValue),
-                              );
-                            });
-                          },
-                          items: ShareData.values
-                              .map(
-                                (slug) => DropdownMenuItem(
-                                  value: slug,
-                                  child: Text(settingsShareData[slug]!),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ],
+                    _EnumSettingRow<ShareData>(
+                      label: l10n.settingShareData,
+                      value: widget.settings.shareData,
+                      options: ShareData.values,
+                      labels: {
+                        ShareData.yes: l10n.settingShareDataYes,
+                        ShareData.no: l10n.settingShareDataNo,
+                      },
+                      onChanged: (v) => setState(() {
+                        widget.onSettingsChange(
+                          ChangeableSettings(shareData: v),
+                        );
+                      }),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      AppLocalizations.of(context)!.settingDifficultyLevel,
+                      l10n.settingDifficultyLevel,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     Row(
@@ -253,13 +145,11 @@ class _SettingsPageState extends State<SettingsPage> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              AppLocalizations.of(context)!.settingPlayerLevel,
-                            ),
+                            Text(l10n.settingPlayerLevel),
                             if (widget.settings.autoLevel) ...[
                               const SizedBox(width: 8),
                               Text(
-                                "(${AppLocalizations.of(context)!.settingPlayerLevelAuto})",
+                                "(${l10n.settingPlayerLevelAuto})",
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(fontStyle: FontStyle.italic),
                               ),
@@ -292,7 +182,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(AppLocalizations.of(context)!.settingAutoLevel),
+                        Text(l10n.settingAutoLevel),
                         Switch(
                           value: widget.settings.autoLevel,
                           onChanged: (newValue) {
@@ -312,6 +202,42 @@ class _SettingsPageState extends State<SettingsPage> {
           );
         },
       ),
+    );
+  }
+}
+
+class _EnumSettingRow<T extends Enum> extends StatelessWidget {
+  final String label;
+  final T value;
+  final List<T> options;
+  final Map<T, String> labels;
+  final ValueChanged<T?> onChanged;
+
+  const _EnumSettingRow({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.labels,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label),
+        DropdownButton<T>(
+          value: value,
+          onChanged: onChanged,
+          items: options
+              .map(
+                (opt) =>
+                    DropdownMenuItem<T>(value: opt, child: Text(labels[opt]!)),
+              )
+              .toList(),
+        ),
+      ],
     );
   }
 }

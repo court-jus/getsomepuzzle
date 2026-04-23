@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
   test('Puzzle.clone preserves state for empty puzzles', () {
@@ -41,6 +41,17 @@ void main() {
     final result = solved.solve();
     expect(result, isTrue);
     expect(solved.freeCells(), isEmpty);
+  });
+
+  test('solve() handles multi-constraint propagation on empty puzzle', () {
+    // Three constraints together (FM + GS + PA) should uniquely determine
+    // a 3x3 puzzle with no prefilled cells — stresses cross-constraint
+    // propagation, not covered by single-constraint tests above.
+    final p = Puzzle.empty(3, 3, [1, 2]);
+    p.constraints.add(ForbiddenMotif('1.2'));
+    p.constraints.add(GroupSize('0.1'));
+    p.constraints.add(ParityConstraint('8.top'));
+    expect(p.clone().solve(), isTrue);
   });
 
   test('solve() works on puzzle built from Puzzle.empty', () {
