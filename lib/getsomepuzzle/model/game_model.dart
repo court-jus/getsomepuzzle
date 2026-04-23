@@ -78,32 +78,45 @@ class GameModel extends ChangeNotifier {
   // Internal helpers – factorise the repeated reset patterns
   // ---------------------------------------------------------------------------
 
-  /// Clears hint highlight and text, used when user interacts with the puzzle.
+  /// Clear all hint state: highlight, displayed text, and the pre-computed
+  /// move that the hint button would apply. Called on every mutation so a
+  /// stale hint can't be applied to a puzzle that has since changed.
   void _clearHint() {
     currentPuzzle?.clearHighlights();
     hintText = "";
+    helpMove = null;
   }
 
-  /// Full reset of interaction state (hint, errors, between-puzzles).
-  /// Used after undo / restart where both the view and the puzzle state change.
+  /// Full reset of interaction state for undo / restart: unfreezes the
+  /// manual-completion stopwatch, clears error highlights and top message,
+  /// then commits via [_afterMutation].
   void _resetPuzzleState() {
-    /// Unfreeze the manual-completion stopwatch when a puzzle mutation is
-    /// guaranteed to leave the puzzle incomplete (restart / undo).
     if (_stoppedForCompletion) {
       currentMeta?.stats?.resume();
       _stoppedForCompletion = false;
     }
 
-    _clearHint();
     betweenPuzzles = false;
     currentPuzzle?.clearConstraintsValidity();
     currentPuzzle?.updateConstraintStatus();
     setTopMessage();
+    _afterMutation();
   }
 
-  /// Schedule hint computation and notify the UI.
-  /// Called after every mutation that changes which moves are available.
-  void _onPuzzleChanged() {
+  /// Called at the start of any puzzle mutation (tap, drag step, undo,
+  /// restart, puzzle open). Cancels any pending debounced check so errors
+  /// don't surface mid-interaction, and re-arms the idle watchdog so a
+  /// long drag or multi-step interaction is not mistaken for inactivity.
+  void _beforeMutation() {
+    _cancelCheckDebounce();
+    rearmIdleTimer();
+  }
+
+  /// Called once a mutation settles into a stable state. Clears hints,
+  /// schedules help/ranking recomputation, notifies listeners, and re-arms
+  /// the idle watchdog. Not called during drag steps — the drag commits
+  /// via [handleDragEnd].
+  void _afterMutation() {
     _clearHint();
     _scheduleHelpMe();
     _scheduleHintRanking();
@@ -126,7 +139,7 @@ class GameModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   void openPuzzle(PuzzleData puz, int playlistLength) {
-    _cancelCheckDebounce();
+    _beforeMutation();
     _cancelIdleTimer();
     dbSize = playlistLength;
     currentMeta = puz;
@@ -135,8 +148,7 @@ class GameModel extends ChangeNotifier {
     betweenPuzzles = false;
     _stoppedForCompletion = false;
     _autoPauseReason = null;
-    hintText = "";
-    _onPuzzleChanged();
+    _afterMutation();
   }
 
   void clearPuzzle() {
@@ -151,20 +163,18 @@ class GameModel extends ChangeNotifier {
 
   void restart() {
     if (currentPuzzle == null) return;
-    _cancelCheckDebounce();
+    _beforeMutation();
     history = [];
     currentPuzzle!.restart();
     _resetPuzzleState();
-    _onPuzzleChanged();
   }
 
   void undo() {
     if (currentPuzzle == null || history.isEmpty) return;
-    _cancelCheckDebounce();
+    _beforeMutation();
     currentPuzzle!.resetCell(history.removeLast());
     currentPuzzle!.updateConstraintStatus();
     _resetPuzzleState();
-    _onPuzzleChanged();
   }
 
   // ---------------------------------------------------------------------------
@@ -257,12 +267,11 @@ class GameModel extends ChangeNotifier {
   bool handleTap(int idx) {
     if (currentPuzzle == null) return false;
     if (currentPuzzle!.cells[idx].readonly) return false;
-    _cancelCheckDebounce();
+    _beforeMutation();
     currentPuzzle!.incrValue(idx);
     currentPuzzle!.clearConstraintsValidity();
-    helpMove = null;
     if (history.isEmpty || history.last != idx) history.add(idx);
-    _onPuzzleChanged();
+    _afterMutation();
     return true;
   }
 
@@ -270,7 +279,7 @@ class GameModel extends ChangeNotifier {
     if (currentPuzzle == null) return;
     if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
     if (lastDragIdx != null && idx == lastDragIdx) return;
-    _cancelCheckDebounce();
+    _beforeMutation();
     lastDragIdx = idx;
     if (firstDragValue == null) {
       final myOpposite = currentPuzzle!.domain
@@ -291,8 +300,7 @@ class GameModel extends ChangeNotifier {
   void handleDragEnd() {
     firstDragValue = null;
     lastDragIdx = null;
-    notifyListeners();
-    _onPuzzleChanged();
+    _afterMutation();
   }
 
   void handleRightDrag(int idx) {
@@ -301,7 +309,7 @@ class GameModel extends ChangeNotifier {
     if (lastRightDragIdx != null && idx == lastRightDragIdx) return;
     final currentValue = currentPuzzle!.cellValues[idx];
     if (firstRightDragValue == null && currentValue == 1) return;
-    _cancelCheckDebounce();
+    _beforeMutation();
     lastRightDragIdx = idx;
     if (firstRightDragValue == null) {
       firstRightDragValue = currentValue == 0 ? 2 : 0;
@@ -320,8 +328,7 @@ class GameModel extends ChangeNotifier {
   void handleRightDragEnd() {
     firstRightDragValue = null;
     lastRightDragIdx = null;
-    notifyListeners();
-    _onPuzzleChanged();
+    _afterMutation();
   }
 
   // ---------------------------------------------------------------------------
@@ -417,7 +424,7 @@ class GameModel extends ChangeNotifier {
     if (hintText.isNotEmpty && !hintIsError) {
       currentPuzzle!.setValue(helpMove!.idx, helpMove!.value);
       history.add(helpMove!.idx);
-      _onPuzzleChanged();
+      _afterMutation();
       return;
     }
     // First reveal of this hint — count it as one "hint used".

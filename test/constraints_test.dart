@@ -7,67 +7,46 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
-/// Build a puzzle from a grid string (domain [1,2]).
-/// Each digit is a cell value (0=empty, 1=black, 2=white), rows separated by newlines.
-Puzzle _make(String grid) {
-  final rows = grid
-      .trim()
-      .split('\n')
-      .map((r) => r.trim())
-      .where((r) => r.isNotEmpty)
-      .toList();
-  final h = rows.length;
-  final w = rows.first.length;
-  final p = Puzzle.empty(w, h, [1, 2]);
-  for (int r = 0; r < h; r++) {
-    for (int c = 0; c < w; c++) {
-      final v = int.parse(rows[r][c]);
-      if (v != 0) {
-        p.cells[r * w + c].setForSolver(v);
-      }
-    }
-  }
-  return p;
-}
+import 'helpers/make_puzzle.dart';
 
 void main() {
   group('ForbiddenMotif.verify', () {
     test('2x1 motif absent → valid', () {
       // FM:12 (NB horizontal) absent from all-black grid
-      final p = _make('111\n111');
+      final p = makePuzzle('111\n111');
       expect(ForbiddenMotif('12').verify(p), isTrue);
     });
 
     test('2x1 motif present → invalid', () {
       // FM:12 present at (0,0)-(1,0): N then B
-      final p = _make('12\n11');
+      final p = makePuzzle('12\n11');
       expect(ForbiddenMotif('12').verify(p), isFalse);
     });
 
     test('2x2 motif absent → valid', () {
       // FM:12.21 absent: grid has no 2x2 block matching NB/BN
-      final p = _make('11\n11');
+      final p = makePuzzle('11\n11');
       expect(ForbiddenMotif('12.21').verify(p), isTrue);
     });
 
     test('2x2 motif present → invalid', () {
       // FM:12.21 present at (0,0): NB/BN
-      final p = _make('12\n21');
+      final p = makePuzzle('12\n21');
       expect(ForbiddenMotif('12.21').verify(p), isFalse);
     });
 
     test('motif with wildcards (0) matches any value', () {
       // FM:10 means N followed by anything → forbids N in any non-last column
       // Grid NN: matches at pos 0 (N then N, wildcard=0 matches N)
-      final p = _make('11');
+      final p = makePuzzle('11');
       expect(ForbiddenMotif('10').verify(p), isFalse);
     });
 
     test('1x3 motif', () {
       // FM:121 = NBN horizontal
-      final p = _make('121\n222');
+      final p = makePuzzle('121\n222');
       expect(ForbiddenMotif('121').verify(p), isFalse);
-      final p2 = _make('112\n222');
+      final p2 = makePuzzle('112\n222');
       expect(ForbiddenMotif('121').verify(p2), isTrue);
     });
   });
@@ -76,14 +55,14 @@ void main() {
     test('correct group size → valid', () {
       // 121/121/222: groups of 1 at {0,3} and {2,5} (size 2 each),
       // group of 2 at {1,4,6,7,8} (size 5)
-      final p = _make('121\n121\n222');
+      final p = makePuzzle('121\n121\n222');
       expect(GroupSize('0.2').verify(p), isTrue);
       expect(GroupSize('1.5').verify(p), isTrue);
       expect(GroupSize('2.2').verify(p), isTrue);
     });
 
     test('wrong group size → invalid', () {
-      final p = _make('121\n121\n222');
+      final p = makePuzzle('121\n121\n222');
       expect(GroupSize('0.1').verify(p), isFalse);
       expect(GroupSize('1.2').verify(p), isFalse);
       expect(GroupSize('0.3').verify(p), isFalse);
@@ -93,19 +72,19 @@ void main() {
   group('ParityConstraint.verify', () {
     test('right: equal count → valid', () {
       // 1221: idx 1 right=[2,1] → 1 odd, 1 even → valid
-      final p = _make('1221');
+      final p = makePuzzle('1221');
       expect(ParityConstraint('1.right').verify(p), isTrue);
     });
 
     test('left: unequal count → invalid', () {
       // 22212: idx 2, left side [2,2] → 0 odd, 2 even → invalid
-      final p = _make('22212');
+      final p = makePuzzle('22212');
       expect(ParityConstraint('2.left').verify(p), isFalse);
     });
 
     test('top/bottom on column', () {
       // 3x3: 111/222/111 → idx 8 (row 2, col 2), top has [1,2] → valid
-      final p = _make('111\n222\n111');
+      final p = makePuzzle('111\n222\n111');
       expect(ParityConstraint('8.top').verify(p), isTrue);
       // 3x3: 111/222/111 → idx 0 (row 0, col 0), bottom has [2,1] → valid
       expect(ParityConstraint('0.bottom').verify(p), isTrue);
@@ -113,17 +92,17 @@ void main() {
 
     test('vertical: both sides must be balanced', () {
       // Column 1x5: 1,2,1,2,1 → idx 2, top=[1,2] bottom=[2,1] → both balanced → valid
-      final p = _make('1\n2\n1\n2\n1');
+      final p = makePuzzle('1\n2\n1\n2\n1');
       expect(ParityConstraint('2.vertical').verify(p), isTrue);
       // 1,1,X,2,1: top=[1,1] → 2 odd, 0 even → invalid
-      final p2 = _make('1\n1\n1\n2\n1');
+      final p2 = makePuzzle('1\n1\n1\n2\n1');
       expect(ParityConstraint('2.vertical').verify(p2), isFalse);
     });
   });
 
   group('Puzzle.getGroups', () {
     test('2x2 with two groups', () {
-      final p = _make('11\n22');
+      final p = makePuzzle('11\n22');
       final groups = getGroups(p);
       expect(groups.length, 2);
       expect(
@@ -138,7 +117,7 @@ void main() {
 
     test('3x3 with two groups of different sizes', () {
       // 212/212/222 → value 2: {0,2,3,5,6,7,8} size 7, value 1: {1,4} size 2
-      final p = _make('212\n212\n222');
+      final p = makePuzzle('212\n212\n222');
       final groups = getGroups(p);
       expect(groups.any((g) => g.length == 7), isTrue);
       expect(
@@ -154,7 +133,7 @@ void main() {
       // GS at idx 0 (value=1), target=2. myGroup={0}, margin=1.
       // Free neighbors: idx 1 and idx 3 (two exits, so single-exit rule doesn't fire).
       // idx 1 touches group {2,5} (size 2, ≥ margin 1) → blocked.
-      final p = _make('''
+      final p = makePuzzle('''
         101
         001
         000
@@ -173,7 +152,7 @@ void main() {
       // Free neighbor idx 4 (center) touches two separate groups: {1} and {5}, each size 1.
       // Each individually < margin (1 < 2), but sum = 2 ≥ margin → blocked.
       // Coloring idx 4 as 1 would create a merged group of size 4 > target 3.
-      final p = _make('''
+      final p = makePuzzle('''
         010
         101
         000
@@ -193,7 +172,7 @@ void main() {
       //   0 0 0
       // GS at idx 3 (row1,col0, value=1), target=4. myGroup={3}, margin=3.
       // Free neighbor idx 4 touches group {1} (size 1). Sum=1 < 3 → not blocked.
-      final p = _make('''
+      final p = makePuzzle('''
         010
         100
         000
@@ -219,7 +198,7 @@ void main() {
       // Color=1: flood-fill spans the full grid via empty + value-1 cells.
       //   Reachable = all 12 cells ≥ 5 → OK.
       // → cell 7 forced to value 1.
-      final p = _make('''
+      final p = makePuzzle('''
         010
         010
         101
@@ -245,7 +224,7 @@ void main() {
       // Correct flood-fill through empty-or-color-1 reaches {7,4,6,8,5,2} = 6,
       // because c5 (empty) bridges c4/c8 to c2 (value 1).
       // Color=2 reachable = {7} alone → impossible. → c7 forced to value 1.
-      final p = _make('''
+      final p = makePuzzle('''
         121
         210
         101
@@ -263,7 +242,7 @@ void main() {
       // 3x3: 000 / 010 / 000
       // GS:4.3 — cell 4 (center) empty, target=3.
       // Empty region = all 8 empty cells. Both colors have max ≥ 3. No deduction.
-      final p = _make('''
+      final p = makePuzzle('''
         000
         010
         000
@@ -278,25 +257,25 @@ void main() {
   group('DifferentFromConstraint.verify', () {
     test('right: different values → valid', () {
       // Cell (1,1)=N and cell (2,1)=B are different
-      final p = _make('12\n12');
+      final p = makePuzzle('12\n12');
       expect(DifferentFromConstraint('0.right').verify(p), isTrue);
     });
 
     test('right: same values → invalid', () {
       // Cell (1,1)=N and cell (2,1)=N are the same
-      final p = _make('11\n12');
+      final p = makePuzzle('11\n12');
       expect(DifferentFromConstraint('0.right').verify(p), isFalse);
     });
 
     test('down: different values → valid', () {
       // Cell (1,1)=N and cell (1,2)=B are different
-      final p = _make('12\n21');
+      final p = makePuzzle('12\n21');
       expect(DifferentFromConstraint('0.down').verify(p), isTrue);
     });
 
     test('down: same values → invalid', () {
       // Cell (1,1)=N and cell (1,2)=N are the same
-      final p = _make('12\n11');
+      final p = makePuzzle('12\n11');
       expect(DifferentFromConstraint('0.down').verify(p), isFalse);
     });
   });
@@ -352,43 +331,43 @@ void main() {
       // 2x2: 2 black groups
       // 1 0
       // 0 1  → 2 isolated black cells = 2 groups
-      final p = _make('10\n01');
+      final p = makePuzzle('10\n01');
       expect(GroupCountConstraint('1.2').verify(p), isTrue);
     });
 
     test('wrong group count → valid', () {
       // 2x2: 2 black groups but constraint asks for 1
       // still valid because groups can merge
-      final p = _make('10\n01');
+      final p = makePuzzle('10\n01');
       expect(GroupCountConstraint('1.1').verify(p), isTrue);
     });
 
     test('wrong group count → invalid', () {
       // 2x2: 2 black groups but constraint asks for 1
       // invalid because groups cannot merge
-      final p = _make('10\n22\n01');
+      final p = makePuzzle('10\n22\n01');
       expect(GroupCountConstraint('1.1').verify(p), isFalse);
     });
 
     test('incomplete puzzle with less groups than target → valid', () {
       // 2x2 with 1 black cell filled, target is 2 groups
-      final p = _make('10\n00');
+      final p = makePuzzle('10\n00');
       expect(GroupCountConstraint('1.2').verify(p), isTrue);
     });
 
     test('incomplete puzzle with more groups than target → valid', () {
       // 2x2 with 2 black groups but target is 1
-      final p = _make('10\n01');
+      final p = makePuzzle('10\n01');
       expect(GroupCountConstraint('1.1').verify(p), isTrue);
     });
 
     test('incomplete puzzle without room for new groups → invalid', () {
-      final p = _make('20\n21');
+      final p = makePuzzle('20\n21');
       expect(GroupCountConstraint('1.2').verify(p), isFalse);
     });
 
     test('incomplete puzzle with groups that cannot merge → invalid', () {
-      final p = _make('111\n222\n010');
+      final p = makePuzzle('111\n222\n010');
       expect(GroupCountConstraint('1.1').verify(p), isFalse);
     });
   });
@@ -418,7 +397,7 @@ void main() {
 
   group('GroupCountConstraint.apply - too many groups', () {
     test('contradiction when groups cannot merge enough', () {
-      final p = _make('100\n022\n021');
+      final p = makePuzzle('100\n022\n021');
       final gc = GroupCountConstraint('1.1'); // target: 1 group - impossible
       p.constraints.add(gc);
       final move = gc.apply(p);
@@ -428,7 +407,7 @@ void main() {
 
     test('force merge when single cell can merge groups', () {
       // Only one cell can merge both groups → force color it black
-      final p = _make('100\n000\n120');
+      final p = makePuzzle('100\n000\n120');
       final gc = GroupCountConstraint('1.1');
       p.constraints.add(gc);
       final move = gc.apply(p);
@@ -443,7 +422,7 @@ void main() {
       // groups. Colouring it merges all 4 → count drops from 4 to 1.
       // Reachable counts = {4, 1}. Target 3 is unreachable, so apply()
       // must flag isImpossible directly (not force a wrong merge first).
-      final p = _make(
+      final p = makePuzzle(
         '2212222\n'
         '2101222\n'
         '2212222\n'
@@ -493,7 +472,7 @@ void main() {
 
   group('GroupCountConstraint.apply - not enough groups', () {
     test('contradiction when not enough cells to create groups', () {
-      final p = _make('112\n122\n011');
+      final p = makePuzzle('112\n122\n011');
       final gc = GroupCountConstraint('2.3');
       p.constraints.add(gc);
       final move = gc.apply(p);
@@ -502,7 +481,7 @@ void main() {
     });
 
     test('force fill when exactly remaining cells needed', () {
-      final p = _make('100');
+      final p = makePuzzle('100');
       final gc = GroupCountConstraint('1.2');
       p.constraints.add(gc);
       final move = gc.apply(p);
@@ -517,7 +496,7 @@ void main() {
         // 1x3 state 000 + GC:1.3: all three cells are candidates, but they
         // form a single path so colouring them all merges into 1 group, not 3.
         // Target unreachable → impossible detected up-front.
-        final p = _make('000');
+        final p = makePuzzle('000');
         final gc = GroupCountConstraint('1.3');
         p.constraints.add(gc);
         final move = gc.apply(p);
@@ -531,7 +510,7 @@ void main() {
       // by color-2 cells, pairwise non-adjacent). current + candidates = 3
       // = target, so every candidate must become its own group → force the
       // first one to black.
-      final p = _make('02020');
+      final p = makePuzzle('02020');
       final gc = GroupCountConstraint('1.3');
       p.constraints.add(gc);
       final move = gc.apply(p);
@@ -549,7 +528,7 @@ void main() {
       // Empty cell idx 2: neighbor black=3 → would merge, not create new
       // getFreeCellsWithoutNeighborColor = none
       // current=2, target=2, candidates=0 → force opposite (color 2) on any cell that would merge
-      final p = _make('10\n01');
+      final p = makePuzzle('10\n01');
       final gc = GroupCountConstraint('1.2');
       p.constraints.add(gc);
       final move = gc.apply(p);
@@ -566,7 +545,7 @@ void main() {
       // 1 1 1 / 1 1 1 / 1 1 1 is a valid completion (one connected black
       // group) because coloring intermediate cells also rejoins the
       // candidate to the existing group.
-      final p = _make('100\n000\n000');
+      final p = makePuzzle('100\n000\n000');
       final gc = GroupCountConstraint('1.1');
       p.constraints.add(gc);
       expect(gc.apply(p), isNull);
@@ -581,7 +560,7 @@ void main() {
       // in a valid completion (e.g., color cell 1 AND cell 8 → count stays 2).
       // So GroupCountConstraint.apply must NOT force a deduction here — it
       // should defer to force/backtracking.
-      final p = _make('101\n000\n000');
+      final p = makePuzzle('101\n000\n000');
       final gc = GroupCountConstraint('1.2');
       p.constraints.add(gc);
       final move = gc.apply(p);
@@ -595,7 +574,7 @@ void main() {
         // only candidate. Colouring cell 4 = 1 completes the puzzle with 3
         // isolated color-1 groups ({0}, {4}, {8}); no merge-cell remains,
         // so reachable = {3}. Target 2 is unreachable, so cell 4 must be 2.
-        final p = _make('122\n202\n221');
+        final p = makePuzzle('122\n202\n221');
         final gc = GroupCountConstraint('1.2');
         p.constraints.add(gc);
         final move = gc.apply(p);
