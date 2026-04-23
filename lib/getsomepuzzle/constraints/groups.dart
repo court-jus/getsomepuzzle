@@ -240,18 +240,28 @@ class LetterGroup extends CellsCentricConstraint {
     }
     return result;
   }
+  // Collect ALL indices for this letter across all LT constraints
+  List<int> getAllIndicesForLetter(Puzzle puzzle) {
+    return puzzle.constraints
+        .whereType<LetterGroup>()
+        .where((c) => c.letter == letter)
+        .map((c) => c.indices)
+        .flattened
+        .toList();
+  }
 
   @override
   bool verify(Puzzle puzzle) {
     // If any of my cells are not filled yet, there's no need to check further
+    final letterIndices = getAllIndicesForLetter(puzzle);
     final myCellValues = puzzle.cellValues.indexed
-        .where((elem) => indices.contains(elem.$1))
+        .where((elem) => letterIndices.contains(elem.$1))
         .map((elem) => elem.$2);
     if (myCellValues.contains(0)) return true;
     final groups = getGroups(puzzle);
     final List<List<int>> myGroups = [];
     for (final group in groups) {
-      final intersect = group.toSet().intersection(indices.toSet());
+      final intersect = group.toSet().intersection(letterIndices.toSet());
       if (intersect.isNotEmpty) {
         myGroups.add(group);
       }
@@ -260,7 +270,7 @@ class LetterGroup extends CellsCentricConstraint {
     final myGroup = myGroups[0];
     final Set<String> lettersInMyGroup = {};
     for (final idx in myGroup) {
-      if (indices.contains(idx)) {
+      if (letterIndices.contains(idx)) {
         lettersInMyGroup.add(letter);
         continue;
       }
