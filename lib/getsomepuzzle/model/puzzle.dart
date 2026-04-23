@@ -281,23 +281,29 @@ class Puzzle {
     }
   }
 
-  Move? findAMove() {
-    // First find broken constraints
-    final hasErrors = check(saveResult: false);
-    if (hasErrors.isNotEmpty) {
-      final firstError = hasErrors.first;
-      final errorMove = firstError.apply(this);
-      if (errorMove != null) {
-        return errorMove;
+  /// Next deducible move, or null if stuck. Does not mutate `this`.
+  /// [checkErrors] returns a corrective move for invalid constraints (UI-only).
+  /// [tryForce] enables the force fallback when propagation is stuck.
+  Move? findAMove({bool checkErrors = true, bool tryForce = true}) {
+    if (checkErrors) {
+      final hasErrors = check(saveResult: false);
+      if (hasErrors.isNotEmpty) {
+        final firstError = hasErrors.first;
+        final errorMove = firstError.apply(this);
+        if (errorMove != null) {
+          return errorMove;
+        }
       }
     }
-    // Then try by directly applying the constraint
     final easyMove = apply();
     if (easyMove != null) return easyMove;
-    // Nothing was found, we will now try on a cloned puzzle
-    // to randomly set a cell's value and see if that leads to
-    // an impossible to solve puzzle. It would mean that this
-    // value is forbidden.
+    if (!tryForce) return null;
+    return _forceOneCell();
+  }
+
+  /// Try setting each free cell to each domain value on a clone; if a value
+  /// leads to contradiction, return the opposite as a forced move.
+  Move? _forceOneCell() {
     final clone = this.clone();
     for (var freeCell in clone.cells.indexed.where(
       (entry) => entry.$2.value == 0,
@@ -305,7 +311,6 @@ class Puzzle {
       for (var value in clone.domain) {
         clone.setValue(freeCell.$1, value);
         Move? result = clone.applyAll();
-        // Check if the puzzle became unsolvable (constraint violation)
         final unsolvableErrors = clone.check(saveResult: false);
         if (unsolvableErrors.isNotEmpty) {
           final opposite = clone.domain.whereNot((v) => v == value).first;
