@@ -656,20 +656,12 @@ class Puzzle {
   /// Returns (solved puzzle or null, steps).
   (Puzzle?, int) solveWithBacktracking({int maxSteps = 100000, int level = 0}) {
     final st = clone();
-    try {
-      final solved = st.solve();
-      if (solved && st.complete) return (st, 0);
-    } on SolverContradiction {
-      return (null, 0);
-    }
+    final solved = st.solve();
+    if (solved && st.complete) return (st, 0);
     if (!st.isPossible()) {
       // Force left state corrupted, retry with propagation only
       final st2 = clone();
-      try {
-        st2.applyConstraintsPropagation();
-      } on SolverContradiction {
-        return (null, 0);
-      }
+      if (st2.propagateToFixpoint() == null) return (null, 0);
       if (st2.freeCells().isEmpty && st2.complete) return (st2, 0);
       return _backtrack(st2, maxSteps, level);
     }
