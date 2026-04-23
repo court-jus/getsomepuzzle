@@ -524,34 +524,24 @@ class Puzzle {
     // Emptiness: ratio of free cells, scaled to 0-6
     final emptiness = (totalFree / size * 6).round();
 
-    // Force rounds
+    // Force rounds: run findAMove to fixpoint, count moves flagged isForce.
+    // Any contradiction → needs backtracking → complexity 100.
     final test = clone();
-    try {
-      test.applyConstraintsPropagation();
-    } on SolverContradiction {
-      cachedComplexity = 100;
-      return 100;
-    }
-
     int forceRounds = 0;
-    if (test.freeCells().isNotEmpty) {
-      for (int step = 0; step < 200; step++) {
-        try {
-          final forced = test.applyWithForce(stopAfterFirst: true);
-          if (!forced) break;
-          forceRounds++;
-          test.applyConstraintsPropagation();
-        } on SolverContradiction {
-          cachedComplexity = 100;
-          return 100;
-        }
-        if (test.freeCells().isEmpty) break;
-      }
-      // Needs backtracking
-      if (test.freeCells().isNotEmpty) {
+    for (int step = 0; step < 1000; step++) {
+      final m = test.findAMove(checkErrors: false);
+      if (m == null) break;
+      if (m.isImpossible != null) {
         cachedComplexity = 100;
         return 100;
       }
+      test.setValue(m.idx, m.value);
+      if (m.isForce) forceRounds++;
+      if (test.complete) break;
+    }
+    if (test.freeCells().isNotEmpty) {
+      cachedComplexity = 100;
+      return 100;
     }
 
     cachedSolution = test.cellValues;
