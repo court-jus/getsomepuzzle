@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
@@ -360,21 +359,5 @@ class PuzzleGenerator {
       );
     }
     return solved;
-  }
-
-  /// Find up to [maxSolutions] distinct solutions for a puzzle.
-  static List<List<int>> findSolutions(Puzzle puzzle, {int maxSolutions = 2}) {
-    final initial = puzzle.clone();
-    initial.applyConstraintsPropagation();
-    final solutions = <List<int>>[];
-
-    for (int i = 0; i < maxSolutions; i++) {
-      final (sol, _) = initial.solveWithBacktracking();
-      if (sol == null) break;
-      final foundSolution = sol.cellValues;
-      solutions.add(foundSolution);
-      initial.constraints.add(OtherSolutionConstraint(foundSolution));
-    }
-    return solutions;
   }
 }
