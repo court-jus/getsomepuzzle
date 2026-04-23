@@ -241,7 +241,8 @@ class PuzzleGenerator {
       final cloned = pu.clone();
       cloned.solve();
       for (final (_, idx) in cloned.freeCells()) {
-        pu.setValue(idx, solvedValues[idx]);
+        pu.cells[idx].setForSolver(solvedValues[idx]);
+        pu.cells[idx].readonly = true;
       }
     }
 

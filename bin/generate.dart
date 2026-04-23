@@ -111,6 +111,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
 
         if (sink != null) {
           sink.writeln(puzzleLine);
+          sink.flush();
         } else {
           stdout.writeln(puzzleLine);
         }

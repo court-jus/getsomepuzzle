@@ -523,8 +523,8 @@ class Puzzle {
     return (null, steps);
   }
 
-  /// Count distinct solutions (up to [maxSolutions]).
-  int countSolutions({int maxSolutions = 2}) {
+  List<List<int>> findSolutions({int maxSolutions = 2}) {
+    _invalidateCaches();
     final solutions = <List<int>>[];
     final test = clone();
     for (int i = 0; i < maxSolutions; i++) {
@@ -542,7 +542,12 @@ class Puzzle {
       }
       test._invalidateCaches();
     }
-    return solutions.length;
+    return solutions;
+  }
+
+  /// Count distinct solutions (up to [maxSolutions]).
+  int countSolutions({int maxSolutions = 2}) {
+    return findSolutions(maxSolutions: maxSolutions).length;
   }
 
   /// Remove constraints that don't affect the number of solutions.

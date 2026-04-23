@@ -172,6 +172,7 @@ void _isolateEntryPoint(_IsolateParams params) {
       }
     } catch (e) {
       // Generation failed for this attempt, retry
+      print("Generation failed for this attempt, retry");
     }
   }
 
