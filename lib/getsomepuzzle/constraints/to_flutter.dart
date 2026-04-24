@@ -49,7 +49,7 @@ Widget constraintToFlutter(
     return _textWidget('≠', fgcolor, cellSize, count);
   }
   if (constraint is NeighborCountConstraint) {
-    return _neighborCountWidget(constraint, fgcolor, cellSize, count);
+    return _neighborCountWidget(constraint, cellSize, count);
   }
 
   // Default: use toString()
@@ -142,7 +142,6 @@ Widget _groupSizeWidget(
 
 Widget _neighborCountWidget(
   NeighborCountConstraint constraint,
-  Color fgcolor,
   double cellSize,
   int count,
 ) {
@@ -150,10 +149,6 @@ Widget _neighborCountWidget(
   return SizedBox(
     width: widgetSize,
     height: widgetSize,
-    child: NeighborCountWidget(
-      constraint: constraint,
-      fgcolor: fgcolor,
-      cellSize: widgetSize,
-    ),
+    child: NeighborCountWidget(constraint: constraint, cellSize: widgetSize),
   );
 }

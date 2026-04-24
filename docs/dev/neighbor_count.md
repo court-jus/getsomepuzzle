@@ -22,12 +22,8 @@ Valid counts range from 0 to the number of orthogonal neighbors of that cell (2 
 
 ## Display
 
-A small digit is displayed in a circle **overlaid on the corner** of the target cell (e.g.,
-bottom-right corner), colored according to `color` (matching the convention of other
-cell-centric constraints). The circle background is grey when neutral, colored when highlighted.
-
-Alternative considered: display as a subscript inside the cell alongside other constraints.
-The corner overlay is preferred to avoid crowding when multiple constraints target the same cell.
+A drawn cross with the background color matching the color of the constraint and the border color
+in the opposite color. Inside the cross the "count" of the constraint is written.
 
 ## Gameplay notes
 
