@@ -18,6 +18,8 @@ import 'package:getsomepuzzle/main.dart' as app;
 import 'package:getsomepuzzle/widgets/quantity.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 
+import 'helpers/harness.dart';
+
 String _cancelLabel(WidgetTester tester) {
   final ctx = tester.element(find.byType(AlertDialog).first);
   return MaterialLocalizations.of(ctx).cancelButtonLabel;
@@ -70,11 +72,7 @@ Future<void> _waitForCreateTileInDrawer(WidgetTester tester) async {
 }
 
 Future<void> _openCreatePage(WidgetTester tester) async {
-  final scaffoldState = tester.state<ScaffoldState>(
-    find.byType(Scaffold).first,
-  );
-  scaffoldState.openDrawer();
-  await tester.pumpAndSettle();
+  await openDrawer(tester);
   await _waitForCreateTileInDrawer(tester);
 
   // The drawer's "Create" entry is the only ListTile with Icons.edit inside it.

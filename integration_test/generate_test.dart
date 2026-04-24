@@ -10,6 +10,8 @@ import 'package:integration_test/integration_test.dart';
 
 import 'package:getsomepuzzle/main.dart' as app;
 
+import 'helpers/harness.dart';
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -18,12 +20,7 @@ void main() {
       app.main();
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
-      // Open the drawer
-      final scaffoldState = tester.state<ScaffoldState>(
-        find.byType(Scaffold).first,
-      );
-      scaffoldState.openDrawer();
-      await tester.pumpAndSettle();
+      await openDrawer(tester);
 
       // Tap the "Generate" menu item (identified by its icon)
       final generateTile = find.byIcon(Icons.auto_fix_high);
@@ -70,11 +67,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // Navigate to generate page
-      final scaffoldState = tester.state<ScaffoldState>(
-        find.byType(Scaffold).first,
-      );
-      scaffoldState.openDrawer();
-      await tester.pumpAndSettle();
+      await openDrawer(tester);
       await tester.tap(find.byIcon(Icons.auto_fix_high));
       await tester.pumpAndSettle();
 

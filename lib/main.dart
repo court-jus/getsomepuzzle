@@ -148,6 +148,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> initialize() async {
     var futures = <Future>[];
     await settings.load();
+    game.idleTimeoutDuration = settings.idleTimeoutDuration;
     futures.add(initializeDatabase(settings.playerLevel));
     futures.add(initializeLocale());
     await Future.wait(futures);
@@ -634,6 +635,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           _onHintTypeChanged();
                         }
                         if (newValue.idleTimeout != null) {
+                          game.idleTimeoutDuration =
+                              settings.idleTimeoutDuration;
                           game.rearmIdleTimer();
                         }
                         // Recompute immediately when auto is toggled on, so
