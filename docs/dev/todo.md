@@ -128,3 +128,19 @@ Run a session where the solver presents individual deduction steps to a human pl
 2. Validate that force rounds correlate with perceived difficulty
 3. Tune complexity formula weights accordingly
 
+## Generator: reject puzzles with equivalent SH constraints
+
+The generator can output a puzzle carrying two `SH` constraints whose shapes
+are equivalent under the allowed rotation + mirror transforms (sometimes even
+textually identical). That is noise — one of them is always redundant and
+`removeUselessRules` doesn't currently dedupe them.
+
+**Example hit:** the tutorial slot for the Shape intro came back as
+`SH:2222;SH:2222` on the same puzzle. Fixed manually by dropping one, but the
+generator should never produce this in the first place.
+
+**Fix idea:** during candidate filtering, treat two `SH` constraints as
+duplicates if `allRotations(a.motif)` and `allRotations(b.motif)` share a
+variant, and drop the later one. Apply the same dedupe to the serialized
+parameter string for cheap equality.
+
