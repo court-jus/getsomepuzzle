@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 import 'helpers/make_puzzle.dart';
@@ -584,5 +585,48 @@ void main() {
         expect(move.value, 2);
       },
     );
+  });
+
+  // NC: center cell in 3x3 grid is idx 4, with 4 neighbors at idx 1/3/5/7.
+  group('NeighborCountConstraint.verify', () {
+    test('complete puzzle with exact count → valid', () {
+      // neighbors of idx 4: 1=1, 3=1, 5=1, 7=1 → 4 color-1 neighbors
+      final p = makePuzzle('212\n111\n212');
+      expect(NeighborCountConstraint('4.1.4').verify(p), isTrue);
+    });
+
+    test('complete puzzle with wrong count → invalid', () {
+      // same grid, constraint asks for 2 color-1 neighbors but there are 4
+      final p = makePuzzle('212\n111\n212');
+      expect(NeighborCountConstraint('4.1.2').verify(p), isFalse);
+    });
+
+    test('incomplete puzzle, target still reachable → valid', () {
+      // Regression for the bug fixed by H1: previously `verify` returned
+      // `targetColorNeighbors + freeNeighbors == count`, so a fully-open
+      // neighborhood with count < freeNeighbors was wrongly flagged invalid.
+      // Here: center=1, all 4 neighbors free, count=2 → perfectly reachable.
+      final p = makePuzzle('000\n010\n000');
+      expect(NeighborCountConstraint('4.1.2').verify(p), isTrue);
+    });
+
+    test('incomplete puzzle with already too many color neighbors → invalid', () {
+      // 3 color-1 neighbors (idx 1/3/5), 1 free (idx 7), count=2 → already exceeded
+      final p = makePuzzle('010\n111\n000');
+      expect(NeighborCountConstraint('4.1.2').verify(p), isFalse);
+    });
+
+    test('incomplete puzzle with target unreachable → invalid', () {
+      // idx 1=2, 3=2, 5=2, 7=0 → 0 color-1, 1 free. count=2 cannot be reached.
+      final p = makePuzzle('020\n202\n000');
+      expect(NeighborCountConstraint('4.1.2').verify(p), isFalse);
+    });
+
+    test('incomplete puzzle with target exactly reachable → valid', () {
+      // 0 color-1, 1 free neighbor, count=1 — only reachable by coloring the
+      // last free neighbor; `verify` must still accept the state.
+      final p = makePuzzle('020\n202\n000');
+      expect(NeighborCountConstraint('4.1.1').verify(p), isTrue);
+    });
   });
 }

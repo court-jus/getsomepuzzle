@@ -62,13 +62,10 @@ class NeighborCountConstraint extends CellsCentricConstraint {
     final freeNeighbors = myNeighbors
         .where((i) => puzzle.cellValues[i] == 0)
         .length;
-    if (puzzle.complete) {
-      return targetColorNeighbors == count;
-    } else if (targetColorNeighbors > count) {
-      return false;
-    } else {
-      return targetColorNeighbors + freeNeighbors == count;
-    }
+    if (puzzle.complete) return targetColorNeighbors == count;
+    if (targetColorNeighbors > count) return false;
+    if (targetColorNeighbors + freeNeighbors < count) return false;
+    return true;
   }
 
   @override
