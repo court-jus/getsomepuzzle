@@ -1,3 +1,3 @@
-The axial symmetry can be **diagonal**.
+También puede haber flechas dobles.
 
-Here again, the group containing the symbol must be symmetrical along the axis.
+En ese caso, ambas direcciones deben respetar la restricción.

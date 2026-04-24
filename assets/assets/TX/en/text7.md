@@ -1,3 +1,5 @@
-Some forbidden patterns contain empty cells.
+New rule: **Column count**.
 
-This means that the pattern is forbidden whatever the color of the empty cell is in the end.
+Similar to the Quantity rule, but it applies to **one column only**.
+
+A number above a column tells you how many cells of the given color that column must contain.

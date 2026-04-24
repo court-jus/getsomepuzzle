@@ -1,3 +1,5 @@
-The **parity** rule is represented by arrows.
+New rule: **Group count**.
 
-An arrow like this means that there is the same number of white and black cells in that direction.
+This rule indicates how many **distinct groups** of a given color the grid must contain.
+
+For example, "3 black groups" means the finished grid must have exactly 3 separate groups of black cells.

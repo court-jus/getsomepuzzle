@@ -1,5 +1,3 @@
-Certaines contraintes sont représentées à l'extérieur de la grille.
+Parfois il faudra réfléchir un peu plus.
 
-Ces indications sur fond violet montrent des **motifs interdits**.
-
-Votre solution ne doit pas contenir ces motifs.
+Vous voudrez probablement commencer par les contraintes les plus évidentes.

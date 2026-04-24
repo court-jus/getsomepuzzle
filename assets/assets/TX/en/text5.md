@@ -1,5 +1,3 @@
-Some constraints are represented outside the grid.
+Sometimes you have to think a bit more.
 
-This purple one indicates that you are not allowed to have this pattern in your finished grid.
-
-It is called the **Forbidden pattern** rule.
+You probably want to start with the constraints that are obvious.

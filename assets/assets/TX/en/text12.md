@@ -1,5 +1,3 @@
-This circle represents a **central** symmetry.
+The **Parity** rule is represented by arrows.
 
-You can also see it as a halfturn rotation.
-
-Again, the group that contains the symbol must respect the rule.
+An arrow like this means that there is the same number of white and black cells in that direction.

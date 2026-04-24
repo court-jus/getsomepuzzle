@@ -1,3 +1,3 @@
-An arrow can be double.
+New rule: **Forbidden pattern**.
 
-In that case, both directions should be considred.
+Another constraint displayed above the grid. This one, on a **purple background**, shows a pattern that **must not** appear anywhere in your finished grid.

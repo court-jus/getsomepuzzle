@@ -1,3 +1,5 @@
-Voici la contrainte de **parité**, représentée par des flèches.
+Nouvelle contrainte : **Nombre de groupes**.
 
-Une flèche indique qu'il doit y avoir autant de cases noires que de cases blanches dans cette direction.
+Cette contrainte indique combien de **groupes distincts** d'une couleur donnée la grille doit contenir.
+
+Par exemple, « 3 groupes noirs » signifie que la grille finie doit comporter exactement 3 groupes séparés de cases noires.

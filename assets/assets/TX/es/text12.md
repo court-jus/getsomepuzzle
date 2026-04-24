@@ -1,5 +1,3 @@
-This circle represents a **central** symmetry.
+La regla de **paridad** se representa con flechas.
 
-You can also see it as a halfturn rotation.
-
-Again, the group that contains the symbol must respect the rule.
+Una flecha indica que debe haber el mismo número de celdas blancas y negras en esa dirección.

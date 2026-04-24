@@ -1,3 +1,5 @@
-Certains motifs interdits contiennent des cases vides.
+Nouvelle contrainte : **Compte par colonne**.
 
-Cela signifie que la couleur à cet endroit ne fait pas partie du motif, le motif est interdit quelle que soit la couleur qu'il y aura dans cette case "vide".
+Similaire à la règle Quantité, mais qui s'applique à **une seule colonne**.
+
+Un nombre au-dessus d'une colonne indique combien de cases de la couleur concernée cette colonne doit contenir.
