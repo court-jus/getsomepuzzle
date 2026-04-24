@@ -337,6 +337,8 @@ class GameModel extends ChangeNotifier {
 
   void handleCheck(
     Settings settings, {
+    required String invalidConstraintsText,
+    required String Function(int count) errorsCountText,
     required void Function() onPuzzleCompleted,
   }) {
     _syncManualCompletionPause(settings);
@@ -349,13 +351,20 @@ class GameModel extends ChangeNotifier {
     _checkDebounce = Timer(const Duration(seconds: 1), () {
       _checkDebounce = null;
       if (currentPuzzle == null) return;
-      checkPuzzle(settings, onPuzzleCompleted: onPuzzleCompleted);
+      checkPuzzle(
+        settings,
+        invalidConstraintsText: invalidConstraintsText,
+        errorsCountText: errorsCountText,
+        onPuzzleCompleted: onPuzzleCompleted,
+      );
     });
   }
 
   void checkPuzzle(
     Settings settings, {
     bool manualCheck = false,
+    required String invalidConstraintsText,
+    required String Function(int count) errorsCountText,
     required void Function() onPuzzleCompleted,
   }) {
     final shouldShowErrors =
@@ -370,13 +379,10 @@ class GameModel extends ChangeNotifier {
     }
     if (failedConstraints.isNotEmpty) {
       if (shouldShowErrors) {
-        setTopMessage(
-          text: "Some constraints are not valid.",
-          color: Colors.red,
-        );
+        setTopMessage(text: invalidConstraintsText, color: Colors.red);
       } else {
         setTopMessage(
-          text: "${failedConstraints.length} errors.",
+          text: errorsCountText(failedConstraints.length),
           color: Colors.red,
         );
       }

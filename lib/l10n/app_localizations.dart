@@ -1053,6 +1053,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tutorial stats cleared.'**
   String get settingTutorialRestarted;
+
+  /// Top-of-screen message shown during play when at least one constraint of the current puzzle is violated
+  ///
+  /// In en, this message translates to:
+  /// **'Some constraints are not valid.'**
+  String get someConstraintsInvalid;
+
+  /// Top-of-screen message shown during play to indicate how many constraints are currently violated (shown when errors are hidden cell-by-cell, so only the count is revealed)
+  ///
+  /// In en, this message translates to:
+  /// **'{count} errors.'**
+  String errorsCount(int count);
 }
 
 class _AppLocalizationsDelegate

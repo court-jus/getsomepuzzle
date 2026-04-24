@@ -194,5 +194,7 @@
     "settingRestartTutorial": "Reiniciar el tutorial",
     "settingRestartTutorialConfirmTitle": "¿Reiniciar el tutorial?",
     "settingRestartTutorialConfirmBody": "Tu progreso en los puzles del tutorial se borrará. Esta acción no se puede deshacer.",
-    "settingTutorialRestarted": "Estadísticas del tutorial borradas."
+    "settingTutorialRestarted": "Estadísticas del tutorial borradas.",
+    "someConstraintsInvalid": "Algunas restricciones no son válidas.",
+    "errorsCount": "{count} errores."
 }

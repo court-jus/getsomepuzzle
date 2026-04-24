@@ -260,7 +260,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   void _handleCheck() {
-    game.handleCheck(settings, onPuzzleCompleted: _onPuzzleCompleted);
+    final l10n = AppLocalizations.of(context)!;
+    game.handleCheck(
+      settings,
+      invalidConstraintsText: l10n.someConstraintsInvalid,
+      errorsCountText: l10n.errorsCount,
+      onPuzzleCompleted: _onPuzzleCompleted,
+    );
   }
 
   void _onPuzzleCompleted() {
@@ -456,6 +462,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     ? () => game.checkPuzzle(
                         settings,
                         manualCheck: true,
+                        invalidConstraintsText: AppLocalizations.of(
+                          context,
+                        )!.someConstraintsInvalid,
+                        errorsCountText: AppLocalizations.of(
+                          context,
+                        )!.errorsCount,
                         onPuzzleCompleted: _onPuzzleCompleted,
                       )
                     : null,

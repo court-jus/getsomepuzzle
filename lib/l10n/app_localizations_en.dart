@@ -504,4 +504,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingTutorialRestarted => 'Tutorial stats cleared.';
+
+  @override
+  String get someConstraintsInvalid => 'Some constraints are not valid.';
+
+  @override
+  String errorsCount(int count) {
+    return '$count errors.';
+  }
 }

@@ -194,5 +194,7 @@
     "settingRestartTutorial": "Recommencer le didacticiel",
     "settingRestartTutorialConfirmTitle": "Recommencer le didacticiel ?",
     "settingRestartTutorialConfirmBody": "Votre progression sur les puzzles du didacticiel sera effacée. Cette action est irréversible.",
-    "settingTutorialRestarted": "Statistiques du didacticiel effacées."
+    "settingTutorialRestarted": "Statistiques du didacticiel effacées.",
+    "someConstraintsInvalid": "Certaines contraintes ne sont pas valides.",
+    "errorsCount": "{count} erreurs."
 }

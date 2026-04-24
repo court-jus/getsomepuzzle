@@ -536,5 +536,18 @@
     "settingTutorialRestarted": "Tutorial stats cleared.",
     "@settingTutorialRestarted": {
         "description": "Snackbar message shown after tutorial stats have been cleared"
+    },
+    "someConstraintsInvalid": "Some constraints are not valid.",
+    "@someConstraintsInvalid": {
+        "description": "Top-of-screen message shown during play when at least one constraint of the current puzzle is violated"
+    },
+    "errorsCount": "{count} errors.",
+    "@errorsCount": {
+        "description": "Top-of-screen message shown during play to indicate how many constraints are currently violated (shown when errors are hidden cell-by-cell, so only the count is revealed)",
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
     }
 }

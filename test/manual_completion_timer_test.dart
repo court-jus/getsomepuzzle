@@ -9,6 +9,11 @@ import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 /// fixture for exercising completion-driven timer behaviour.
 PuzzleData _fixture() => PuzzleData('v2_12_2x2_0000_NOOP_0_0');
 
+/// Stubs for the l10n strings the production code would inject — tests don't
+/// care about the text content, only about control flow.
+const String _invalidMsg = 'invalid';
+String _errorsMsg(int count) => '$count errors';
+
 void main() {
   group('Manual-mode completion freezes the timer', () {
     test(
@@ -25,7 +30,12 @@ void main() {
         for (var i = 0; i < 4; i++) {
           game.currentPuzzle!.setValue(i, 1);
         }
-        game.handleCheck(settings, onPuzzleCompleted: () {});
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () {},
+        );
         expect(
           game.currentMeta!.stats!.timer.isRunning,
           isFalse,
@@ -34,7 +44,12 @@ void main() {
 
         // Breaking completeness must restart the stopwatch on the next check.
         game.currentPuzzle!.setValue(0, 0);
-        game.handleCheck(settings, onPuzzleCompleted: () {});
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () {},
+        );
         expect(
           game.currentMeta!.stats!.timer.isRunning,
           isTrue,
@@ -53,7 +68,12 @@ void main() {
       for (var i = 0; i < 4; i++) {
         game.currentPuzzle!.setValue(i, 1);
       }
-      game.handleCheck(settings, onPuzzleCompleted: () {});
+      game.handleCheck(
+        settings,
+        invalidConstraintsText: _invalidMsg,
+        errorsCountText: _errorsMsg,
+        onPuzzleCompleted: () {},
+      );
       expect(game.currentMeta!.stats!.timer.isRunning, isFalse);
 
       // Simulate the user toggling the pause button: resume() must NOT
@@ -77,7 +97,12 @@ void main() {
       for (var i = 0; i < 4; i++) {
         game.currentPuzzle!.setValue(i, 1);
       }
-      game.handleCheck(settings, onPuzzleCompleted: () {});
+      game.handleCheck(
+        settings,
+        invalidConstraintsText: _invalidMsg,
+        errorsCountText: _errorsMsg,
+        onPuzzleCompleted: () {},
+      );
       expect(
         game.currentMeta!.stats!.timer.isRunning,
         isTrue,

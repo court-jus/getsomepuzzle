@@ -7,6 +7,11 @@ import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 /// Minimal 2x2 puzzle, no real constraints → trivially valid when full.
 PuzzleData _fixture() => PuzzleData('v2_12_2x2_0000_NOOP_0_0');
 
+/// Stubs for the l10n strings the production code would inject — tests don't
+/// care about the text content, only about control flow.
+const String _invalidMsg = 'invalid';
+String _errorsMsg(int count) => '$count errors';
+
 void _fill(GameModel game) {
   for (var i = 0; i < 4; i++) {
     game.currentPuzzle!.setValue(i, 1);
@@ -26,7 +31,12 @@ void main() {
         game.openPuzzle(_fixture(), 1);
         var completed = 0;
         _fill(game);
-        game.handleCheck(settings, onPuzzleCompleted: () => completed++);
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () => completed++,
+        );
 
         // Must not switch immediately — the user needs to register completion.
         async.elapse(const Duration(milliseconds: 500));
@@ -51,7 +61,12 @@ void main() {
         game.openPuzzle(_fixture(), 1);
         var completed = 0;
         _fill(game);
-        game.handleCheck(settings, onPuzzleCompleted: () => completed++);
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () => completed++,
+        );
 
         async.elapse(const Duration(milliseconds: 500));
         expect(completed, 0);
@@ -73,15 +88,30 @@ void main() {
         game.openPuzzle(_fixture(), 1);
         var completed = 0;
         _fill(game);
-        game.handleCheck(settings, onPuzzleCompleted: () => completed++);
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () => completed++,
+        );
 
         // Half a second in, the user taps a cell twice to clear it back to 0:
         // 1 → 2 (puzzle still complete), 2 → 0 (puzzle now incomplete).
         async.elapse(const Duration(milliseconds: 500));
         game.handleTap(0);
-        game.handleCheck(settings, onPuzzleCompleted: () => completed++);
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () => completed++,
+        );
         game.handleTap(0);
-        game.handleCheck(settings, onPuzzleCompleted: () => completed++);
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () => completed++,
+        );
 
         async.elapse(const Duration(seconds: 2));
         expect(
@@ -107,7 +137,12 @@ void main() {
         game.openPuzzle(_fixture(), 1);
         var completed = 0;
         _fill(game);
-        game.handleCheck(settings, onPuzzleCompleted: () => completed++);
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () => completed++,
+        );
 
         async.elapse(const Duration(milliseconds: 500));
         expect(completed, 0);
@@ -133,6 +168,8 @@ void main() {
         game.checkPuzzle(
           settings,
           manualCheck: true,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
           onPuzzleCompleted: () => completed++,
         );
         expect(completed, 1, reason: 'manual validation must not debounce');
@@ -152,13 +189,23 @@ void main() {
         game.openPuzzle(_fixture(), 1);
         var completed = 0;
         _fill(game);
-        game.handleCheck(settings, onPuzzleCompleted: () => completed++);
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () => completed++,
+        );
 
         // 900 ms later (close to the edge), user taps again — puzzle still
         // complete (1 → 2) but debounce must restart from 0.
         async.elapse(const Duration(milliseconds: 900));
         game.handleTap(0);
-        game.handleCheck(settings, onPuzzleCompleted: () => completed++);
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () => completed++,
+        );
 
         // 500 ms after the new tap is still within the 1s window.
         async.elapse(const Duration(milliseconds: 500));
@@ -184,7 +231,12 @@ void main() {
         // Filling with four 1s therefore fails the constraint.
         game.openPuzzle(PuzzleData('v2_12_2x2_0000_QA:1.2_0_0'), 1);
         _fill(game);
-        game.handleCheck(settings, onPuzzleCompleted: () {});
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () {},
+        );
 
         // Before the debounce fires, the top message is still empty — the
         // user has not yet been told about the error.
@@ -210,7 +262,12 @@ void main() {
         game.openPuzzle(_fixture(), 1);
         var completed = 0;
         _fill(game);
-        game.handleCheck(settings, onPuzzleCompleted: () => completed++);
+        game.handleCheck(
+          settings,
+          invalidConstraintsText: _invalidMsg,
+          errorsCountText: _errorsMsg,
+          onPuzzleCompleted: () => completed++,
+        );
 
         async.elapse(const Duration(milliseconds: 400));
         game.pause();

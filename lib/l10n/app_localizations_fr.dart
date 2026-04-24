@@ -511,4 +511,13 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingTutorialRestarted =>
       'Statistiques du didacticiel effacées.';
+
+  @override
+  String get someConstraintsInvalid =>
+      'Certaines contraintes ne sont pas valides.';
+
+  @override
+  String errorsCount(int count) {
+    return '$count erreurs.';
+  }
 }
