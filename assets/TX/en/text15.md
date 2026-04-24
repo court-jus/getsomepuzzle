@@ -1,1 +1,5 @@
-Start with the obvious ones, you should be able to solve this one easily now.
+This circle represents a **central** symmetry.
+
+You can also see it as a half-turn rotation.
+
+Again, the group that contains the symbol must respect the rule.

@@ -1,13 +1,13 @@
-# Hi, welcome to this tutorial.
+# Hola, bienvenido a este tutorial.
 
-Your goal is to fill the grid with white and black cells while following some rules. Click or touch a cell to change its color.
+Tu objetivo es llenar la cuadrícula con celdas blancas y negras respetando ciertas reglas. Haz clic o toca una celda para cambiar su color.
 
-Cells with a thicker border are fixed and cannot be changed.
+Las celdas con un borde más grueso están fijas y no pueden modificarse.
 
-When cells contain letters, identical letters should form groups of the same color.
+Cuando las celdas contienen letras, las letras idénticas deben formar grupos del mismo color.
 
-A **group** contains all the cell of the **same color** that are **orthogonally** connected
+Todas las celdas de un **grupo** son del **mismo color** y están conectadas **ortogonalmente**. La cuadrícula puede contener varios grupos distintos del mismo color, separados entre sí.
 
-Different letters cannot be part of the same group.
+Las letras distintas no pueden pertenecer al mismo grupo.
 
-*Complete this puzzle to move on.*
+*Resuelve este puzle para continuar.*

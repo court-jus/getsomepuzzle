@@ -6,7 +6,7 @@ Cells with a thicker border are fixed and cannot be changed.
 
 When cells contain letters, identical letters should form groups of the same color.
 
-A **group** contains all the cell of the **same color** that are **orthogonally** connected.
+All cells of a **group** are of the **same color** and are connected **orthogonally**. The grid can contain several distinct groups of the same color, separated from each other.
 
 Different letters cannot be part of the same group.
 

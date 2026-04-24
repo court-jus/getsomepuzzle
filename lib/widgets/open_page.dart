@@ -37,7 +37,25 @@ class _OpenPageState extends State<OpenPage> {
   void initState() {
     super.initState();
     collection = widget.database.collection;
-    updateMatchingCount();
+    // If the player just landed on Open-page while the tutorial collection is
+    // fully completed, surface the main collection instead so the list isn't
+    // empty. The actual switch is done async to avoid setState-during-build.
+    final tutorialDone =
+        collection == 'tutorial' &&
+        widget.database.puzzles.isNotEmpty &&
+        widget.database.puzzles.every((p) => p.played);
+    if (tutorialDone) {
+      collection = 'default';
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.database.loadPuzzlesFile('default').then((_) {
+          if (!mounted) return;
+          setState(updateMatchingCount);
+        });
+      });
+    } else {
+      updateMatchingCount();
+    }
   }
 
   void applyFilter({

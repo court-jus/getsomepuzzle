@@ -1,3 +1,9 @@
-Sometimes you have to think a bit more.
+Otra nueva regla: **Tamaño de grupo**.
 
-You probably want to start with the constraints that are obvious.
+Cuando una celda contiene un **número**, debe formar parte de un grupo de ese tamaño.
+
+Por ejemplo, una celda que contiene un «3» debe pertenecer a un grupo de 3 celdas.
+
+----
+
+Recuerda: todas las celdas de un **grupo** son del **mismo color** y están conectadas **ortogonalmente**.

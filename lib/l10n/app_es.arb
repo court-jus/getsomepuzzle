@@ -99,6 +99,10 @@
         }
     },
     "endOfPlaylistMaxLevel": "Has alcanzado la cima del catálogo.",
+    "endOfPlaylistTutorialFinished": "Has terminado el tutorial.",
+    "endOfPlaylistTutorialHaveFun": "¡Diviértete!",
+    "endOfPlaylistTutorialStartPlaying": "Empezar a jugar",
+    "endOfPlaylistTutorialAutoLevelNote": "La dificultad se adaptará automáticamente a tu habilidad. Puedes desactivarlo en los ajustes.",
     "hintDeducedFrom": "Esta celda se puede deducir gracias a la restricción: {constraintName}",
     "hintForce": "Esta celda se puede deducir combinando múltiples restricciones",
     "hintImpossible": "Una restricción está violada — se ha cometido un error",
@@ -185,5 +189,10 @@
     "constraintColumnCount": "células por columna",
     "@constraintColumnCount": {
         "description": "Name of the column count constraint"
-    }
+    },
+    "settingTutorialSection": "Tutorial",
+    "settingRestartTutorial": "Reiniciar el tutorial",
+    "settingRestartTutorialConfirmTitle": "¿Reiniciar el tutorial?",
+    "settingRestartTutorialConfirmBody": "Tu progreso en los puzles del tutorial se borrará. Esta acción no se puede deshacer.",
+    "settingTutorialRestarted": "Estadísticas del tutorial borradas."
 }

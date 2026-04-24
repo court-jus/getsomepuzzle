@@ -1,5 +1,3 @@
-Ce cercle représente une symétrie **centrale**.
+Voici la contrainte de **parité**, représentée par des flèches.
 
-Vous pouvez aussi la voir comme une rotation d'un demi-tour.
-
-À nouveau, le groupe qui contient le symbole doit respecter la contrainte.
+Une flèche indique qu'il doit y avoir autant de cases noires que de cases blanches dans cette direction.

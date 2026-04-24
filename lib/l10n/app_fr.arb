@@ -99,6 +99,10 @@
         }
     },
     "endOfPlaylistMaxLevel": "Vous avez atteint le sommet du catalogue.",
+    "endOfPlaylistTutorialFinished": "Vous avez terminé le tutoriel.",
+    "endOfPlaylistTutorialHaveFun": "Amusez-vous bien !",
+    "endOfPlaylistTutorialStartPlaying": "Commencer à jouer",
+    "endOfPlaylistTutorialAutoLevelNote": "La difficulté s'adaptera automatiquement à votre niveau. Vous pouvez désactiver cette option dans les paramètres.",
     "hintDeducedFrom": "Cette cellule peut être déduite grâce à la contrainte : {constraintName}",
     "hintForce": "Cette cellule peut être déduite en combinant plusieurs contraintes",
     "hintImpossible": "Une contrainte est violée — une erreur a été commise",
@@ -185,5 +189,10 @@
     "constraintColumnCount": "cellules par colonne",
     "@constraintColumnCount": {
         "description": "Name of the column count constraint"
-    }
+    },
+    "settingTutorialSection": "Didacticiel",
+    "settingRestartTutorial": "Recommencer le didacticiel",
+    "settingRestartTutorialConfirmTitle": "Recommencer le didacticiel ?",
+    "settingRestartTutorialConfirmBody": "Votre progression sur les puzzles du didacticiel sera effacée. Cette action est irréversible.",
+    "settingTutorialRestarted": "Statistiques du didacticiel effacées."
 }

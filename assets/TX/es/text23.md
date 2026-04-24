@@ -1,3 +1,3 @@
-This is the last puzzle in the tutorial.
+Este es el último puzle del tutorial.
 
-After solving it you should go open some puzzles, I suggest you start with the collection 'A'.
+Tras resolverlo, abre otros puzles desde el menú — te sugiero empezar por «Collection 1».

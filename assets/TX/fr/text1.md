@@ -6,7 +6,7 @@ Les cases avec une bordure plus épaisse sont fixées et ne peuvent pas être ch
 
 Lorsque des cases contiennent des lettres, les lettres identiques doivent faire partie du même groupe.
 
-Un **groupe** contient toutes les cellules connectées **orthogonalement** de **même couleur**.
+Toutes les cellules d'un **groupe** sont de la **même couleur** et connectées **orthogonalement**. La grille peut contenir plusieurs groupes distincts de la même couleur, séparés les uns des autres.
 
 Des lettres différentes ne peuvent pas faire partie du même groupe.
 

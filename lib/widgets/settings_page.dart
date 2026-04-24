@@ -6,10 +6,15 @@ class SettingsPage extends StatefulWidget {
   final Settings settings;
   final ValueChanged<ChangeableSettings> onSettingsChange;
 
+  /// Callback that wipes the player's stats on tutorial puzzles. Awaited so
+  /// the snackbar only fires after the async work is done.
+  final Future<void> Function() onRestartTutorial;
+
   const SettingsPage({
     super.key,
     required this.settings,
     required this.onSettingsChange,
+    required this.onRestartTutorial,
   });
 
   @override
@@ -195,6 +200,20 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 24),
+                    Text(
+                      l10n.settingTutorialSection,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.refresh),
+                        label: Text(l10n.settingRestartTutorial),
+                        onPressed: _confirmRestartTutorial,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -203,6 +222,33 @@ class _SettingsPageState extends State<SettingsPage> {
         },
       ),
     );
+  }
+
+  Future<void> _confirmRestartTutorial() async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.settingRestartTutorialConfirmTitle),
+        content: Text(l10n.settingRestartTutorialConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await widget.onRestartTutorial();
+    if (!mounted) return;
+    // Pop back to the game screen so the player lands directly on the first
+    // tutorial puzzle that the callback just queued up.
+    Navigator.of(context).pop();
   }
 }
 

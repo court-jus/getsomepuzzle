@@ -538,6 +538,30 @@ abstract class AppLocalizations {
   /// **'You\'ve reached the top of the catalog.'**
   String get endOfPlaylistMaxLevel;
 
+  /// Main message shown when the player completes every tutorial puzzle
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve finished the tutorial.'**
+  String get endOfPlaylistTutorialFinished;
+
+  /// Encouragement shown right after the tutorial-finished message
+  ///
+  /// In en, this message translates to:
+  /// **'Have fun!'**
+  String get endOfPlaylistTutorialHaveFun;
+
+  /// Primary button that takes the player to Collection 1 with auto-level enabled
+  ///
+  /// In en, this message translates to:
+  /// **'Start playing'**
+  String get endOfPlaylistTutorialStartPlaying;
+
+  /// Small caption below the Start Playing button, explaining auto-level
+  ///
+  /// In en, this message translates to:
+  /// **'The difficulty will adapt automatically to your skill. You can disable this in settings.'**
+  String get endOfPlaylistTutorialAutoLevelNote;
+
   /// Hint message shown when the player clicks the lightbulb to get a clue
   ///
   /// In en, this message translates to:
@@ -999,6 +1023,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My puzzles'**
   String get collectionMyPuzzles;
+
+  /// Header of the tutorial-related settings section
+  ///
+  /// In en, this message translates to:
+  /// **'Tutorial'**
+  String get settingTutorialSection;
+
+  /// Button label that restarts the tutorial by erasing tutorial puzzle stats
+  ///
+  /// In en, this message translates to:
+  /// **'Restart tutorial'**
+  String get settingRestartTutorial;
+
+  /// Title of the confirmation dialog for the restart-tutorial action
+  ///
+  /// In en, this message translates to:
+  /// **'Restart tutorial?'**
+  String get settingRestartTutorialConfirmTitle;
+
+  /// Body text of the confirmation dialog for the restart-tutorial action
+  ///
+  /// In en, this message translates to:
+  /// **'Your progress on tutorial puzzles will be erased. This cannot be undone.'**
+  String get settingRestartTutorialConfirmBody;
+
+  /// Snackbar message shown after tutorial stats have been cleared
+  ///
+  /// In en, this message translates to:
+  /// **'Tutorial stats cleared.'**
+  String get settingTutorialRestarted;
 }
 
 class _AppLocalizationsDelegate

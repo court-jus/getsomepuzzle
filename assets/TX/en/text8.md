@@ -1,3 +1,5 @@
-Some complex rules can lead to a repetitive pattern in the grid.
+New rule: **Neighbor count**.
 
-Be careful, only the rules matter, don't try to extrapolate the end result.
+A cross drawn inside a cell shows how many of that cell's **orthogonal neighbors** must be of the cross's color.
+
+For example, a black cross with "2" means the cell has exactly 2 black neighbors (among up, down, left, right).

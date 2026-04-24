@@ -601,6 +601,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   MaterialPageRoute(
                     builder: (context) => SettingsPage(
                       settings: settings,
+                      onRestartTutorial: () async {
+                        if (database == null) return;
+                        await database!.restartTutorial();
+                        // Switch to the tutorial collection (reloads puzzles
+                        // + stats + playlist) and open the first puzzle.
+                        await database!.loadPuzzlesFile('tutorial');
+                        game.clearPuzzle();
+                        loadPuzzle();
+                        setState(() {});
+                      },
                       onSettingsChange: (newValue) {
                         final autoLevelTurnedOn =
                             newValue.autoLevel == true && !settings.autoLevel;
@@ -717,6 +727,27 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                               else
                                 EndOfPlaylist(
                                   currentLevel: settings.playerLevel,
+                                  isTutorial:
+                                      database?.collection == 'tutorial',
+                                  onStartPlaying: () async {
+                                    if (database == null) return;
+                                    settings.change(
+                                      ChangeableSettings(
+                                        playerLevel: 0,
+                                        autoLevel: true,
+                                      ),
+                                    );
+                                    database!.setPlayerLevel(0);
+                                    // Must be awaited before loadPuzzlesFile:
+                                    // loadPuzzlesFile reads shouldShuffle from
+                                    // prefs, so the flip must be persisted first.
+                                    await database!.setShouldShuffle(false);
+                                    await database!.loadPuzzlesFile('default');
+                                    if (database!.playlist.isNotEmpty) {
+                                      loadPuzzle();
+                                    }
+                                    setState(() {});
+                                  },
                                   filtersBlocking:
                                       database
                                           ?.hasUnplayedAtLevelIgnoringFilters(

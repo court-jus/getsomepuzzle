@@ -305,6 +305,22 @@
     "@endOfPlaylistMaxLevel": {
         "description": "Message shown when there is no higher level with puzzles available"
     },
+    "endOfPlaylistTutorialFinished": "You've finished the tutorial.",
+    "@endOfPlaylistTutorialFinished": {
+        "description": "Main message shown when the player completes every tutorial puzzle"
+    },
+    "endOfPlaylistTutorialHaveFun": "Have fun!",
+    "@endOfPlaylistTutorialHaveFun": {
+        "description": "Encouragement shown right after the tutorial-finished message"
+    },
+    "endOfPlaylistTutorialStartPlaying": "Start playing",
+    "@endOfPlaylistTutorialStartPlaying": {
+        "description": "Primary button that takes the player to Collection 1 with auto-level enabled"
+    },
+    "endOfPlaylistTutorialAutoLevelNote": "The difficulty will adapt automatically to your skill. You can disable this in settings.",
+    "@endOfPlaylistTutorialAutoLevelNote": {
+        "description": "Small caption below the Start Playing button, explaining auto-level"
+    },
     "hintDeducedFrom": "This cell can be deduced from the {constraintName} constraint",
     "@hintDeducedFrom": {
         "description": "Hint message shown when the player clicks the lightbulb to get a clue",
@@ -500,5 +516,25 @@
     "collectionMyPuzzles": "My puzzles",
     "@collectionMyPuzzles": {
         "description": "Label of the custom puzzles collection"
+    },
+    "settingTutorialSection": "Tutorial",
+    "@settingTutorialSection": {
+        "description": "Header of the tutorial-related settings section"
+    },
+    "settingRestartTutorial": "Restart tutorial",
+    "@settingRestartTutorial": {
+        "description": "Button label that restarts the tutorial by erasing tutorial puzzle stats"
+    },
+    "settingRestartTutorialConfirmTitle": "Restart tutorial?",
+    "@settingRestartTutorialConfirmTitle": {
+        "description": "Title of the confirmation dialog for the restart-tutorial action"
+    },
+    "settingRestartTutorialConfirmBody": "Your progress on tutorial puzzles will be erased. This cannot be undone.",
+    "@settingRestartTutorialConfirmBody": {
+        "description": "Body text of the confirmation dialog for the restart-tutorial action"
+    },
+    "settingTutorialRestarted": "Tutorial stats cleared.",
+    "@settingTutorialRestarted": {
+        "description": "Snackbar message shown after tutorial stats have been cleared"
     }
 }

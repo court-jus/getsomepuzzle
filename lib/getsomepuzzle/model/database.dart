@@ -432,7 +432,11 @@ class Database {
   }
 
   void preparePlaylist() {
-    if (shouldShuffle) {
+    if (collection == 'tutorial') {
+      // Tutorial has a fixed pedagogical order: no shuffle, no level
+      // filtering, no user filters — just skip puzzles already completed.
+      playlist = puzzles.where((p) => !p.played).toList();
+    } else if (shouldShuffle) {
       playlist = filter().toList();
       playlist.shuffle();
     } else {
@@ -441,6 +445,66 @@ class Database {
     log.info(
       "Playlist prepared with ${playlist.length} puzzles (shuffled: $shouldShuffle)",
     );
+  }
+
+  /// Erase every stat entry belonging to a tutorial puzzle and reset the
+  /// in-memory flags on any tutorial puzzle currently loaded. After this the
+  /// player can replay the tutorial from scratch.
+  Future<void> restartTutorial() async {
+    final tutorialAsset = await rootBundle.loadString('assets/tutorial.txt');
+    final tutorialLines = tutorialAsset
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty && !l.startsWith('#'))
+        .toSet();
+
+    // Reset in-memory flags on any currently-loaded tutorial puzzle.
+    for (final puz in puzzles) {
+      if (!tutorialLines.contains(puz.lineRepresentation)) continue;
+      puz.played = false;
+      puz.finished = null;
+      puz.skipped = null;
+      puz.liked = null;
+      puz.disliked = null;
+      puz.pleasure = null;
+      puz.duration = 0;
+      puz.failures = 0;
+      puz.hints = 0;
+    }
+
+    // Remove tutorial entries from the persisted stats. Unlike `writeStats`
+    // (which only sees the currently loaded collection), we rewrite the stats
+    // file in-place, keeping every entry that doesn't belong to the tutorial.
+    bool keepLine(String line) {
+      final entry = StatEntry.parse(line);
+      return entry == null || !tutorialLines.contains(entry.puzzleLine);
+    }
+
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in prefs.getKeys().toList()) {
+        if (!key.startsWith('stats')) continue;
+        final existing = prefs.getStringList(key) ?? [];
+        await prefs.setStringList(key, existing.where(keepLine).toList());
+      }
+    } else {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final statsPath = p.join(
+        documentsDirectory.path,
+        'getsomepuzzle',
+        'stats.txt',
+      );
+      final file = File(statsPath);
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final kept = content.split('\n').where(keepLine).toList();
+        await file.writeAsString(kept.join('\n'), mode: FileMode.writeOnly);
+      }
+    }
+
+    if (collection == 'tutorial') {
+      preparePlaylist();
+    }
   }
 
   void removePuzzleFromPlaylist(PuzzleData puz) {

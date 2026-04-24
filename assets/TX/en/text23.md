@@ -1,3 +1,3 @@
 This is the last puzzle in the tutorial.
 
-After solving it you should go open some puzzles, I suggest you start with the collection 'A'.
+After solving it you can open other puzzles from the menu — I suggest you start with "Collection 1".

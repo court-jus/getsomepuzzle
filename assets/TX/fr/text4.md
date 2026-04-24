@@ -1,3 +1,9 @@
-Parfois il faudra réfléchir un peu plus.
+Voici une autre nouvelle contrainte : **Taille de groupe**.
 
-Vous voudrez probablement commencer par les contraintes les plus évidentes.
+Lorsqu'une case contient un **nombre**, elle doit faire partie d'un groupe de cette taille.
+
+Par exemple, une case contenant un « 3 » doit faire partie d'un groupe de 3 cases.
+
+----
+
+Rappel : toutes les cellules d'un **groupe** sont de la **même couleur** et connectées **orthogonalement**.

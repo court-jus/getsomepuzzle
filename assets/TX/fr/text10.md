@@ -1,3 +1,3 @@
-Il peut également y avoir des flèches doubles.
+Nouvelle contrainte : **Motif interdit**.
 
-Dans ce cas, les deux directions doivent respecter la contrainte.
+Encore une contrainte affichée au-dessus de la grille. Celle-ci, sur **fond violet**, montre un motif qui **ne doit pas** apparaître dans votre grille finie.

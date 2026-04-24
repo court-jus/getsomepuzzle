@@ -1,3 +1,5 @@
-Some complex rules can lead to a repetitive pattern in the grid.
+Nueva regla: **Cuenta de vecinos**.
 
-Be careful, only the rules matter, don't try to extrapolate the end result.
+Una cruz dibujada dentro de una celda indica cuántos **vecinos ortogonales** de esa celda deben ser del color de la cruz.
+
+Por ejemplo, una cruz negra con un «2» significa que la celda tiene exactamente 2 vecinos negros (entre arriba, abajo, izquierda, derecha).

@@ -1,1 +1,1 @@
-You may have noticed the arrow to undo your last move?
+The pause menu also lets you restart the current puzzle from scratch.

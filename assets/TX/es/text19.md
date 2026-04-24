@@ -1,1 +1,1 @@
-You may have noticed the arrow to undo your last move?
+El menú de pausa también te permite reiniciar el puzle actual desde el principio.

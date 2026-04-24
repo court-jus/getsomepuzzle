@@ -1,9 +1,3 @@
-La contrainte de **symétrie** est représentée par des barres.
+Certains motifs interdits contiennent des cases vides.
 
-Une cellule contenant une barre doit faire partie d'un groupe symétrique selon cet axe.
-
-La symétrie ne peut pas s'étendre au delà des limites de la grille.
-
-----
-
-Souvenez-vous qu'un **groupe** contient toutes les cellules de **même couleur** connectées **orthogonalement**.
+Cela signifie que la couleur à cet endroit ne fait pas partie du motif : le motif est interdit quelle que soit la couleur finale de cette case « vide ».

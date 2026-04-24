@@ -1,3 +1,5 @@
-The **parity** rule is represented by arrows.
+Nueva regla: **Número de grupos**.
 
-An arrow like this means that there is the same number of white and black cells in that direction.
+Esta regla indica cuántos **grupos distintos** de un color determinado debe contener la cuadrícula.
+
+Por ejemplo, «3 grupos negros» significa que la cuadrícula final debe tener exactamente 3 grupos separados de celdas negras.

@@ -1,3 +1,5 @@
-Commencez avec les contraintes les plus évidentes.
+Ce cercle représente une symétrie **centrale**.
 
-Vous devriez pouvoir résoudre celui-ci facilement maintenant.
+Vous pouvez aussi la voir comme une rotation d'un demi-tour.
+
+À nouveau, le groupe qui contient le symbole doit respecter la contrainte.

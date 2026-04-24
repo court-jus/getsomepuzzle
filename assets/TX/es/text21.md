@@ -1,1 +1,1 @@
-In the pause menu, there is also a link to open other puzzles, you will use it when the tutorial will be finished.
+En el menú de pausa también hay un enlace para abrir otros puzles; lo usarás cuando termines el tutorial.

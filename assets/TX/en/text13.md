@@ -1,3 +1,3 @@
-The axial symmetry can be **diagonal**.
+An arrow can be double.
 
-Here again, the group containing the symbol must be symmetrical along the axis.
+In that case, both directions should be considered.

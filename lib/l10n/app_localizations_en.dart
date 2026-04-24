@@ -236,6 +236,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get endOfPlaylistMaxLevel => 'You\'ve reached the top of the catalog.';
 
   @override
+  String get endOfPlaylistTutorialFinished => 'You\'ve finished the tutorial.';
+
+  @override
+  String get endOfPlaylistTutorialHaveFun => 'Have fun!';
+
+  @override
+  String get endOfPlaylistTutorialStartPlaying => 'Start playing';
+
+  @override
+  String get endOfPlaylistTutorialAutoLevelNote =>
+      'The difficulty will adapt automatically to your skill. You can disable this in settings.';
+
+  @override
   String hintDeducedFrom(String constraintName) {
     return 'This cell can be deduced from the $constraintName constraint';
   }
@@ -475,4 +488,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get collectionMyPuzzles => 'My puzzles';
+
+  @override
+  String get settingTutorialSection => 'Tutorial';
+
+  @override
+  String get settingRestartTutorial => 'Restart tutorial';
+
+  @override
+  String get settingRestartTutorialConfirmTitle => 'Restart tutorial?';
+
+  @override
+  String get settingRestartTutorialConfirmBody =>
+      'Your progress on tutorial puzzles will be erased. This cannot be undone.';
+
+  @override
+  String get settingTutorialRestarted => 'Tutorial stats cleared.';
 }

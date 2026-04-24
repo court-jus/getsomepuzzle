@@ -238,6 +238,19 @@ class AppLocalizationsFr extends AppLocalizations {
       'Vous avez atteint le sommet du catalogue.';
 
   @override
+  String get endOfPlaylistTutorialFinished => 'Vous avez terminé le tutoriel.';
+
+  @override
+  String get endOfPlaylistTutorialHaveFun => 'Amusez-vous bien !';
+
+  @override
+  String get endOfPlaylistTutorialStartPlaying => 'Commencer à jouer';
+
+  @override
+  String get endOfPlaylistTutorialAutoLevelNote =>
+      'La difficulté s\'adaptera automatiquement à votre niveau. Vous pouvez désactiver cette option dans les paramètres.';
+
+  @override
   String hintDeducedFrom(String constraintName) {
     return 'Cette cellule peut être déduite grâce à la contrainte : $constraintName';
   }
@@ -480,4 +493,22 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get collectionMyPuzzles => 'Mes puzzles';
+
+  @override
+  String get settingTutorialSection => 'Didacticiel';
+
+  @override
+  String get settingRestartTutorial => 'Recommencer le didacticiel';
+
+  @override
+  String get settingRestartTutorialConfirmTitle =>
+      'Recommencer le didacticiel ?';
+
+  @override
+  String get settingRestartTutorialConfirmBody =>
+      'Votre progression sur les puzzles du didacticiel sera effacée. Cette action est irréversible.';
+
+  @override
+  String get settingTutorialRestarted =>
+      'Statistiques du didacticiel effacées.';
 }

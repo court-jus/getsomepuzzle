@@ -1,7 +1,5 @@
-Here is a new rule.
+Here is a new rule: **Different from**.
 
-When a cell contains a **number**, it must be part of a group of that size.
+Two cells separated by the **≠** symbol must have **different colors** — one black, one white.
 
-For example, a cell containing a "3" must be part of a group of size 3.
-
-Remember that a **group** contains all the cell of the **same color** that are **orthogonally** connected.
+The symbol can appear between cells that are adjacent horizontally or vertically.

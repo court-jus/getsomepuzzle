@@ -1,9 +1,5 @@
-Voici une nouvelle contrainte.
+Voici une nouvelle contrainte : **Différent de**.
 
-Lorsqu'une case contient un **nombre**, elle doit faire partie d'un groupe de cette taille.
+Deux cellules séparées par le symbole **≠** doivent avoir des **couleurs différentes** — une noire, une blanche.
 
-Par exemple, une case contenant un "3" doit faire partie d'un groupe de 3 cases.
-
-----
-
-Souvenez-vous qu'un **groupe** contient toutes les cellules de **même couleur** connectées **orthogonalement**.
+Le symbole peut apparaître entre des cellules adjacentes horizontalement ou verticalement.

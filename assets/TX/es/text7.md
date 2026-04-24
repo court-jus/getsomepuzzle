@@ -1,3 +1,5 @@
-Some forbidden patterns contain empty cells.
+Nueva regla: **Cuenta por columna**.
 
-This means that the pattern is forbidden whatever the color of the empty cell is in the end.
+Similar a la regla Cantidad, pero aplicada a **una sola columna**.
+
+Un número sobre una columna indica cuántas celdas del color indicado debe contener esa columna.

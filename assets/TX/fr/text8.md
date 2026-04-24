@@ -1,5 +1,5 @@
-Certains ensembles de contraintes peuvent mener à une solution sous forme de motif répétitif.
+Nouvelle contrainte : **Compte des voisins**.
 
-Ne vous y fiez pas, n'essayez pas d'extrapoler le résultat final.
+Une croix dessinée dans une case indique combien de **voisins orthogonaux** de cette case doivent être de la couleur de la croix.
 
-Seules les contraintes comptent.
+Par exemple, une croix noire contenant « 2 » signifie que la case a exactement 2 voisins noirs (parmi haut, bas, gauche, droite).
