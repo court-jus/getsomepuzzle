@@ -51,6 +51,20 @@ void main() {
       expect(ColumnCountConstraint('0.1.1').verify(p), isFalse);
     });
 
+    test('incomplete puzzle with target unreachable → invalid', () {
+      // column 0 = [1, 2, 2]: have=1 of color 1, 0 free cells in column.
+      // Puzzle overall still incomplete (free cells elsewhere) but target
+      // count=2 can never be reached for this column.
+      final p = _make('12\n20\n20');
+      expect(ColumnCountConstraint('0.1.2').verify(p), isFalse);
+    });
+
+    test('incomplete puzzle with target just reachable → valid', () {
+      // column 0 = [1, 0, 0]: have=1, freeInCol=2, target=3 → reachable
+      final p = _make('12\n02\n02');
+      expect(ColumnCountConstraint('0.1.3').verify(p), isTrue);
+    });
+
     test('checks the right column', () {
       // column 1 has [2,1,2] → 1 cell of color 1
       final p = _make('12\n21\n12');

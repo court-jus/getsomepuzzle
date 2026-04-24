@@ -111,16 +111,17 @@ class ParityConstraint extends CellsCentricConstraint {
 
   @override
   bool verify(Puzzle puzzle) {
-    final sides = _getSideValues(puzzle);
-    for (var side in sides) {
-      if (side.contains(0)) {
-        continue;
-      }
-      final int even = side.where((v) => v % 2 == 0).length;
-      final int odd = side.where((v) => v % 2 != 0).length;
-      if (even != odd) {
-        return false;
-      }
+    for (var side in _getSideValues(puzzle)) {
+      final int even = side.where((v) => v != 0 && v % 2 == 0).length;
+      final int odd = side.where((v) => v != 0 && v % 2 != 0).length;
+      final int half = side.length ~/ 2;
+      // Too many of one parity already → target `even == odd == half` is
+      // unreachable from this state (monotone non-decreasing counts).
+      if (even > half || odd > half) return false;
+      // For a fully-filled side the counts must match exactly; for an
+      // incomplete side, `even <= half && odd <= half` already guarantees the
+      // remaining free cells can be coloured to reach the balanced target.
+      if (!side.contains(0) && even != odd) return false;
     }
     return true;
   }

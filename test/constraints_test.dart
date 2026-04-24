@@ -6,6 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 import 'helpers/make_puzzle.dart';
@@ -98,6 +99,56 @@ void main() {
       // 1,1,X,2,1: top=[1,1] → 2 odd, 0 even → invalid
       final p2 = makePuzzle('1\n1\n1\n2\n1');
       expect(ParityConstraint('2.vertical').verify(p2), isFalse);
+    });
+
+    test('incomplete side, too many evens → invalid (unreachable)', () {
+      // 5x1 row, idx 0 right side = [2, 0, 2, 2]: even=3 > half=2 → target
+      // `even == odd == 2` can no longer be reached whatever fills the 0.
+      final p = makePuzzle('22022');
+      expect(ParityConstraint('0.right').verify(p), isFalse);
+    });
+
+    test('incomplete side, too many odds → invalid (unreachable)', () {
+      final p = makePuzzle('11011');
+      expect(ParityConstraint('0.right').verify(p), isFalse);
+    });
+
+    test('incomplete side, target still reachable → valid', () {
+      // 5x1 row, idx 0 right side = [2, 0, 1, 2]: even=2, odd=1, half=2.
+      // Filling the 0 with 1 reaches the balanced target.
+      final p = makePuzzle('12012');
+      expect(ParityConstraint('0.right').verify(p), isTrue);
+    });
+  });
+
+  group('QuantityConstraint.verify', () {
+    test('complete puzzle with exact count → valid', () {
+      // 2x2 grid with two '1' cells, target 2
+      final p = makePuzzle('12\n21');
+      expect(QuantityConstraint('1.2').verify(p), isTrue);
+    });
+
+    test('complete puzzle with wrong count → invalid', () {
+      final p = makePuzzle('12\n21');
+      expect(QuantityConstraint('1.1').verify(p), isFalse);
+    });
+
+    test('incomplete puzzle with count already exceeded → invalid', () {
+      // Three '1' cells placed, target 2 → already over.
+      final p = makePuzzle('11\n01');
+      expect(QuantityConstraint('1.2').verify(p), isFalse);
+    });
+
+    test('incomplete puzzle, target still reachable → valid', () {
+      // 1 '1' placed, 2 free cells, target 2 → reachable by colouring one free
+      final p = makePuzzle('12\n00');
+      expect(QuantityConstraint('1.2').verify(p), isTrue);
+    });
+
+    test('incomplete puzzle with target unreachable → invalid', () {
+      // 0 '1' cells placed, 2 free cells, target 3 → max achievable 2 < 3.
+      final p = makePuzzle('00\n22');
+      expect(QuantityConstraint('1.3').verify(p), isFalse);
     });
   });
 

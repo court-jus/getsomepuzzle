@@ -46,12 +46,12 @@ class ColumnCountConstraint extends Constraint {
   @override
   bool verify(Puzzle puzzle) {
     final column = puzzle.getColumns()[columnIdx];
-    final colorCount = column.where((cell) => cell.value == color).length;
-    if (puzzle.complete) {
-      return colorCount == count;
-    } else {
-      return colorCount <= count;
-    }
+    final have = column.where((cell) => cell.value == color).length;
+    if (puzzle.complete) return have == count;
+    if (have > count) return false;
+    final free = column.where((cell) => cell.value == 0).length;
+    if (have + free < count) return false;
+    return true;
   }
 
   @override

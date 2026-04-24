@@ -84,6 +84,28 @@ Fields: version, domain, dimensions, cell state, constraint definitions.
 
 - **Always run `dart format` after modifying Dart files**
 
+## Constraint invariants
+
+When adding or modifying a `Constraint` subclass in
+`lib/getsomepuzzle/constraints/`:
+
+- **`verify(puzzle)`** returns `false` **exactly** when the current state
+  already violates the constraint — either directly (broken *now*) or by
+  making future satisfaction unreachable. An incomplete-but-still-reachable
+  state returns `true`. Do not import `apply()`-flavoured forcing conditions
+  (e.g. `have + free == target`) into `verify`: those are deduction
+  conditions, not violation conditions.
+- **`apply(puzzle)`** may be more aggressive than `verify` about forcing
+  cells. It returns a `Move` or `Move(..., isImpossible: this)` on
+  contradiction. It must not report a cell value that the current state
+  already contradicts.
+- **`isCompleteFor(puzzle)`** is the grayout signal: return `true` only
+  when no future play can ever make `apply` fire again.
+- Every new constraint needs paired regression tests: a reachable-but-
+  incomplete state → `verify == true`, an unreachable-but-incomplete state
+  → `verify == false`. See `NeighborCountConstraint.verify` in
+  `test/constraints_test.dart` for a minimal template.
+
 ## Testing Guidelines
 
 - Each test must be **necessary** (not a duplicate of another test), **clear** (title and code match exactly), and **well commented** (explain what is being tested and why)

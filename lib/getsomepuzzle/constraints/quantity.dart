@@ -42,12 +42,12 @@ class QuantityConstraint extends Constraint {
 
   @override
   bool verify(Puzzle puzzle) {
-    final myValues = puzzle.cellValues.where((val) => val == value);
-    if (puzzle.complete) {
-      return myValues.length == count;
-    } else {
-      return myValues.length <= count;
-    }
+    final have = puzzle.cellValues.where((val) => val == value).length;
+    if (puzzle.complete) return have == count;
+    if (have > count) return false;
+    final free = puzzle.cellValues.where((val) => val == 0).length;
+    if (have + free < count) return false;
+    return true;
   }
 
   @override
