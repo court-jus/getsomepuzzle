@@ -680,4 +680,82 @@ void main() {
       expect(NeighborCountConstraint('4.1.1').verify(p), isTrue);
     });
   });
+
+  group('NeighborCountConstraint.apply', () {
+    test(
+      'target already reached → forces remaining free neighbors to opposite',
+      () {
+        // Neighbors of idx 4: 1=1, 3=0, 5=0, 7=1. count=2 already satisfied
+        // by the two color-1 neighbors, so any remaining free neighbor must
+        // be color-2. `apply` returns one such deduction.
+        final p = makePuzzle('010\n000\n010');
+        final move = NeighborCountConstraint('4.1.2').apply(p);
+        expect(move, isNotNull);
+        expect(move!.isImpossible, isNull);
+        expect([3, 5], contains(move.idx));
+        expect(move.value, 2);
+      },
+    );
+
+    test('free cells exactly match remaining need → forces all to target', () {
+      // 0 color-1 neighbors, 2 free (idx 5, 7), count=2 → every free
+      // neighbor must take color 1 to reach the target.
+      final p = makePuzzle('020\n201\n000');
+      final move = NeighborCountConstraint('4.1.2').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect([5, 7], contains(move.idx));
+      expect(move.value, 1);
+    });
+
+    test('already too many target-color neighbors → reports impossibility', () {
+      // 3 color-1 neighbors (1, 3, 5), 1 free (7), count=2 → no recovery
+      // possible; `apply` must flag the puzzle as impossible.
+      final p = makePuzzle('010\n111\n000');
+      final move = NeighborCountConstraint('4.1.2').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('not enough remaining cells → reports impossibility', () {
+      // 0 color-1, 1 free (7), count=2 → target unreachable even if the
+      // last free neighbor is coloured, so `apply` must detect the
+      // contradiction rather than silently returning null.
+      final p = makePuzzle('020\n202\n000');
+      final move = NeighborCountConstraint('4.1.2').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('slack available → no deduction', () {
+      // 1 color-1 (idx 1), 3 free (3, 5, 7), count=2 → any two of the free
+      // neighbors can satisfy the target; nothing is forced yet.
+      final p = makePuzzle('010\n000\n000');
+      expect(NeighborCountConstraint('4.1.2').apply(p), isNull);
+    });
+  });
+
+  group('NeighborCountConstraint.isCompleteFor', () {
+    test('all neighbors filled and target reached → complete', () {
+      // Satisfied and no free neighbor remains → grayout signal must fire:
+      // no future play can ever re-trigger `apply`.
+      final p = makePuzzle('212\n111\n212');
+      expect(NeighborCountConstraint('4.1.4').isCompleteFor(p), isTrue);
+    });
+
+    test('target reached but a free neighbor remains → not complete', () {
+      // targetColorNeighbors==count is satisfied but a free neighbor exists;
+      // `apply` will still fire (to force the opposite color) so the
+      // constraint must NOT be grayed out yet.
+      final p = makePuzzle('010\n000\n010');
+      expect(NeighborCountConstraint('4.1.2').isCompleteFor(p), isFalse);
+    });
+
+    test('invalid state (too many targets) → not complete', () {
+      // `isCompleteFor` must return false when `verify` fails, even though
+      // no future play could recover the state.
+      final p = makePuzzle('010\n111\n000');
+      expect(NeighborCountConstraint('4.1.2').isCompleteFor(p), isFalse);
+    });
+  });
 }

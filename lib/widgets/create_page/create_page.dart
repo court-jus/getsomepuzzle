@@ -27,6 +27,7 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/constraint_type_picker
 import 'package:getsomepuzzle/widgets/create_page/dialogs/different_from_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/group_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/group_size_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/neighbor_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/letter_group_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/motif_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/parity_dialog.dart';
@@ -299,6 +300,13 @@ class _CreatePageState extends State<CreatePage> {
       case ConstraintType.groupCount:
         added = await showGroupCountDialog(
           context,
+          width: _width,
+          height: _height,
+        );
+      case ConstraintType.neighborCount:
+        added = await showNeighborCountDialog(
+          context,
+          cellIdx: cellIdx,
           width: _width,
           height: _height,
         );

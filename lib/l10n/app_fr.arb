@@ -115,6 +115,7 @@
     "constraintQuantity": "quantité",
     "constraintGroupCount": "nombre de groupes",
     "constraintShape": "forme",
+    "constraintNeighborCount": "nombre de voisins",
     "constraintSymmetry": "symétrie",
     "generate": "Générer",
     "generateTitle": "Générer des puzzles",

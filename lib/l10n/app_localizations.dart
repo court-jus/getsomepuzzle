@@ -1018,6 +1018,12 @@ abstract class AppLocalizations {
   /// **'shape'**
   String get constraintShape;
 
+  /// Name of the neighbor count constraint
+  ///
+  /// In en, this message translates to:
+  /// **'neighbor count'**
+  String get constraintNeighborCount;
+
   /// Label of the custom puzzles collection
   ///
   /// In en, this message translates to:

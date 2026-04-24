@@ -487,6 +487,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintShape => 'shape';
 
   @override
+  String get constraintNeighborCount => 'neighbor count';
+
+  @override
   String get collectionMyPuzzles => 'My puzzles';
 
   @override

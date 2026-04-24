@@ -492,6 +492,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintShape => 'forme';
 
   @override
+  String get constraintNeighborCount => 'nombre de voisins';
+
+  @override
   String get collectionMyPuzzles => 'Mes puzzles';
 
   @override

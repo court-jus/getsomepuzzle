@@ -513,6 +513,10 @@
     "@constraintShape": {
         "description": "Name of the shape constraint"
     },
+    "constraintNeighborCount": "neighbor count",
+    "@constraintNeighborCount": {
+        "description": "Name of the neighbor count constraint"
+    },
     "collectionMyPuzzles": "My puzzles",
     "@collectionMyPuzzles": {
         "description": "Label of the custom puzzles collection"
