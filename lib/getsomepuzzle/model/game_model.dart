@@ -492,8 +492,9 @@ class GameModel extends ChangeNotifier {
       if (puzzle.cells[i].readonly) readonlyIndices.add(i);
     }
 
-    _hintWorker = HintWorker();
-    _hintWorker!
+    final worker = HintWorker();
+    _hintWorker = worker;
+    worker
         .compute(
           width: puzzle.width,
           height: puzzle.height,
@@ -503,11 +504,18 @@ class GameModel extends ChangeNotifier {
           readonlyIndices: readonlyIndices,
         )
         .then((result) {
+          // Drop stale results: the worker we awaited is no longer the
+          // active one (cancelled or replaced by a newer call).
+          if (!identical(worker, _hintWorker)) return;
           result.shuffle();
           availableHintConstraints = result;
           hintConstraintsReady = true;
           _hintWorker = null;
           _computeHintRanking();
+        })
+        .catchError((Object _) {
+          // Cancellation closes the receive port → first throws StateError.
+          // Nothing to do: a newer worker is in flight (or none is needed).
         });
   }
 
@@ -539,8 +547,9 @@ class GameModel extends ChangeNotifier {
     final puzzle = currentPuzzle;
     if (puzzle == null || availableHintConstraints.isEmpty) return;
 
-    _hintRankWorker = HintRankWorker();
-    _hintRankWorker!
+    final worker = HintRankWorker();
+    _hintRankWorker = worker;
+    worker
         .rank(
           width: puzzle.width,
           height: puzzle.height,
@@ -552,10 +561,17 @@ class GameModel extends ChangeNotifier {
           candidateConstraints: availableHintConstraints,
         )
         .then((result) {
+          // Drop stale results: this worker may have been cancelled and
+          // replaced by a newer one mid-flight (rapid cell changes).
+          if (!identical(worker, _hintRankWorker)) return;
           availableHintConstraints = result.ranked;
           _usefulHintCount = result.usefulCount;
           _hintRankWorker = null;
           notifyListeners();
+        })
+        .catchError((Object _) {
+          // Cancellation closes the receive port → first throws StateError.
+          // A newer ranker has already taken over (or none is needed).
         });
   }
 

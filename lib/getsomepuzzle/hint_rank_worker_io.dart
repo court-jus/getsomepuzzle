@@ -7,6 +7,7 @@ export 'hint_rank_worker_core.dart' show HintRankResult;
 
 class HintRankWorker {
   Isolate? _isolate;
+  ReceivePort? _receivePort;
 
   Future<HintRankResult> rank({
     required int width,
@@ -16,12 +17,13 @@ class HintRankWorker {
     required List<String> existingConstraints,
     required List<String> candidateConstraints,
   }) async {
-    final receivePort = ReceivePort();
+    final port = ReceivePort();
+    _receivePort = port;
 
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
       _RankParams(
-        sendPort: receivePort.sendPort,
+        sendPort: port.sendPort,
         width: width,
         height: height,
         domain: domain,
@@ -31,18 +33,24 @@ class HintRankWorker {
       ),
     );
 
-    final result = await receivePort.first as Map<String, dynamic>;
-    receivePort.close();
-    _isolate = null;
-    return HintRankResult(
-      (result['ranked'] as List).cast<String>(),
-      result['usefulCount'] as int,
-    );
+    try {
+      final result = await port.first as Map<String, dynamic>;
+      return HintRankResult(
+        (result['ranked'] as List).cast<String>(),
+        result['usefulCount'] as int,
+      );
+    } finally {
+      port.close();
+      if (identical(_receivePort, port)) _receivePort = null;
+      _isolate = null;
+    }
   }
 
   void cancel() {
     _isolate?.kill(priority: Isolate.immediate);
     _isolate = null;
+    _receivePort?.close();
+    _receivePort = null;
   }
 
   void dispose() {

@@ -6,6 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class HintWorker {
   Isolate? _isolate;
+  ReceivePort? _receivePort;
 
   Future<List<String>> compute({
     required int width,
@@ -15,12 +16,13 @@ class HintWorker {
     required Set<String> existingConstraints,
     required Set<int> readonlyIndices,
   }) async {
-    final receivePort = ReceivePort();
+    final port = ReceivePort();
+    _receivePort = port;
 
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
       _HintParams(
-        sendPort: receivePort.sendPort,
+        sendPort: port.sendPort,
         width: width,
         height: height,
         domain: domain,
@@ -30,15 +32,21 @@ class HintWorker {
       ),
     );
 
-    final result = await receivePort.first;
-    receivePort.close();
-    _isolate = null;
-    return (result as List).cast<String>();
+    try {
+      final result = await port.first;
+      return (result as List).cast<String>();
+    } finally {
+      port.close();
+      if (identical(_receivePort, port)) _receivePort = null;
+      _isolate = null;
+    }
   }
 
   void cancel() {
     _isolate?.kill(priority: Isolate.immediate);
     _isolate = null;
+    _receivePort?.close();
+    _receivePort = null;
   }
 
   void dispose() {
