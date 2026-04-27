@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -34,6 +35,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final bannedRules = (parsed['banned'] as String?)?.split(',').toSet() ?? {};
   final requiredRules =
       (parsed['required'] as String?)?.split(',').toSet() ?? {};
+  final equilibriumRequested = parsed['equilibrium'] as bool;
 
   IOSink? sink;
   if (output != null) {
@@ -42,13 +44,29 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
 
   // Load existing collection stats if output file exists
   final usageStats = <String, int>{};
+  List<String> existingLines = const [];
+  int existingPuzzles = 0;
   if (output != null && File(output).existsSync()) {
-    final existing = File(output).readAsLinesSync();
-    usageStats.addAll(PuzzleGenerator.computeUsageStats(existing));
-    stderr.writeln(
-      'Loaded ${existing.where((l) => l.trim().isNotEmpty).length} existing puzzles',
-    );
+    existingLines = File(output).readAsLinesSync();
+    usageStats.addAll(PuzzleGenerator.computeUsageStats(existingLines));
+    existingPuzzles = existingLines.where((l) => l.trim().isNotEmpty).length;
+    stderr.writeln('Loaded $existingPuzzles existing puzzles');
     _printHistogram(usageStats);
+  }
+
+  // Equilibrium needs a warm corpus to drive meaningful targets. Below the
+  // warmup threshold we silently fall back to legacy slug-only bias.
+  final equilibriumEnabled =
+      equilibriumRequested && existingPuzzles >= kEquilibriumWarmupSize;
+  if (equilibriumRequested && !equilibriumEnabled) {
+    stderr.writeln(
+      'Equilibrium: OFF (warming up: $existingPuzzles/'
+      '$kEquilibriumWarmupSize puzzles needed)',
+    );
+  } else if (equilibriumEnabled) {
+    stderr.writeln('Equilibrium: ON (use --no-equilibrium to disable)');
+  } else {
+    stderr.writeln('Equilibrium: OFF (legacy slug-only bias)');
   }
 
   int generated = 0;
@@ -73,6 +91,9 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     exit(0);
   }
 
+  final allowedSlugs = bannedRules.isEmpty
+      ? null
+      : constraintSlugs.toSet().difference(bannedRules);
   final config = GeneratorConfig(
     width: minWidth,
     height: minHeight,
@@ -82,12 +103,17 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     maxHeight: maxHeight,
     maxTime: Duration(seconds: maxTime),
     requiredRules: requiredRules,
-    bannedRules: bannedRules,
+    allowedSlugs: allowedSlugs,
     count: count,
   );
 
   final worker = GeneratorWorker();
-  final stream = worker.start(config, usageStats: usageStats);
+  final stream = worker.start(
+    config,
+    usageStats: usageStats,
+    puzzleLines: existingLines,
+    equilibriumEnabled: equilibriumEnabled,
+  );
 
   ProcessSignal.sigint.watch().listen((_) {
     worker.cancel();
@@ -111,7 +137,6 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
 
         if (sink != null) {
           sink.writeln(puzzleLine);
-          sink.flush();
         } else {
           stdout.writeln(puzzleLine);
         }
@@ -289,6 +314,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'required': null,
     'checkFile': null,
     'statsDir': null,
+    'equilibrium': true,
   };
 
   for (int i = 0; i < args.length; i++) {
@@ -322,6 +348,8 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['banned'] = args[++i];
       case '--require':
         result['required'] = args[++i];
+      case '--no-equilibrium':
+        result['equilibrium'] = false;
       case '-h':
       case '--help':
         _printUsage();
@@ -365,6 +393,9 @@ Generation options:
   -o, --output FILE       Output file (default: stdout)
       --ban RULES         Comma-separated rule slugs to exclude (e.g. FM,LT)
       --require RULES     Comma-separated rule slugs to require (e.g. PA,GS)
+      --no-equilibrium    Disable the multi-axis equilibrium bias.
+                          Default: ON. When OFF, only the legacy slug-usage
+                          bias is applied (matches pre-equilibrium behavior).
 
 General:
   -h, --help              Show this help

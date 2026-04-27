@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:math';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
 
@@ -12,10 +14,12 @@ class GeneratorWorker {
   Stream<GeneratorMessage> start(
     GeneratorConfig config, {
     Map<String, int>? usageStats,
+    List<String>? puzzleLines,
+    bool equilibriumEnabled = false,
   }) {
     _controller = StreamController<GeneratorMessage>();
 
-    _runIsolate(config, usageStats);
+    _runIsolate(config, usageStats, puzzleLines, equilibriumEnabled);
 
     return _controller!.stream;
   }
@@ -33,6 +37,8 @@ class GeneratorWorker {
   Future<void> _runIsolate(
     GeneratorConfig config,
     Map<String, int>? usageStats,
+    List<String>? puzzleLines,
+    bool equilibriumEnabled,
   ) async {
     final receivePort = ReceivePort();
 
@@ -47,10 +53,12 @@ class GeneratorWorker {
         minHeight: config.minHeight,
         maxHeight: config.maxHeight,
         requiredRules: config.requiredRules.toList(),
-        bannedRules: config.bannedRules.toList(),
+        allowedSlugs: config.allowedSlugs?.toList(),
         maxTimeMs: config.maxTime.inMilliseconds,
         count: config.count,
         usageStats: usageStats,
+        puzzleLines: puzzleLines,
+        equilibriumEnabled: equilibriumEnabled,
       ),
     );
 
@@ -86,10 +94,13 @@ class _IsolateParams {
   final SendPort sendPort;
   final int width, height;
   final int? minWidth, maxWidth, minHeight, maxHeight;
-  final List<String> requiredRules, bannedRules;
+  final List<String> requiredRules;
+  final List<String>? allowedSlugs;
   final int maxTimeMs;
   final int count;
   final Map<String, int>? usageStats;
+  final List<String>? puzzleLines;
+  final bool equilibriumEnabled;
 
   _IsolateParams({
     required this.sendPort,
@@ -100,10 +111,12 @@ class _IsolateParams {
     this.minHeight,
     this.maxHeight,
     required this.requiredRules,
-    required this.bannedRules,
+    this.allowedSlugs,
     required this.maxTimeMs,
     required this.count,
     this.usageStats,
+    this.puzzleLines,
+    this.equilibriumEnabled = false,
   });
 }
 
@@ -116,26 +129,68 @@ void _isolateEntryPoint(_IsolateParams params) {
   final maxTime = Duration(milliseconds: params.maxTimeMs);
   final usageStats = params.usageStats != null
       ? Map<String, int>.from(params.usageStats!)
-      : null;
+      : <String, int>{};
+  final baseAllowedSlugs = params.allowedSlugs?.toSet();
+  final requiredSet = params.requiredRules.toSet();
+
+  // Equilibrium state
+  EquilibriumStats? equiStats;
+  TargetUniverse? universe;
+  final failureCounts = <String, int>{};
+  final blacklist = <String>{};
+  if (params.equilibriumEnabled) {
+    equiStats = EquilibriumStats.fromLines(params.puzzleLines ?? const []);
+    universe = TargetUniverse(
+      allowedSlugs: baseAllowedSlugs ?? constraintSlugs.toSet(),
+      minWidth: effectiveMinW,
+      maxWidth: effectiveMaxW,
+      minHeight: effectiveMinH,
+      maxHeight: effectiveMaxH,
+    );
+  }
 
   int generated = 0;
   final stopwatch = Stopwatch()..start();
 
   while (generated < params.count && stopwatch.elapsed < maxTime) {
-    final w = effectiveMinW + rng.nextInt(effectiveMaxW - effectiveMinW + 1);
-    final h = effectiveMinH + rng.nextInt(effectiveMaxH - effectiveMinH + 1);
+    Target? target;
+    int w;
+    int h;
+    Set<String>? allowedSlugs = baseAllowedSlugs;
+    Set<String> required = requiredSet;
+    int? exactNTypes;
+
+    if (params.equilibriumEnabled && universe != null && equiStats != null) {
+      target = pickTarget(equiStats, universe, blacklistedKeys: blacklist);
+      // Random width/height by default; target may override.
+      w = effectiveMinW + rng.nextInt(effectiveMaxW - effectiveMinW + 1);
+      h = effectiveMinH + rng.nextInt(effectiveMaxH - effectiveMinH + 1);
+      if (target != null) {
+        final resolved = _resolveTarget(target, universe, requiredSet, rng);
+        w = resolved.width ?? w;
+        h = resolved.height ?? h;
+        allowedSlugs = resolved.allowedSlugs;
+        required = resolved.required;
+        exactNTypes = resolved.exactNTypes;
+      }
+    } else {
+      w = effectiveMinW + rng.nextInt(effectiveMaxW - effectiveMinW + 1);
+      h = effectiveMinH + rng.nextInt(effectiveMaxH - effectiveMinH + 1);
+    }
 
     final config = GeneratorConfig(
       width: w,
       height: h,
-      requiredRules: params.requiredRules.toSet(),
-      bannedRules: params.bannedRules.toSet(),
+      requiredRules: required,
+      allowedSlugs: allowedSlugs,
+      exactNTypes: exactNTypes,
       maxTime: maxTime,
       count: 1,
     );
 
+    String? line;
     try {
-      final line = PuzzleGenerator.generateOne(
+      line = PuzzleGenerator.generateOne(
         config,
         usageStats: usageStats,
         onProgress: (p) {
@@ -150,31 +205,108 @@ void _isolateEntryPoint(_IsolateParams params) {
         },
         shouldStop: () => stopwatch.elapsed > maxTime,
       );
+    } catch (e) {
+      print("Generation failed for this attempt, retry");
+      line = null;
+    }
 
-      if (line != null) {
-        generated++;
-        params.sendPort.send({'type': 'puzzle', 'line': line});
+    if (line != null) {
+      generated++;
+      params.sendPort.send({'type': 'puzzle', 'line': line});
 
-        // Update usage stats for next generation
-        if (usageStats != null) {
-          final parts = line.split('_');
-          if (parts.length >= 5) {
-            final slugs = parts[4]
-                .split(';')
-                .map((c) => c.split(':').first)
-                .where((s) => s.isNotEmpty)
-                .toSet();
-            for (final slug in slugs) {
-              usageStats[slug] = (usageStats[slug] ?? 0) + 1;
-            }
-          }
+      // Update legacy usageStats (slug-only bias).
+      final parts = line.split('_');
+      Set<String> producedSlugs = {};
+      if (parts.length >= 5) {
+        producedSlugs = parts[4]
+            .split(';')
+            .map((c) => c.split(':').first)
+            .where((s) => s.isNotEmpty)
+            .toSet();
+        for (final slug in producedSlugs) {
+          usageStats[slug] = (usageStats[slug] ?? 0) + 1;
         }
       }
-    } catch (e) {
-      // Generation failed for this attempt, retry
-      print("Generation failed for this attempt, retry");
+      // Update equilibrium stats (used to pick the next target).
+      if (params.equilibriumEnabled && equiStats != null) {
+        equiStats = equiStats.withPuzzle(
+          slugs: producedSlugs,
+          width: w,
+          height: h,
+        );
+        if (target != null) failureCounts.remove(target.key);
+      }
+    } else if (target != null) {
+      // Track consecutive failures per target; blacklist after threshold.
+      final next = (failureCounts[target.key] ?? 0) + 1;
+      failureCounts[target.key] = next;
+      if (next >= kBlacklistAfterFailures) {
+        blacklist.add(target.key);
+      }
     }
   }
 
   params.sendPort.send({'type': 'done', 'generated': generated});
+}
+
+class _ResolvedTarget {
+  final int? width;
+  final int? height;
+  final Set<String>? allowedSlugs;
+  final Set<String> required;
+  final int? exactNTypes;
+
+  const _ResolvedTarget({
+    this.width,
+    this.height,
+    this.allowedSlugs,
+    required this.required,
+    this.exactNTypes,
+  });
+}
+
+/// Translate an abstract [Target] into the concrete restrictions
+/// [PuzzleGenerator.generateOne] understands. SH pre-fill is decided by the
+/// generator based on whether 'SH' ends up in [required], so we don't need
+/// to surface it here.
+_ResolvedTarget _resolveTarget(
+  Target target,
+  TargetUniverse universe,
+  Set<String> baseRequired,
+  Random rng,
+) {
+  switch (target) {
+    case SlugTarget(:final slug):
+      // Push this slug: keep all other slugs available, just require this one.
+      return _ResolvedTarget(required: {...baseRequired, slug});
+
+    case NTypesTarget():
+      // n==7 represents the "7+" bucket — try to use as many slugs as possible.
+      final desired = target.isSevenPlus ? 7 : target.n;
+      final pool = [...universe.allowedSlugs]..shuffle(rng);
+      final n = desired > pool.length ? pool.length : desired;
+      final chosen = pool.take(n).toSet();
+      return _ResolvedTarget(
+        allowedSlugs: chosen,
+        required: {...baseRequired, ...chosen},
+        exactNTypes: n,
+      );
+
+    case PairTarget(:final slugA, :final slugB):
+      final pair = {slugA, slugB};
+      return _ResolvedTarget(
+        allowedSlugs: pair,
+        required: {...baseRequired, ...pair},
+        exactNTypes: 2,
+      );
+
+    case SizeTarget(:final width, :final height):
+      // Size axis only constrains dimensions — slugs stay free, slug-bias
+      // (legacy usageStats sort) keeps doing its thing.
+      return _ResolvedTarget(
+        width: width,
+        height: height,
+        required: baseRequired,
+      );
+  }
 }

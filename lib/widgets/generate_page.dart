@@ -56,11 +56,14 @@ class _GeneratePageState extends State<GeneratePage> {
   }
 
   void _startGeneration() {
+    final allowedSlugs = _excludedRules.isEmpty
+        ? null
+        : constraintSlugs.toSet().difference(_excludedRules);
     final config = GeneratorConfig(
       width: _width,
       height: _height,
       requiredRules: _requiredRules,
-      bannedRules: _excludedRules,
+      allowedSlugs: allowedSlugs,
       maxTime: Duration(seconds: _maxTimeSeconds),
       count: _count,
     );

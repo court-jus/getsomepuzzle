@@ -14,7 +14,18 @@ class GeneratorConfig {
   final int? minHeight;
   final int? maxHeight;
   final Set<String> requiredRules;
-  final Set<String> bannedRules;
+
+  /// Restrict candidate constraints to these slugs. `null` = every slug in
+  /// the registry is allowed. Callers translate user-facing "ban" lists
+  /// into this set (`registry - banned`) before constructing the config.
+  final Set<String>? allowedSlugs;
+
+  /// If non-null, reject the generated puzzle when the final number of
+  /// distinct constraint types is not exactly this value. Used by
+  /// equilibrium for n-types and pair targets so the puzzle counts toward
+  /// the requested bin.
+  final int? exactNTypes;
+
   final Duration maxTime;
   final int count;
 
@@ -26,7 +37,8 @@ class GeneratorConfig {
     this.minHeight,
     this.maxHeight,
     this.requiredRules = const {},
-    this.bannedRules = const {},
+    this.allowedSlugs,
+    this.exactNTypes,
     this.maxTime = const Duration(seconds: 60),
     this.count = 1,
   });
@@ -88,22 +100,19 @@ class PuzzleGenerator {
     // generation trivial.
     final ratio = 0.8 + _rng.nextDouble() * 0.2;
 
-    // Build the allowed rule slugs
+    // Build the allowed rule slugs. Callers either pass an explicit set, or
+    // let it default to the full registry.
     final allSlugs = constraintRegistry.map((entry) => entry.slug).toSet();
-    final allowedSlugs = allSlugs.difference(config.bannedRules);
+    final allowedSlugs = config.allowedSlugs ?? allSlugs;
 
     // If required rules are specified, ensure at least one of each is added
     final requiredSlugs = config.requiredRules.intersection(allowedSlugs);
 
-    // 1. Create a random solved grid
-    // In case we want a "SH" constraint, this step is different
-    bool hasSH = config.requiredRules.contains("SH");
-    if (!hasSH && usageStats != null && usageStats.containsKey("SH")) {
-      final lowestUsage = usageStats.values.reduce(min);
-      if (usageStats["SH"] == lowestUsage) {
-        hasSH = true;
-      }
-    }
+    // 1. Create a random solved grid. Whenever SH must end up in the puzzle
+    // (required by the caller — CLI `--require` or equilibrium target), the
+    // pre-fill paints a valid Shape motif so the SH constraint is satisfiable.
+    final hasSH =
+        config.requiredRules.contains("SH") && allowedSlugs.contains("SH");
     final solved = hasSH
         ? _preFillSh(width, height)
         : _preFillRegular(width, height);
@@ -228,6 +237,14 @@ class PuzzleGenerator {
       if (!config.requiredRules.every((r) => presentSlugs.contains(r))) {
         return null;
       }
+    }
+
+    // Equilibrium: reject if the puzzle does not hit the exact number of
+    // distinct types requested by the target (otherwise it would count
+    // toward a different n-types or pair bin).
+    if (config.exactNTypes != null) {
+      final distinct = pu.constraints.map((c) => c.slug).toSet();
+      if (distinct.length != config.exactNTypes) return null;
     }
 
     // Compute the solved ratio (not the raw pre-filled ratio)

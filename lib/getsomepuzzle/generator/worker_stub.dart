@@ -7,6 +7,8 @@ class GeneratorWorker {
   Stream<GeneratorMessage> start(
     GeneratorConfig config, {
     Map<String, int>? usageStats,
+    List<String>? puzzleLines,
+    bool equilibriumEnabled = false,
   }) => const Stream.empty();
 
   void cancel() {}

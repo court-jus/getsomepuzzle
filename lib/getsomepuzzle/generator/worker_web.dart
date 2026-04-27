@@ -10,7 +10,11 @@ class GeneratorWorker {
   Stream<GeneratorMessage> start(
     GeneratorConfig config, {
     Map<String, int>? usageStats,
+    List<String>? puzzleLines,
+    bool equilibriumEnabled = false,
   }) {
+    // Equilibrium is CLI-only for now; the web/in-app generator keeps the
+    // legacy slug-only bias.
     _controller = StreamController<GeneratorMessage>();
     _cancelled = false;
 
