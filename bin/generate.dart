@@ -69,7 +69,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
         'min: ${durations.reduce(min)}ms, max: ${durations.reduce(max)}ms',
       );
     }
-    sink?.close();
+    // sink?.close();
     exit(0);
   }
 
