@@ -11,10 +11,13 @@ class GeneratorWorker {
     GeneratorConfig config, {
     Map<String, int>? usageStats,
     List<String>? puzzleLines,
-    bool equilibriumEnabled = false,
+    bool equilibriumRequested = false,
+    int jobsCount = 1,
+    int workerIndex = 0,
+    String? logFilePath,
   }) {
-    // Equilibrium is CLI-only for now; the web/in-app generator keeps the
-    // legacy slug-only bias.
+    // Equilibrium and warm-up are CLI-only for now; the web/in-app generator
+    // keeps the legacy slug-only bias and ignores both flags.
     _controller = StreamController<GeneratorMessage>();
     _cancelled = false;
 

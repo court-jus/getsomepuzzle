@@ -3,7 +3,6 @@ import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/other_solution.dart';
 
 /// Method used to determine a cell value during solving.
 enum SolveMethod { propagation, force }
@@ -14,17 +13,21 @@ class SolveStep {
   final int value;
   final String constraint;
   final SolveMethod method;
+  // For a force step, length of the propagation chain that exposed the
+  // contradiction. Same semantic as `Move.forceDepth`. 0 for propagation.
+  final int forceDepth;
 
   const SolveStep({
     required this.cellIdx,
     required this.value,
     required this.constraint,
     required this.method,
+    this.forceDepth = 0,
   });
 
   @override
   String toString() {
-    return '${method.name}: cell $cellIdx = $value${constraint.isNotEmpty ? ' by $constraint' : ''}';
+    return '${method.name}: cell $cellIdx = $value${constraint.isNotEmpty ? ' by $constraint' : ''}${method == SolveMethod.force ? ' (depth=$forceDepth)' : ''}';
   }
 }
 
@@ -251,39 +254,90 @@ class Puzzle {
 
   /// Try setting each free cell to each domain value on a fresh clone; if a
   /// value leads to contradiction, return the opposite as a forced move.
+  ///
+  /// Scans every (cell, value) pair and returns the move whose refutation
+  /// requires the **shortest propagation chain** (`forceDepth`). The
+  /// shallowest contradiction is what a human player can verify in their
+  /// head — picking the first one found would often hand the player a
+  /// 10-step cascade when a 1-step refutation existed elsewhere on the
+  /// grid. Short-circuits as soon as a depth-0 refutation is found (can't
+  /// do better).
   Move? _forceOneCell() {
+    Move? best;
+    int bestDepth = -1;
     for (final (idx, cell) in cells.indexed) {
       if (cell.value != 0) continue;
       for (final value in domain) {
         final clone = this.clone();
         clone.setValue(idx, value);
-        final moves = clone.propagateToFixpoint();
-        final errors = clone.check(saveResult: false);
+        final r = clone._propagateCount();
         final opposite = domain.whereNot((v) => v == value).first;
 
-        if (errors.isNotEmpty) {
-          return Move(idx, opposite, errors.first, isForce: true);
-        }
-        if (moves == null) {
-          // Re-run apply once to recover the constraint that detected the
-          // impossibility — used by the UI hint display.
+        Move? candidate;
+        int depth;
+
+        if (r.failed) {
+          // Propagation hit an explicit impossibility. Re-run apply once
+          // to recover the responsible constraint for the hint display.
           final diag = clone.apply();
-          return Move(
+          candidate = Move(
             idx,
             opposite,
             diag?.givenBy ?? clone.constraints.first,
             isForce: true,
+            forceDepth: r.moves,
           );
+          depth = r.moves;
+        } else {
+          final errors = clone.check(saveResult: false);
+          if (errors.isNotEmpty) {
+            candidate = Move(
+              idx,
+              opposite,
+              errors.first,
+              isForce: true,
+              forceDepth: r.moves,
+            );
+            depth = r.moves;
+          } else if (r.moves > 0 && clone.complete) {
+            // Cascade reached completion → the tested value is consistent
+            // and forced (the opposite would have failed elsewhere).
+            candidate = Move(
+              idx,
+              value,
+              clone.constraints.first,
+              isForce: true,
+              forceDepth: r.moves,
+            );
+            depth = r.moves;
+          } else {
+            continue;
+          }
         }
-        if (moves > 0 && clone.complete) {
-          // Propagation cascade solved everything → value is forced.
-          return Move(idx, value, clone.constraints.first, isForce: true);
+
+        if (best == null || depth < bestDepth) {
+          best = candidate;
+          bestDepth = depth;
+          if (bestDepth == 0) return best;
         }
-        // Stuck with a valid state, or trivial completion (no propagation
-        // happened) — try next value with a fresh clone.
       }
     }
-    return null;
+    return best;
+  }
+
+  /// Like `propagateToFixpoint` but always returns the move count, even
+  /// when propagation hits an impossibility. `failed=true` signals the
+  /// impossibility branch.
+  ({int moves, bool failed}) _propagateCount() {
+    int moves = 0;
+    while (true) {
+      final m = findAMove(checkErrors: false, tryForce: false);
+      if (m == null) return (moves: moves, failed: false);
+      if (m.isImpossible != null) return (moves: moves, failed: true);
+      setValue(m.idx, m.value);
+      moves++;
+      if (complete) return (moves: moves, failed: false);
+    }
   }
 
   void clearConstraintsValidity() {
@@ -313,16 +367,13 @@ class Puzzle {
     // Deep-clone constraints: the mutable UI-state fields (`isValid`,
     // `isHighlighted`, `isComplete`) must not be shared between the clone
     // and the original, else exploratory solver work on the clone (force,
-    // backtracking, findAMove) leaks state into the original puzzle.
+    // findAMove) leaks state into the original puzzle.
     p.constraints = constraints.map(_cloneConstraint).toList();
     return p;
   }
 
   static Constraint _cloneConstraint(Constraint c) {
     if (c is HelpText) return HelpText(c.text);
-    if (c is OtherSolutionConstraint) {
-      return OtherSolutionConstraint(List<int>.from(c.solution));
-    }
     final serialized = c.serialize();
     final colonIdx = serialized.indexOf(':');
     if (colonIdx < 0) return c;
@@ -371,8 +422,12 @@ class Puzzle {
   /// Compute puzzle complexity on a 0-100 scale.
   ///
   /// Three components:
-  /// - **Force rounds** (0-90): each round of forced deduction = 10 points,
-  ///   capped at 9 rounds. 100 if backtracking is needed.
+  /// - **Force effort** (0-90): each forced deduction costs `1 + depth`
+  ///   where `depth` is the propagation chain length to refutation. The
+  ///   sum is multiplied by 5 and capped at 90. A round with an immediate
+  ///   contradiction (depth 0) costs 5; one that requires the player to
+  ///   trace 8 cascading steps in their head costs 45. 100 if the puzzle
+  ///   isn't deductively solvable at all.
   /// - **Rule diversity** (0-4): number of distinct constraint types.
   ///   1 type=0, 2=1, 3=2, 4-5=3, 6+=4.
   /// - **Emptiness** (0-6): proportion of free cells.
@@ -410,10 +465,12 @@ class Puzzle {
     // Emptiness: ratio of free cells, scaled to 0-6
     final emptiness = (totalFree / size * 6).round();
 
-    // Force rounds: run findAMove to fixpoint, count moves flagged isForce.
-    // Any contradiction → needs backtracking → complexity 100.
+    // Force effort: run findAMove to fixpoint, summing (1 + forceDepth)
+    // for each forced deduction so deep cascades cost more than shallow
+    // refutations. Any contradiction → puzzle isn't deductively solvable
+    // → complexity 100.
     final test = clone();
-    int forceRounds = 0;
+    int forceEffort = 0;
     for (int step = 0; step < 1000; step++) {
       final m = test.findAMove(checkErrors: false);
       if (m == null) break;
@@ -422,7 +479,7 @@ class Puzzle {
         return 100;
       }
       test.setValue(m.idx, m.value);
-      if (m.isForce) forceRounds++;
+      if (m.isForce) forceEffort += 1 + m.forceDepth;
       if (test.complete) break;
     }
     if (test.freeCells().isNotEmpty) {
@@ -431,7 +488,7 @@ class Puzzle {
     }
 
     cachedSolution = test.cellValues;
-    final forceScore = (forceRounds * 10).clamp(0, 90);
+    final forceScore = (forceEffort * 5).clamp(0, 90);
     cachedComplexity = (forceScore + ruleDiversity + emptiness).clamp(0, 100);
     return cachedComplexity!;
   }
@@ -457,6 +514,7 @@ class Puzzle {
           value: m.value,
           constraint: m.isForce ? '' : m.givenBy.serialize(),
           method: m.isForce ? SolveMethod.force : SolveMethod.propagation,
+          forceDepth: m.isForce ? m.forceDepth : 0,
         ),
       );
       if (test.complete) return steps;
@@ -476,93 +534,32 @@ class Puzzle {
     return complete && check(saveResult: false).isEmpty;
   }
 
-  /// Full solver: propagation + force + MRV backtracking.
-  /// Returns (solved puzzle or null, steps).
-  (Puzzle?, int) solveWithBacktracking({int maxSteps = 100000, int level = 0}) {
-    final st = clone();
-    final solved = st.solve();
-    if (solved && st.complete) return (st, 0);
-    if (!st.isPossible()) {
-      // Force left state corrupted, retry with propagation only
-      final st2 = clone();
-      if (st2.propagateToFixpoint() == null) return (null, 0);
-      if (st2.freeCells().isEmpty && st2.complete) return (st2, 0);
-      return _backtrack(st2, maxSteps, level);
-    }
-    return _backtrack(st, maxSteps, level);
-  }
-
-  (Puzzle?, int) _backtrack(Puzzle st, int maxSteps, int level) {
-    int steps = 0;
-    while (steps <= maxSteps) {
-      if (st.freeCells().isEmpty &&
-          st.complete &&
-          st.check(saveResult: false).isEmpty) {
-        return (st, steps);
-      }
-      steps++;
-      // MRV heuristic: pick cell with fewest options
-      final free = st.freeCells();
-      if (free.isEmpty) return (null, steps);
-      free.sort((a, b) => a.$1.options.length.compareTo(b.$1.options.length));
-      final (cell, idx) = free.first;
-      if (cell.options.isEmpty) return (null, steps);
-      for (final option in List<int>.from(cell.options)) {
-        final clone = st.clone();
-        clone.cells[idx].setForSolver(option);
-        final (subSt, subSteps) = clone.solveWithBacktracking(
-          maxSteps: maxSteps - steps,
-          level: level + 1,
-        );
-        steps += subSteps;
-        if (subSt != null) return (subSt, steps);
-        st.cells[idx].options.remove(option);
-        if (st.cells[idx].options.isEmpty) return (null, steps);
-      }
-    }
-    return (null, steps);
-  }
-
-  List<List<int>> findSolutions({int maxSolutions = 2}) {
-    _invalidateCaches();
-    final solutions = <List<int>>[];
+  /// Validity check used everywhere a puzzle's uniqueness must be confirmed
+  /// (generator, polisher, `--check`, `removeUselessRules`).
+  ///
+  /// Returns `true` iff `solve()` (propagation + force, no backtracking)
+  /// reaches the unique completion from the readonly cells. This is the
+  /// project-wide convention: any puzzle that can't be deduced this way is
+  /// invalid by definition — it would also be unsolvable with the in-game
+  /// hint system, which uses the same `solve()` machinery.
+  bool isDeductivelyUnique() {
     final test = clone();
-    for (int i = 0; i < maxSolutions; i++) {
-      final (sol, _) = test.solveWithBacktracking();
-      if (sol == null) break;
-      solutions.add(sol.cellValues);
-      // Exclude this solution and try again
-      test.constraints.add(OtherSolutionConstraint(sol.cellValues));
-      // Reset cells to re-solve from scratch
-      for (final cell in test.cells) {
-        if (!cell.readonly) {
-          cell.value = 0;
-          cell.options = cell.domain.toList();
-        }
-      }
-      test._invalidateCaches();
-    }
-    return solutions;
+    return test.solve();
   }
 
-  /// Count distinct solutions (up to [maxSolutions]).
-  int countSolutions({int maxSolutions = 2}) {
-    return findSolutions(maxSolutions: maxSolutions).length;
-  }
-
-  /// Remove constraints that don't affect the number of solutions.
-  /// Iterates from last to first; if removing a constraint keeps
-  /// the same solution count, the constraint is useless.
+  /// Remove constraints that aren't required for the puzzle to remain
+  /// deductively solvable. Iterates from last to first; if removing a
+  /// constraint still leaves `isDeductivelyUnique()` true, that constraint
+  /// was redundant for the in-game solver and stays removed.
   void removeUselessRules() {
-    final initialCount = countSolutions();
+    if (!isDeductivelyUnique()) return;
     int i = constraints.length;
     while (i > 0) {
       i--;
       if (constraints[i] is HelpText) continue;
       final removed = constraints.removeAt(i);
-      final newCount = countSolutions();
-      if (newCount != initialCount) {
-        // Constraint was needed, put it back
+      if (!isDeductivelyUnique()) {
+        // Constraint was needed, put it back.
         constraints.insert(i, removed);
       }
     }

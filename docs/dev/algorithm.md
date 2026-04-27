@@ -33,7 +33,13 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 
 ## Solving Algorithm
 
-The solver uses three levels of deduction, applied in order of increasing cost:
+The solver uses two levels of deduction. **Backtracking is intentionally not
+implemented:** the project-wide convention is that *a puzzle is valid iff
+`solve()` (propagation + force) reaches `ratio == 0` from its readonly
+cells*. Any puzzle that would require backtracking to be solved is
+considered invalid by definition — players use the same deductive solver
+in-game, so a non-deductive puzzle wouldn't be solvable for them anyway.
+See `Puzzle.isDeductivelyUnique()` for the validity check used everywhere.
 
 ### Level 1: Constraint Propagation
 
@@ -49,12 +55,6 @@ This is more expensive: it requires cloning the puzzle and running propagation f
 
 The `autoCheck` flag is critical: after each propagation step inside force, ALL constraints are verified via `verify()`. Without this, the solver cannot detect indirect contradictions (e.g., a forbidden motif appearing as a side effect of constraint propagation).
 
-### Level 3: Backtracking (MRV)
-
-When force cannot make further progress, the solver uses backtracking with the **Minimum Remaining Values (MRV)** heuristic: it picks the free cell with the fewest remaining options and recursively tries each value. This guarantees finding a solution if one exists, but can be exponentially expensive.
-
-Puzzles requiring backtracking are assigned maximum complexity (100).
-
 ### Solving Loop
 
 ```
@@ -64,8 +64,12 @@ solve():
      a. Run force → may determine cells
      b. Run propagation → may determine more cells
      c. If neither made progress, stop
-  3. If still unsolved, use backtracking
+  3. Return true iff every cell is determined and all constraints satisfied
 ```
+
+If `solve()` returns false, the puzzle isn't deductively solvable — either
+under-constrained (multiple completions) or contradictory. There is no
+backtracking fallback.
 
 ## Puzzle Generation
 
@@ -100,9 +104,19 @@ After each successful addition, remaining candidates are reshuffled with priorit
 
 ### Step 5: Finalization
 
-- If the solved ratio reaches 0: the puzzle is fully determined by its constraints. Export it.
-- If 0 < ratio <= 0.25: fill remaining cells from the known solution (partial puzzle).
-- If ratio > 0.25: the puzzle is too under-determined. Discard and retry.
+- If the solved ratio reaches 0: the puzzle is fully determined by its
+  constraints. Verify `isDeductivelyUnique()` (always true at ratio=0) and
+  export.
+- If 0 < ratio ≤ 0.25: fill remaining cells from the known solution as
+  readonly hints, then verify `isDeductivelyUnique()` on the augmented
+  puzzle. If `solve()` still leaves cells free *with* the hints, the
+  puzzle isn't deductively solvable even with help — discard.
+- If ratio > 0.25: too under-determined. Discard and retry.
+
+There is no `countSolutions()` / backtracking unicity check. The
+`isDeductivelyUnique()` test is sufficient because reaching `ratio == 0`
+through propagation + force mechanically implies a single completion
+(every cell was deductively determined, leaving no ambiguity).
 
 ### Retry Strategy
 
@@ -126,7 +140,10 @@ complexity = force_score + rule_diversity + emptiness
 force_score = min(90, force_rounds * 10)
 ```
 
-If the puzzle requires backtracking (force is insufficient): complexity = 100.
+If the puzzle isn't deductively solvable (force itself can't close it):
+complexity = 100. Such puzzles are no longer produced by the generator —
+they would fail `isDeductivelyUnique()` — but legacy entries with
+`cplx=100` survive in `assets/default.txt` and are tagged this way.
 
 **Rule diversity (0–4):** Number of distinct constraint types in the puzzle.
 
@@ -154,7 +171,7 @@ A fully empty grid scores 6, a 50% pre-filled grid scores 3.
 | 10–29 | Easy | 1–2 force rounds, moderate diversity |
 | 30–59 | Medium | 3–5 force rounds |
 | 60–90 | Hard | 6–9 force rounds, high diversity |
-| 100 | Expert | Requires backtracking (trial and error) |
+| 100 | (legacy) | Not deductively solvable — only present in legacy entries; the current generator rejects these |
 
 ### Rationale
 

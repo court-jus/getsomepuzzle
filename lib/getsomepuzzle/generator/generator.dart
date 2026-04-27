@@ -20,11 +20,13 @@ class GeneratorConfig {
   /// into this set (`registry - banned`) before constructing the config.
   final Set<String>? allowedSlugs;
 
-  /// If non-null, reject the generated puzzle when the final number of
-  /// distinct constraint types is not exactly this value. Used by
-  /// equilibrium for n-types and pair targets so the puzzle counts toward
-  /// the requested bin.
-  final int? exactNTypes;
+  /// Slugs the equilibrium / warm-up logic would *like* to see in the final
+  /// puzzle. Soft preference only — they are pushed to the front of the
+  /// candidate sort, and they trigger SH prefill if SH is among them. The
+  /// final puzzle is accepted regardless of which preferred slugs survived
+  /// the iterative selection (cross-axis recycling: a 2-types target that
+  /// only ends up using one slug still produces a valid 1-type puzzle).
+  final Set<String> preferredSlugs;
 
   final Duration maxTime;
   final int count;
@@ -38,7 +40,7 @@ class GeneratorConfig {
     this.maxHeight,
     this.requiredRules = const {},
     this.allowedSlugs,
-    this.exactNTypes,
+    this.preferredSlugs = const {},
     this.maxTime = const Duration(seconds: 60),
     this.count = 1,
   });
@@ -105,14 +107,18 @@ class PuzzleGenerator {
     final allSlugs = constraintRegistry.map((entry) => entry.slug).toSet();
     final allowedSlugs = config.allowedSlugs ?? allSlugs;
 
-    // If required rules are specified, ensure at least one of each is added
+    // Soft and strict slug preferences. `requiredSlugs` is what the user must
+    // see in the puzzle (strictly enforced at the end). `prioritySlugs` is the
+    // union with the equilibrium-pushed `preferredSlugs` — used only for
+    // candidate prioritization and SH prefill, never for rejection.
     final requiredSlugs = config.requiredRules.intersection(allowedSlugs);
+    final preferredSlugs = config.preferredSlugs.intersection(allowedSlugs);
+    final prioritySlugs = {...requiredSlugs, ...preferredSlugs};
 
-    // 1. Create a random solved grid. Whenever SH must end up in the puzzle
-    // (required by the caller — CLI `--require` or equilibrium target), the
-    // pre-fill paints a valid Shape motif so the SH constraint is satisfiable.
-    final hasSH =
-        config.requiredRules.contains("SH") && allowedSlugs.contains("SH");
+    // 1. Create a random solved grid. Whenever SH should be tried (required
+    // by user or pushed by an equilibrium / warm-up target), the pre-fill
+    // paints a valid Shape motif so the SH constraint is satisfiable.
+    final hasSH = prioritySlugs.contains("SH");
     final solved = hasSH
         ? _preFillSh(width, height)
         : _preFillRegular(width, height);
@@ -163,14 +169,16 @@ class PuzzleGenerator {
 
     final total = allConstraints.length;
     allConstraints.shuffle(_rng);
-    // Sort by usage priority (less common types first)
+    // Sort by priority then usage. Required + preferred slugs bubble up so
+    // they are tried first — this is the only mechanism by which a target
+    // is "pushed" into the puzzle now that exactNTypes rejection is gone.
     final usage = usageStats ?? <String, int>{};
     allConstraints.sort((a, b) {
       final sa = a.slug;
       final sb = b.slug;
-      final aRequired = requiredSlugs.contains(sa) ? -1 : 0;
-      final bRequired = requiredSlugs.contains(sb) ? -1 : 0;
-      if (aRequired != bRequired) return aRequired.compareTo(bRequired);
+      final aPriority = prioritySlugs.contains(sa) ? -1 : 0;
+      final bPriority = prioritySlugs.contains(sb) ? -1 : 0;
+      if (aPriority != bPriority) return aPriority.compareTo(bPriority);
       return (usage[sa] ?? 0).compareTo(usage[sb] ?? 0);
     });
 
@@ -231,20 +239,15 @@ class PuzzleGenerator {
       });
     }
 
-    // Check required rules are present
+    // Strictly enforce the user-facing required rules (CLI `--require`).
+    // Target-pushed `preferredSlugs` are NOT enforced here — if the iterative
+    // loop never picked them, the puzzle is still credited to whatever bin it
+    // actually falls in (cross-axis recycling).
     if (config.requiredRules.isNotEmpty) {
       final presentSlugs = pu.constraints.map((c) => c.slug).toSet();
       if (!config.requiredRules.every((r) => presentSlugs.contains(r))) {
         return null;
       }
-    }
-
-    // Equilibrium: reject if the puzzle does not hit the exact number of
-    // distinct types requested by the target (otherwise it would count
-    // toward a different n-types or pair bin).
-    if (config.exactNTypes != null) {
-      final distinct = pu.constraints.map((c) => c.slug).toSet();
-      if (distinct.length != config.exactNTypes) return null;
     }
 
     // Compute the solved ratio (not the raw pre-filled ratio)
@@ -263,9 +266,11 @@ class PuzzleGenerator {
       }
     }
 
-    // Reject puzzles that are not uniquely solvable.
-    // Propagation + force can miss alternate solutions that backtracking finds.
-    if (pu.countSolutions() != 1) return null;
+    // Project-wide validity convention: a puzzle is valid iff `solve()`
+    // (propagation + force, no backtracking) reaches the unique completion
+    // from its readonly cells. This guarantees the player can solve it
+    // with the in-game hint system, which uses the same `solve()` engine.
+    if (!pu.isDeductivelyUnique()) return null;
 
     return pu.lineExport();
   }

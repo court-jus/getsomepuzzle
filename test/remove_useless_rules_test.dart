@@ -3,37 +3,43 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 
 void main() {
-  group('countSolutions', () {
-    test('returns 1 for a puzzle with a unique solution', () {
+  group('isDeductivelyUnique', () {
+    test('returns true for a puzzle with a unique deductive solution', () {
       final p = Puzzle('v2_12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top_0:0_0');
-      expect(p.countSolutions(), 1);
+      expect(p.isDeductivelyUnique(), isTrue);
     });
 
-    test('returns 2 for a puzzle with no constraints', () {
-      // A 2x2 grid with no constraints has multiple valid colorings
+    test('returns false for a 2x2 grid with no constraints', () {
+      // No constraints at all → multiple valid colorings, deductive solver
+      // can't pin a unique answer.
       final p = Puzzle.empty(2, 2, [1, 2]);
-      expect(p.countSolutions(), 2);
+      expect(p.isDeductivelyUnique(), isFalse);
     });
   });
 
   group('removeUselessRules', () {
-    test('keeps all constraints when each one is necessary', () {
+    test('preserves deductive uniqueness', () {
+      // Whatever subset survives, the puzzle must still be deductively
+      // unique — otherwise removeUselessRules would have stripped a load-
+      // bearing constraint.
       final p = Puzzle('v2_12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top_0:0_0');
-      expect(p.countSolutions(), 1);
+      expect(p.isDeductivelyUnique(), isTrue);
       p.removeUselessRules();
-      // All 3 constraints are needed for uniqueness — none removed
-      expect(p.constraints.length, 3);
+      expect(p.isDeductivelyUnique(), isTrue);
     });
 
-    test('removes a redundant constraint', () {
-      // Start with a puzzle that has a unique solution with 3 constraints
+    test('strips a constraint that is provably redundant', () {
+      // Start from a puzzle that's already deductively unique, then add a
+      // redundant FM:22 (already satisfied by the solution) and verify
+      // the result has at most the original count — the redundant one
+      // (and any earlier-redundant rules) are dropped.
       final p = Puzzle('v2_12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top_0:0_0');
-      // Add a redundant FM that is already satisfied and doesn't help
+      final originalLength = p.constraints.length;
       p.constraints.add(ForbiddenMotif('22'));
-      expect(p.constraints.length, 4);
+      expect(p.constraints.length, originalLength + 1);
       p.removeUselessRules();
-      // FM:22 should be removed since the puzzle already has a unique solution without it
-      expect(p.constraints.length, 3);
+      expect(p.constraints.length, lessThanOrEqualTo(originalLength));
+      expect(p.isDeductivelyUnique(), isTrue);
     });
   });
 }

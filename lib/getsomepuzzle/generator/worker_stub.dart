@@ -8,7 +8,10 @@ class GeneratorWorker {
     GeneratorConfig config, {
     Map<String, int>? usageStats,
     List<String>? puzzleLines,
-    bool equilibriumEnabled = false,
+    bool equilibriumRequested = false,
+    int jobsCount = 1,
+    int workerIndex = 0,
+    String? logFilePath,
   }) => const Stream.empty();
 
   void cancel() {}

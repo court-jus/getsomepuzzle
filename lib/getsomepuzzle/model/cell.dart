@@ -63,6 +63,10 @@ class Move {
   Constraint givenBy;
   Constraint? isImpossible;
   bool isForce;
+  // For a force move, length of the propagation chain that exposed the
+  // contradiction (shorter = easier for a human to verify). 0 for
+  // propagation moves and for force moves whose refutation is immediate.
+  int forceDepth;
 
   Move(
     this.idx,
@@ -70,5 +74,6 @@ class Move {
     this.givenBy, {
     this.isImpossible,
     this.isForce = false,
+    this.forceDepth = 0,
   });
 }

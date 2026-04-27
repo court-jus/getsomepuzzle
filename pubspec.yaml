@@ -86,6 +86,7 @@ flutter:
   assets:
     - assets/tutorial.txt
     - assets/default.txt
+    - assets/collection2.txt
     - assets/help.en.md
     - assets/help.fr.md
     - assets/help.es.md

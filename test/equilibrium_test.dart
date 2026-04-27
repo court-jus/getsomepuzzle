@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 
@@ -76,13 +78,13 @@ void main() {
       expect(targetShare(Axis.pair, '', 0), 0.0); // no candidates → 0
     });
 
-    test('ntypes profile reads from kTargetNTypesProfile', () {
+    test('ntypes profile reads from kTargetNTypesProfile (1..5 only)', () {
       expect(targetShare(Axis.ntypes, 1, 0), 0.25);
       expect(targetShare(Axis.ntypes, 2, 0), 0.30);
-      expect(targetShare(Axis.ntypes, 6, 0), 0.09);
-      // 7+ bucket
-      expect(targetShare(Axis.ntypes, 7, 0), kTargetSevenPlusShare);
-      expect(targetShare(Axis.ntypes, 99, 0), kTargetSevenPlusShare);
+      expect(targetShare(Axis.ntypes, 5, 0), 0.10);
+      // 6+ reliquat bucket has share 0 — never pushed.
+      expect(targetShare(Axis.ntypes, 6, 0), 0.0);
+      expect(targetShare(Axis.ntypes, 99, 0), 0.0);
     });
   });
 
@@ -199,6 +201,259 @@ void main() {
         blackAll.add(r.target.key);
       }
       expect(pickTarget(stats, universe, blacklistedKeys: blackAll), isNull);
+    });
+  });
+
+  group('sizeTargetShare', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'PA'],
+      minWidth: 4,
+      maxWidth: 7,
+      minHeight: 4,
+      maxHeight: 8,
+    );
+
+    test('sums to 1.0 across the universe', () {
+      double total = 0.0;
+      for (final (w, h) in universe.allowedSizes) {
+        total += sizeTargetShare(w, h, universe);
+      }
+      expect(total, closeTo(1.0, 1e-9));
+    });
+
+    test('peaks near area=20 and decreases on both sides', () {
+      // (4,5) and (5,4) both have area 20 → identical share, and that share
+      // should dominate the rest in this universe.
+      final sharePeak = sizeTargetShare(4, 5, universe);
+      expect(sharePeak, closeTo(sizeTargetShare(5, 4, universe), 1e-9));
+      // Move further from the peak in either direction → share shrinks.
+      expect(sizeTargetShare(4, 4, universe), lessThan(sharePeak)); // area 16
+      expect(sizeTargetShare(7, 7, universe), lessThan(sharePeak)); // area 49
+      // Right tail (σ_R=15) is wider than left (σ_L=8) so far-right values
+      // shouldn't collapse to 0 too fast — but should still be less than
+      // a same-distance left value.
+      expect(sizeTargetShare(7, 8, universe), greaterThan(0)); // area 56
+    });
+
+    test(
+      'aggregated bucket shares favor small/medium over large (per Option B)',
+      () {
+        double small = 0.0, medium = 0.0, large = 0.0;
+        for (final (w, h) in universe.allowedSizes) {
+          final s = sizeTargetShare(w, h, universe);
+          final area = w * h;
+          if (area <= 20) {
+            small += s;
+          } else if (area <= 40) {
+            medium += s;
+          } else {
+            large += s;
+          }
+        }
+        // Skew check: smalls + medium should clearly dominate larges.
+        expect(small + medium, greaterThan(large * 5));
+        // And smalls should outweigh larges (the whole point of Option B).
+        expect(small, greaterThan(large));
+      },
+    );
+  });
+
+  group('pickWeightedSize', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'PA'],
+      minWidth: 3,
+      maxWidth: 4,
+      minHeight: 3,
+      maxHeight: 4,
+    );
+
+    test('returns null when no size has a positive gap', () {
+      // Single-size universe → target share = 1.0 for that size. One puzzle
+      // saturates the bin exactly → gap = 0 everywhere → null.
+      final solo = TargetUniverse(
+        allowedSlugs: ['FM'],
+        minWidth: 4,
+        maxWidth: 4,
+        minHeight: 4,
+        maxHeight: 4,
+      );
+      var stats = EquilibriumStats.empty();
+      stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
+      expect(pickWeightedSize(stats, solo, Random(0)), isNull);
+    });
+
+    test('biased toward positive-gap bins on a sample of 1000 draws', () {
+      // 100 puzzles all on (3,3): that bin is heavily over-represented; the
+      // other three each have a positive gap (their target share is
+      // unobserved). With Option B's asymmetric Gaussian on area, (4,4)
+      // (area 16, closest to peak 20) carries the largest gap, so it gets
+      // the most picks — but all three still get sampled at least once.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 100; i++) {
+        stats = stats.withPuzzle(slugs: {'FM'}, width: 3, height: 3);
+      }
+      final rng = Random(42);
+      final counts = <(int, int), int>{};
+      for (int i = 0; i < 1000; i++) {
+        final picked = pickWeightedSize(stats, universe, rng);
+        if (picked != null) counts[picked] = (counts[picked] ?? 0) + 1;
+      }
+      // (3,3) is saturated → never returned.
+      expect(counts[(3, 3)] ?? 0, 0);
+      // The other three have positive gaps, all eligible.
+      expect(counts[(3, 4)] ?? 0, greaterThan(0));
+      expect(counts[(4, 3)] ?? 0, greaterThan(0));
+      expect(counts[(4, 4)] ?? 0, greaterThan(0));
+      // (4,4) has the biggest gap → most-picked.
+      final cMax = counts[(4, 4)] ?? 0;
+      expect(cMax, greaterThan(counts[(3, 4)] ?? 0));
+      expect(cMax, greaterThan(counts[(4, 3)] ?? 0));
+    });
+  });
+
+  group('pickWeightedSlugs', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'PA', 'GS', 'SY'],
+      minWidth: 4,
+      maxWidth: 4,
+      minHeight: 4,
+      maxHeight: 4,
+    );
+
+    test('always returns exactly n slugs (clamped to nSlugs)', () {
+      // No corpus → every slug has gap 0. The function must still return
+      // n slugs by filling with random uniform picks.
+      final stats = EquilibriumStats.empty();
+      for (final n in [0, 1, 2, 4, 99]) {
+        final picked = pickWeightedSlugs(stats, universe, n, Random(n));
+        final expected = n > 4 ? 4 : n;
+        expect(picked.length, expected);
+        expect(picked.every((s) => universe.allowedSlugs.contains(s)), isTrue);
+      }
+    });
+
+    test('biases toward under-represented slugs', () {
+      // Saturate FM and PA; GS and SY have positive gaps. Asking for 1
+      // slug should produce GS or SY almost every time.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 100; i++) {
+        stats = stats.withPuzzle(slugs: {'FM', 'PA'}, width: 4, height: 4);
+      }
+      final rng = Random(7);
+      int undersampled = 0;
+      for (int i = 0; i < 200; i++) {
+        final picked = pickWeightedSlugs(stats, universe, 1, rng);
+        if (picked.contains('GS') || picked.contains('SY')) undersampled++;
+      }
+      // Heuristic: at least 95% of draws should hit the under-represented set.
+      // (FM/PA gaps are ≤ 0 → never picked by the weighted phase, and the
+      // random fill phase only kicks in when fewer than n positive-gap
+      // candidates exist.)
+      expect(undersampled, greaterThan(190));
+    });
+  });
+
+  group('pickWarmupConfig', () {
+    final allowed = const ['FM', 'PA', 'GS', 'SY', 'QA'];
+
+    test('clamps grid sides to kWarmupMaxWidth/Height', () {
+      final rng = Random(0);
+      // User asks for 3..10 / 3..10 — warm-up clamps the upper end.
+      for (int i = 0; i < 50; i++) {
+        final wc = pickWarmupConfig(
+          minWidth: 3,
+          maxWidth: 10,
+          minHeight: 3,
+          maxHeight: 10,
+          baseAllowedSlugs: allowed,
+          baseRequired: const {},
+          rng: rng,
+        );
+        expect(wc.width, inInclusiveRange(3, kWarmupMaxWidth));
+        expect(wc.height, inInclusiveRange(3, kWarmupMaxHeight));
+      }
+    });
+
+    test(
+      'falls back to user min when it exceeds the cap (still respects --min-width)',
+      () {
+        // User explicitly asked for ≥7 wide grids — we can't honor the warm-up
+        // cap, so the floor wins (8 in this case is locked).
+        final rng = Random(1);
+        final wc = pickWarmupConfig(
+          minWidth: 8,
+          maxWidth: 8,
+          minHeight: 8,
+          maxHeight: 8,
+          baseAllowedSlugs: allowed,
+          baseRequired: const {},
+          rng: rng,
+        );
+        expect(wc.width, 8);
+        expect(wc.height, 8);
+      },
+    );
+
+    test(
+      'pool size is drawn from kWarmupNTypesPool when baseRequired is empty',
+      () {
+        final rng = Random(2);
+        final seen = <int>{};
+        for (int i = 0; i < 200; i++) {
+          final wc = pickWarmupConfig(
+            minWidth: 3,
+            maxWidth: 5,
+            minHeight: 3,
+            maxHeight: 5,
+            baseAllowedSlugs: allowed,
+            baseRequired: const {},
+            rng: rng,
+          );
+          // Pool is [1, 1, 2, 2] → only 1 or 2 ever appear in the chosen set.
+          expect(kWarmupNTypesPool, contains(wc.allowedSlugs.length));
+          // Warm-up makes preferredSlugs == allowedSlugs (both = chosen set).
+          expect(wc.preferredSlugs, equals(wc.allowedSlugs));
+          seen.add(wc.allowedSlugs.length);
+        }
+        // Both 1 and 2 should appear with random seed across 200 draws.
+        expect(seen, containsAll([1, 2]));
+      },
+    );
+
+    test('respects baseRequired even when it exceeds the warm-up pool', () {
+      // Three required slugs — pool max is 2 — must still include all 3 in
+      // the chosen set so SH prefill / sort priority work as expected.
+      final rng = Random(3);
+      final wc = pickWarmupConfig(
+        minWidth: 3,
+        maxWidth: 5,
+        minHeight: 3,
+        maxHeight: 5,
+        baseAllowedSlugs: allowed,
+        baseRequired: const {'FM', 'PA', 'GS'},
+        rng: rng,
+      );
+      expect(wc.allowedSlugs.length, 3);
+      expect(wc.allowedSlugs.containsAll({'FM', 'PA', 'GS'}), isTrue);
+      expect(wc.preferredSlugs, equals(wc.allowedSlugs));
+    });
+
+    test('drops baseRequired entries that conflict with the allowed set', () {
+      // 'XX' is not in the allowed list — it must NOT inflate the pool size.
+      final rng = Random(4);
+      final wc = pickWarmupConfig(
+        minWidth: 3,
+        maxWidth: 5,
+        minHeight: 3,
+        maxHeight: 5,
+        baseAllowedSlugs: allowed,
+        baseRequired: const {'XX', 'YY'},
+        rng: rng,
+      );
+      // baseRequired reduces to empty after intersection — pool decides size.
+      expect(kWarmupNTypesPool, contains(wc.allowedSlugs.length));
+      expect(wc.allowedSlugs.contains('XX'), isFalse);
+      expect(wc.allowedSlugs.contains('YY'), isFalse);
     });
   });
 }

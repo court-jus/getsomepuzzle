@@ -177,7 +177,12 @@ class Database {
   List<PuzzleData> playlist = [];
   int playerLevel;
   final log = Logger("Database");
-  static const _builtInCollectionKeys = {'tutorial', 'default', 'custom'};
+  static const _builtInCollectionKeys = {
+    'tutorial',
+    'default',
+    'collection2',
+    'custom',
+  };
 
   Database({required this.playerLevel});
 
@@ -191,6 +196,7 @@ class Database {
     for (final (key, label, icon) in [
       ('tutorial', 'Tutorial', UniconsLine.baby_carriage),
       ('default', 'Collection 1', UniconsLine.puzzle_piece),
+      ('collection2', 'Collection 2', UniconsLine.puzzle_piece),
       ('custom', customLabel, Icons.build),
     ])
       (
@@ -530,8 +536,8 @@ class Database {
   /// ≈ 0.92 · cells · exp(cplx/75) · 1.65^failures  (R²=0.45, MAPE=56%).
   ///
   /// `cplx` is clipped to 80: the complexity formula attributes 100 to any
-  /// puzzle needing backtracking, including those trivially guessed, which
-  /// biases the model at the high end.
+  /// puzzle that isn't deductively solvable, including those that would
+  /// require guessing — that biases the model at the high end.
   static double _expectedDuration(int cplx, int cells, int failures) {
     final clampedCplx = cplx.clamp(0, 80);
     return 0.92 *

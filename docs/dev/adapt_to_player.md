@@ -39,8 +39,11 @@ expectedDuration(cplx, cells, failures)
   the regression gave an exponent of 1.009 on `log(cells)`, i.e. duration
   grows linearly with grid size.
 - `cplx` is clipped to 80 before evaluation: the complexity function
-  attributes 100 to any puzzle that requires backtracking, including
-  easily-guessed ones, which biases the model at the top end.
+  attributes 100 to any puzzle that isn't deductively solvable
+  (`solve()` = propagation+force can't close it). Such puzzles are no
+  longer produced by the current generator but legacy entries with
+  `cplx=100` survive in `assets/default.txt`; the clamp neutralises
+  their bias on the model.
 - `1.65^failures` penalises wrong-click episodes. Rare in practice
   (≈96 % of plays have no failures), but when they occur they roughly
   double-to-triple the duration.
@@ -155,12 +158,14 @@ too-noisy a signal to be useful — hence the fallback threshold.
 
 ### Known limitation: `cplx = 100`
 
-Puzzles flagged `cplx=100` (those requiring backtracking) are not reliably
-harder than the highest non-backtracking tier. Observed durations on these
-puzzles are about half what the model predicts. The clamp to 80 in
-`_expectedDuration` neutralises this for level inference. Refining the
-complexity function to discriminate "shallow" vs "deep" backtracking is
-a separate task.
+Puzzles flagged `cplx=100` (those that aren't deductively solvable —
+i.e., would have required backtracking under the previous solver) are
+not reliably harder than the highest fully-deductive tier. Observed
+durations on these puzzles are about half what the model predicts. The
+clamp to 80 in `_expectedDuration` neutralises this for level inference.
+Going forward the generator no longer emits `cplx=100` (it requires
+`isDeductivelyUnique()` to ship), so this limitation will fade as the
+legacy corpus is replaced.
 
 ## Hints and future refinements
 

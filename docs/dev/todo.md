@@ -52,7 +52,7 @@ This is currently partially handled by the merge-too-big check on empty cells (i
 **Reachability check** (lines 98-133): when the GS cell is empty, flood-fills the connected empty region from it, then for each color sums the sizes of adjacent same-color groups. If empty region + adjacent groups < target, that color is impossible. Handles cases like `v2_12_3x4_010010101000_GS:7.5` where a color can't physically form a large enough group.
 
 **Tested (2026-04-10):**
-- `v2_12_3x4_010010101000_GS:7.5_0:0_100`: was cplx=100 (backtracking) → now **cplx=4/0 force** (reachability eliminates color 2)
+- `v2_12_3x4_010010101000_GS:7.5_0:0_100`: was cplx=100 (not deductively solvable) → now **cplx=4/0 force** (reachability eliminates color 2)
 - `v2_12_4x5_00010000002122001200_FM:10.01;GS:1.3;FM:01.12;GS:19.1;GS:3.1;FM:1.1.1_0:0_4`: was cplx=55/5 force → now **cplx=35/3 force**
 - `v2_12_4x3_010000001020_PA:9.top;FM:2.2;GS:0.1;FM:211_0:0_1`: was cplx=17/1 force → now **cplx=7/0 force**
 - `v2_12_4x3_000010000022_GS:4.4;GS:0.4;FM:01.22;GS:3.1_0:0_5`: was cplx=46/4 force → now **cplx=26/2 force** (reachability + merge-too-big combined)
