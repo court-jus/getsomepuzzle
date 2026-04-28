@@ -60,6 +60,10 @@ Un nombre dans un cercle au dessus d'une colonne indique combien de cellules de 
 
 Un nombre dans un cadre avec une icône de lien indique combien de groupes (composantes connectées) de cette couleur doivent être dans la solution.
 
+### Yeux
+
+Une case contenant un symbole d'œil doit « voir » exactement le nombre indiqué de cases de la couleur de l'œil. Une case voit en ligne droite dans chacune des quatre directions orthogonales jusqu'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue). La couleur de l'œil est la couleur cible ; la bordure autour de l'œil est la couleur opposée.
+
 ## Puzzles personnalisés
 
 ### Générer des puzzles
@@ -73,6 +77,33 @@ Ouvrez le menu et appuyez sur "Créer" pour concevoir votre propre puzzle. Vous 
 ### Playlists
 
 Les puzzles générés et créés sont sauvegardés dans des playlists. La playlist par défaut est "Mes puzzles", mais vous pouvez en créer de nouvelles depuis la page Ouvrir. Vous pouvez aussi importer des puzzles depuis un fichier.
+
+## Astuces
+
+Si vous êtes bloqué, le bouton d'astuce vous donne un coup de pouce progressif — chaque appui révèle un peu plus d'information. Dans le menu paramètres, vous pouvez choisir le type d'aide.
+
+Le premier appui est le même quel que soit le mode :
+
+- Si vous avez fait une erreur, il met en évidence la contrainte violée, ou la cellule fausse quand aucune contrainte ne le détecte directement.
+- Si tout ce que vous avez rempli jusqu'ici est correct, il vous le confirme.
+
+Les appuis suivants dépendent du mode choisi.
+
+### Cellule déductible
+
+Le mode par défaut. Après le diagnostic d'erreurs, les appuis suivants vous guident vers une déduction précise :
+
+- Deuxième appui : met en évidence une case que vous pouvez déduire.
+- Troisième appui : met aussi en évidence la contrainte qui justifie la déduction, avec une flèche reliant les deux.
+- Quatrième appui : colorie la case à votre place.
+
+Pratique quand vous voulez un petit indice sans tout vous gâcher : arrêtez-vous au deuxième appui si vous préférez trouver la justification par vous-même.
+
+### Ajout de contrainte
+
+Au lieu de désigner une case, le deuxième appui ajoute une nouvelle contrainte au puzzle. Cette règle est cohérente avec la solution et vous donne une information supplémentaire pour avancer — le puzzle devient plus simple sans qu'on vous dise quelle case remplir.
+
+Après l'ajout d'une contrainte, le cycle reprend au diagnostic d'erreurs sur l'appui suivant.
 
 ## Stats
 

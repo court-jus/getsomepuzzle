@@ -60,6 +60,10 @@ A number in a circle above a column indicates how many cells of that color must 
 
 A number in a box with a link icon indicates how many groups (connected components) of that color must be in the solution.
 
+### Eyes
+
+A cell with an eye symbol must "see" exactly the indicated number of cells of the eye's color. A cell sees in a straight line in each of the four orthogonal directions until it reaches the edge of the grid or a cell of the opposite color (which blocks the line of sight). The eye's color is the target color; the border around the eye is the opposite color.
+
 ## Custom puzzles
 
 ### Generating puzzles
@@ -73,6 +77,33 @@ Open the menu and tap "Create" to design your own puzzle. You can set the grid d
 ### Playlists
 
 Generated and created puzzles are saved to playlists. The default playlist is "My puzzles", but you can create your own playlists from the Open page. You can also import puzzles from a file.
+
+## Hints
+
+If you get stuck, the hint button gives you a progressive nudge — each tap reveals a little more. From the settings menu, you can choose how the game helps you.
+
+The first tap is the same in both modes:
+
+- If you've made a mistake, it highlights the broken constraint, or the wrong cell when no constraint catches it directly.
+- If everything you've filled so far is correct, it just confirms it.
+
+What the next taps do depends on the mode you've chosen.
+
+### Deducible cell
+
+The default mode. After the error check, the next taps walk you through one specific deduction:
+
+- Second tap: highlights a cell you can deduce.
+- Third tap: also highlights the constraint that justifies the deduction, with an arrow linking the two.
+- Fourth tap: fills the cell in for you.
+
+Useful when you want a small push without spoiling the rest: stop at the second tap if you'd rather find the reason yourself.
+
+### Add constraint
+
+Instead of pointing at a cell, the second tap adds a brand-new constraint to the puzzle. The new rule is consistent with the solution and gives you extra information to work from — the puzzle becomes easier without anyone telling you which cell to fill.
+
+After a constraint is added, the next tap restarts the cycle at the error check.
 
 ## Stats
 

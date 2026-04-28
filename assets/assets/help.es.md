@@ -60,6 +60,10 @@ Un número en un círculo encima de una columna indica cuántas celdas de ese co
 
 Un número en un cuadro con un icono de enlace indica cuántos grupos (componentes conectados) de ese color deben estar en la solución.
 
+### Ojos
+
+Una celda con un símbolo de ojo debe «ver» exactamente el número indicado de celdas del color del ojo. Una celda ve en línea recta en cada una de las cuatro direcciones ortogonales hasta llegar al borde de la cuadrícula o a una celda del color opuesto (que bloquea la línea de visión). El color del ojo es el color objetivo; el borde alrededor del ojo es el color opuesto.
+
 ## Puzzles personalizados
 
 ### Generar puzzles
@@ -73,6 +77,33 @@ Abre el menú y toca "Crear" para diseñar tu propio puzzle. Puedes definir las 
 ### Playlists
 
 Los puzzles generados y creados se guardan en playlists. La playlist por defecto es "Mis puzzles", pero puedes crear nuevas desde la página Abrir. También puedes importar puzzles desde un archivo.
+
+## Pistas
+
+Si te quedas atascado, el botón de pista te da un empujoncito progresivo — cada toque revela un poco más. Desde el menú de ajustes, puedes elegir el tipo de ayuda.
+
+El primer toque es el mismo en ambos modos:
+
+- Si has cometido un error, resalta la restricción violada, o la celda incorrecta cuando ninguna restricción lo detecta directamente.
+- Si todo lo que has rellenado hasta ahora es correcto, te lo confirma.
+
+Los toques siguientes dependen del modo elegido.
+
+### Celda deducible
+
+El modo por defecto. Tras el diagnóstico de errores, los toques siguientes te guían hacia una deducción precisa:
+
+- Segundo toque: resalta una celda que puedes deducir.
+- Tercer toque: también resalta la restricción que justifica la deducción, con una flecha que une ambas.
+- Cuarto toque: colorea la celda por ti.
+
+Útil cuando quieres una pista pequeña sin estropearte el reto: párate en el segundo toque si prefieres encontrar la justificación por ti mismo.
+
+### Añadir restricción
+
+En lugar de señalar una celda, el segundo toque añade una nueva restricción al puzzle. Esta regla es coherente con la solución y te da información adicional para avanzar — el puzzle se vuelve más fácil sin que nadie te diga qué celda rellenar.
+
+Tras añadir una restricción, el ciclo vuelve al diagnóstico de errores en el siguiente toque.
 
 ## Estadísticas
 
