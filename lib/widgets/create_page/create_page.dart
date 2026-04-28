@@ -11,6 +11,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/eyes_dialog.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -321,6 +322,8 @@ class _CreatePageState extends State<CreatePage> {
           width: _width,
           height: _height,
         );
+      case ConstraintType.eyes:
+        added = await showEyesDialog(context, cellIdx: cellIdx, width: _width, height: _height);
       case ConstraintType.fixBlack:
         _setFixedCell(cellIdx, 1);
         return;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
@@ -6,6 +7,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/widgets/eyes.dart';
 import 'package:getsomepuzzle/widgets/neighbor_count.dart';
 import 'package:getsomepuzzle/widgets/symmetry.dart';
 import 'package:getsomepuzzle/widgets/group_size.dart';
@@ -50,6 +52,9 @@ Widget constraintToFlutter(
   }
   if (constraint is NeighborCountConstraint) {
     return _neighborCountWidget(constraint, cellSize, count);
+  }
+  if (constraint is EyesConstraint) {
+    return _eyesWidget(constraint, cellSize, count);
   }
 
   // Default: use toString()
@@ -150,5 +155,19 @@ Widget _neighborCountWidget(
     width: widgetSize,
     height: widgetSize,
     child: NeighborCountWidget(constraint: constraint, cellSize: widgetSize),
+  );
+}
+
+
+Widget _eyesWidget(
+  EyesConstraint constraint,
+  double cellSize,
+  int count,
+) {
+  final double widgetSize = cellSize / count;
+  return SizedBox(
+    width: widgetSize,
+    height: widgetSize,
+    child: EyesWidget(constraint: constraint, cellSize: widgetSize),
   );
 }

@@ -539,10 +539,12 @@ class Database {
   /// puzzle that isn't deductively solvable, including those that would
   /// require guessing — that biases the model at the high end.
   static double _expectedDuration(int cplx, int cells, int failures) {
-    final clampedCplx = cplx.clamp(0, 80);
-    return 0.92 *
-        cells *
-        math.exp(clampedCplx / 75.0) *
+    final clampedCplx = cplx.clamp(0, 100) / 100;
+
+    return cells *
+        1.25 *
+        math.exp(clampedCplx) *
+        math.exp(clampedCplx) *
         math.pow(1.65, failures);
   }
 
@@ -560,7 +562,7 @@ class Database {
               p.duration > 0,
         )
         .toList();
-    if (playedPuzzles.length < 10) {
+    if (playedPuzzles.length < 2) {
       log.info(
         "computePlayerLevel: only ${playedPuzzles.length} usable samples, keeping stored level $fallback",
       );
@@ -578,14 +580,8 @@ class Database {
       final expected = _expectedDuration(puz.cplx, cells, puz.failures);
       // Clamp duration to neutralise puzzles left open for hours.
       final clampedDur = puz.duration.clamp(1, (expected * 10).round());
-      // Invert _expectedDuration to get the cplx that would have predicted
-      // this duration — i.e. the player's implicit level for this play.
-      final levelI =
-          75 *
-          (math.log(clampedDur.toDouble()) -
-              math.log(cells.toDouble()) -
-              0.504 * puz.failures +
-              0.086);
+      final ratio = expected / clampedDur.toDouble();
+      final levelI = ratio * puz.cplx;
       // Exponential decay, half-life = 25 puzzles.
       final weight = math.pow(0.5, i / 25.0).toDouble();
       weightedSum += levelI * weight;

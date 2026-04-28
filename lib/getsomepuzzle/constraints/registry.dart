@@ -1,3 +1,4 @@
+import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
@@ -92,6 +93,12 @@ final constraintRegistry =
         label: 'Neighbor count',
         fromParams: NeighborCountConstraint.new,
         generateAllParameters: NeighborCountConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'EY',
+        label: 'Eyes',
+        fromParams: EyesConstraint.new,
+        generateAllParameters: EyesConstraint.generateAllParameters,
       ),
     ];
 

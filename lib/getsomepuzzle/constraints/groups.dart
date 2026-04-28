@@ -392,6 +392,7 @@ class LetterGroup extends CellsCentricConstraint {
   @override
   bool isCompleteFor(Puzzle puzzle) {
     if (!verify(puzzle)) return false;
+    if (indices.any((i) => i >= puzzle.cellValues.length)) return false;
     final myCellValues = indices.map((i) => puzzle.cellValues[i]).toList();
     if (myCellValues.contains(0)) return false;
     final groups = getGroups(puzzle);

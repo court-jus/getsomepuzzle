@@ -79,7 +79,7 @@ Options:
 | `--require` | Comma-separated rules to require | |
 
 Rule slugs: `FM` (forbidden motif), `PA` (parity), `GS` (group size), `LT` (letter group), `QA` (quantity),
-`SY` (symmetry), `DF` (different from), `CC` (column count), `GC` (group count), `NC` (neighbor count).
+`SY` (symmetry), `DF` (different from), `CC` (column count), `GC` (group count), `NC` (neighbor count), `EY` (eyes).
 
 Examples:
 
