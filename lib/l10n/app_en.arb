@@ -346,6 +346,18 @@
     "@hintConstraintNone": {
         "description": "Hint message shown when all constraints have been exhausted"
     },
+    "hintCellWrong": "This cell is wrong",
+    "@hintCellWrong": {
+        "description": "Hint message shown when a filled cell does not match the puzzle's solution"
+    },
+    "hintAllCorrectSoFar": "Everything filled so far is correct",
+    "@hintAllCorrectSoFar": {
+        "description": "Hint message shown on tap 1 when no error is detected"
+    },
+    "hintCellDeducible": "This cell can be deduced",
+    "@hintCellDeducible": {
+        "description": "Hint message shown on tap 2 of the deducibleCell mode (cell highlighted, source not yet shown)"
+    },
     "constraintForbiddenPattern": "forbidden pattern",
     "@constraintForbiddenPattern": {
         "description": "Name of the forbidden pattern constraint"

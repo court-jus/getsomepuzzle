@@ -16,6 +16,7 @@ keep_local/*
 assets/liked
 assets/disliked
 assets/played
+/stats/
 
 # IntelliJ related
 *.iml

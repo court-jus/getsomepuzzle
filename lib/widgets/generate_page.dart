@@ -113,6 +113,8 @@ class _GeneratePageState extends State<GeneratePage> {
             _isDone = true;
             _generated = totalGenerated;
           });
+        case GeneratorTargetMessage():
+          break;
       }
     });
   }
@@ -197,7 +199,6 @@ class _GeneratePageState extends State<GeneratePage> {
               wanted: _requiredRules,
               banned: _excludedRules,
               apply: (value) {
-                print(value);
                 setState(() {
                   _requiredRules.clear();
                   _requiredRules.addAll(value.$1);

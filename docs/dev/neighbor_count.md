@@ -40,154 +40,132 @@ NC interacts naturally with GS: if a cell has NC:idx.color.0, it cannot belong t
 group with any neighbor, effectively capping the group size at 1 for that color at that location.
 Combined with FM, NC can block specific local patterns more precisely than the motif alone.
 
-## Implementation plan
+## Implementation
 
-### 1. Create the `NeighborCountConstraint` class
+### Constraint class
 
-**File**: `lib/getsomepuzzle/constraints/neighbor_count.dart`
+**Location**: `lib/getsomepuzzle/constraints/neighbor_count.dart`
 
-Extends `CellsCentricConstraint` (or `Constraint` with an `idx` field — follow the pattern of
-`GroupSizeConstraint` which is also cell-centric).
-
-Fields: `idx` (int), `color` (int), `count` (int).
+`NeighborCountConstraint` extends `CellsCentricConstraint` and stores
+`indices` (a single-element list with the target cell index), `color`,
+and `count`.
 
 - **`slug`** → `'NC'`
-- **`serialize()`** → `'NC:$idx.$color.$count'`
-- **`toString()`** → `'$count'`
+- **`serialize()`** → `'NC:${indices.first}.$color.$count'`
+- **`toString()`** → `'$count'` (the displayed digit)
+- **`toHuman(puzzle)`** → human-readable description used in hint
+  messages.
 
-#### verify(Puzzle)
+#### `verify(Puzzle)`
 
-```
+```text
 neighbors = puzzle.getNeighbors(idx)
-colorNeighbors = neighbors.where((n) => puzzle.cellValues[n] == color).length
-freeNeighbors  = neighbors.where((n) => puzzle.cellValues[n] == 0).length
+colorNeighbors = count of neighbors with value == color
+freeNeighbors  = count of neighbors with value == 0
 
-if puzzle is complete:
+if puzzle.complete:
   return colorNeighbors == count
-else:
-  // Not yet violated: current color count ≤ target AND
-  // maximum achievable count (current + free) ≥ target
-  return colorNeighbors <= count && colorNeighbors + freeNeighbors >= count
+if colorNeighbors > count:                       return false
+if colorNeighbors + freeNeighbors < count:       return false
+return true
 ```
 
-#### apply(Puzzle)
+In words: violated *now* if the count already exceeds the target, or
+unreachable in the future if even painting every free neighbor with
+`color` cannot reach the target. Otherwise the state is still valid.
 
-Four deduction cases, in order:
+#### `apply(Puzzle)`
 
-1. **Impossible — too many**: `colorNeighbors > count` → `isImpossible`.
+Returns `null` if all neighbors are filled (no deduction left), and
+otherwise checks four cases in order:
 
-2. **Impossible — unreachable**: `colorNeighbors + freeNeighbors < count` → `isImpossible`.
-   (Cannot place enough color cells even using all free neighbors.)
+1. **Too many** — `colorNeighbors > count` → `Move(..., isImpossible: this)`.
+2. **Saturated** — `colorNeighbors == count` → first free neighbor is
+   forced to the opposite color.
+3. **Unreachable** — `colorNeighbors + freeNeighbors < count` →
+   `Move(..., isImpossible: this)`.
+4. **Full need** — `colorNeighbors + freeNeighbors == count` → first
+   free neighbor is forced to `color`.
 
-3. **Saturated**: `colorNeighbors == count` → all free neighbors must take the opposite value.
-   Return the first such free neighbor forced to `oppositeColor`.
+Otherwise `null` (constraint active but not yet forcing).
 
-4. **Full need**: `colorNeighbors + freeNeighbors == count` → all free neighbors must take
-   `color`. Return the first such free neighbor forced to `color`.
+Each call returns a single move; the solver loop reapplies until the
+constraint produces no further moves, which is consistent with the rest
+of the codebase.
 
-Return `null` when none of the above applies (constraint is active but no deduction yet).
-
-Note: `apply()` returns a single `Move` per call; the solver loop calls it repeatedly until
-it returns null, so returning only the first forced cell is correct and consistent with the
-rest of the codebase.
-
-#### isCompleteFor(Puzzle)
+#### `isCompleteFor(Puzzle)`
 
 ```dart
 @override
 bool isCompleteFor(Puzzle puzzle) {
   if (!verify(puzzle)) return false;
-  // Complete when all neighbors are filled: no future move can change the neighbor count.
-  final neighbors = puzzle.getNeighbors(idx);
-  return neighbors.every((n) => puzzle.cellValues[n] != 0);
+  final myNeighbors = puzzle.getNeighbors(indices.first);
+  return myNeighbors.every((i) => puzzle.cellValues[i] != 0);
 }
 ```
 
-This is monotone: once all neighbors are filled, they stay filled.
+NC is monotone: once all the target cell's neighbors are filled, they
+stay filled, so no future move can revive the deduction.
 
-#### generateAllParameters(width, height, domain)
+#### `generateAllParameters(width, height, domain, excludedIndices)`
 
-For each cell index (0..width*height-1), compute its actual neighbor count `k` from grid
-geometry. For each domain color, for each valid count (0..k), generate `'$idx.$color.$n'`.
+For each cell, compute the actual neighbor count from grid geometry
+(2 for corners, 3 for edges, 4 for interior). For each domain color
+and each `count ∈ [0, neighbors)`, emit `'$idx.$color.$count'`.
 
-Exclude `count == k` when it would be trivially equivalent to a QA constraint on that color
-(all neighbors must be color X — this is usually too strong and rarely satisfies the target
-solution, so the generator's filter will discard most of them anyway; no need to special-case).
+`count == neighbors` is intentionally excluded — saturating every
+neighbor with the same color is rarely satisfied by random grids and
+the upstream generator filter would discard the candidates anyway.
 
-### 2. Register the constraint
+### Registry
 
-**File**: `lib/getsomepuzzle/constraints/registry.dart`
+`lib/getsomepuzzle/constraints/registry.dart`:
 
-- Add the import of `neighbor_count.dart`.
-- Add the entry to `constraintRegistry`:
-  `(slug: 'NC', label: 'Neighbor count', fromParams: NeighborCountConstraint.new)`
+```dart
+(slug: 'NC', label: 'Neighbor count', fromParams: NeighborCountConstraint.new),
+```
 
-### 3. Integrate with the generator
+### Generator
 
-**File**: `lib/getsomepuzzle/generator/generator.dart`
+NC is enumerated by `generateAllParameters` like every other registered
+constraint type. The parameter space is `O(width × height × |domain| ×
+maxNeighbors)` — manageable at typical grid sizes; no special pruning is
+needed beyond the solution-validity filter applied by the generator
+itself.
 
-- Add the `'NC'` case in `_generateParamsForSlug()`:
-  `return NeighborCountConstraint.generateAllParameters(width, height, domain);`
+### Widget
 
-The parameter space is O(width × height × |domain| × 5) ≈ manageable for typical grid sizes.
-No special pruning needed beyond the solution-validity filter already applied by the generator.
+**Location**: `lib/widgets/neighbor_count.dart`
 
-### 4. Display widget
+The constraint is rendered as a cross over the target cell, with the
+background color matching the constraint color and the border in the
+opposite color. The count digit sits inside the cross. The widget is
+overlaid via a `Stack` on top of the cell, so multiple NC constraints
+on the same cell stack rather than push grid layout — consistent with
+how GS and PA render their in-cell indicators.
 
-**File**: `lib/widgets/neighbor_count.dart` (new)
+The hint highlight follows the GS pattern: when an NC constraint is
+highlighted, the arrow points from the target cell to the free
+neighbor being forced.
 
-`NeighborCountWidget` renders a small filled circle with the count digit inside.
+### Localization
 
-- Circle color: semi-transparent grey background, digit colored as `color`
-  (black text for color 1, white text for color 2).
-- Size: approximately 40% of `cellSize` to avoid obscuring the cell's own fill color.
-- Position: overlaid on the **bottom-right corner** of the target cell by default. If another
-  corner-overlay constraint already occupies that corner (future-proofing), shift to bottom-left.
+ARB key `constraintNeighborCount` is present in `lib/l10n/app_en.arb`,
+`app_fr.arb`, and `app_es.arb`. The help texts in `assets/help.*.md`
+include the description of the constraint.
 
-**File**: `lib/widgets/puzzle.dart` / cell rendering
+### Tests
 
-NC is rendered as a cell overlay, not in the top bar. Add a `Stack` layer inside the cell
-widget for each NC constraint targeting that cell. This is consistent with how GS and PA render
-their in-cell indicators.
+`test/constraints_test.dart` exercises:
 
-### 5. Highlight and hint arrow
-
-**File**: `lib/widgets/puzzle.dart`
-
-When an NC constraint is highlighted, the arrow points from the target cell to the free
-neighbor being forced. This follows the existing GS highlight pattern (cell → relevant neighbor).
-
-### 6. Help text
-
-**File**: `lib/l10n/` (all ARB files)
-
-Suggested wording (EN): "A small number in the corner of a cell indicates how many of its
-orthogonal neighbors must be of that color."
-
-### 7. Tests
-
-**File**: `test/neighbor_count_test.dart` (new)
-
-- **verify complete — correct**: all neighbors filled, color count matches → true.
-- **verify complete — incorrect**: color count wrong → false.
-- **verify partial — possible**: current count ≤ target, achievable with remaining free → true.
-- **verify partial — impossible**: free neighbors insufficient to reach target → false.
-- **apply — saturated**: color count == target, free neighbors → forced opposite.
-- **apply — full need**: color + free == target → free neighbors forced to color.
-- **apply impossible — too many**: color count > target → isImpossible.
-- **apply impossible — unreachable**: color + free < target → isImpossible.
-- **apply — no deduction**: intermediate state, no forcing yet → null.
-- **isCompleteFor**: all neighbors filled + verify true → true; any free neighbor → false.
-- **serialize / deserialize**: round-trip `NC:4.1.2` → object → `NC:4.1.2`.
-- **generateAllParameters**: corner cell (2 neighbors) generates counts 0, 1, 2 only;
-  interior cell (4 neighbors) generates counts 0..4.
-- **NC:0 interaction with GS**: synthetic puzzle where NC:idx.color.0 forces a GS:idx.1
-  deduction by propagation (no force round needed).
-
-### Recommended implementation order
-
-1. **Step 1** (class + registry) — parsable, verifiable, deductions working.
-2. **Step 7** (logic tests) — covers all apply/verify branches before UI.
-3. **Step 3** (generator) — NC puzzles generatable and testable end-to-end.
-4. **Steps 4-5** (UI) — corner overlay and arrow.
-5. **Step 6** (help text).
+- complete puzzle, correct / incorrect count → `verify` true / false
+- partial puzzle, possible vs unreachable → `verify` true / false
+- `apply` saturated → free neighbor forced to opposite
+- `apply` full need → free neighbor forced to color
+- `apply` impossible (too many, unreachable)
+- `apply` no deduction → `null`
+- `isCompleteFor` only when every neighbor is filled
+- `serialize` / `deserialize` round-trip
+- `generateAllParameters` cardinality on corner / edge / interior cells
+- NC:0 interaction with GS where the propagation chain replaces a force
+  round.

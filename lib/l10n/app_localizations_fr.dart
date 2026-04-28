@@ -270,6 +270,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get hintConstraintNone => 'Plus de contraintes disponibles';
 
   @override
+  String get hintCellWrong => 'Cette cellule est fausse';
+
+  @override
+  String get hintAllCorrectSoFar => 'Tout ce que vous avez rempli est correct';
+
+  @override
+  String get hintCellDeducible => 'Cette cellule est déductible';
+
+  @override
   String get constraintForbiddenPattern => 'motif interdit';
 
   @override

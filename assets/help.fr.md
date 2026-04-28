@@ -74,6 +74,33 @@ Ouvrez le menu et appuyez sur "Créer" pour concevoir votre propre puzzle. Vous 
 
 Les puzzles générés et créés sont sauvegardés dans des playlists. La playlist par défaut est "Mes puzzles", mais vous pouvez en créer de nouvelles depuis la page Ouvrir. Vous pouvez aussi importer des puzzles depuis un fichier.
 
+## Astuces
+
+Si vous êtes bloqué, le bouton d'astuce vous donne un coup de pouce progressif — chaque appui révèle un peu plus d'information. Dans le menu paramètres, vous pouvez choisir le type d'aide.
+
+Le premier appui est le même quel que soit le mode :
+
+- Si vous avez fait une erreur, il met en évidence la contrainte violée, ou la cellule fausse quand aucune contrainte ne le détecte directement.
+- Si tout ce que vous avez rempli jusqu'ici est correct, il vous le confirme.
+
+Les appuis suivants dépendent du mode choisi.
+
+### Cellule déductible
+
+Le mode par défaut. Après le diagnostic d'erreurs, les appuis suivants vous guident vers une déduction précise :
+
+- Deuxième appui : met en évidence une case que vous pouvez déduire.
+- Troisième appui : met aussi en évidence la contrainte qui justifie la déduction, avec une flèche reliant les deux.
+- Quatrième appui : colorie la case à votre place.
+
+Pratique quand vous voulez un petit indice sans tout vous gâcher : arrêtez-vous au deuxième appui si vous préférez trouver la justification par vous-même.
+
+### Ajout de contrainte
+
+Au lieu de désigner une case, le deuxième appui ajoute une nouvelle contrainte au puzzle. Cette règle est cohérente avec la solution et vous donne une information supplémentaire pour avancer — le puzzle devient plus simple sans qu'on vous dise quelle case remplir.
+
+Après l'ajout d'une contrainte, le cycle reprend au diagnostic d'erreurs sur l'appui suivant.
+
 ## Stats
 
 Le jeu enregistre le temps passé à résoudre un puzzle ainsi que le nombre d'erreurs. Ces données ne sont pas collectés automatiquement mais j'apprécierai que vous me les envoyiez, j'ai l'intention de m'en servir pour calculer la difficulté des puzzles.

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_rank_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_worker.dart';
@@ -23,9 +24,24 @@ class GameModel extends ChangeNotifier {
   int dbSize = 0;
 
   // --- Hint state ---
+  /// Next deducible move, refreshed (debounced) by [_scheduleHelpMe] after
+  /// every mutation. Computed with `checkErrors: false` — error reporting is
+  /// done separately by [_revealErrors] on tap 1 of the hint flow.
   Move? helpMove;
   String hintText = "";
   bool hintIsError = false;
+
+  /// Position in the multi-tap hint sequence. The transitions are mode-
+  /// dependent (see [HintType]). Both modes start at 0 → 1 (errors), then
+  /// diverge:
+  ///   - `deducibleCell`: 1 → 2 (cell only) → 3 (cell + constraint) → 4
+  ///     (apply move). The apply path mutates and `_afterMutation` resets
+  ///     this back to 0.
+  ///   - `addConstraint`: 1 → 2 (attach a new constraint) → 0 (manual reset
+  ///     since attaching a constraint does not call `_afterMutation`).
+  /// Reset to 0 by [_clearHint], so any mutation, undo, restart, puzzle open
+  /// or hint-mode switch starts the cycle fresh.
+  int hintStage = 0;
 
   // --- Session state ---
   bool paused = false;
@@ -78,13 +94,16 @@ class GameModel extends ChangeNotifier {
   // Internal helpers – factorise the repeated reset patterns
   // ---------------------------------------------------------------------------
 
-  /// Clear all hint state: highlight, displayed text, and the pre-computed
-  /// move that the hint button would apply. Called on every mutation so a
-  /// stale hint can't be applied to a puzzle that has since changed.
+  /// Clear all hint state: highlight, displayed text, the pre-computed move
+  /// that the hint button would apply, and the multi-tap stage. Called on
+  /// every mutation so a stale hint can't be applied to a puzzle that has
+  /// since changed.
   void _clearHint() {
     currentPuzzle?.clearHighlights();
     hintText = "";
+    hintIsError = false;
     helpMove = null;
+    hintStage = 0;
   }
 
   /// Full reset of interaction state for undo / restart: unfreezes the
@@ -377,15 +396,14 @@ class GameModel extends ChangeNotifier {
       currentMeta!.failures += 1;
       currentMeta!.stats?.failures += 1;
     }
-    if (failedConstraints.isNotEmpty) {
-      if (shouldShowErrors) {
-        setTopMessage(text: invalidConstraintsText, color: Colors.red);
-      } else {
-        setTopMessage(
-          text: errorsCountText(failedConstraints.length),
-          color: Colors.red,
-        );
-      }
+    if (failedConstraints.isNotEmpty && shouldShowErrors) {
+      setTopMessage(text: invalidConstraintsText, color: Colors.red);
+    } else if (failedConstraints.isNotEmpty &&
+        settings.liveCheckType == LiveCheckType.count) {
+      setTopMessage(
+        text: errorsCountText(failedConstraints.length),
+        color: Colors.red,
+      );
     } else {
       setTopMessage();
     }
@@ -422,37 +440,145 @@ class GameModel extends ChangeNotifier {
   // Hint
   // ---------------------------------------------------------------------------
 
-  /// Shows the hint or applies the help move.
-  /// [resolvedHintText] must be pre-resolved from l10n by the caller.
-  void showHelpMove(String resolvedHintText) {
-    if (helpMove == null) return;
-    if (hintText.isNotEmpty && !hintIsError) {
-      currentPuzzle!.setValue(helpMove!.idx, helpMove!.value);
-      history.add(helpMove!.idx);
-      _afterMutation();
+  /// Drive the multi-tap hint flow. Both modes share tap 1 (errors) — the
+  /// modes only differ on what subsequent taps do. The caller pre-resolves
+  /// every l10n string into [texts]; this method picks the right one for the
+  /// stage being entered.
+  void onHintTap(Settings settings, HintTexts texts) {
+    if (currentPuzzle == null) return;
+    final mode = settings.hintType;
+
+    // Stage 0 → 1: errors, regardless of mode.
+    if (hintStage == 0) {
+      _revealErrors(texts);
+      hintStage = 1;
+      notifyListeners();
       return;
     }
-    // First reveal of this hint — count it as one "hint used".
-    if (currentMeta != null) {
-      currentMeta!.hints += 1;
-      currentMeta!.stats?.hints += 1;
+
+    if (mode == HintType.deducibleCell) {
+      switch (hintStage) {
+        case 1:
+          _revealCellOnly(texts);
+          hintStage = 2;
+        case 2:
+          _revealCellAndConstraint(texts);
+          hintStage = 3;
+        case 3:
+          _applyHelpMove();
+          // _afterMutation has already reset hintStage to 0.
+          return;
+      }
+    } else {
+      // addConstraint mode: tap 2 attaches a new constraint, then we cycle
+      // back to stage 0 so the next tap re-runs the error pass.
+      if (hintStage == 1) {
+        _revealAddedConstraint(texts);
+        hintStage = 0;
+      }
     }
+    notifyListeners();
+  }
+
+  /// Reset the multi-tap cycle without touching the puzzle state. Used when
+  /// the hint mode is switched mid-puzzle so the next tap starts at stage 1.
+  void resetHintCycle() {
+    currentPuzzle?.clearHighlights();
+    hintText = "";
+    hintIsError = false;
+    hintStage = 0;
+    notifyListeners();
+  }
+
+  /// Tap 1 — surface error info (or "all correct" when the grid is fine).
+  /// Shared between both hint modes. Three sub-cases, in priority order:
+  ///   (a) a constraint is currently violated → highlight it
+  ///   (b) a filled cell diverges from the cached solution → highlight it
+  ///   (c) nothing wrong → "all correct so far" message, no highlight
+  void _revealErrors(HintTexts texts) {
+    final puzzle = currentPuzzle!;
+    puzzle.clearHighlights();
+
+    final failed = puzzle.check(saveResult: false);
+    if (failed.isNotEmpty) {
+      failed.first.isHighlighted = true;
+      hintText = texts.someConstraintsInvalid;
+      hintIsError = true;
+      return;
+    }
+
+    final wrongIdx = puzzle.findFirstWrongCell();
+    if (wrongIdx != null) {
+      puzzle.cells[wrongIdx].isHighlighted = true;
+      hintText = texts.hintCellWrong;
+      hintIsError = true;
+      return;
+    }
+
+    hintText = texts.hintAllCorrectSoFar;
+    hintIsError = false;
+  }
+
+  /// Tap 2 of `deducibleCell` — highlight the deducible cell, no source yet.
+  /// No-op if [helpMove] hasn't been computed (debounce race or puzzle
+  /// already solved); the next tap will retry from the current stage.
+  void _revealCellOnly(HintTexts texts) {
+    if (helpMove == null) return;
+    currentPuzzle!.clearHighlights();
+    currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
+    hintText = texts.hintCellDeducible;
+    hintIsError = false;
+  }
+
+  /// Tap 3 of `deducibleCell` — also highlight the giving constraint, which
+  /// triggers the arrow widget (see `widgets/puzzle.dart`). Increment the
+  /// hint counter here: this is the "real" reveal — tap 1 is diagnostic only.
+  void _revealCellAndConstraint(HintTexts texts) {
+    if (helpMove == null) return;
     currentPuzzle!.clearHighlights();
     if (helpMove!.isImpossible != null) {
       helpMove!.isImpossible!.isValid = false;
-      hintText = resolvedHintText;
+      hintText = texts.hintImpossible;
       hintIsError = true;
     } else {
       if (helpMove!.isForce) {
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
+        hintText = texts.hintForce;
       } else {
         helpMove!.givenBy.isHighlighted = true;
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
+        hintText = texts.hintDeducedFrom(helpMove!.givenBy);
       }
-      hintText = resolvedHintText;
       hintIsError = false;
     }
-    notifyListeners();
+    if (currentMeta != null) {
+      currentMeta!.hints += 1;
+      currentMeta!.stats?.hints += 1;
+    }
+  }
+
+  /// Tap 4 of `deducibleCell` — apply the move. Triggers `_afterMutation`,
+  /// which resets [hintStage] and recomputes the next [helpMove].
+  void _applyHelpMove() {
+    if (helpMove == null) return;
+    currentPuzzle!.setValue(helpMove!.idx, helpMove!.value);
+    history.add(helpMove!.idx);
+    _afterMutation();
+  }
+
+  /// Tap 2 of `addConstraint` — attach the next useful constraint, or
+  /// surface a "no more available" message when the candidate list is
+  /// empty (still leaves the button useful: tap 1 worked, this is just the
+  /// terminal feedback). Stage advancement is handled by the caller.
+  void _revealAddedConstraint(HintTexts texts) {
+    if (addHintConstraint()) {
+      hintText = texts.hintConstraintAdded;
+      hintIsError = false;
+    } else {
+      currentPuzzle?.clearHighlights();
+      hintText = texts.hintConstraintNone;
+      hintIsError = false;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -626,7 +752,9 @@ class GameModel extends ChangeNotifier {
   void _computeHelp() {
     if (currentPuzzle == null) return;
     _log.fine(currentPuzzle!.lineRepresentation);
-    helpMove = currentPuzzle!.findAMove();
+    // Errors are surfaced by tap 1 of the hint flow ([_revealErrors]); the
+    // pre-computed move is purely the next *deducible* move.
+    helpMove = currentPuzzle!.findAMove(checkErrors: false);
     notifyListeners();
   }
 
@@ -639,4 +767,31 @@ class GameModel extends ChangeNotifier {
     _cancelHintRanking();
     super.dispose();
   }
+}
+
+/// L10n strings for the hint flow, pre-resolved by the caller. Bundled in a
+/// struct rather than passed individually because [GameModel.onHintTap] picks
+/// the right one based on the (mode, stage, sub-case) combo at call time.
+class HintTexts {
+  final String someConstraintsInvalid;
+  final String hintCellWrong;
+  final String hintAllCorrectSoFar;
+  final String hintCellDeducible;
+  final String hintImpossible;
+  final String hintForce;
+  final String Function(Constraint givenBy) hintDeducedFrom;
+  final String hintConstraintAdded;
+  final String hintConstraintNone;
+
+  const HintTexts({
+    required this.someConstraintsInvalid,
+    required this.hintCellWrong,
+    required this.hintAllCorrectSoFar,
+    required this.hintCellDeducible,
+    required this.hintImpossible,
+    required this.hintForce,
+    required this.hintDeducedFrom,
+    required this.hintConstraintAdded,
+    required this.hintConstraintNone,
+  });
 }

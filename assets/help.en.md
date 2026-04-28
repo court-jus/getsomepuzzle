@@ -74,6 +74,33 @@ Open the menu and tap "Create" to design your own puzzle. You can set the grid d
 
 Generated and created puzzles are saved to playlists. The default playlist is "My puzzles", but you can create your own playlists from the Open page. You can also import puzzles from a file.
 
+## Hints
+
+If you get stuck, the hint button gives you a progressive nudge — each tap reveals a little more. From the settings menu, you can choose how the game helps you.
+
+The first tap is the same in both modes:
+
+- If you've made a mistake, it highlights the broken constraint, or the wrong cell when no constraint catches it directly.
+- If everything you've filled so far is correct, it just confirms it.
+
+What the next taps do depends on the mode you've chosen.
+
+### Deducible cell
+
+The default mode. After the error check, the next taps walk you through one specific deduction:
+
+- Second tap: highlights a cell you can deduce.
+- Third tap: also highlights the constraint that justifies the deduction, with an arrow linking the two.
+- Fourth tap: fills the cell in for you.
+
+Useful when you want a small push without spoiling the rest: stop at the second tap if you'd rather find the reason yourself.
+
+### Add constraint
+
+Instead of pointing at a cell, the second tap adds a brand-new constraint to the puzzle. The new rule is consistent with the solution and gives you extra information to work from — the puzzle becomes easier without anyone telling you which cell to fill.
+
+After a constraint is added, the next tap restarts the cycle at the error check.
+
 ## Stats
 
 The game records how much time has passed before a puzzle is solved and how many failures were made. This data is NOT collected automatically but if you solve a bunch of puzzles I hope you will send me your stats, I intend to sort the puzzles by difficulty and this would help a lot.

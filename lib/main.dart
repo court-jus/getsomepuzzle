@@ -336,40 +336,30 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     return "";
   }
 
-  void showHelpMove() {
-    if (settings.hintType == HintType.addConstraint) {
-      _showHintConstraint();
-      return;
-    }
-    if (game.helpMove == null) return;
-    if (game.hintText.isNotEmpty && !game.hintIsError) {
-      game.showHelpMove("");
-      return;
-    }
+  HintTexts _buildHintTexts() {
     final l10n = AppLocalizations.of(context)!;
-    String resolvedHintText;
-    if (game.helpMove!.isImpossible != null) {
-      resolvedHintText = l10n.hintImpossible;
-    } else if (game.helpMove!.isForce) {
-      resolvedHintText = l10n.hintForce;
-    } else {
-      resolvedHintText = l10n.hintDeducedFrom(
-        _constraintName(game.helpMove!.givenBy),
-      );
-    }
-    game.showHelpMove(resolvedHintText);
+    return HintTexts(
+      someConstraintsInvalid: l10n.someConstraintsInvalid,
+      hintCellWrong: l10n.hintCellWrong,
+      hintAllCorrectSoFar: l10n.hintAllCorrectSoFar,
+      hintCellDeducible: l10n.hintCellDeducible,
+      hintImpossible: l10n.hintImpossible,
+      hintForce: l10n.hintForce,
+      hintDeducedFrom: (c) => l10n.hintDeducedFrom(_constraintName(c)),
+      hintConstraintAdded: l10n.hintConstraintAdded,
+      hintConstraintNone: l10n.hintConstraintNone,
+    );
   }
 
-  void _showHintConstraint() {
-    final l10n = AppLocalizations.of(context)!;
-    if (game.addHintConstraint()) {
-      game.hintText = l10n.hintConstraintAdded;
-      game.hintIsError = false;
-    }
+  void showHelpMove() {
+    game.onHintTap(settings, _buildHintTexts());
   }
 
   void _onHintTypeChanged() {
     if (game.currentPuzzle == null) return;
+    // Force a clean cycle: a stage from the previous mode would be confusing
+    // (e.g. "stage 2 = cell shown" doesn't exist in addConstraint).
+    game.resetHintCycle();
     if (settings.hintType == HintType.addConstraint) {
       game.startHintConstraintComputation();
     } else {
@@ -378,10 +368,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   bool _isHintButtonEnabled() {
-    if (settings.hintType == HintType.addConstraint) {
-      return game.canAddHintConstraint;
-    }
-    return game.helpMove != null;
+    // Tap 1 of the hint flow must always be available so the player can
+    // surface errors / "all correct" feedback regardless of mode.
+    return game.currentPuzzle != null;
   }
 
   // ---------------------------------------------------------------------------

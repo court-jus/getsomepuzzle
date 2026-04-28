@@ -128,6 +128,19 @@ Run a session where the solver presents individual deduction steps to a human pl
 2. Validate that force rounds correlate with perceived difficulty
 3. Tune complexity formula weights accordingly
 
+## Generator: equilibrium failure blacklist
+
+`pickTarget` and `rankTargets` (`lib/getsomepuzzle/generator/equilibrium.dart`)
+already accept a `blacklistedKeys` parameter, but the worker
+(`worker_io.dart`) currently passes the empty set. When a target is
+unreachable in practice (e.g. a complex pair on a `3x3` grid) the loop
+keeps retrying until the global `maxTime` budget runs out.
+
+**Plan:** track per-target `failureCount` in the worker. After N consecutive
+failures (5 is the value used in early sketches) add the target's `key` to
+a session blacklist passed to `pickTarget` so the loop falls back to the
+next-deepest gap. Reset on successful generation or on warm-up.
+
 ## Generator: reject puzzles with equivalent SH constraints
 
 The generator can output a puzzle carrying two `SH` constraints whose shapes
@@ -144,3 +157,9 @@ duplicates if `allRotations(a.motif)` and `allRotations(b.motif)` share a
 variant, and drop the later one. Apply the same dedupe to the serialized
 parameter string for cheap equality.
 
+
+## QOL
+
+* Allow saving a puzzle in its current state.
+* Allow sharing a puzzle, from scratch or from its current state.
+* Allow opening the app directly with a puzzle (link for the web, intent for android, cli argument for desktop)

@@ -7,7 +7,7 @@ types, pair of types, size). This document describes how the system works.
 The implementation lives in `lib/getsomepuzzle/generator/equilibrium.dart`
 (pure logic — constants, stats, gap-based picker) and
 `lib/getsomepuzzle/generator/worker_io.dart` (per-iteration loop, target
-resolution, blacklist).
+resolution).
 
 ## Goal
 
@@ -86,7 +86,10 @@ algorithm into populating the empty axis.
 
 ### Number-of-types profile
 
-Decreasing overall, with a peak at 2 types:
+Only `n ∈ {1, 2, 3, 4, 5}` are explicitly pushed by the picker. The
+remaining ~11 % budget is left for the residual `6+` bucket, which the
+dashboard surfaces as a single bin so we can monitor drift but never
+target.
 
 | Number of types | Target share |
 | --------------- | ------------ |
@@ -95,10 +98,9 @@ Decreasing overall, with a peak at 2 types:
 | 3               | 12 %         |
 | 4               | 12 %         |
 | 5               | 10 %         |
-| 6               | 9 %          |
-| 7+              | residual (~2 % combined) |
+| 6+              | 0 % (reliquat, never targeted) |
 
-Tunable via `kTargetNTypesProfile` and `kTargetSevenPlusShare`.
+Tunable via `kTargetNTypesProfile`.
 
 ### Per-axis mechanism
 
@@ -121,17 +123,15 @@ than reject after the fact.
 The post-solve free-cell ratio cap of `kMaxAcceptableRatio` (= 0.25)
 applies to every size, including 10x10.
 
-### Failure blacklist
+### Failure blacklist (API surface only)
 
-Some targets are unreachable in practice (e.g. pair `{SH, PA}` on a
-`3x3` grid is too small to carry the necessary information). To avoid
-spinning on them:
-
-- Failure counts are tracked per target key.
-- After `kBlacklistAfterFailures` (= 5) consecutive failures, the target
-  is blacklisted for the session.
-- Blacklisted targets are skipped by `pickTarget`, letting the loop fall
-  back to the next-deepest gap.
+`pickTarget` and `rankTargets` accept an optional `blacklistedKeys`
+parameter that filters candidate targets out of the ranking. The current
+caller (`worker_io.dart`) always passes the empty set: there is no
+session-level failure tracking yet. Targets that are unreachable in
+practice (e.g. a complex pair on a `3x3` grid) are bounded by the
+worker's overall `maxTime` budget rather than by per-target retries.
+See `docs/dev/todo.md` for the planned blacklist follow-up.
 
 ## SH special case
 
@@ -186,17 +186,25 @@ All tunable knobs are declared at the top of
 functions, so the behavior can be retuned without touching the
 algorithm:
 
-- `kTargetNTypesProfile` — map for axis 2 (`{1: 0.25, 2: 0.30, …}`).
-- `kTargetSevenPlusShare` — residual share for the `7+` bucket (0.02).
+- `kTargetNTypesProfile` — map for axis 2 (`{1: 0.25, 2: 0.30, 3: 0.12,
+  4: 0.12, 5: 0.10}`). Anything outside the map (the `6+` reliquat
+  bucket) maps to share 0 and is never targeted.
 - `kMinSide`, `kMaxSide` — size axis bounds (3, 10).
-- `kBlacklistAfterFailures` — failures before blacklisting (5).
 - `kEquilibriumWarmupSize` — corpus size below which equilibrium stays
   off (100).
 - `kMaxAcceptableRatio` — post-solve free-cell ratio cap (0.25).
+- `kSizePeakArea`, `kSizeSigmaLeft`, `kSizeSigmaRight` — asymmetric
+  Gaussian on grid area used by the size axis (peak ≈ 4×5, right tail
+  almost twice as wide as the left).
+- `kWarmupMaxWidth`, `kWarmupMaxHeight`, `kWarmupNTypesPool` — clamps
+  and n-types pool used during corpus warm-up.
 - `targetShare(axis, category, categoryCount)` — pure function returning
-  the expected share. Uniform axes: `1 / categoryCount`. Number of
-  types: lookup in `kTargetNTypesProfile` (or `kTargetSevenPlusShare`
-  for `n ≥ 7`).
+  the expected share. Uniform axes (slug, pair) and the legacy size
+  fallback: `1 / categoryCount`. Number of types: lookup in
+  `kTargetNTypesProfile` (any key not in the map yields 0).
+- `sizeTargetShare(width, height, universe)` — non-uniform per-size
+  weighting derived from the Gaussian on area, normalised over
+  `universe.allowedSizes`.
 
 The gap computation, target ranking (`rankTargets`), and target
 selection (`pickTarget`) are pure functions covered by

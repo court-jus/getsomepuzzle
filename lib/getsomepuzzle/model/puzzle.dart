@@ -355,6 +355,19 @@ class Puzzle {
     }
   }
 
+  /// First filled cell whose value diverges from [cachedSolution], or null
+  /// when nothing is wrong (or no solution is stored). Used by the hint
+  /// system's "tap 1" to surface a wrong cell without revealing its source.
+  int? findFirstWrongCell() {
+    final sol = cachedSolution;
+    if (sol == null) return null;
+    for (int i = 0; i < cells.length; i++) {
+      final v = cells[i].value;
+      if (v != 0 && v != sol[i]) return i;
+    }
+    return null;
+  }
+
   // --- Constructor for empty puzzles (no lineRepresentation parsing) ---
   Puzzle.empty(this.width, this.height, this.domain) : lineRepresentation = '' {
     cells = List.generate(width * height, (idx) => Cell(0, idx, domain, false));

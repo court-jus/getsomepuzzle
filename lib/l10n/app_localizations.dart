@@ -592,6 +592,24 @@ abstract class AppLocalizations {
   /// **'No more constraints available'**
   String get hintConstraintNone;
 
+  /// Hint message shown when a filled cell does not match the puzzle's solution
+  ///
+  /// In en, this message translates to:
+  /// **'This cell is wrong'**
+  String get hintCellWrong;
+
+  /// Hint message shown on tap 1 when no error is detected
+  ///
+  /// In en, this message translates to:
+  /// **'Everything filled so far is correct'**
+  String get hintAllCorrectSoFar;
+
+  /// Hint message shown on tap 2 of the deducibleCell mode (cell highlighted, source not yet shown)
+  ///
+  /// In en, this message translates to:
+  /// **'This cell can be deduced'**
+  String get hintCellDeducible;
+
   /// Name of the forbidden pattern constraint
   ///
   /// In en, this message translates to:

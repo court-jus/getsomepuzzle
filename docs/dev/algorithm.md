@@ -30,6 +30,9 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 | SY | Symmetry | Group must be symmetric along a specified axis |
 | DF | Different From | Two adjacent cells must have different colors |
 | SH | Shape | One color's group(s) must match a mandatory 2D shape |
+| CC | Column Count | A given column must contain exactly N cells of a color |
+| GC | Group Count | The grid must contain exactly N connected groups of a color |
+| NC | Neighbor Count | A given cell must have exactly N orthogonal neighbors of a color |
 
 ## Solving Algorithm
 
@@ -85,7 +88,7 @@ Select a random subset of cells (controlled by a ratio parameter, typically 80-1
 
 ### Step 3: Enumerate Valid Constraints
 
-For each constraint type (FM, PA, GS, LT, QA, SY, DF, SH), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
+For each constraint type (FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
 
 ### Step 4: Iterative Constraint Selection
 

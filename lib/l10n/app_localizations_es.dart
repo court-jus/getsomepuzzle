@@ -269,6 +269,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get hintConstraintNone => 'No hay más restricciones disponibles';
 
   @override
+  String get hintCellWrong => 'Esta celda está mal';
+
+  @override
+  String get hintAllCorrectSoFar => 'Todo lo rellenado hasta ahora es correcto';
+
+  @override
+  String get hintCellDeducible => 'Esta celda es deducible';
+
+  @override
   String get constraintForbiddenPattern => 'patrón prohibido';
 
   @override
