@@ -36,6 +36,10 @@ There are about 10k puzzles bundled within the app. You can also generate new pu
 
 If you see a pattern above the puzzles that has a purple background, you must fill your grid so that this pattern does NOT appear anywhere.
 
+### Shape
+
+If you see a pattern above the puzzles that has a light blue background and is rotated 45°, all groups of that color must have that exact shape (rotations and mirrors are allowed).
+
 ### Group size
 
 If a cell contains a number, it must be part of a group of orthogonally connected cells of the same color and that group's size much match the number.
@@ -52,6 +56,32 @@ Cells containing the same letter should be part of the same group. A group must 
 
 A black or white number over the puzzle, on a blue background indicates that the
 total number of cells of that color should match that number.
+
+### Symmetry
+
+When a cell contains one of ⟍, |, ⟋, ― or 🞋, the group it belongs to must respect a symmetry along that axis. The central symmetry (🞋) is equivalent to a half-turn rotation.
+
+### Different from
+
+When two cells are separated by the ≠ symbol, they must be different colors.
+
+### Column count
+
+A number in a circle above a column indicates how many cells of that color must be in that specific column.
+
+### Group count
+
+A number in a box with a link icon indicates how many groups (connected components) of that color must be in the solution.
+
+### Neighbor count
+
+A small number on a cell indicates how many of its orthogonal neighbors must be of a given color.
+
+### Eyes
+
+If a cell contains an eye symbol with a number, that cell must "see" exactly that
+many cells of the eye's color in the four orthogonal directions. A cell sees in a
+straight line until it hits a cell of the opposite color or the edge of the grid.
 
 ## Generating puzzles
 

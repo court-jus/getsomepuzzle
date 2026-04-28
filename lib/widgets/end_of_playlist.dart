@@ -4,8 +4,6 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 class EndOfPlaylist extends StatelessWidget {
   final int currentLevel;
   final bool filtersBlocking;
-  final int? nextLevel;
-  final ValueChanged<int> onJumpToLevel;
 
   /// When true, the widget shows a tutorial-specific congratulatory message
   /// and drops everything that would mention the player level / catalog
@@ -21,8 +19,6 @@ class EndOfPlaylist extends StatelessWidget {
     super.key,
     required this.currentLevel,
     required this.filtersBlocking,
-    required this.nextLevel,
-    required this.onJumpToLevel,
     this.isTutorial = false,
     this.onStartPlaying,
   });
@@ -64,6 +60,10 @@ class EndOfPlaylist extends StatelessWidget {
         ],
       );
     }
+    // Two distinct cases: filters are too restrictive (relax them) vs the
+    // baseline catalog itself is genuinely exhausted. With Gaussian sampling
+    // there is no longer a "tier exhausted" middle case — getPuzzlesByLevel
+    // only returns empty when filter() does.
     final message = filtersBlocking
         ? l.endOfPlaylistFiltersBlocking
         : l.endOfPlaylistCongrats;
@@ -77,20 +77,6 @@ class EndOfPlaylist extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(l.endOfPlaylistCurrentLevel(currentLevel)),
-        const SizedBox(height: 16),
-        if (nextLevel != null)
-          FilledButton.icon(
-            onPressed: () => onJumpToLevel(nextLevel!),
-            icon: const Icon(Icons.trending_up),
-            label: Text(
-              l.endOfPlaylistJumpTo(nextLevel!, nextLevel! - currentLevel),
-            ),
-          )
-        else
-          Text(
-            l.endOfPlaylistMaxLevel,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
       ],
     );
   }

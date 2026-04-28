@@ -60,6 +60,10 @@ A number in a circle above a column indicates how many cells of that color must 
 
 A number in a box with a link icon indicates how many groups (connected components) of that color must be in the solution.
 
+### Eyes
+
+A cell with an eye symbol must "see" exactly the indicated number of cells of the eye's color. A cell sees in a straight line in each of the four orthogonal directions until it reaches the edge of the grid or a cell of the opposite color (which blocks the line of sight). The eye's color is the target color; the border around the eye is the opposite color.
+
 ## Custom puzzles
 
 ### Generating puzzles

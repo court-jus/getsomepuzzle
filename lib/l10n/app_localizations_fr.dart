@@ -217,25 +217,16 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get endOfPlaylistCongrats =>
-      'Félicitations ! Vous avez résolu tous les puzzles de ce niveau.';
+      'Félicitations ! Vous avez résolu tous les puzzles de cette collection.';
 
   @override
   String get endOfPlaylistFiltersBlocking =>
-      'Il reste des puzzles à ce niveau, mais vos filtres actuels les excluent.';
+      'Il reste des puzzles disponibles, mais vos filtres actuels les excluent.';
 
   @override
   String endOfPlaylistCurrentLevel(int level) {
     return 'Niveau actuel : $level';
   }
-
-  @override
-  String endOfPlaylistJumpTo(int level, int gap) {
-    return 'Passer au niveau $level (+$gap)';
-  }
-
-  @override
-  String get endOfPlaylistMaxLevel =>
-      'Vous avez atteint le sommet du catalogue.';
 
   @override
   String get endOfPlaylistTutorialFinished => 'Vous avez terminé le tutoriel.';
@@ -502,6 +493,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get constraintNeighborCount => 'nombre de voisins';
+
+  @override
+  String get constraintEyes => 'yeux';
 
   @override
   String get collectionMyPuzzles => 'Mes puzzles';

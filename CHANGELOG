@@ -1,5 +1,13 @@
 # Get Some Puzzle Release Notes
 
+## Unreleased
+
+* New "Eyes" constraint: a cell counts how many cells of a given color it sees in straight lines
+* Equilibrium: first version of the equilibrium-based difficulty signal
+* Adapt-to-player improvements (smoother level progression)
+* Generator: better puzzle quality, no longer shrinks constraints because of DF
+* Hints: improved hint system and fixed a race in hint worker cancellation
+
 ## 0.0.1 (13 Aug 2025)
 
 * Initial release

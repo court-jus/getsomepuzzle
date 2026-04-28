@@ -66,10 +66,7 @@ void main() {
         expect(game.hintStage, 3);
         expect(
           game.hintText,
-          anyOf(
-            equals('force'),
-            startsWith('deduced from'),
-          ),
+          anyOf(equals('force'), startsWith('deduced from')),
           reason: 'tap 3 surfaces either the source constraint or "force"',
         );
 
@@ -155,10 +152,7 @@ void main() {
         game.onHintTap(settings, _texts); // stage 1
         game.onHintTap(settings, _texts); // stage 2
         expect(game.hintStage, 2);
-        expect(
-          game.currentPuzzle!.cells.any((c) => c.isHighlighted),
-          isTrue,
-        );
+        expect(game.currentPuzzle!.cells.any((c) => c.isHighlighted), isTrue);
 
         // Use case: the player flips the hint mode mid-cycle.
         game.resetHintCycle();
@@ -214,9 +208,15 @@ void main() {
       expect(game.hintStage, 1);
       game.onHintTap(settings, _texts); // 1 → 2: _revealCellOnly no-ops
       expect(game.hintStage, 2);
-      game.onHintTap(settings, _texts); // 2 → 3: _revealCellAndConstraint no-ops
+      game.onHintTap(
+        settings,
+        _texts,
+      ); // 2 → 3: _revealCellAndConstraint no-ops
       expect(game.hintStage, 3);
-      game.onHintTap(settings, _texts); // 3 → apply: _applyHelpMove early-returns
+      game.onHintTap(
+        settings,
+        _texts,
+      ); // 3 → apply: _applyHelpMove early-returns
 
       expect(
         game.currentPuzzle!.cellValues,

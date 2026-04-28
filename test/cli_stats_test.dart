@@ -47,6 +47,19 @@ void main() {
       expect(entry, isNotNull);
       expect(entry!.hints, 0);
     });
+
+    test('parses cell-edit analytics (cellEdits/firstClickMs/longestGapMs)', () {
+      // The three trailing fields capture in-play hesitation; their suffixes
+      // are `e`, `fc`, `lg`. Older lines without them parse with all three
+      // defaulting to 0 (covered by the test above).
+      final entry = StatEntry.parse(
+        '2025-01-01T10:00:00 60s 2f v2_12_3x3_000000000_FM:12_0:0_0 - ___ -  -  -  -  - 0h - 27e - 4500fc - 18000lg',
+      );
+      expect(entry, isNotNull);
+      expect(entry!.cellEdits, 27);
+      expect(entry.firstClickMs, 4500);
+      expect(entry.longestGapMs, 18000);
+    });
   });
 
   group('aggregateStats', () {

@@ -323,7 +323,12 @@ class _CreatePageState extends State<CreatePage> {
           height: _height,
         );
       case ConstraintType.eyes:
-        added = await showEyesDialog(context, cellIdx: cellIdx, width: _width, height: _height);
+        added = await showEyesDialog(
+          context,
+          cellIdx: cellIdx,
+          width: _width,
+          height: _height,
+        );
       case ConstraintType.fixBlack:
         _setFixedCell(cellIdx, 1);
         return;

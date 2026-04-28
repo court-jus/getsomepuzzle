@@ -272,13 +272,13 @@
     "@settingAutoLevel": {
         "description": "Setting label for automatic level adaptation"
     },
-    "endOfPlaylistCongrats": "Congratulations! You've solved every puzzle at this level.",
+    "endOfPlaylistCongrats": "Congratulations! You've solved every puzzle in this collection.",
     "@endOfPlaylistCongrats": {
-        "description": "Message shown when the player has genuinely exhausted all puzzles at their level"
+        "description": "Message shown when the player has genuinely exhausted the catalog (no remaining unplayed puzzles)"
     },
-    "endOfPlaylistFiltersBlocking": "There are still puzzles at this level, but your current filters exclude them.",
+    "endOfPlaylistFiltersBlocking": "There are still puzzles available, but your current filters exclude them.",
     "@endOfPlaylistFiltersBlocking": {
-        "description": "Message shown when puzzles exist at the current level but are hidden by user filters"
+        "description": "Message shown when puzzles remain in the catalog but are hidden by user filters"
     },
     "endOfPlaylistCurrentLevel": "Current level: {level}",
     "@endOfPlaylistCurrentLevel": {
@@ -289,19 +289,6 @@
             }
         }
     },
-    "endOfPlaylistJumpTo": "Jump to level {level} (+{gap})",
-    "@endOfPlaylistJumpTo": {
-        "description": "Button label: jumps to the next populated level, showing the gap",
-        "placeholders": {
-            "level": {
-                "type": "int"
-            },
-            "gap": {
-                "type": "int"
-            }
-        }
-    },
-    "endOfPlaylistMaxLevel": "You've reached the top of the catalog.",
     "@endOfPlaylistMaxLevel": {
         "description": "Message shown when there is no higher level with puzzles available"
     },
@@ -528,6 +515,10 @@
     "constraintNeighborCount": "neighbor count",
     "@constraintNeighborCount": {
         "description": "Name of the neighbor count constraint"
+    },
+    "constraintEyes": "eyes",
+    "@constraintEyes": {
+        "description": "Name of the eyes constraint"
     },
     "collectionMyPuzzles": "My puzzles",
     "@collectionMyPuzzles": {

@@ -77,8 +77,8 @@
     "@settingAutoLevel": {
         "description": "Setting label for automatic level adaptation"
     },
-    "endOfPlaylistCongrats": "Félicitations ! Vous avez résolu tous les puzzles de ce niveau.",
-    "endOfPlaylistFiltersBlocking": "Il reste des puzzles à ce niveau, mais vos filtres actuels les excluent.",
+    "endOfPlaylistCongrats": "Félicitations ! Vous avez résolu tous les puzzles de cette collection.",
+    "endOfPlaylistFiltersBlocking": "Il reste des puzzles disponibles, mais vos filtres actuels les excluent.",
     "endOfPlaylistCurrentLevel": "Niveau actuel : {level}",
     "@endOfPlaylistCurrentLevel": {
         "placeholders": {
@@ -87,18 +87,6 @@
             }
         }
     },
-    "endOfPlaylistJumpTo": "Passer au niveau {level} (+{gap})",
-    "@endOfPlaylistJumpTo": {
-        "placeholders": {
-            "level": {
-                "type": "int"
-            },
-            "gap": {
-                "type": "int"
-            }
-        }
-    },
-    "endOfPlaylistMaxLevel": "Vous avez atteint le sommet du catalogue.",
     "endOfPlaylistTutorialFinished": "Vous avez terminé le tutoriel.",
     "endOfPlaylistTutorialHaveFun": "Amusez-vous bien !",
     "endOfPlaylistTutorialStartPlaying": "Commencer à jouer",
@@ -119,6 +107,7 @@
     "constraintGroupCount": "nombre de groupes",
     "constraintShape": "forme",
     "constraintNeighborCount": "nombre de voisins",
+    "constraintEyes": "yeux",
     "constraintSymmetry": "symétrie",
     "generate": "Générer",
     "generateTitle": "Générer des puzzles",

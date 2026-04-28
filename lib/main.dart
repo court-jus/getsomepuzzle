@@ -753,26 +753,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                     setState(() {});
                                   },
                                   filtersBlocking:
-                                      database
-                                          ?.hasUnplayedAtLevelIgnoringFilters(
-                                            settings.playerLevel,
-                                          ) ??
+                                      database?.hasUnplayedIgnoringFilters() ??
                                       false,
-                                  nextLevel: database?.nextPopulatedLevel(
-                                    settings.playerLevel,
-                                  ),
-                                  onJumpToLevel: (newLevel) {
-                                    settings.change(
-                                      ChangeableSettings(playerLevel: newLevel),
-                                    );
-                                    if (database != null) {
-                                      database!.setPlayerLevel(newLevel);
-                                      database!.preparePlaylist();
-                                      if (database!.playlist.isNotEmpty) {
-                                        loadPuzzle();
-                                      }
-                                    }
-                                  },
                                 ),
                             ],
                           ),

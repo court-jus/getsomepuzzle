@@ -1,13 +1,18 @@
 /// A parsed stat line from the stats files.
 /// Format: finishedTimestamp durationS failuresF puzzleLine - SLD - extras
-/// The extras block contains: skipped - liked - disliked - pleasure - hintsH.
-/// The trailing `hintsH` field was added later — older lines without it
-/// parse with hints=0.
+/// The extras block contains in order:
+///   skipped - liked - disliked - pleasure - hintsH - cellEditsE
+///   - firstClickMsFC - longestGapMsLG
+/// New fields are appended over time; older lines parse with the defaults
+/// `hints=cellEdits=firstClickMs=longestGapMs=0`.
 class StatEntry {
   final String? finished;
   final int duration;
   final int failures;
   final int hints;
+  final int cellEdits;
+  final int firstClickMs;
+  final int longestGapMs;
   final String puzzleLine;
   final String? skipped;
   final String? liked;
@@ -24,6 +29,9 @@ class StatEntry {
     required this.failures,
     required this.puzzleLine,
     this.hints = 0,
+    this.cellEdits = 0,
+    this.firstClickMs = 0,
+    this.longestGapMs = 0,
     this.skipped,
     this.liked,
     this.disliked,
@@ -38,14 +46,26 @@ class StatEntry {
     final duration = int.tryParse(fields[1].replaceAll('s', ''));
     final failures = int.tryParse(fields[2].replaceAll('f', ''));
     if (duration == null || failures == null) return null;
-    final hints = fields.length > 15
-        ? int.tryParse(fields[15].replaceAll('h', '')) ?? 0
-        : 0;
+    // Suffix-tagged fields appended at the end of the line in order. We look
+    // them up by suffix rather than position so future fields can slot in
+    // without breaking parsers — and so old lines that lack them still parse.
+    int parseSuffixed(String suffix) {
+      for (final f in fields) {
+        if (f.endsWith(suffix)) {
+          return int.tryParse(f.substring(0, f.length - suffix.length)) ?? 0;
+        }
+      }
+      return 0;
+    }
+
     return StatEntry(
       finished: finished,
       duration: duration,
       failures: failures,
-      hints: hints,
+      hints: parseSuffixed('h'),
+      cellEdits: parseSuffixed('e'),
+      firstClickMs: parseSuffixed('fc'),
+      longestGapMs: parseSuffixed('lg'),
       puzzleLine: fields[3],
       skipped: fields.length > 7 && fields[7].isNotEmpty ? fields[7] : null,
       liked: fields.length > 9 && fields[9].isNotEmpty ? fields[9] : null,

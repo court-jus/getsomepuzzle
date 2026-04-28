@@ -9,13 +9,17 @@ ahead of that level, nudging them upward while keeping the pace comfortable.
 - **Player level** is an integer in the same scale as puzzle `cplx` (0–100).
   It is either set manually with the slider in the settings, or computed
   automatically from the last plays (toggle `autoLevel`, `true` by default).
-- **Puzzle selection** pulls from a `[level−1, level+2]` window around the
-  player level. Asymmetric on purpose: one easier tier for variety, two
-  harder tiers to pull the player upward.
-- **End-of-tier UX**: when the window is exhausted, an `EndOfPlaylist`
-  widget tells the player whether they have genuinely solved everything
-  at this tier or whether their filters are hiding candidates, and offers
-  a one-click jump to the next populated level.
+- **Puzzle selection** weights the entire filtered catalog by a Gaussian
+  centred on the player level (default `σ=5`). Every puzzle has a
+  non-zero probability of being picked; the closer its `cplx` is to the
+  player's level, the higher the chance. Soft tails ensure that a fast-
+  progressing player never finds the well dry, since occasional out-of-
+  centre puzzles are still surfaced.
+- **End-of-list UX**: with weighted sampling there is no longer a
+  "tier" to exhaust. The only empty states are (a) the player has
+  literally solved every puzzle in the filtered catalog, or (b) the
+  user's filters are too restrictive. `EndOfPlaylist` distinguishes
+  the two with `Database.hasUnplayedIgnoringFilters()`.
 
 ## Player level
 
@@ -28,46 +32,65 @@ like an average solver of `cplx=42` puzzles".
 
 ### Expected duration
 
-The core model, calibrated by log-linear regression on ~1300 real plays:
+The core model, recalibrated by log-linear regression on 1815 real plays
+(see `bin/analyze_stats.dart`; cplx values were recomputed with the
+current complexity formula to homogenise across game versions):
 
 ```
 expectedDuration(cplx, cells, failures)
-    = 0.92 · cells · exp(cplx / 75) · 1.65^failures
+    ≈ 1.4 · cells^0.85 · exp(cplx / 74) · 1.29^failures      (R²=0.44, MAPE=59%)
 ```
 
-- `cells = width · height` — grid size matters almost as much as `cplx`:
-  the regression gave an exponent of 1.009 on `log(cells)`, i.e. duration
-  grows linearly with grid size.
-- `cplx` is clipped to 80 before evaluation: the complexity function
-  attributes 100 to any puzzle that isn't deductively solvable
-  (`solve()` = propagation+force can't close it). Such puzzles are no
-  longer produced by the current generator but legacy entries with
-  `cplx=100` survive in `assets/default.txt`; the clamp neutralises
-  their bias on the model.
-- `1.65^failures` penalises wrong-click episodes. Rare in practice
-  (≈96 % of plays have no failures), but when they occur they roughly
-  double-to-triple the duration.
+- `cells = width · height` — duration grows sub-linearly with the grid
+  (exponent 0.85): a fraction of the cells in larger grids are "obvious"
+  and cost little.
+- `cplx` slope of `1/74` — broadly consistent across game versions once
+  cplx values are recomputed. Empirically the previous "x/50" scale was
+  too steep and the older "x/75" was very close.
+- `1.29^failures` penalises wrong-click episodes. Rare in practice
+  (≈84 % of plays have zero failures). The earlier `1.65^failures`
+  guess was much too aggressive; on real data each failure costs about
+  29 % more time, not 65 %.
+- No artificial clamp on `cplx`. Puzzles with `cplx=100` (the legacy
+  "non-deductively-solvable" bucket) are no longer emitted by the
+  generator; they're still in legacy `assets/default.txt` lines but no
+  longer biased the calibration once recomputed.
 
 This model sits inside `Database` as `_expectedDuration` and is not exposed:
-nothing outside the level computation needs it.
+nothing outside the level computation needs it. The companion
+`_impliedCplx(dur, cells, failures)` is its algebraic inverse, used by
+the level computation below.
 
 ### Level computation
 
-`Database.computePlayerLevel({required int fallback})` inverts the model:
+`Database.computePlayerLevel({required int fallback})` uses a "skill"
+inversion (A3): when a play's duration matches the model for its
+`cplx`, `level_i = cplx` exactly. Faster than expected ⇒ implicit level
+above `cplx`; slower ⇒ below.
 
 ```
-level_i = 75 · ( log(duration_i) − log(cells_i) − 0.504·failures_i + 0.086 )
+level_i = 2 · cplx_i − impliedCplx(duration_i, cells_i, failures_i)
+       where impliedCplx(d, c, f) = 74 · ( log(d) − 0.85·log(c)
+                                            − 0.252·f − 0.336 )
 ```
 
-For each of the last 50 plays — filtered to `played && finished && !skipped
-&& duration > 0` — we compute `level_i` and take a weighted average with
-**exponential decay, half-life = 25 puzzles**. The duration is clamped to
-`10 · expected` up front so that a puzzle left open for hours does not
-swing the result.
+This convention keeps `level_i ≈ cplx` as a fixed point and gives
+intuitive direction: a player who consistently outpaces the model
+trends *upward*.
 
-If fewer than 10 usable plays are available, we return `fallback` (usually
-the currently stored level) rather than snapping to 0 — this preserves any
-manually set level during onboarding.
+For each of the last 50 plays — filtered to `played && finished &&
+!skipped && duration > 0` — we compute `level_i` and take a weighted
+average with **exponential decay, half-life = 25 puzzles**. The
+duration is clamped to `[1, 10·expected]` up front so a puzzle left
+open for hours does not swing the result.
+
+If fewer than 2 usable plays are available, we return `fallback`
+(usually the currently stored level) rather than snapping to 0 — this
+preserves any manually set level during onboarding. Two is a low bar:
+the noise floor on a single play is large (per-play std ~ 35 of
+`level_i`), so the rolling average needs many samples to stabilise.
+Raising the threshold is a UX/responsiveness trade-off worth revisiting
+once we expose a confidence band.
 
 `autoLevel` toggling is live: flipping it on in Settings triggers an
 immediate recompute without waiting for the next puzzle to finish, and
@@ -78,39 +101,51 @@ trailing `*` when it is computed rather than manual.
 
 ## Puzzle selection
 
-`Database.getPuzzlesByLevel(level)` returns `filter()`-ed puzzles whose
-`cplx ∈ [level − 1, level + 2]`, shuffled. The window is tight on purpose:
-with ~11 000 puzzles in `assets/default.txt`, even the thinnest tier still
-yields dozens of candidates, and a wider window would water down the
-"nudge upward" effect.
+`Database.getPuzzlesByLevel(level)` orders the entire `filter()`-ed
+catalog by a Gaussian-weighted draw centred on `level + selectionOffset`
+(default offset 0) with standard deviation `selectionSigma` (default 5).
+Each puzzle gets a weight
+
+```
+w(cplx) = exp( −(cplx − μ)² / 2σ² )
+```
+
+The shuffle is implemented with the Efraimidis-Spirakis trick: each
+candidate gets a sort key `−ln(uniform()) / w`, and ascending sort by
+key is equivalent to weighted-sampling-without-replacement. The first
+few elements of the returned list are very likely to be near `μ`; later
+elements drift toward the tails. With σ=5 the practical reach is
+roughly ±15 cplx (`exp(−4.5) ≈ 0.011`, so ~1 % of the central weight).
 
 `preparePlaylist` uses this when `shouldShuffle` is `false`. When
 `shouldShuffle` is `true`, the player has explicitly asked for the full
-filtered catalog in random order — the adaptive window is bypassed
+filtered catalog in random order — the Gaussian bias is bypassed
 entirely. `autoLevel` and `shouldShuffle` are orthogonal; shuffle wins.
 
-User-set filters (size, rules) combine with the level window: they act
-as hard constraints the player has chosen to impose. The UX surfaces
-that interaction when it backfires — see below.
+User-set filters (size, rules) intersect the catalog before weighting:
+they act as hard constraints the player has chosen to impose. When they
+backfire, `EndOfPlaylist` surfaces it (see below).
+
+The selection knobs `selectionOffset` and `selectionSigma` are
+constants today. Wiring them through `Settings` would unlock UX
+modes like "challenge" (`offset = +5`), "rest" (`offset = −3`) or
+"variety" (`σ = 10`).
 
 ## End of playlist
 
 When `getPuzzlesByLevel` returns an empty list, `loadPuzzle` clears the
-puzzle state and `EndOfPlaylist` takes over. It distinguishes two cases
-using `Database.hasUnplayedAtLevelIgnoringFilters(level)`:
+puzzle state and `EndOfPlaylist` takes over. With Gaussian sampling the
+list is empty only when `filter()` itself is empty, which yields just
+two cases — surfaced via `Database.hasUnplayedIgnoringFilters()`:
 
-- **Filters are hiding candidates** — unplayed puzzles exist at this
-  level, but are excluded by the user's filters. The widget says so
-  explicitly, inviting the player to relax them.
-- **Tier genuinely exhausted** — the player has played everything
-  accessible at this level. The widget congratulates them.
+- **Filters are hiding candidates** — at least one unplayed/non-skipped/
+  non-disliked puzzle exists in the catalog but is excluded by the
+  user's filters. The widget invites the player to relax them.
+- **Catalog genuinely exhausted** — every puzzle has been played,
+  skipped or disliked. The widget congratulates the player.
 
-In both cases, the widget also exposes a one-click jump to the next
-populated level via `Database.nextPopulatedLevel(current)`. That method
-walks upward and returns the smallest level whose window would produce
-at least one candidate (respecting filters). The button label includes
-the gap: "Jump to level 25 (+7)". When no higher level is populated,
-the button is replaced by a "top of the catalog" message.
+There is no longer a "jump to the next populated level" affordance:
+with weighted sampling, no level is unreachable by definition.
 
 ## Data model
 
@@ -135,37 +170,39 @@ returns `hints = 0` for older lines without it. No migration is required.
 
 ## Calibration notes
 
-The `expectedDuration` coefficients are not speculative — they come from
-OLS on 1335 plays (after trimming `duration > 600 s`). The analysis lives
-in the git history of this file and on the `puzzle_stats.txt` artefact;
-the headline results:
+The `expectedDuration` coefficients come from OLS on 1815 plays after
+recomputing every play's `cplx` with the current complexity formula
+(older entries had cplx values from earlier formulas that were not
+comparable). The tool is `bin/analyze_stats.dart`:
 
-| Model | R² | MAPE |
-|---|---:|---:|
-| `log(dur) = a·cplx + b` | 0.21 | 73 % |
-| `+ log(cells)` | **0.43** | 57 % |
-| `+ failures` | **0.45** | 56 % |
-| `+ sqrt(cplx)` variant | 0.47 | 54 % |
+```
+dart run bin/analyze_stats.dart --recompute-cplx stats/
+```
 
-Adding `log(cells)` as a predictor roughly doubles the explained variance,
-confirming that grid size is a first-order effect and not a correction.
-The `sqrt(cplx)` variant is marginally better but harder to invert, so we
-picked the linear-in-`cplx` form.
+Headline numbers on the recomputed dataset:
 
-Per-play noise is large (IQR of the inferred level: ~72 points), which is
-why the level is averaged over up to 50 plays. Fewer than ~10 plays give
-too-noisy a signal to be useful — hence the fallback threshold.
+| Formula | R² | MAPE | Notes |
+|---|---:|---:|---|
+| Previous `1.25·cells·exp(cplx/50)·1.65^f` | −0.11 | 150 % | worse than predicting the mean |
+| Earlier `0.92·cells·exp(cplx/75)·1.65^f` | 0.41 | 70 % | calibration good, failures coef too high |
+| **Current `1.4·cells^0.85·exp(cplx/74)·1.29^f`** | **0.44** | **59 %** | refit |
 
-### Known limitation: `cplx = 100`
+Three lessons from the refit:
 
-Puzzles flagged `cplx=100` (those that aren't deductively solvable —
-i.e., would have required backtracking under the previous solver) are
-not reliably harder than the highest fully-deductive tier. Observed
-durations on these puzzles are about half what the model predicts. The
-clamp to 80 in `_expectedDuration` neutralises this for level inference.
-Going forward the generator no longer emits `cplx=100` (it requires
-`isDeductivelyUnique()` to ship), so this limitation will fade as the
-legacy corpus is replaced.
+- The `cplx` exponential scale stabilises around `1/74` once cplx values
+  are homogenised — very close to the historical `1/75`. The intermediate
+  `1/50` (post-714574d) was off because the model had drifted from data.
+- The `cells` dependency is sub-linear (0.85 not 1.0). Larger grids
+  cost less per cell because their solutions contain more "free" cells.
+- The failures multiplier is much milder than first guessed: 1.29 per
+  failure, not 1.65. Plays with high failure counts dominate the bias
+  if the multiplier is too aggressive.
+
+Per-play noise remains large (per-play std of `level_i` ≈ 35), which is
+why we average over up to 50 plays. R² of 0.44 means ~56 % of the
+variance is irreducible with this feature set; richer instrumentation
+(per-cell timestamps, per-constraint durations) would be needed to push
+further.
 
 ## Hints and future refinements
 
@@ -198,8 +235,9 @@ Other directions we may explore:
 ## Testing
 
 `test/adapt_to_player_test.dart` covers `computePlayerLevel`,
-`getPuzzlesByLevel`, `hasUnplayedAtLevelIgnoringFilters`, and
-`nextPopulatedLevel` with inline fixtures. `test/cli_stats_test.dart`
+`getPuzzlesByLevel`, and `hasUnplayedIgnoringFilters` with inline
+fixtures. The Gaussian draw is tested with a pinned RNG to make the
+distribution check deterministic. `test/cli_stats_test.dart`
 covers `StatEntry.parse` including the backwards-compatible `hints`
 field. Both suites build their data directly from synthetic puzzle lines
 rather than shipping a stats fixture, so they run in milliseconds and do

@@ -288,6 +288,7 @@ class GameModel extends ChangeNotifier {
     if (currentPuzzle!.cells[idx].readonly) return false;
     _beforeMutation();
     currentPuzzle!.incrValue(idx);
+    currentMeta?.stats?.recordCellEdit();
     currentPuzzle!.clearConstraintsValidity();
     if (history.isEmpty || history.last != idx) history.add(idx);
     _afterMutation();
@@ -306,11 +307,13 @@ class GameModel extends ChangeNotifier {
           .first;
       firstDragValue = myOpposite;
       currentPuzzle!.setValue(idx, firstDragValue!);
+      currentMeta?.stats?.recordCellEdit();
       if (history.isEmpty || history.last != idx) history.add(idx);
     }
     if (currentPuzzle!.cellValues[idx] != firstDragValue &&
         currentPuzzle!.cellValues[idx] == 0) {
       currentPuzzle!.setValue(idx, firstDragValue!);
+      currentMeta?.stats?.recordCellEdit();
       if (history.isEmpty || history.last != idx) history.add(idx);
     }
     notifyListeners();
@@ -334,12 +337,18 @@ class GameModel extends ChangeNotifier {
       firstRightDragValue = currentValue == 0 ? 2 : 0;
       print("$idx $currentValue $firstRightDragValue");
       final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
-      if (changed && (history.isEmpty || history.last != idx)) history.add(idx);
+      if (changed) {
+        currentMeta?.stats?.recordCellEdit();
+        if (history.isEmpty || history.last != idx) history.add(idx);
+      }
     }
     final oppositeValue = firstRightDragValue == 0 ? 2 : 0;
     if (currentPuzzle!.cellValues[idx] == oppositeValue) {
       final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
-      if (changed && (history.isEmpty || history.last != idx)) history.add(idx);
+      if (changed) {
+        currentMeta?.stats?.recordCellEdit();
+        if (history.isEmpty || history.last != idx) history.add(idx);
+      }
     }
     notifyListeners();
   }

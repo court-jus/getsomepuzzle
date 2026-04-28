@@ -508,16 +508,16 @@ abstract class AppLocalizations {
   /// **'Auto-adapt'**
   String get settingAutoLevel;
 
-  /// Message shown when the player has genuinely exhausted all puzzles at their level
+  /// Message shown when the player has genuinely exhausted the catalog (no remaining unplayed puzzles)
   ///
   /// In en, this message translates to:
-  /// **'Congratulations! You\'ve solved every puzzle at this level.'**
+  /// **'Congratulations! You\'ve solved every puzzle in this collection.'**
   String get endOfPlaylistCongrats;
 
-  /// Message shown when puzzles exist at the current level but are hidden by user filters
+  /// Message shown when puzzles remain in the catalog but are hidden by user filters
   ///
   /// In en, this message translates to:
-  /// **'There are still puzzles at this level, but your current filters exclude them.'**
+  /// **'There are still puzzles available, but your current filters exclude them.'**
   String get endOfPlaylistFiltersBlocking;
 
   /// Caption displaying the player's current level
@@ -525,18 +525,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Current level: {level}'**
   String endOfPlaylistCurrentLevel(int level);
-
-  /// Button label: jumps to the next populated level, showing the gap
-  ///
-  /// In en, this message translates to:
-  /// **'Jump to level {level} (+{gap})'**
-  String endOfPlaylistJumpTo(int level, int gap);
-
-  /// Message shown when there is no higher level with puzzles available
-  ///
-  /// In en, this message translates to:
-  /// **'You\'ve reached the top of the catalog.'**
-  String get endOfPlaylistMaxLevel;
 
   /// Main message shown when the player completes every tutorial puzzle
   ///
@@ -1041,6 +1029,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'neighbor count'**
   String get constraintNeighborCount;
+
+  /// Name of the eyes constraint
+  ///
+  /// In en, this message translates to:
+  /// **'eyes'**
+  String get constraintEyes;
 
   /// Label of the custom puzzles collection
   ///

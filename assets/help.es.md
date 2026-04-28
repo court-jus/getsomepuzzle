@@ -60,6 +60,10 @@ Un número en un círculo encima de una columna indica cuántas celdas de ese co
 
 Un número en un cuadro con un icono de enlace indica cuántos grupos (componentes conectados) de ese color deben estar en la solución.
 
+### Ojos
+
+Una celda con un símbolo de ojo debe «ver» exactamente el número indicado de celdas del color del ojo. Una celda ve en línea recta en cada una de las cuatro direcciones ortogonales hasta llegar al borde de la cuadrícula o a una celda del color opuesto (que bloquea la línea de visión). El color del ojo es el color objetivo; el borde alrededor del ojo es el color opuesto.
+
 ## Puzzles personalizados
 
 ### Generar puzzles

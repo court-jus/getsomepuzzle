@@ -37,6 +37,24 @@ class Stats {
   int duration = 0;
   Stopwatch timer = Stopwatch();
 
+  // Cell-modification analytics. Recorded per user-driven cell edit (taps
+  // and drags), not on hint-driven reveals. Useful for richer level-of-skill
+  // regression: the in-play hesitation pattern is a feature that the bare
+  // `duration` does not capture.
+  /// Total user-driven cell edits during the play. ≥ cells in a clean run,
+  /// higher when the player changes their mind.
+  int cellEdits = 0;
+
+  /// Time (ms) from puzzle start to the very first cell edit. Captures the
+  /// "reading the constraints" phase, which scales with constraint count
+  /// rather than grid size.
+  int firstClickMs = 0;
+
+  /// Longest gap (ms) between two consecutive cell edits. Captures
+  /// "stuck moments" within the play that the total duration averages out.
+  int longestGapMs = 0;
+  int _lastEditMs = 0;
+
   @override
   String toString() {
     // 2025-08-23T22:59:42 8s - 0f 3x3_000001020_GS:5.1;PA:6.top;PA:0.right;PA:2.left;FM:222_1:212121122
@@ -47,6 +65,25 @@ class Stats {
     timer.start();
     failures = 0;
     hints = 0;
+    cellEdits = 0;
+    firstClickMs = 0;
+    longestGapMs = 0;
+    _lastEditMs = 0;
+  }
+
+  /// Record a single user-driven cell edit. Only call from real interactions
+  /// (tap, drag) — not from hint-revealed cell fills, which are counted under
+  /// `hints` instead.
+  void recordCellEdit() {
+    final now = timer.elapsedMilliseconds;
+    cellEdits++;
+    if (firstClickMs == 0) {
+      firstClickMs = now;
+    } else {
+      final gap = now - _lastEditMs;
+      if (gap > longestGapMs) longestGapMs = gap;
+    }
+    _lastEditMs = now;
   }
 
   void pause() {

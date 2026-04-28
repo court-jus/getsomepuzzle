@@ -140,7 +140,7 @@ String _labelNeighborCount(AppLocalizations l) => l.constraintNeighborCount;
 String _labelShape(AppLocalizations l) => l.constraintShape;
 String _labelSymmetry(AppLocalizations l) => l.constraintSymmetry;
 String _labelDifferentFrom(AppLocalizations l) => l.constraintDifferentFrom;
-String _labelEyes(AppLocalizations l) => "Eyes";
+String _labelEyes(AppLocalizations l) => l.constraintEyes;
 
 Future<ConstraintType?> showConstraintTypePicker(BuildContext context) {
   final loc = AppLocalizations.of(context)!;

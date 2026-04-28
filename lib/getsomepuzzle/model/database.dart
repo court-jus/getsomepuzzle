@@ -27,6 +27,11 @@ class PuzzleData {
   int duration = 0;
   int failures = 0;
   int hints = 0;
+  // Cell-modification analytics persisted across plays. Default 0 for older
+  // stats lines that pre-date the instrumentation. See Stats.recordCellEdit.
+  int cellEdits = 0;
+  int firstClickMs = 0;
+  int longestGapMs = 0;
   Stats? stats;
   DateTime? started;
   DateTime? finished;
@@ -75,6 +80,9 @@ class PuzzleData {
       disliked != null ? formatter.format(disliked!) : "",
       pleasure != null ? pleasure.toString() : "",
       "${hints}h",
+      "${cellEdits}e",
+      "${firstClickMs}fc",
+      "${longestGapMs}lg",
     ].join(" - ");
     return "$finishedForLog ${duration}s ${failures}f $lineRepresentation - $sld - $extraFields";
   }
@@ -99,6 +107,9 @@ class PuzzleData {
     duration = stats!.duration;
     failures = stats!.failures;
     hints = stats!.hints;
+    cellEdits = stats!.cellEdits;
+    firstClickMs = stats!.firstClickMs;
+    longestGapMs = stats!.longestGapMs;
   }
 }
 
@@ -531,21 +542,37 @@ class Database {
   /// Expected duration (seconds) for a puzzle of given `cplx` and `cells`,
   /// adjusted by `failures`.
   ///
-  /// Calibrated by log-linear regression on ~1300 real plays:
-  ///   log(dur) = -0.086 + 0.01356·cplx + 1.009·log(cells) + 0.504·failures
-  /// ≈ 0.92 · cells · exp(cplx/75) · 1.65^failures  (R²=0.45, MAPE=56%).
+  /// Calibrated by log-linear regression on 1815 real plays (recomputed cplx
+  /// to homogenise across game versions):
+  ///   log(dur) ≈ 0.32 + 0.0135·cplx + 0.85·log(cells) + 0.252·failures
+  ///   ≈ 1.4 · cells^0.85 · exp(cplx/74) · 1.29^failures   (R²=0.44, MAPE=59%)
   ///
-  /// `cplx` is clipped to 80: the complexity formula attributes 100 to any
-  /// puzzle that isn't deductively solvable, including those that would
-  /// require guessing — that biases the model at the high end.
-  static double _expectedDuration(int cplx, int cells, int failures) {
-    final clampedCplx = cplx.clamp(0, 100) / 100;
+  /// See `bin/analyze_stats.dart` for the regression tool. Failures has a
+  /// much milder coefficient than the previous 1.65 — empirically a wrong-
+  /// click costs ≈ 29 % time, not 65 %. Cells exponent is sub-linear (0.85)
+  /// because a fraction of cells in larger grids are "obvious" and cost
+  /// little.
+  static const _kBase = 1.4;
+  static const _kCellsExp = 0.85;
+  static const _kCplxScale = 74.0;
+  static const _kFailMul = 1.29;
 
-    return cells *
-        1.25 *
-        math.exp(clampedCplx) *
-        math.exp(clampedCplx) *
-        math.pow(1.65, failures);
+  static double _expectedDuration(int cplx, int cells, int failures) {
+    return _kBase *
+        math.pow(cells, _kCellsExp) *
+        math.exp(cplx / _kCplxScale) *
+        math.pow(_kFailMul, failures);
+  }
+
+  /// Algebraic inverse of `_expectedDuration`: given an observed play, the
+  /// `cplx` value the model would have predicted for that duration.
+  /// Used by `computePlayerLevel` (A3 / skill model).
+  static double _impliedCplx(int dur, int cells, int failures) {
+    return _kCplxScale *
+        (math.log(dur) -
+            math.log(_kBase) -
+            _kCellsExp * math.log(cells) -
+            failures * math.log(_kFailMul));
   }
 
   /// Compute the player's implicit level (in `cplx` units) from recent plays.
@@ -578,10 +605,16 @@ class Database {
       final cells = puz.width * puz.height;
       if (cells <= 0) continue;
       final expected = _expectedDuration(puz.cplx, cells, puz.failures);
-      // Clamp duration to neutralise puzzles left open for hours.
+      // Clamp duration to neutralise puzzles left open for hours and to keep
+      // log() finite if the timer recorded zero somehow.
       final clampedDur = puz.duration.clamp(1, (expected * 10).round());
-      final ratio = expected / clampedDur.toDouble();
-      final levelI = ratio * puz.cplx;
+      // A3 / skill model: when the play matches the expected duration for its
+      // cplx, level_i = cplx. Faster than expected ⇒ higher implicit level;
+      // slower ⇒ lower. Symmetric and intuitive, derived as
+      //   level_i = 2·cplx − implied_cplx_for(this duration)
+      // where implied_cplx is the proper inverse of _expectedDuration.
+      final levelI =
+          2 * puz.cplx - _impliedCplx(clampedDur, cells, puz.failures);
       // Exponential decay, half-life = 25 puzzles.
       final weight = math.pow(0.5, i / 25.0).toDouble();
       weightedSum += levelI * weight;
@@ -593,42 +626,60 @@ class Database {
     return level;
   }
 
-  /// Puzzles in a `[level-1, level+2]` window around `level`. Asymmetric on
-  /// purpose: nudges the player slightly upward while keeping one easier tier
-  /// for variety. Empty list means the player has exhausted their tier —
-  /// surfaced to the UI via `EndOfPlaylist`.
+  /// Selection bias applied on top of the player's level when picking the
+  /// next puzzles. `+5` would favour puzzles slightly harder than skill
+  /// (challenge mode); `-5` would favour easier ones (rest). 0 = match.
+  static const int selectionOffset = 0;
+
+  /// Standard deviation of the cplx-distance Gaussian used to weight the
+  /// catalog. With σ=5, ~68 % of picks land within ±5 of the target cplx
+  /// and ~95 % within ±10; puzzles further out are still occasionally
+  /// proposed, which is what saves a fast-progressing player from running
+  /// out of in-tier candidates.
+  static const double selectionSigma = 5.0;
+
+  // Random source for puzzle sampling. Exposed as a package-private setter
+  // so tests can pin it to a seeded Random for reproducibility.
+  math.Random _samplingRandom = math.Random();
+  // ignore: unused_element
+  set samplingRandom(math.Random r) => _samplingRandom = r;
+
+  /// Filtered catalog ordered by Gaussian-weighted draw centred on `level
+  /// + selectionOffset`, std `selectionSigma`. The first puzzles in the
+  /// returned list are most likely to be near the player's skill; later
+  /// ones drift toward the tails. Empty list ⇒ the filtered catalog
+  /// itself is empty (every puzzle played / skipped / disliked, or
+  /// filters too restrictive).
+  ///
+  /// Implementation: Efraimidis-Spirakis weighted reservoir / sort
+  /// trick. Each item gets a key `−ln(uniform()) / weight`; sorting by
+  /// key ascending is equivalent to sampling without replacement
+  /// proportionally to the weights.
   List<PuzzleData> getPuzzlesByLevel(int level) {
-    final candidates = filter()
-        .where((p) => p.cplx >= level - 1 && p.cplx <= level + 2)
-        .toList();
-    candidates.shuffle();
-    return candidates;
+    final mu = level + selectionOffset;
+    final twoSigmaSq = 2 * selectionSigma * selectionSigma;
+    final keyed = filter().map((p) {
+      final d = p.cplx - mu;
+      // Clamp the exponent to avoid `exp` underflow producing key = +∞ for
+      // every puzzle on the tail (which would then sort arbitrarily).
+      final w = math.exp(-math.min(d * d / twoSigmaSq, 700));
+      // The +1e-300 below guards against `nextDouble() == 0`, which would
+      // make `−ln(u)` infinite and corrupt the sort.
+      final u = _samplingRandom.nextDouble() + 1e-300;
+      final key = -math.log(u) / w;
+      return (p, key);
+    }).toList()..sort((a, b) => a.$2.compareTo(b.$2));
+    return keyed.map((e) => e.$1).toList();
   }
 
-  /// Whether any unplayed puzzle exists at `level` when user-configured
+  /// Whether any unplayed puzzle exists in the catalog when user-configured
   /// filters (size, rules) are ignored. Only the baseline exclusions
   /// (played / skipped / disliked) still apply. Used by `EndOfPlaylist`
   /// to distinguish "filters are hiding puzzles" from "really exhausted".
-  bool hasUnplayedAtLevelIgnoringFilters(int level) {
+  bool hasUnplayedIgnoringFilters() {
     return puzzles.any(
-      (p) =>
-          !p.played &&
-          p.skipped == null &&
-          p.disliked == null &&
-          p.cplx >= level - 1 &&
-          p.cplx <= level + 2,
+      (p) => !p.played && p.skipped == null && p.disliked == null,
     );
-  }
-
-  /// Smallest level strictly greater than `currentLevel` for which
-  /// `getPuzzlesByLevel` would return at least one candidate. Returns `null`
-  /// if the player has truly reached the top of the filtered catalog.
-  int? nextPopulatedLevel(int currentLevel) {
-    final filteredCplxs = filter().map((p) => p.cplx).toList();
-    for (int l = currentLevel + 1; l <= 100; l++) {
-      if (filteredCplxs.any((c) => c >= l - 1 && c <= l + 2)) return l;
-    }
-    return null;
   }
 
   List<String> getStats() {

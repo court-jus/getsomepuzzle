@@ -158,12 +158,7 @@ Widget _neighborCountWidget(
   );
 }
 
-
-Widget _eyesWidget(
-  EyesConstraint constraint,
-  double cellSize,
-  int count,
-) {
+Widget _eyesWidget(EyesConstraint constraint, double cellSize, int count) {
   final double widgetSize = cellSize / count;
   return SizedBox(
     width: widgetSize,

@@ -60,6 +60,10 @@ Un nombre dans un cercle au dessus d'une colonne indique combien de cellules de 
 
 Un nombre dans un cadre avec une icône de lien indique combien de groupes (composantes connectées) de cette couleur doivent être dans la solution.
 
+### Yeux
+
+Une case contenant un symbole d'œil doit « voir » exactement le nombre indiqué de cases de la couleur de l'œil. Une case voit en ligne droite dans chacune des quatre directions orthogonales jusqu'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue). La couleur de l'œil est la couleur cible ; la bordure autour de l'œil est la couleur opposée.
+
 ## Puzzles personnalisés
 
 ### Générer des puzzles
