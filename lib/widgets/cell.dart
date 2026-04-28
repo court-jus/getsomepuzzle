@@ -71,7 +71,12 @@ class CellWidget extends StatelessWidget {
 
     int widgetScale = 1;
     if (constraints != null) {
-      widgetScale = sqrt(constraints!.length).ceil();
+      // DF is rendered on the cell border by DifferentFromPainter, not inside
+      // the cell, so it must not shrink the in-cell widgets.
+      final inCellCount = constraints!
+          .where((c) => c is! DifferentFromConstraint)
+          .length;
+      if (inCellCount > 0) widgetScale = sqrt(inCellCount).ceil();
     }
     final Widget emptyText = Text(" ");
     final Widget label = constraints == null
