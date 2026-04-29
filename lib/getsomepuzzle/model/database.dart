@@ -539,40 +539,62 @@ class Database {
     return selection;
   }
 
-  /// Expected duration (seconds) for a puzzle of given `cplx` and `cells`,
-  /// adjusted by `failures`.
+  /// Expected duration (seconds) for a puzzle of given `cplx`, `cells`,
+  /// `failures`, and `nConstraints` (the puzzle's constraint count).
   ///
-  /// Calibrated by log-linear regression on 1815 real plays (recomputed cplx
-  /// to homogenise across game versions):
-  ///   log(dur) ≈ 0.32 + 0.0135·cplx + 0.85·log(cells) + 0.252·failures
-  ///   ≈ 1.4 · cells^0.85 · exp(cplx/74) · 1.29^failures   (R²=0.44, MAPE=59%)
+  /// Refit by OLS on real plays:
+  ///   log(dur) ≈ 2.155 + 0.0366·cplx + 0.442·log(cells)
+  ///                    + 0.136·failures + 0.082·n_constraints
+  ///   ≈ 8.62 · cells^0.442 · exp(cplx/27.3)
+  ///        · 1.145^failures · 1.085^n_constraints       (R²=0.70, MAPE=29 %)
   ///
-  /// See `bin/analyze_stats.dart` for the regression tool. Failures has a
-  /// much milder coefficient than the previous 1.65 — empirically a wrong-
-  /// click costs ≈ 29 % time, not 65 %. Cells exponent is sub-linear (0.85)
-  /// because a fraction of cells in larger grids are "obvious" and cost
-  /// little.
-  static const _kBase = 1.4;
-  static const _kCellsExp = 0.85;
-  static const _kCplxScale = 74.0;
-  static const _kFailMul = 1.29;
+  /// The intercept is anchored so the calibration cohort's mean `level_i`
+  /// lands on **50** rather than on the cohort's mean `cplx`. Concretely:
+  /// a player who solves at the same pace as the calibration cohort
+  /// converges to level 50; faster players go above, slower below. This
+  /// puts the "average" right in the middle of [0, 100] instead of in the
+  /// low single digits.
+  ///
+  /// The new `n_constraints` term captures parsing/setup cost: a 4×4 puzzle
+  /// with 12 constraints takes meaningfully longer than the same grid with
+  /// 3 constraints, even at identical `cplx`. Adding it lifts R² from 0.61
+  /// (cplx + cells + failures only) to 0.70.
+  ///
+  /// See `bin/analyze_stats.dart` for the regression tool.
+  static const _kBase = 8.62;
+  static const _kCellsExp = 0.442;
+  static const _kCplxScale = 27.3;
+  static const _kFailMul = 1.145;
+  static const _kNConsMul = 1.085;
 
-  static double _expectedDuration(int cplx, int cells, int failures) {
+  static double _expectedDuration(
+    int cplx,
+    int cells,
+    int failures,
+    int nConstraints,
+  ) {
     return _kBase *
         math.pow(cells, _kCellsExp) *
         math.exp(cplx / _kCplxScale) *
-        math.pow(_kFailMul, failures);
+        math.pow(_kFailMul, failures) *
+        math.pow(_kNConsMul, nConstraints);
   }
 
   /// Algebraic inverse of `_expectedDuration`: given an observed play, the
-  /// `cplx` value the model would have predicted for that duration.
-  /// Used by `computePlayerLevel` (A3 / skill model).
-  static double _impliedCplx(int dur, int cells, int failures) {
+  /// `cplx` value the model would have predicted for that duration. Used
+  /// by the skill inversion in `computePlayerLevel`.
+  static double _impliedCplx(
+    int dur,
+    int cells,
+    int failures,
+    int nConstraints,
+  ) {
     return _kCplxScale *
         (math.log(dur) -
             math.log(_kBase) -
             _kCellsExp * math.log(cells) -
-            failures * math.log(_kFailMul));
+            failures * math.log(_kFailMul) -
+            nConstraints * math.log(_kNConsMul));
   }
 
   /// Compute the player's implicit level (in `cplx` units) from recent plays.
@@ -604,17 +626,18 @@ class Database {
       final puz = toAnalyze[i];
       final cells = puz.width * puz.height;
       if (cells <= 0) continue;
-      final expected = _expectedDuration(puz.cplx, cells, puz.failures);
+      final nCons = puz.rules.length;
+      final expected = _expectedDuration(puz.cplx, cells, puz.failures, nCons);
       // Clamp duration to neutralise puzzles left open for hours and to keep
       // log() finite if the timer recorded zero somehow.
       final clampedDur = puz.duration.clamp(1, (expected * 10).round());
-      // A3 / skill model: when the play matches the expected duration for its
-      // cplx, level_i = cplx. Faster than expected ⇒ higher implicit level;
-      // slower ⇒ lower. Symmetric and intuitive, derived as
+      // Skill inversion: when the play's duration matches the expected
+      // value for its `cplx`, `level_i = cplx`. Faster than expected ⇒
+      // higher implicit level; slower ⇒ lower. Derived as
       //   level_i = 2·cplx − implied_cplx_for(this duration)
-      // where implied_cplx is the proper inverse of _expectedDuration.
+      // where implied_cplx is the proper inverse of `_expectedDuration`.
       final levelI =
-          2 * puz.cplx - _impliedCplx(clampedDur, cells, puz.failures);
+          2 * puz.cplx - _impliedCplx(clampedDur, cells, puz.failures, nCons);
       // Exponential decay, half-life = 25 puzzles.
       final weight = math.pow(0.5, i / 25.0).toDouble();
       weightedSum += levelI * weight;

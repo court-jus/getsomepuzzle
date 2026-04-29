@@ -2,16 +2,17 @@
 //
 // Reads every `.txt` under the given directory, deduplicates, filters out
 // the cplx=100 legacy bucket, then:
-//   1. Refits the duration model log(dur) = a + b·cplx + c·log(cells) + d·failures
-//      via ordinary least squares and reports R² + MAPE.
-//   2. Compares the three level-inference approaches discussed in the
-//      adapt-to-player brainstorm:
-//        A1 = proper inverse of the OLD formula (pre-714574d)
-//        A2 = ratio·cplx (current code, post-714574d)
-//        A3 = skill model: skill = cplx − inverseOfNewModel(dur)
-//      and prints summary statistics + a few sample plays side-by-side.
+//   1. Refits log(dur) = a + b·cplx + c·log(cells) + d·failures (4 vars)
+//      and the v1.6.1+ form that adds e·n_constraints (5 vars). Reports
+//      coefficients + R² + MAPE for each.
+//   2. Replays the production skill inversion (`expectedProd` /
+//      `levelProd`, mirrors of `Database._expectedDuration` /
+//      `Database._impliedCplx`) on every play and reports the per-play
+//      level distribution, saturation rate, and within-bucket spread.
+//   3. Lists the eight plays the production model fits worst — useful
+//      for spotting a missing variable or a stale calibration.
 //
-// Usage: dart run bin/analyze_stats.dart stats/
+// Usage: dart run bin/analyze_stats.dart [--recompute-cplx] <stats_dir>
 
 import 'dart:io';
 import 'dart:math' as math;
@@ -24,6 +25,8 @@ class Play {
   final int failures;
   final int cplx;
   final int cells;
+  final int nConstraints; // count of `;`-separated entries in the constraints
+  // section. Folded into the duration model in v1.6.1.
   final String puzzleLine;
   // Suffix-tagged fields appended over time. Default 0 for older lines.
   final int cellEdits;
@@ -35,6 +38,7 @@ class Play {
     required this.failures,
     required this.cplx,
     required this.cells,
+    required this.nConstraints,
     required this.puzzleLine,
     this.cellEdits = 0,
     this.firstClickMs = 0,
@@ -69,6 +73,11 @@ Play? parsePlay(String line) {
   final h = int.tryParse(dim[1]);
   final cplx = int.tryParse(pp.last);
   if (w == null || h == null || cplx == null) return null;
+  // Constraints section sits at index 4 in the v2 layout. We just count
+  // the `;`-separated entries; semantic validation is not our concern.
+  final nCons = pp.length > 4
+      ? pp[4].split(';').where((s) => s.isNotEmpty).length
+      : 0;
 
   return Play(
     timestamp: ts,
@@ -76,6 +85,7 @@ Play? parsePlay(String line) {
     failures: fails,
     cplx: cplx,
     cells: w * h,
+    nConstraints: nCons,
     puzzleLine: puzLine,
     cellEdits: _suffixedValue(parts, 'e'),
     firstClickMs: _suffixedValue(parts, 'fc'),
@@ -84,48 +94,37 @@ Play? parsePlay(String line) {
 }
 
 // ---------------------------------------------------------------------------
-// Duration models (current and proposed reference)
+// Production duration model + skill inversion
 // ---------------------------------------------------------------------------
 
-double expectedNew(int cplx, int cells, int failures) {
-  final c = cplx.clamp(0, 100) / 100.0;
-  return cells * 1.25 * math.exp(c) * math.exp(c) * math.pow(1.65, failures);
+// Must mirror `Database._expectedDuration` in
+// `lib/getsomepuzzle/model/database.dart`. Anchored so the calibration
+// cohort's mean `level_i` lands at 50.
+double expectedProd(int cplx, int cells, int failures, int nConstraints) {
+  return 8.62 *
+      math.pow(cells, 0.442) *
+      math.exp(cplx / 27.3) *
+      math.pow(1.145, failures) *
+      math.pow(1.085, nConstraints);
 }
 
-double expectedOld(int cplx, int cells, int failures) {
-  final c = cplx.clamp(0, 80);
-  return 0.92 * cells * math.exp(c / 75.0) * math.pow(1.65, failures);
-}
-
-// ---------------------------------------------------------------------------
-// Level inference approaches
-// ---------------------------------------------------------------------------
-
-// A1: proper algebraic inverse of the OLD model.
-double levelA1(int dur, int cells, int failures) {
-  return 75.0 * (math.log(dur) - math.log(cells) - 0.504 * failures + 0.086);
-}
-
-// A2: current code — ratio · cplx, with duration clamp at 10·expected.
-double levelA2(int dur, int cells, int failures, int cplx) {
-  final exp = expectedNew(cplx, cells, failures);
-  final clampedDur = dur.clamp(1, (exp * 10).round());
-  final ratio = exp / clampedDur.toDouble();
-  return ratio * cplx;
-}
-
-// A3: skill model. Convention: when dur == expected, skill = cplx (so the
-// scale aligns with the existing playerLevel display).
-//   skill = 2·cplx − cplx_implicit_proper(NEW model)
-double levelA3(int dur, int cells, int failures, int cplx) {
-  // proper inverse of expectedNew: cplx_imp = 50·log(dur / (cells·1.25·1.65^f))
-  final cplxImp =
-      50.0 *
+// Mirror of `Database._impliedCplx`: the algebraic inverse of
+// `expectedProd`. Same constants as the production code.
+double impliedCplxProd(int dur, int cells, int failures, int nConstraints) {
+  return 27.3 *
       (math.log(dur) -
-          math.log(cells) -
-          math.log(1.25) -
-          failures * math.log(1.65));
-  return 2.0 * cplx - cplxImp;
+          math.log(8.62) -
+          0.442 * math.log(cells) -
+          failures * math.log(1.145) -
+          nConstraints * math.log(1.085));
+}
+
+// Mirror of `Database.computePlayerLevel`'s per-play inversion: when a
+// play's duration matches the expected for its puzzle, level == cplx.
+// Faster ⇒ above; slower ⇒ below. The intercept anchor in `expectedProd`
+// shifts cohort plays up so their average lands at 50.
+double levelProd(int dur, int cells, int failures, int cplx, int nCons) {
+  return 2.0 * cplx - impliedCplxProd(dur, cells, failures, nCons);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,33 +139,55 @@ class FitResult {
 }
 
 FitResult fitLogLinear(List<Play> plays) {
-  // Design matrix X (N×4), response y (N).
-  final n = plays.length;
-  final xs = List.generate(n, (i) {
-    final p = plays[i];
-    return [1.0, p.cplx.toDouble(), math.log(p.cells), p.failures.toDouble()];
-  });
-  final ys = plays.map((p) => math.log(p.duration)).toList();
+  return _fitOLS(
+    plays,
+    (p) => [1.0, p.cplx.toDouble(), math.log(p.cells), p.failures.toDouble()],
+  );
+}
 
-  // Build X^T X (4×4) and X^T y (4).
-  final xtx = List.generate(4, (_) => List.filled(4, 0.0));
-  final xty = List.filled(4, 0.0);
+/// Same as `fitLogLinear` but with a 5th regressor: the puzzle's constraint
+/// count. Used to verify the v1.6.1+ production model and to refit on new
+/// data.
+FitResult fitLogLinearWithConstraints(List<Play> plays) {
+  return _fitOLS(
+    plays,
+    (p) => [
+      1.0,
+      p.cplx.toDouble(),
+      math.log(p.cells),
+      p.failures.toDouble(),
+      p.nConstraints.toDouble(),
+    ],
+  );
+}
+
+FitResult _fitOLS(List<Play> plays, List<double> Function(Play) features) {
+  final n = plays.length;
+  final xs = plays.map(features).toList();
+  final ys = plays.map((p) => math.log(p.duration)).toList();
+  final p = xs[0].length;
+
+  // Build X^T X (p×p) and X^T y (p).
+  final xtx = List.generate(p, (_) => List.filled(p, 0.0));
+  final xty = List.filled(p, 0.0);
   for (var i = 0; i < n; i++) {
-    for (var j = 0; j < 4; j++) {
+    for (var j = 0; j < p; j++) {
       xty[j] += xs[i][j] * ys[i];
-      for (var k = 0; k < 4; k++) {
+      for (var k = 0; k < p; k++) {
         xtx[j][k] += xs[i][j] * xs[i][k];
       }
     }
   }
-  final beta = solve4x4(xtx, xty);
+  final beta = _solveLinear(xtx, xty);
 
   // R² and MAPE
   final yMean = ys.reduce((a, b) => a + b) / n;
   double ssTot = 0, ssRes = 0, mape = 0;
   for (var i = 0; i < n; i++) {
-    final yhat =
-        beta[0] + beta[1] * xs[i][1] + beta[2] * xs[i][2] + beta[3] * xs[i][3];
+    double yhat = 0;
+    for (var j = 0; j < p; j++) {
+      yhat += beta[j] * xs[i][j];
+    }
     ssTot += math.pow(ys[i] - yMean, 2).toDouble();
     ssRes += math.pow(ys[i] - yhat, 2).toDouble();
     final durHat = math.exp(yhat);
@@ -175,12 +196,13 @@ FitResult fitLogLinear(List<Play> plays) {
   return FitResult(beta, 1 - ssRes / ssTot, 100 * mape / n);
 }
 
-List<double> solve4x4(List<List<double>> A, List<double> b) {
-  // Augmented matrix
-  final m = List.generate(4, (i) => [...A[i], b[i]]);
-  for (var i = 0; i < 4; i++) {
+// Gauss-Jordan elimination on an augmented matrix [A | b] of any size.
+List<double> _solveLinear(List<List<double>> A, List<double> b) {
+  final p = A.length;
+  final m = List.generate(p, (i) => [...A[i], b[i]]);
+  for (var i = 0; i < p; i++) {
     var maxRow = i;
-    for (var k = i + 1; k < 4; k++) {
+    for (var k = i + 1; k < p; k++) {
       if (m[k][i].abs() > m[maxRow][i].abs()) maxRow = k;
     }
     if (maxRow != i) {
@@ -188,17 +210,17 @@ List<double> solve4x4(List<List<double>> A, List<double> b) {
       m[maxRow] = m[i];
       m[i] = t;
     }
-    for (var k = i + 1; k < 4; k++) {
+    for (var k = i + 1; k < p; k++) {
       final f = m[k][i] / m[i][i];
-      for (var j = i; j <= 4; j++) {
+      for (var j = i; j <= p; j++) {
         m[k][j] -= f * m[i][j];
       }
     }
   }
-  final x = List.filled(4, 0.0);
-  for (var i = 3; i >= 0; i--) {
-    var s = m[i][4];
-    for (var j = i + 1; j < 4; j++) {
+  final x = List.filled(p, 0.0);
+  for (var i = p - 1; i >= 0; i--) {
+    var s = m[i][p];
+    for (var j = i + 1; j < p; j++) {
       s -= m[i][j] * x[j];
     }
     x[i] = s / m[i][i];
@@ -322,6 +344,7 @@ void main(List<String> args) {
               failures: p.failures,
               cplx: c,
               cells: p.cells,
+              nConstraints: p.nConstraints,
               puzzleLine: p.puzzleLine,
             ),
           );
@@ -428,23 +451,30 @@ void main(List<String> args) {
   );
   print('');
 
-  // ---------- 2. Compare existing formulas ----------
-  final r2New = rSquaredOf(
-    filtered,
-    (p) => expectedNew(p.cplx, p.cells, p.failures),
+  // ---------- 1b. Refit including n_constraints (the v1.6.1+ form) ----------
+  final fitC = fitLogLinearWithConstraints(filtered);
+  final ac = fitC.beta[0],
+      bc = fitC.beta[1],
+      cc = fitC.beta[2],
+      dc = fitC.beta[3],
+      ec = fitC.beta[4];
+  print(
+    '=== OLS refit on log(dur) = a + b·cplx + c·log(cells) + d·failures '
+    '+ e·n_constraints ===',
   );
-  final r2Old = rSquaredOf(
-    filtered,
-    (p) => expectedOld(p.cplx, p.cells, p.failures),
+  print(
+    '  a = ${ac.toStringAsFixed(4)}  '
+    'b (cplx) = ${bc.toStringAsFixed(5)} (1/${(1 / bc).toStringAsFixed(1)})  '
+    'c (cells) = ${cc.toStringAsFixed(4)}  '
+    'd (fails) = ${dc.toStringAsFixed(4)}  '
+    'e (n_cons) = ${ec.toStringAsFixed(4)}',
   );
-  final mNew = mapeOf(
-    filtered,
-    (p) => expectedNew(p.cplx, p.cells, p.failures),
+  print(
+    '  R² = ${fitC.rSquared.toStringAsFixed(3)}    MAPE = ${fitC.mape.toStringAsFixed(1)} %',
   );
-  final mOld = mapeOf(
-    filtered,
-    (p) => expectedOld(p.cplx, p.cells, p.failures),
-  );
+  print('');
+
+  // ---------- 2. Per-month subset refits ----------
   // Per-source / per-date diagnostics: split the dataset by year-month and
   // by source file, refit on each chunk, and report R². If older data has
   // stale cplx values, the older chunks should refit poorly even on their
@@ -476,122 +506,87 @@ void main(List<String> args) {
   }
   print('');
 
-  print('=== Existing formulas on this data ===');
-  print(
-    '  OLD (pre-714574d):  0.92·cells·exp(cplx/75)·1.65^f  '
-    '→ R²=${r2Old.toStringAsFixed(3)}  MAPE=${mOld.toStringAsFixed(1)} %',
-  );
-  print(
-    '  NEW (current):     1.25·cells·exp(cplx/50)·1.65^f  '
-    '→ R²=${r2New.toStringAsFixed(3)}  MAPE=${mNew.toStringAsFixed(1)} %',
-  );
-  print(
-    '  Refit (this run):                                    '
-    '→ R²=${fit.rSquared.toStringAsFixed(3)}  MAPE=${fit.mape.toStringAsFixed(1)} %',
-  );
-  print('');
-
   // ---------- 3. Distribution of per-play level estimates ----------
-  // Restrict to plays that actually pass the filters used in computePlayerLevel
-  // (skipped is excluded by stats absence, played always true here).
-  // Clip A2 to [0,100] like the production code.
-  final a1 = filtered
-      .map((p) => levelA1(p.duration, p.cells, p.failures).clamp(0.0, 100.0))
-      .toList();
-  final a2 = filtered
+  // Mirrors the production code path: same constants, same skill inversion.
+  // Saturation rows tell us how often the formula hits the [0, 100] floor
+  // or ceiling on this dataset — the signal we'd lose to clamping.
+  final levels = filtered
       .map(
         (p) =>
-            levelA2(p.duration, p.cells, p.failures, p.cplx).clamp(0.0, 100.0),
+            levelProd(p.duration, p.cells, p.failures, p.cplx, p.nConstraints),
       )
       .toList();
-  final a3 = filtered
-      .map(
-        (p) =>
-            levelA3(p.duration, p.cells, p.failures, p.cplx).clamp(0.0, 100.0),
-      )
-      .toList();
-
-  print('=== Distribution of per-play level estimates (clamped to 0..100) ===');
-  print('  A1 (old proper inverse):   ${describe(a1).fmt()}');
-  print('  A2 (current ratio·cplx):    ${describe(a2).fmt()}');
-  print('  A3 (skill: 2·cplx−cplxImp): ${describe(a3).fmt()}');
-  print('');
-
-  // Saturation count (how many plays hit the ceiling/floor).
-  final satA2 = a2.where((x) => x == 0 || x == 100).length;
-  final satA3 = a3.where((x) => x == 0 || x == 100).length;
+  final clamped = levels.map((x) => x.clamp(0.0, 100.0)).toList();
+  print('=== Per-play level (production formula, n_cons-aware) ===');
+  print('  raw:           ${describe(levels).fmt()}');
+  print('  clamped 0–100: ${describe(clamped).fmt()}');
+  final sat = clamped.where((x) => x == 0 || x == 100).length;
   print(
-    '  A2 plays saturated at 0 or 100: $satA2 / ${filtered.length} '
-    '(${(100 * satA2 / filtered.length).toStringAsFixed(1)} %)',
-  );
-  print(
-    '  A3 plays saturated at 0 or 100: $satA3 / ${filtered.length} '
-    '(${(100 * satA3 / filtered.length).toStringAsFixed(1)} %)',
+    '  saturated at 0 or 100: $sat / ${filtered.length} '
+    '(${(100 * sat / filtered.length).toStringAsFixed(1)} %)',
   );
   print('');
 
-  // Coherence check: how stable is each approach across same-cplx plays?
-  // Group by cplx bucket and compute std-dev of level_i within each bucket.
-  // A small std means the approach gives consistent estimates for the same
-  // puzzle difficulty (good signal); a large std means it depends heavily on
-  // the actual duration noise.
+  // Coherence check: how stable is the level estimate across plays of
+  // similar difficulty? A small bucket std means estimates don't depend
+  // heavily on per-play duration noise.
   final byBucket = <int, List<int>>{};
   for (var i = 0; i < filtered.length; i++) {
     final b = (filtered[i].cplx ~/ 10) * 10;
     byBucket.putIfAbsent(b, () => []).add(i);
   }
-  print('=== Within-bucket standard deviation of level estimates ===');
-  print('  (smaller = more consistent across plays of similar difficulty)');
-  print('  bucket   n   A1-σ   A2-σ   A3-σ');
+  print('=== Within-cplx-bucket level standard deviation ===');
+  print('  bucket   n    σ');
   final sortedBuckets = byBucket.keys.toList()..sort();
   for (final b in sortedBuckets) {
     final ids = byBucket[b]!;
     if (ids.length < 5) continue;
-    double std(List<double> all) {
-      final xs = ids.map((i) => all[i]).toList();
-      final m = xs.reduce((a, b) => a + b) / xs.length;
-      return math.sqrt(
-        xs.fold(0.0, (a, x) => a + math.pow(x - m, 2)) / xs.length,
-      );
-    }
-
+    final xs = ids.map((i) => clamped[i]).toList();
+    final m = xs.reduce((a, b) => a + b) / xs.length;
+    final std = math.sqrt(
+      xs.fold(0.0, (a, x) => a + math.pow(x - m, 2)) / xs.length,
+    );
     print(
       '  [${b.toString().padLeft(2)},${(b + 10).toString().padLeft(3)})  '
       '${ids.length.toString().padLeft(3)}   '
-      '${std(a1).toStringAsFixed(1).padLeft(5)}  '
-      '${std(a2).toStringAsFixed(1).padLeft(5)}  '
-      '${std(a3).toStringAsFixed(1).padLeft(5)}',
+      '${std.toStringAsFixed(1).padLeft(4)}',
     );
   }
   print('');
 
   // ---------- 4. A few sample plays side-by-side ----------
+  // Sorted by largest deviation from the production model — these are the
+  // plays the model fits worst, which are usually the most informative
+  // for spotting a missing variable or a stale calibration.
   print(
-    '=== Sample plays (sorted by abs(dur − expectedNew), most surprising first) ===',
+    '=== Sample plays (sorted by abs(dur − expectedProd), most surprising first) ===',
   );
   final indexed = List.generate(filtered.length, (i) => i);
   indexed.sort((i, j) {
     final pi = filtered[i], pj = filtered[j];
-    final di = (pi.duration - expectedNew(pi.cplx, pi.cells, pi.failures))
-        .abs();
-    final dj = (pj.duration - expectedNew(pj.cplx, pj.cells, pj.failures))
-        .abs();
+    final di =
+        (pi.duration -
+                expectedProd(pi.cplx, pi.cells, pi.failures, pi.nConstraints))
+            .abs();
+    final dj =
+        (pj.duration -
+                expectedProd(pj.cplx, pj.cells, pj.failures, pj.nConstraints))
+            .abs();
     return dj.compareTo(di);
   });
-  print('  cplx cells fail  dur  expN     A1    A2    A3');
+  print('  cplx cells fail n_cons  dur  expected  level');
   for (final i in indexed.take(8)) {
     final p = filtered[i];
-    final eN = expectedNew(p.cplx, p.cells, p.failures);
+    final exp = expectedProd(p.cplx, p.cells, p.failures, p.nConstraints);
     print(
       '  '
       '${p.cplx.toString().padLeft(4)} '
       '${p.cells.toString().padLeft(5)} '
       '${p.failures.toString().padLeft(4)} '
+      '${p.nConstraints.toString().padLeft(6)} '
       '${p.duration.toString().padLeft(4)} '
-      '${eN.toStringAsFixed(0).padLeft(5)}  '
-      '${a1[i].toStringAsFixed(0).padLeft(4)}  '
-      '${a2[i].toStringAsFixed(0).padLeft(4)}  '
-      '${a3[i].toStringAsFixed(0).padLeft(4)}',
+      '${exp.toStringAsFixed(0).padLeft(8)}  '
+      '${clamped[i].toStringAsFixed(0).padLeft(5)}',
     );
   }
 }

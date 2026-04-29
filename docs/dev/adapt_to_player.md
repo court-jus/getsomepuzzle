@@ -26,31 +26,47 @@ ahead of that level, nudging them upward while keeping the pace comfortable.
 ### Scale
 
 `playerLevel` lives in `Settings` (0–100, persisted in `SharedPreferences`).
-It is always expressed in the same unit as `PuzzleData.cplx` — no secondary
-scale, no arbitrary multiplier. A level of 42 means "the player performs
-like an average solver of `cplx=42` puzzles".
+The scale is **anchored at 50 = the calibration cohort's pace**: a
+player who solves at the same speed as the historical baseline trends
+toward 50, faster players go above, slower below. This puts the
+"average" player in the middle of [0, 100] instead of at 0 or near 0.
+
+The unit is still puzzle-`cplx`-compatible: the puzzle selector compares
+`level` against `cplx` directly via the Gaussian weighting (see below).
+But the absolute number `42` no longer means "performs like a `cplx=42`
+solver" — it means "42 in the centred-on-50 skill scale".
 
 ### Expected duration
 
-The core model, recalibrated by log-linear regression on 1815 real plays
-(see `bin/analyze_stats.dart`; cplx values were recomputed with the
-current complexity formula to homogenise across game versions):
+The core model is OLS-fit on real plays:
 
 ```
-expectedDuration(cplx, cells, failures)
-    ≈ 1.4 · cells^0.85 · exp(cplx / 74) · 1.29^failures      (R²=0.44, MAPE=59%)
+expectedDuration(cplx, cells, failures, n_constraints)
+    ≈ 8.62 · cells^0.442 · exp(cplx / 27.3)
+         · 1.145^failures · 1.085^n_constraints      (R²=0.70, MAPE=29%)
 ```
 
 - `cells = width · height` — duration grows sub-linearly with the grid
-  (exponent 0.85): a fraction of the cells in larger grids are "obvious"
+  (exponent 0.442): a fraction of the cells in larger grids are "obvious"
   and cost little.
-- `cplx` slope of `1/74` — broadly consistent across game versions once
-  cplx values are recomputed. Empirically the previous "x/50" scale was
-  too steep and the older "x/75" was very close.
-- `1.29^failures` penalises wrong-click episodes. Rare in practice
-  (≈84 % of plays have zero failures). The earlier `1.65^failures`
-  guess was much too aggressive; on real data each failure costs about
-  29 % more time, not 65 %.
+- `cplx` slope of `1/27.3` — much steeper than the previous `1/74`
+  estimate. Once `n_constraints` is in the model, cplx and constraint
+  count untangle and `cplx` carries a stronger marginal signal.
+- `1.145^failures` penalises wrong-click episodes. Mild on purpose:
+  ~84 % of plays have zero failures, so the multiplier is fit to the
+  cases where there *are* failures; aggressive multipliers (1.65) have
+  always overcorrected.
+- **`1.085^n_constraints`** captures parsing/setup cost, new in
+  v1.6.1. A 4×4 grid with 12 constraints takes meaningfully longer
+  than the same grid with 3, even at identical `cplx`. Adding the term
+  lifts R² from 0.61 to 0.70 on the calibration cohort.
+- The intercept (`8.62 = exp(2.155)`) is **anchored**: it is shifted
+  from the OLS-minimum-MSE intercept by `+1.50` so the cohort's mean
+  `level_i` lands on **50** instead of on the cohort's mean `cplx`.
+  This is a deliberate shift in interpretation, not a fit error: the
+  formula intentionally over-predicts the cohort's durations, because
+  we want a "matches the cohort" pace to read as middle-of-the-bar,
+  not bottom-of-the-bar.
 - No artificial clamp on `cplx`. Puzzles with `cplx=100` (the legacy
   "non-deductively-solvable" bucket) are no longer emitted by the
   generator; they're still in legacy `assets/default.txt` lines but no
@@ -58,25 +74,27 @@ expectedDuration(cplx, cells, failures)
 
 This model sits inside `Database` as `_expectedDuration` and is not exposed:
 nothing outside the level computation needs it. The companion
-`_impliedCplx(dur, cells, failures)` is its algebraic inverse, used by
-the level computation below.
+`_impliedCplx(dur, cells, failures, nConstraints)` is its algebraic
+inverse, used by the level computation below.
 
 ### Level computation
 
-`Database.computePlayerLevel({required int fallback})` uses a "skill"
-inversion (A3): when a play's duration matches the model for its
-`cplx`, `level_i = cplx` exactly. Faster than expected ⇒ implicit level
-above `cplx`; slower ⇒ below.
+`Database.computePlayerLevel({required int fallback})` uses a skill
+inversion: faster than expected ⇒ implicit level above `cplx`; slower ⇒
+below. The intercept anchor on the duration model shifts the output up
+by ~41 cplx-units so the cohort centres on 50.
 
 ```
-level_i = 2 · cplx_i − impliedCplx(duration_i, cells_i, failures_i)
-       where impliedCplx(d, c, f) = 74 · ( log(d) − 0.85·log(c)
-                                            − 0.252·f − 0.336 )
+level_i = 2 · cplx_i − impliedCplx(duration_i, cells_i, failures_i, n_cons_i)
+       where impliedCplx(d, c, f, n) = 27.3 · ( log(d) − log(8.62)
+                                            − 0.442·log(c)
+                                            − 0.135·f − 0.082·n )
 ```
 
-This convention keeps `level_i ≈ cplx` as a fixed point and gives
-intuitive direction: a player who consistently outpaces the model
-trends *upward*.
+When a play's duration matches the (anchored) expected duration for its
+`cplx`, `level_i = cplx`. The cohort's *typical* pace, however, is
+faster than this anchored expected — by design — so cohort plays come
+in around 50 on average rather than around their puzzle's `cplx`.
 
 For each of the last 50 plays — filtered to `played && finished &&
 !skipped && duration > 0` — we compute `level_i` and take a weighted
@@ -170,39 +188,45 @@ returns `hints = 0` for older lines without it. No migration is required.
 
 ## Calibration notes
 
-The `expectedDuration` coefficients come from OLS on 1815 plays after
-recomputing every play's `cplx` with the current complexity formula
-(older entries had cplx values from earlier formulas that were not
-comparable). The tool is `bin/analyze_stats.dart`:
+`expectedDuration` is OLS-fit on real play data via
+`bin/analyze_stats.dart`. Each refit recomputes every play's `cplx`
+with the current complexity formula (older entries carry cplx values
+from earlier formulas that are not directly comparable):
 
 ```
 dart run bin/analyze_stats.dart --recompute-cplx stats/
 ```
 
-Headline numbers on the recomputed dataset:
+Current model and its immediate predecessor on the recomputed dataset:
 
 | Formula | R² | MAPE | Notes |
 |---|---:|---:|---|
-| Previous `1.25·cells·exp(cplx/50)·1.65^f` | −0.11 | 150 % | worse than predicting the mean |
-| Earlier `0.92·cells·exp(cplx/75)·1.65^f` | 0.41 | 70 % | calibration good, failures coef too high |
-| **Current `1.4·cells^0.85·exp(cplx/74)·1.29^f`** | **0.44** | **59 %** | refit |
+| `1.4·cells^0.85·exp(cplx/74)·1.29^f` | 0.44 | 59 % | pre-1.6.1 (no `n_constraints`, OLS-minimum intercept) |
+| **`8.62·cells^0.442·exp(cplx/27.3)·1.145^f·1.085^n_cons`** | **0.70** | **29 %** | **current (1.6.1+, anchored at level 50)** |
 
-Three lessons from the refit:
+Three things changed in the v1.6.1 refit:
 
-- The `cplx` exponential scale stabilises around `1/74` once cplx values
-  are homogenised — very close to the historical `1/75`. The intermediate
-  `1/50` (post-714574d) was off because the model had drifted from data.
-- The `cells` dependency is sub-linear (0.85 not 1.0). Larger grids
-  cost less per cell because their solutions contain more "free" cells.
-- The failures multiplier is much milder than first guessed: 1.29 per
-  failure, not 1.65. Plays with high failure counts dominate the bias
-  if the multiplier is too aggressive.
+- **`n_constraints` is now in the model.** Once parsing/setup cost is
+  accounted for explicitly, the previously-confounded `cplx` slope and
+  `cells` exponent both shift dramatically — `cplx` becomes much more
+  informative (slope `1/27.3` instead of `1/74`) and `cells` drops to
+  `0.442` (each extra cell costs less, but each extra constraint costs
+  ~8.5 % more time).
+- **The intercept is anchored, not OLS-minimum.** Plain OLS would put
+  the cohort's mean `level_i` at the cohort's mean `cplx` (≈ 9 on the
+  v1.6.1 calibration set), which read as "no adaptation" in the UI.
+  Adding `+1.50` to the intercept (multiplying expected duration by
+  ~4.5) shifts the cohort to `level=50`. This is a UX choice — it
+  trades MSE on the calibration set for an interpretable scale.
+- **The failures multiplier softens from 1.29 to 1.145.** With
+  `n_constraints` separated out, failures stop double-counting the
+  parsing cost of busy puzzles.
 
-Per-play noise remains large (per-play std of `level_i` ≈ 35), which is
-why we average over up to 50 plays. R² of 0.44 means ~56 % of the
-variance is irreducible with this feature set; richer instrumentation
-(per-cell timestamps, per-constraint durations) would be needed to push
-further.
+Per-play noise is still substantial — per-play std of `level_i` ≈ 13 on
+the cohort, so the rolling average over 50 plays (half-life 25) is what
+gives a stable reading. R² of 0.70 means ~30 % of variance is
+irreducible with this feature set; richer instrumentation (per-cell
+timestamps, per-constraint durations) would be needed to push further.
 
 ## Hints and future refinements
 

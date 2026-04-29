@@ -3,23 +3,33 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 
-/// Minimal-but-valid `PuzzleData` line: `v2_12_WxH_0..0_FM:12_0:0_CPLX`.
-/// We keep the constraint section trivial (`FM:12`) because none of the
-/// adapt-to-player code cares about semantic validity — only width, height,
-/// and the trailing `cplx` value.
-PuzzleData _puz({required int cplx, int width = 5, int height = 5}) {
+/// Minimal-but-valid `PuzzleData` line. The constraint section repeats
+/// `FM:12` `nCons` times so `PuzzleData.rules.length == nCons`, which the
+/// duration model now consumes. None of the adapt-to-player logic cares
+/// about semantic validity — only width, height, the trailing `cplx`, and
+/// the parsed `rules` count.
+PuzzleData _puz({
+  required int cplx,
+  int width = 5,
+  int height = 5,
+  int nCons = 1,
+}) {
   final cellsStr = '0' * (width * height);
-  return PuzzleData('v2_12_${width}x${height}_${cellsStr}_FM:12_0:0_$cplx');
+  final cons = List.filled(nCons, 'FM:12').join(';');
+  return PuzzleData('v2_12_${width}x${height}_${cellsStr}_${cons}_0:0_$cplx');
 }
 
 /// Mirror of the private `Database._expectedDuration`. Tests use it to craft
 /// durations that satisfy the model's equilibrium so we can check the
-/// invariant `level ≈ cplx`.
-double _expectedFor(int cplx, int cells, int failures) =>
-    1.4 *
-    math.pow(cells, 0.85) *
-    math.exp(cplx / 74.0) *
-    math.pow(1.29, failures);
+/// invariant `level ≈ cplx`. Must stay in sync with the constants in
+/// `database.dart` (anchored model: log(dur) = 2.155 + 0.0366·cplx
+/// + 0.442·log(cells) + 0.136·failures + 0.082·n_cons).
+double _expectedFor(int cplx, int cells, int failures, int nCons) =>
+    8.62 *
+    math.pow(cells, 0.442) *
+    math.exp(cplx / 27.3) *
+    math.pow(1.145, failures) *
+    math.pow(1.085, nCons);
 
 void main() {
   group('Database.computePlayerLevel', () {
@@ -37,14 +47,17 @@ void main() {
     });
 
     test('yields ≈ cplx when every duration matches the expected model', () {
-      // Invariant of the A3 (skill) inversion: when a play's duration equals
-      // _expectedDuration for its puzzle, level_i = cplx exactly. So
+      // Invariant of the skill inversion: when a play's duration equals
+      // `_expectedDuration` for its puzzle, `level_i = cplx` exactly. So
       // averaging 12 plays at cplx=40 must give ~40 (small rounding only).
+      // The fixture pins `nCons=3` to match the duration the helper feeds
+      // back into `_expectedFor`, since the model now depends on it.
       final db = Database(playerLevel: 0);
       const cplx = 40;
-      final dur = _expectedFor(cplx, 25, 0).round();
+      const nCons = 3;
+      final dur = _expectedFor(cplx, 25, 0, nCons).round();
       db.puzzles = List.generate(12, (i) {
-        return _puz(cplx: cplx)
+        return _puz(cplx: cplx, nCons: nCons)
           ..played = true
           ..duration = dur
           ..finished = DateTime(2026, 1, 1).add(Duration(minutes: i));
@@ -61,20 +74,46 @@ void main() {
       // genuinely excluded from the sample size check.)
       final db = Database(playerLevel: 0);
       const cplx = 40;
-      final dur = _expectedFor(cplx, 25, 0).round();
+      const nCons = 3;
+      final dur = _expectedFor(cplx, 25, 0, nCons).round();
       db.puzzles = [
-        _puz(cplx: cplx)
+        _puz(cplx: cplx, nCons: nCons)
           ..played = true
           ..duration = dur
           ..finished = DateTime(2026, 1, 1),
         for (int i = 0; i < 10; i++)
-          (_puz(cplx: cplx)
+          (_puz(cplx: cplx, nCons: nCons)
             ..played = true
             ..duration = dur
             ..finished = DateTime(2026, 1, 1).add(Duration(minutes: i + 10))
             ..skipped = DateTime(2026, 1, 1)),
       ];
       expect(db.computePlayerLevel(fallback: 77), 77);
+    });
+
+    test('level rises with constraint count when duration is held fixed', () {
+      // n_constraints captures parsing/setup cost: at the same cplx,
+      // cells, and duration, a puzzle with more constraints means the
+      // player worked through more rules at the same speed → higher
+      // implicit level. Locks in the sign of the n_cons coefficient so a
+      // future regression that drops the term (or flips its sign) fails
+      // here instead of silently undoing the recalibration.
+      DateTime ts(int i) => DateTime(2026, 1, 1).add(Duration(minutes: i));
+      Database build(int nCons) {
+        final db = Database(playerLevel: 0);
+        db.puzzles = List.generate(
+          12,
+          (i) => _puz(cplx: 20, nCons: nCons)
+            ..played = true
+            ..duration = 30
+            ..finished = ts(i),
+        );
+        return db;
+      }
+
+      final lowCons = build(2).computePlayerLevel(fallback: 0);
+      final highCons = build(15).computePlayerLevel(fallback: 0);
+      expect(highCons, greaterThan(lowCons));
     });
   });
 
