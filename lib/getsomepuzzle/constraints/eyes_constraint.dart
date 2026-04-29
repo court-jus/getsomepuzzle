@@ -1,14 +1,54 @@
+import 'dart:math' as math;
+
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-class WhatIsSeen {
-  // Describe what can be seen by a cell
-  late int count; // The number of cells of that color that are seen by the cell
-  late List<int> candidates; //Empty cells that are seen and can be filled
+/// What an eye sees in a single direction (left, right, up or down).
+class DirectionView {
+  /// Number of contiguous color cells visible from the eye in this direction.
+  final int seen;
 
-  WhatIsSeen({required this.count, required this.candidates});
+  /// Total cells from the eye until (but not including) the first opposite-color
+  /// cell or the grid edge. This is the maximum [seen] could ever become.
+  final int max;
+
+  /// Puzzle indices of the empty cells in this direction, ordered from closest
+  /// to farthest from the eye.
+  final List<int> empties;
+
+  /// Position in the line of sight of each empty cell (0-indexed: 0 is the cell
+  /// immediately adjacent to the eye). Parallel array to [empties].
+  /// `emptyPositions[0] == seen`.
+  final List<int> emptyPositions;
+
+  const DirectionView({
+    required this.seen,
+    required this.max,
+    required this.empties,
+    required this.emptyPositions,
+  });
+}
+
+class WhatIsSeen {
+  final DirectionView left;
+  final DirectionView right;
+  final DirectionView up;
+  final DirectionView down;
+
+  WhatIsSeen({
+    required this.left,
+    required this.right,
+    required this.up,
+    required this.down,
+  });
+
+  Iterable<DirectionView> get directions => [left, right, up, down];
+
+  int get totalSeen => directions.fold(0, (s, d) => s + d.seen);
+  int get totalMax => directions.fold(0, (s, d) => s + d.max);
+  bool get hasEmpty => directions.any((d) => d.empties.isNotEmpty);
 }
 
 class EyesConstraint extends CellsCentricConstraint {
@@ -57,103 +97,116 @@ class EyesConstraint extends CellsCentricConstraint {
   }
 
   WhatIsSeen whatDoIsee(Puzzle puzzle) {
-    final result = WhatIsSeen(count: 0, candidates: []);
     final idx = indices.first;
-    final size = puzzle.width * puzzle.height;
-    for (
-      var left = idx - 1;
-      left >= 0 && (left ~/ puzzle.width) == (idx ~/ puzzle.width);
-      left--
-    ) {
-      if (puzzle.cellValues[left] == color) {
-        result.count += 1;
-        continue;
+    final width = puzzle.width;
+    final size = width * puzzle.height;
+    final eyeRow = idx ~/ width;
+    return WhatIsSeen(
+      left: _scan(puzzle, idx - 1, -1, (i) => i >= 0 && i ~/ width == eyeRow),
+      right: _scan(puzzle, idx + 1, 1, (i) => i < size && i ~/ width == eyeRow),
+      up: _scan(puzzle, idx - width, -width, (i) => i >= 0),
+      down: _scan(puzzle, idx + width, width, (i) => i < size),
+    );
+  }
+
+  DirectionView _scan(
+    Puzzle puzzle,
+    int start,
+    int step,
+    bool Function(int) inBounds,
+  ) {
+    int seen = 0;
+    bool stillSeeing = true;
+    final empties = <int>[];
+    final emptyPositions = <int>[];
+    int max = 0;
+    for (var i = start; inBounds(i); i += step) {
+      final v = puzzle.cellValues[i];
+      if (v != color && v != 0) break;
+      if (v == color && stillSeeing) seen++;
+      if (v == 0) {
+        stillSeeing = false;
+        empties.add(i);
+        emptyPositions.add(max);
       }
-      if (puzzle.cellValues[left] == 0) {
-        result.candidates.add(left);
-      }
-      break;
+      max++;
     }
-    for (
-      var right = idx + 1;
-      right < size && (right ~/ puzzle.width) == (idx ~/ puzzle.width);
-      right++
-    ) {
-      if (puzzle.cellValues[right] == color) {
-        result.count += 1;
-        continue;
-      }
-      if (puzzle.cellValues[right] == 0) {
-        result.candidates.add(right);
-      }
-      break;
-    }
-    for (var top = idx - puzzle.width; top >= 0; top -= puzzle.width) {
-      if (puzzle.cellValues[top] == color) {
-        result.count += 1;
-        continue;
-      }
-      if (puzzle.cellValues[top] == 0) {
-        result.candidates.add(top);
-      }
-      break;
-    }
-    for (
-      var bottom = idx + puzzle.width;
-      bottom < size;
-      bottom += puzzle.width
-    ) {
-      if (puzzle.cellValues[bottom] == color) {
-        result.count += 1;
-        continue;
-      }
-      if (puzzle.cellValues[bottom] == 0) {
-        result.candidates.add(bottom);
-      }
-      break;
-    }
-    return result;
+    return DirectionView(
+      seen: seen,
+      max: max,
+      empties: empties,
+      emptyPositions: emptyPositions,
+    );
   }
 
   @override
   bool verify(Puzzle puzzle) {
-    final whatDoISee = whatDoIsee(puzzle);
-    final int matches = whatDoISee.count;
-    final int? candidate = whatDoISee.candidates.firstOrNull;
-    return matches == count || (matches < count && candidate != null);
+    final view = whatDoIsee(puzzle);
+    return view.totalSeen <= count && view.totalMax >= count;
   }
 
   @override
   Move? apply(Puzzle puzzle) {
-    final whatDoISee = whatDoIsee(puzzle);
-    final int matches = whatDoISee.count;
-    final int? candidate = whatDoISee.candidates.firstOrNull;
-    final int opposite = puzzle.domain.firstWhereOrNull((v) => v != color) ?? 0;
-    if (matches > count) {
-      // There is an error, I see too many colored cells
+    final view = whatDoIsee(puzzle);
+    final opposite = puzzle.domain.firstWhereOrNull((v) => v != color) ?? 0;
+
+    if (view.totalSeen > count) {
+      // Already seeing more than required.
       return Move(0, 0, this, isImpossible: this);
     }
-    if (matches == count && candidate != null) {
-      // I'm complete and have a free candidate,
-      // I can say that no more cells can be added to my "sides"
-      // so this candidate must be my opposite color
-      return Move(candidate, opposite, this);
+    if (view.totalMax < count) {
+      // Even filling every reachable empty with the target color is not enough.
+      return Move(0, 0, this, isImpossible: this);
     }
-    if (matches < count && whatDoISee.candidates.length == 1) {
-      // I don't see enough colored cells and have only one free candidate,
-      // I can say that this candidate must by my color
-      return Move(candidate!, color, this);
+
+    for (final d in view.directions) {
+      final othersMax = view.totalMax - d.max;
+      final othersSeen = view.totalSeen - d.seen;
+      // Range of feasible final counts in this direction.
+      final minD = math.max(d.seen, count - othersMax);
+      final maxD = math.min(d.max, count - othersSeen);
+
+      // Lower bound: cells at positions 0..minD-1 must all hold the target
+      // color in the final state. Force the first empty in that range.
+      if (minD > d.seen) {
+        for (int i = 0; i < d.empties.length; i++) {
+          if (d.emptyPositions[i] < minD) {
+            return Move(d.empties[i], color, this);
+          }
+        }
+      }
+
+      // Upper bound: cells 0..maxD cannot all be color, otherwise count_d would
+      // exceed maxD. If exactly one empty is at position <= maxD, that empty
+      // must take the opposite color to break line of sight in time.
+      if (maxD < d.max) {
+        int? unique;
+        bool multiple = false;
+        for (int i = 0; i < d.empties.length; i++) {
+          if (d.emptyPositions[i] <= maxD) {
+            if (unique == null) {
+              unique = d.empties[i];
+            } else {
+              multiple = true;
+              break;
+            }
+          }
+        }
+        if (unique != null && !multiple) {
+          return Move(unique, opposite, this);
+        }
+      }
     }
+
     return null;
   }
 
   @override
   bool isCompleteFor(Puzzle puzzle) {
     if (!verify(puzzle)) return false;
-    final whatDoISee = whatDoIsee(puzzle);
-    final int matches = whatDoISee.count;
-    final int? candidate = whatDoISee.candidates.firstOrNull;
-    // I'm complete if I have the correct number of matches and no free candidate
-    return matches == count && candidate == null;
+    final view = whatDoIsee(puzzle);
+    // Complete when the count is reached and no empty cell remains in any line
+    // of sight (no future fill can move the constraint).
+    return view.totalSeen == count && !view.hasEmpty;
   }
 }

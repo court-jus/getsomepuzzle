@@ -4,6 +4,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
@@ -757,5 +758,162 @@ void main() {
       final p = makePuzzle('010\n111\n000');
       expect(NeighborCountConstraint('4.1.2').isCompleteFor(p), isFalse);
     });
+  });
+
+  group('EyesConstraint.verify', () {
+    test('reachable-but-incomplete state → valid', () {
+      // 3x3, eye at (1,1) with count=2, color=1. Already sees 1 cell up and
+      // has plenty of room left/right/down to gain a second.
+      final p = makePuzzle('010\n000\n000');
+      expect(EyesConstraint('4.1.2').verify(p), isTrue);
+    });
+
+    test('current count exceeds target → invalid', () {
+      // count=0 but the eye already sees one cell of color 1 above it: the
+      // constraint is broken now (and forever, since seen cannot decrease).
+      final p = makePuzzle('010\n000\n000');
+      expect(EyesConstraint('4.1.0').verify(p), isFalse);
+    });
+
+    test('max possible count below target → invalid', () {
+      // 3x3 grid: an eye at any cell can see at most (W-1)+(H-1) = 4 cells.
+      // count=5 is unreachable from any state, so verify must reject the
+      // initial empty grid (regression for the old buggy verify).
+      final p = makePuzzle('000\n000\n000');
+      expect(EyesConstraint('4.1.5').verify(p), isFalse);
+    });
+
+    test('all directions blocked, count > 0 → invalid', () {
+      // The eye is surrounded by opposite-coloured neighbours so no future
+      // fill can ever produce a colour-1 cell in line of sight. count=1 is
+      // unreachable.
+      final p = makePuzzle('020\n202\n020');
+      expect(EyesConstraint('4.1.1').verify(p), isFalse);
+    });
+  });
+
+  group('EyesConstraint.apply - lower-bound deductions', () {
+    test('count saturates the only direction with empties → forces colour', () {
+      // 3x3 with all neighbours of the eye blocked except the right cell.
+      // count=1 must come from that cell, so it is forced to colour 1.
+      // (Same case the original `apply` already handled.)
+      final p = makePuzzle('020\n200\n020');
+      final move = EyesConstraint('4.1.1').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 5);
+      expect(move.value, 1);
+    });
+
+    test(
+      'eye 4 with 2 free left, blocked up/right → forces 2 down (user example)',
+      () {
+        // 5x7 grid, eye at (0,2) (idx 2), color=1, count=4. Cell (0,3) is the
+        // opposite colour blocking right; up is out of bounds; left has 2
+        // reachable empties. The four-cell target therefore needs at least 2
+        // colour-1 cells downward — apply must force the first cell below.
+        final p = makePuzzle(
+          '00020\n'
+          '00000\n'
+          '00000\n'
+          '00000\n'
+          '00000\n'
+          '00000\n'
+          '00000',
+        );
+        final move = EyesConstraint('2.1.4').apply(p);
+        expect(move, isNotNull);
+        expect(move!.isImpossible, isNull);
+        expect(move.idx, 7);
+        expect(move.value, 1);
+      },
+    );
+
+    test('after the first downward force, the second one chains', () {
+      // Same setup as above but with the first cell below the eye already
+      // coloured. The eye now sees 1 down and still needs 1 more from below
+      // (left only contributes 2 max) → the next cell down is forced.
+      final p = makePuzzle(
+        '00020\n'
+        '00100\n'
+        '00000\n'
+        '00000\n'
+        '00000\n'
+        '00000\n'
+        '00000',
+      );
+      final move = EyesConstraint('2.1.4').apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 12);
+      expect(move.value, 1);
+    });
+  });
+
+  group('EyesConstraint.apply - upper-bound deductions', () {
+    test('totalSeen == count forces remaining empty to opposite', () {
+      // 3x3 eye sees 1 up + 1 left = 2 = count. The single empty in line of
+      // sight (idx 5 to the right) must therefore become opposite so the
+      // count cannot grow past 2.
+      final p = makePuzzle('010\n100\n020');
+      final move = EyesConstraint('4.1.2').apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 5);
+      expect(move.value, 2);
+    });
+
+    test(
+      'budget already consumed elsewhere → forces lone empty to opposite',
+      () {
+        // 5x3, eye at idx 7. count=1; right side already shows 1 colour-1
+        // (cell 8). Up/down are blocked by opposite cells. The left direction
+        // therefore must contribute 0 colour-1 cells, and there is exactly one
+        // empty at position 0 in line of sight → force it to opposite.
+        final p = makePuzzle('00200\n00010\n00200');
+        final move = EyesConstraint('7.1.1').apply(p);
+        expect(move, isNotNull);
+        expect(move!.idx, 6);
+        expect(move.value, 2);
+      },
+    );
+  });
+
+  group('EyesConstraint.apply - impossibility', () {
+    test('seeing more than count → impossible', () {
+      // count=0 but the eye already sees one colour-1 cell above it.
+      final p = makePuzzle('010\n000\n000');
+      final move = EyesConstraint('4.1.0').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('not enough reachable cells to ever reach count → impossible', () {
+      // All four neighbours of the eye are opposite-coloured: max possible
+      // count is 0, but target is 1. apply must flag impossibility instead
+      // of returning a no-op.
+      final p = makePuzzle('020\n202\n020');
+      final move = EyesConstraint('4.1.1').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+  });
+
+  group('EyesConstraint.isCompleteFor', () {
+    test('count reached and no empty in line of sight → complete', () {
+      // Eye sees exactly count=2 (1 up, 1 left); right and down are blocked
+      // by opposite cells with no empties in line of sight → no future move
+      // can change the constraint, grayout signal must fire.
+      final p = makePuzzle('010\n122\n020');
+      expect(EyesConstraint('4.1.2').isCompleteFor(p), isTrue);
+    });
+
+    test(
+      'count reached but an empty remains in line of sight → not complete',
+      () {
+        // Same target reached but an empty at idx 5 means apply will still
+        // fire (forcing it to opposite); the constraint is not done yet.
+        final p = makePuzzle('010\n100\n020');
+        expect(EyesConstraint('4.1.2').isCompleteFor(p), isFalse);
+      },
+    );
   });
 }
