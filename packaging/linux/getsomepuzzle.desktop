@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Get Some Puzzle
+Comment=Grid-based logic puzzle game
+Exec=/usr/local/bin/getsomepuzzle %u
+Icon=getsomepuzzle
+Terminal=false
+Categories=Game;LogicGame;
+MimeType=x-scheme-handler/getsomepuzzle;
+StartupWMClass=getsomepuzzle
+
