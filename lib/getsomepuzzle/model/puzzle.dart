@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 
@@ -161,6 +162,33 @@ class Puzzle {
             .toList();
       }
     }
+    _aggregateLetterGroups();
+  }
+
+  /// Merge `LT:<letter>....` constraints sharing the same letter into a
+  /// single `LetterGroup` whose `indices` list every cell of that letter.
+  /// Generation produces pairs (one `LT` per pair of cells sharing a
+  /// letter), but display and deduction logic are simpler — and stronger —
+  /// when each letter is represented by a single constraint with N cells.
+  void _aggregateLetterGroups() {
+    final byLetter = <String, LetterGroup>{};
+    final newConstraints = <Constraint>[];
+    for (final c in constraints) {
+      if (c is! LetterGroup) {
+        newConstraints.add(c);
+        continue;
+      }
+      final existing = byLetter[c.letter];
+      if (existing == null) {
+        byLetter[c.letter] = c;
+        newConstraints.add(c);
+      } else {
+        for (final idx in c.indices) {
+          if (!existing.indices.contains(idx)) existing.indices.add(idx);
+        }
+      }
+    }
+    constraints = newConstraints;
   }
 
   void restart() {

@@ -163,3 +163,7 @@ parameter string for cheap equality.
 * Allow saving a puzzle in its current state.
 * Allow sharing a puzzle, from scratch or from its current state.
 * Allow opening the app directly with a puzzle (link for the web, intent for android, cli argument for desktop)
+
+## UI
+
+* When showing that a cell can be deduced thanks to a constraint and that constraint is DF, the name of the constraint is not shown.

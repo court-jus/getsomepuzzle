@@ -112,6 +112,45 @@ void _componentsAnchoredOnValue(Puzzle puzzle, int v, List<List<int>> out) {
   }
 }
 
+/// True iff treating [blocked] as the opposite colour (removing it from the
+/// merge graph) would prevent at least one of [members] from being reachable
+/// from `members.first`.
+///
+/// The merge graph spans every cell whose value is [color] or 0 (uncoloured).
+/// Used by constraints that require a set of cells to end up in the same
+/// same-colour group (`LT`, future `GC`) to detect articulation points —
+/// cells that lie on every possible merge path between [members] and must
+/// therefore take [color].
+///
+/// Returns false when [members] has fewer than two cells or when [blocked]
+/// itself is one of the members. Callers must ensure [members] are
+/// reachable from one another in the unblocked graph; otherwise the result
+/// is vacuously true (the puzzle is already infeasible).
+bool blockingDisconnectsMembers(
+  Puzzle puzzle,
+  int blocked,
+  int color,
+  List<int> members,
+) {
+  if (members.length < 2) return false;
+  if (members.contains(blocked)) return false;
+  final start = members.first;
+  final visited = <int>{start};
+  final queue = Queue<int>()..add(start);
+  while (queue.isNotEmpty) {
+    final cur = queue.removeFirst();
+    for (final nei in puzzle.getNeighbors(cur)) {
+      if (nei == blocked) continue;
+      if (visited.contains(nei)) continue;
+      final v = puzzle.cellValues[nei];
+      if (v != color && v != 0) continue;
+      visited.add(nei);
+      queue.add(nei);
+    }
+  }
+  return members.any((m) => !visited.contains(m));
+}
+
 bool canMergeGroups(Puzzle puzzle, List<int> groupA, List<int> groupB) {
   // Check if there exists a path of free cells (value 0 or same color) connecting groupA and groupB
   // Perform flood fill from all cells in groupA, through cells that are either empty (0) or same color

@@ -241,55 +241,33 @@ class LetterGroup extends CellsCentricConstraint {
     return result;
   }
 
-  // Collect ALL indices for this letter across all LT constraints
-  List<int> getAllIndicesForLetter(Puzzle puzzle) {
-    return puzzle.constraints
-        .whereType<LetterGroup>()
-        .where((c) => c.letter == letter)
-        .map((c) => c.indices)
-        .flattened
-        .toList();
-  }
-
   @override
   bool verify(Puzzle puzzle) {
-    // If any of my cells are not filled yet, there's no need to check further
-    final letterIndices = (getAllIndicesForLetter(
-      puzzle,
-    ).toSet().union(indices.toSet())).toList();
-    final myCellValues = puzzle.cellValues.indexed
-        .where((elem) => letterIndices.contains(elem.$1))
-        .map((elem) => elem.$2);
-    if (myCellValues.contains(0)) return true;
+    // Aggregation in `Puzzle` guarantees a single LetterGroup per letter, so
+    // `indices` already lists every cell sharing this letter.
+    if (indices.any((i) => puzzle.cellValues[i] == 0)) return true;
     final groups = getGroups(puzzle);
-    final List<List<int>> myGroups = [];
-    for (final group in groups) {
-      final intersect = group.toSet().intersection(letterIndices.toSet());
-      if (intersect.isNotEmpty) {
-        myGroups.add(group);
+    final myIndicesSet = indices.toSet();
+    final myGroups = groups
+        .where((g) => g.toSet().intersection(myIndicesSet).isNotEmpty)
+        .toList();
+    if (myGroups.isEmpty) return false;
+    // No cell carrying a different letter may share my group(s).
+    for (final group in myGroups) {
+      for (final idx in group) {
+        if (myIndicesSet.contains(idx)) continue;
+        final constraintsAtIdx = puzzle.cellConstraints[idx];
+        if (constraintsAtIdx == null) continue;
+        for (final constraint in constraintsAtIdx) {
+          if (constraint is LetterGroup && constraint.letter != letter) {
+            return false;
+          }
+        }
       }
     }
-    // There should be no other letter in mygroup
-    final myGroup = myGroups[0];
-    final Set<String> lettersInMyGroup = {};
-    for (final idx in myGroup) {
-      if (letterIndices.contains(idx)) {
-        lettersInMyGroup.add(letter);
-        continue;
-      }
-      final constraintsAtIdx = puzzle.cellConstraints[idx];
-      if (constraintsAtIdx == null) continue;
-      for (final constraint in constraintsAtIdx) {
-        if (constraint is! LetterGroup) continue;
-        lettersInMyGroup.add(constraint.letter);
-      }
-    }
-    if (lettersInMyGroup.length != 1) return false;
-    // If the puzzle is incomplete, disconnection is allowed
     if (!puzzle.complete) return true;
-    // Only when complete: there should be exactly one group covering all my indices
-    if (myGroups.length != 1) return false;
-    return true;
+    // Complete state: a single connected group must cover all my indices.
+    return myGroups.length == 1;
   }
 
   @override
@@ -305,7 +283,7 @@ class LetterGroup extends CellsCentricConstraint {
         .map((c) => c.indices)
         .flattenedToList;
     final myOpposite = puzzle.domain.whereNot((v) => v == myColor).first;
-    // Apply color to other members of the letter group
+    // 1. Every member must take myColor; opposite-coloured ones are an error.
     for (var member in indices) {
       final memberValue = puzzle.getValue(member);
       if (memberValue == myOpposite) {
@@ -316,14 +294,16 @@ class LetterGroup extends CellsCentricConstraint {
       }
     }
     final allGroups = getGroups(puzzle);
+    final myIndicesSet = indices.toSet();
     final myGroupsJoined = allGroups
-        .where((grp) => grp.toSet().intersection(indices.toSet()).isNotEmpty)
+        .where((grp) => grp.toSet().intersection(myIndicesSet).isNotEmpty)
         .flattened;
+    // 2. Cells of another letter touching my group cannot be the same colour
+    //    (would merge two distinct letters).
     final neighborWithLetters = myGroupsJoined
         .map((idx) => puzzle.getNeighbors(idx))
         .flattened
         .where((nei) => otherLetters.contains(nei));
-    // Apply opposite color to neighbors_with_letters
     for (var nei in neighborWithLetters) {
       final neiValue = puzzle.getValue(nei);
       if (neiValue == myColor) {
@@ -333,59 +313,69 @@ class LetterGroup extends CellsCentricConstraint {
         return Move(nei, myOpposite, this);
       }
     }
-    // If not connected yet, find members that only have one empty neighbor
-    final sameGroup = allGroups.where((grp) {
-      return grp.toSet().intersection(indices.toSet()).length == indices.length;
-    }).isNotEmpty;
-    final Set<int> groupFreeNeighbors = {};
-    for (var member in indices) {
-      final memberGroup = allGroups.where((grp) => grp.contains(member)).first;
-      for (var groupCell in memberGroup) {
-        groupFreeNeighbors.addAll(
-          puzzle
-              .getNeighbors(groupCell)
-              .where((idx) => puzzle.getValue(idx) == 0),
-        );
+
+    // 3. Feasibility: my members must all share one virtual group anchored
+    //    on myColor (i.e. there must be SOME path of myColor + empty cells
+    //    connecting them).
+    final canConnect = toVirtualGroups(
+      puzzle,
+    ).any((vg) => indices.every((m) => vg.contains(m)));
+    if (!canConnect) {
+      return Move(0, 0, this, isImpossible: this);
+    }
+
+    final sameGroup = allGroups.any(
+      (grp) => grp.toSet().intersection(myIndicesSet).length == indices.length,
+    );
+
+    // 4. Articulation: any empty cell whose blocking would disconnect the
+    //    members must take myColor — it lies on every possible merge path.
+    //    Subsumes the per-group "single exit" rule (a sealed-but-one group
+    //    has its lone exit as articulation point).
+    if (!sameGroup && indices.length > 1) {
+      for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
+        if (puzzle.getValue(idx) != 0) continue;
+        if (blockingDisconnectsMembers(puzzle, idx, myColor, indices)) {
+          return Move(idx, myColor, this);
+        }
       }
     }
-    if (!sameGroup && groupFreeNeighbors.length == 1) {
-      return Move(groupFreeNeighbors.first, myColor, this);
-    }
-    // Find cells that would create a conflict if set
-    // We need to find all the neighbors of this letter group that
-    // are also neighbor of another letter of the same color
+
+    // 5. Free neighbours of my group that also touch another letter's
+    //    same-colour cells cannot take myColor (would merge two letters).
     final otherSameColor = otherLetters.where(
       (idx) => puzzle.cellValues[idx] == myColor,
     );
-    final otherGroups = allGroups
-        .where(
-          (grp) => grp.toSet().intersection(otherSameColor.toSet()).isNotEmpty,
-        )
-        .flattened;
     if (otherSameColor.isNotEmpty) {
+      final otherGroups = allGroups
+          .where(
+            (grp) =>
+                grp.toSet().intersection(otherSameColor.toSet()).isNotEmpty,
+          )
+          .flattened;
+      final Set<int> groupFreeNeighbors = {};
+      for (var member in indices) {
+        final memberGroup = allGroups
+            .where((grp) => grp.contains(member))
+            .first;
+        for (var groupCell in memberGroup) {
+          groupFreeNeighbors.addAll(
+            puzzle
+                .getNeighbors(groupCell)
+                .where((idx) => puzzle.getValue(idx) == 0),
+          );
+        }
+      }
       for (final groupFreeNeighbor in groupFreeNeighbors) {
-        final neighborNeighborsWithOtherLetters = puzzle
+        final neighborsWithOther = puzzle
             .getNeighbors(groupFreeNeighbor)
             .where((nei) => otherGroups.contains(nei));
-        if (neighborNeighborsWithOtherLetters.isNotEmpty) {
-          // We know that groupFreeNeighbor can't be myColor
+        if (neighborsWithOther.isNotEmpty) {
           return Move(groupFreeNeighbor, myOpposite, this);
         }
       }
     }
 
-    // Now, find if other members of the letter group are disconnected and raise
-    var foundVGroup = false;
-    for (var vgroup in toVirtualGroups(puzzle)) {
-      final notInVgroup = indices.whereNot((member) => vgroup.contains(member));
-      if (notInVgroup.isEmpty) {
-        foundVGroup = true;
-        break;
-      }
-    }
-    if (!foundVGroup) {
-      return Move(0, 0, this, isImpossible: this);
-    }
     return null;
   }
 

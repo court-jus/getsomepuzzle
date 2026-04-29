@@ -916,4 +916,75 @@ void main() {
       },
     );
   });
+
+  group('LetterGroup aggregation', () {
+    test('multiple LT constraints sharing a letter merge into one', () {
+      // Generation outputs LT pairs (`A.idx1.idx2`); the loader rolls them
+      // up into a single constraint listing every cell of the letter so
+      // display and deduction can reason about the whole letter at once.
+      final p = Puzzle('v2_12_3x3_000000000_LT:A.0.4;LT:A.4.8;LT:B.1.7_0:0_0');
+      final lts = p.constraints.whereType<LetterGroup>().toList();
+      expect(lts.length, 2);
+      final a = lts.firstWhere((c) => c.letter == 'A');
+      final b = lts.firstWhere((c) => c.letter == 'B');
+      expect(a.indices.toSet(), {0, 4, 8});
+      expect(b.indices.toSet(), {1, 7});
+    });
+  });
+
+  group('LetterGroup.apply - articulation', () {
+    test('lone exit of a member group is forced (single-exit case)', () {
+      // 3x3, LT:A.0.8: cell 3 is colour 2, sealing cell 0's downward side.
+      // Cell 0's only free neighbour is cell 1, so cell 1 must be colour 1
+      // — otherwise cell 0 stays isolated and the two A members can never
+      // share a group.
+      final p = makePuzzle('100\n200\n001');
+      final lt = LetterGroup('A.0.8');
+      p.constraints.add(lt);
+      final move = lt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 1);
+      expect(move.value, 1);
+    });
+
+    test('cell on the unique merge path is forced (corridor)', () {
+      // 1x5 corridor: letter A pinned at the two ends. Every middle cell
+      // sits on the only possible merge path, so the first encountered
+      // articulation point is forced to colour 1. (Subsequent applies
+      // would then force the others one by one.)
+      final p = makePuzzle('10001');
+      final lt = LetterGroup('A.0.4');
+      p.constraints.add(lt);
+      final move = lt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 1);
+      expect(move.value, 1);
+    });
+
+    test('opposite-colour wall splits the corridor → impossible', () {
+      // 1x5: letter A at 0 and 4, cell 2 is colour 2 cutting the corridor
+      // in two. No virtual group covers both members → apply must report
+      // impossibility, not silently return null.
+      final p = makePuzzle('10201');
+      final lt = LetterGroup('A.0.4');
+      p.constraints.add(lt);
+      final move = lt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('multi-member aggregated indices use the same articulation rule', () {
+      // 1x5 with three letter-A cells (0, 2, 4) and an empty between each
+      // pair. Both empties are articulation points; the lower-index one is
+      // forced first. Exercises an aggregated LetterGroup with N>2.
+      final p = makePuzzle('10101');
+      final lt = LetterGroup('A.0.2.4');
+      p.constraints.add(lt);
+      final move = lt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 1);
+      expect(move.value, 1);
+    });
+  });
 }
