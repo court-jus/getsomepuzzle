@@ -544,6 +544,22 @@
     "@settingTutorialRestarted": {
         "description": "Snackbar message shown after tutorial stats have been cleared"
     },
+    "settingClearStats": "Clear all stats",
+    "@settingClearStats": {
+        "description": "Button label that wipes every play stat (tutorial + every collection)"
+    },
+    "settingClearStatsConfirmTitle": "Clear all stats?",
+    "@settingClearStatsConfirmTitle": {
+        "description": "Title of the confirmation dialog for the clear-all-stats action"
+    },
+    "settingClearStatsConfirmBody": "Every play history will be erased: timings, ratings, played/skipped flags. This cannot be undone.",
+    "@settingClearStatsConfirmBody": {
+        "description": "Body text of the confirmation dialog for the clear-all-stats action"
+    },
+    "settingStatsCleared": "All stats cleared.",
+    "@settingStatsCleared": {
+        "description": "Snackbar message shown after all stats have been cleared"
+    },
     "someConstraintsInvalid": "Some constraints are not valid.",
     "@someConstraintsInvalid": {
         "description": "Top-of-screen message shown during play when at least one constraint of the current puzzle is violated"

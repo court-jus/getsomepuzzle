@@ -1,10 +1,13 @@
 // Offline stats analysis for adapt-to-player.
 //
 // Reads every `.txt` under the given directory, deduplicates, filters out
-// the cplx=100 legacy bucket, then:
+// the cplx=100 legacy bucket and AFK plays (idle gap > 30 s, dur > 1800 s),
+// then:
 //   1. Refits log(dur) = a + b·cplx + c·log(cells) + d·failures (4 vars)
 //      and the v1.6.1+ form that adds e·n_constraints (5 vars). Reports
-//      coefficients + R² + MAPE for each.
+//      coefficients + R² + MAPE for each. Anchors the intercept so the
+//      mean per-play level on the kept corpus lands on 50 — and prints
+//      the resulting constants in a paste-ready block for `database.dart`.
 //   2. Replays the production skill inversion (`expectedProd` /
 //      `levelProd`, mirrors of `Database._expectedDuration` /
 //      `Database._impliedCplx`) on every play and reports the per-play
@@ -12,7 +15,24 @@
 //   3. Lists the eight plays the production model fits worst — useful
 //      for spotting a missing variable or a stale calibration.
 //
-// Usage: dart run bin/analyze_stats.dart [--recompute-cplx] <stats_dir>
+// **Cleaning is mandatory.** A previous calibration round used the legacy
+// dur≤1800 filter only, which let multi-minute AFK gaps inflate the cplx
+// slope to `exp(cplx/27.3)` — i.e. a predicted ~1.6 h for cplx=100 8×8.
+// The current pipeline always rejects plays with `longestGapMs > 30 s`
+// before the OLS so the slope reflects engaged play, not background tabs.
+//
+// Usage: dart run bin/analyze_stats.dart [--recompute-cplx]
+//          [--exclude-source <substring>]... [--max-gap-ms N]
+//          [--max-dur-s N] <stats_dir>
+//
+//   --exclude-source X   drop every line read from a file whose name
+//                        contains X (case-insensitive). Repeatable —
+//                        useful for excluding other players, e.g.
+//                        --exclude-source jml.
+//   --max-gap-ms N       keep plays with longestGapMs ≤ N (default
+//                        30 000). Set to 0 to disable, but the OLS will
+//                        regress to the broken pre-cleaning shape.
+//   --max-dur-s N        keep plays with dur ≤ N seconds (default 1800).
 
 import 'dart:io';
 import 'dart:math' as math;
@@ -99,24 +119,30 @@ Play? parsePlay(String line) {
 
 // Must mirror `Database._expectedDuration` in
 // `lib/getsomepuzzle/model/database.dart`. Anchored so the calibration
-// cohort's mean `level_i` lands at 50.
+// corpus's mean `level_i` lands at 50.
+const double _kBase = 3.3108;
+const double _kCellsExp = 0.5146;
+const double _kCplxScale = 123.82;
+const double _kFailMul = 1.1627;
+const double _kNConsMul = 1.1069;
+
 double expectedProd(int cplx, int cells, int failures, int nConstraints) {
-  return 8.62 *
-      math.pow(cells, 0.442) *
-      math.exp(cplx / 27.3) *
-      math.pow(1.145, failures) *
-      math.pow(1.085, nConstraints);
+  return _kBase *
+      math.pow(cells, _kCellsExp) *
+      math.exp(cplx / _kCplxScale) *
+      math.pow(_kFailMul, failures) *
+      math.pow(_kNConsMul, nConstraints);
 }
 
 // Mirror of `Database._impliedCplx`: the algebraic inverse of
 // `expectedProd`. Same constants as the production code.
 double impliedCplxProd(int dur, int cells, int failures, int nConstraints) {
-  return 27.3 *
+  return _kCplxScale *
       (math.log(dur) -
-          math.log(8.62) -
-          0.442 * math.log(cells) -
-          failures * math.log(1.145) -
-          nConstraints * math.log(1.085));
+          math.log(_kBase) -
+          _kCellsExp * math.log(cells) -
+          failures * math.log(_kFailMul) -
+          nConstraints * math.log(_kNConsMul));
 }
 
 // Mirror of `Database.computePlayerLevel`'s per-play inversion: when a
@@ -291,27 +317,58 @@ Stats describe(List<double> xs) {
 // ---------------------------------------------------------------------------
 
 void main(List<String> args) {
-  if (args.isEmpty) {
+  void usage() {
     print(
-      'usage: dart run bin/analyze_stats.dart [--recompute-cplx] <stats_dir>',
+      'usage: dart run bin/analyze_stats.dart [--recompute-cplx] '
+      '[--exclude-source <substr>]... [--max-gap-ms N] [--max-dur-s N] '
+      '<stats_dir>',
     );
-    exit(2);
   }
+
   final recomputeCplx = args.contains('--recompute-cplx');
-  final dirArg = args.firstWhere((a) => !a.startsWith('--'), orElse: () => '');
-  if (dirArg.isEmpty) {
-    print(
-      'usage: dart run bin/analyze_stats.dart [--recompute-cplx] <stats_dir>',
-    );
+  final excludeSources = <String>[];
+  int maxGapMs = 30000;
+  int maxDurS = 1800;
+  String? dirArg;
+  for (var i = 0; i < args.length; i++) {
+    final a = args[i];
+    if (a == '--recompute-cplx') continue;
+    if (a == '--exclude-source' && i + 1 < args.length) {
+      excludeSources.add(args[++i].toLowerCase());
+    } else if (a == '--max-gap-ms' && i + 1 < args.length) {
+      maxGapMs = int.parse(args[++i]);
+    } else if (a == '--max-dur-s' && i + 1 < args.length) {
+      maxDurS = int.parse(args[++i]);
+    } else if (!a.startsWith('--')) {
+      dirArg = a;
+    } else {
+      stderr.writeln('Unknown flag: $a');
+      usage();
+      exit(2);
+    }
+  }
+  if (dirArg == null) {
+    usage();
     exit(2);
   }
   final dir = Directory(dirArg);
   final lines = <String>{};
-  // Track which file each line came from for per-source diagnostics.
+  // Track which file each line came from for per-source diagnostics
+  // and for `--exclude-source` filtering.
   final lineSource = <String, String>{};
+  int excludedLines = 0;
   for (final f in dir.listSync()) {
     if (f is File && f.path.endsWith('.txt')) {
       final fname = f.uri.pathSegments.last;
+      final lower = fname.toLowerCase();
+      if (excludeSources.any(lower.contains)) {
+        // Count lines for the report but do not include them in `lines`.
+        excludedLines += f
+            .readAsLinesSync()
+            .where((l) => l.trim().isNotEmpty)
+            .length;
+        continue;
+      }
       for (final l in f.readAsLinesSync()) {
         final t = l.trim();
         if (t.isEmpty) continue;
@@ -375,8 +432,14 @@ void main(List<String> args) {
 
   // Outlier filter:
   //   - dur < 2 s   → likely an accidental auto-complete or stale stat
-  //   - dur > 1800 s → puzzle left open / AFK (the in-game clamp is 10·exp,
-  //     but we don't trust the model here so we use an absolute cap).
+  //   - dur > maxDurS → puzzle left open / AFK (the in-game clamp is
+  //     10·expected, but we don't trust the model here so we use an
+  //     absolute cap; default 1800 s = 30 min).
+  //   - longestGapMs > maxGapMs → background tab / AFK during the play.
+  //     This is the load-bearing filter: without it the OLS regresses
+  //     onto plays where the *clock* ran for an hour but the *player*
+  //     was engaged for two minutes, which yanks the cplx slope toward
+  //     `exp(cplx/27)` and makes high-cplx predictions absurd.
   //   - dur > 10 · median(dur for same cplx-bucket × cells-bucket) → bucket
   //     median is robust enough to drop "ten times what's typical for this
   //     puzzle class" without referring to a model.
@@ -399,20 +462,32 @@ void main(List<String> args) {
     bucketMedian[e.key] = s[s.length ~/ 2].toDouble();
   }
 
+  bool gapTooLong(Play p) => maxGapMs > 0 && p.longestGapMs > maxGapMs;
+
   final filtered = baseline
       .where(
         (p) =>
-            p.duration >= 2 && p.duration <= 1800 && !tooLong(p, bucketMedian),
+            p.duration >= 2 &&
+            p.duration <= maxDurS &&
+            !gapTooLong(p) &&
+            !tooLong(p, bucketMedian),
       )
       .toList();
 
   final droppedAfk = baseline
-      .where((p) => p.duration > 1800 || tooLong(p, bucketMedian))
+      .where((p) => p.duration > maxDurS || tooLong(p, bucketMedian))
       .length;
+  final droppedGap = baseline.where(gapTooLong).length;
   final droppedShort = baseline.where((p) => p.duration < 2).length;
 
   print('=== Data ===');
   print('  raw lines (deduped):  ${lines.length}');
+  if (excludeSources.isNotEmpty) {
+    print(
+      '  excluded sources:     ${excludeSources.join(", ")} '
+      '($excludedLines lines dropped before parsing)',
+    );
+  }
   print('  parsed plays:         ${all.length}');
   print(
     '  after baseline:       ${baseline.length}  '
@@ -420,7 +495,11 @@ void main(List<String> args) {
   );
   print(
     '  after outlier filter: ${filtered.length}  '
-    '(dropped $droppedShort short + $droppedAfk afk/extreme)',
+    '(dropped $droppedShort short + $droppedAfk dur-afk + $droppedGap gap-afk)',
+  );
+  print(
+    '  filter params: maxDurS=$maxDurS  '
+    'maxGapMs=$maxGapMs ${maxGapMs == 0 ? "(disabled)" : ""}',
   );
   print('');
 
@@ -471,6 +550,51 @@ void main(List<String> args) {
   );
   print(
     '  R² = ${fitC.rSquared.toStringAsFixed(3)}    MAPE = ${fitC.mape.toStringAsFixed(1)} %',
+  );
+  print('');
+
+  // ---------- 1c. Anchored constants (paste-ready) ----------
+  // Anchor: shift the intercept so mean(level_i) = 50 on the kept corpus.
+  // After OLS, mean(implied_cplx) == mean(cplx) by construction, so
+  // mean(level_i) = mean(2·cplx − implied_cplx) = mean(cplx). Adding Δ to
+  // `a` shifts implied_cplx by −Δ/b and thus level_i by +Δ/b; we want
+  // Δ/b = 50 − mean(cplx).
+  final meanCplx =
+      filtered.fold<int>(0, (s, p) => s + p.cplx) / filtered.length;
+  final aRaw = ac;
+  final bRaw = bc;
+  final aAnchored = aRaw + bRaw * (50 - meanCplx);
+  final newBase = math.exp(aAnchored);
+  final newCplxScale = 1 / bRaw;
+  final newFailMul = math.exp(dc);
+  final newNConsMul = math.exp(ec);
+  print('=== Anchored constants for `Database._expectedDuration` ===');
+  print(
+    '  mean(cplx) on kept corpus = ${meanCplx.toStringAsFixed(2)}  '
+    '⇒ intercept shift Δ = ${(bRaw * (50 - meanCplx)).toStringAsFixed(4)}',
+  );
+  print('  // Paste into lib/getsomepuzzle/model/database.dart');
+  print('  static const _kBase      = ${newBase.toStringAsFixed(4)};');
+  print('  static const _kCellsExp  = ${cc.toStringAsFixed(4)};');
+  print('  static const _kCplxScale = ${newCplxScale.toStringAsFixed(2)};');
+  print('  static const _kFailMul   = ${newFailMul.toStringAsFixed(4)};');
+  print('  static const _kNConsMul  = ${newNConsMul.toStringAsFixed(4)};');
+
+  // Sanity check on the kept corpus using the just-anchored constants.
+  double impliedAnchored(Play p) =>
+      newCplxScale *
+      (math.log(p.duration) -
+          aAnchored -
+          cc * math.log(p.cells) -
+          p.failures * math.log(newFailMul) -
+          p.nConstraints * math.log(newNConsMul));
+  double levelAnchored(Play p) => 2.0 * p.cplx - impliedAnchored(p);
+  final anchoredLevels = filtered.map(levelAnchored).toList();
+  final meanAnchored =
+      anchoredLevels.reduce((a, b) => a + b) / anchoredLevels.length;
+  print(
+    '  sanity: mean(level_i) on kept corpus = ${meanAnchored.toStringAsFixed(2)} '
+    '(target 50.00)',
   );
   print('');
 

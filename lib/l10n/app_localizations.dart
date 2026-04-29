@@ -1072,6 +1072,30 @@ abstract class AppLocalizations {
   /// **'Tutorial stats cleared.'**
   String get settingTutorialRestarted;
 
+  /// Button label that wipes every play stat (tutorial + every collection)
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all stats'**
+  String get settingClearStats;
+
+  /// Title of the confirmation dialog for the clear-all-stats action
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all stats?'**
+  String get settingClearStatsConfirmTitle;
+
+  /// Body text of the confirmation dialog for the clear-all-stats action
+  ///
+  /// In en, this message translates to:
+  /// **'Every play history will be erased: timings, ratings, played/skipped flags. This cannot be undone.'**
+  String get settingClearStatsConfirmBody;
+
+  /// Snackbar message shown after all stats have been cleared
+  ///
+  /// In en, this message translates to:
+  /// **'All stats cleared.'**
+  String get settingStatsCleared;
+
   /// Top-of-screen message shown during play when at least one constraint of the current puzzle is violated
   ///
   /// In en, this message translates to:

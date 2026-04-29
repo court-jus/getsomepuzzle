@@ -519,6 +519,20 @@ class AppLocalizationsFr extends AppLocalizations {
       'Statistiques du didacticiel effacées.';
 
   @override
+  String get settingClearStats => 'Effacer toutes les statistiques';
+
+  @override
+  String get settingClearStatsConfirmTitle =>
+      'Effacer toutes les statistiques ?';
+
+  @override
+  String get settingClearStatsConfirmBody =>
+      'Tout l\'historique de jeu sera supprimé : temps, notes, statuts joué/passé. Cette action est irréversible.';
+
+  @override
+  String get settingStatsCleared => 'Toutes les statistiques ont été effacées.';
+
+  @override
   String get someConstraintsInvalid =>
       'Certaines contraintes ne sont pas valides.';
 

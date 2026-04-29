@@ -10,11 +10,16 @@ class SettingsPage extends StatefulWidget {
   /// the snackbar only fires after the async work is done.
   final Future<void> Function() onRestartTutorial;
 
+  /// Callback that wipes **every** persisted stat (tutorial + every
+  /// collection). Awaited for the same reason.
+  final Future<void> Function() onClearStats;
+
   const SettingsPage({
     super.key,
     required this.settings,
     required this.onSettingsChange,
     required this.onRestartTutorial,
+    required this.onClearStats,
   });
 
   @override
@@ -214,6 +219,23 @@ class _SettingsPageState extends State<SettingsPage> {
                         onPressed: _confirmRestartTutorial,
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        icon: Icon(
+                          Icons.delete_forever,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        label: Text(
+                          l10n.settingClearStats,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                        onPressed: _confirmClearStats,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -249,6 +271,36 @@ class _SettingsPageState extends State<SettingsPage> {
     // Pop back to the game screen so the player lands directly on the first
     // tutorial puzzle that the callback just queued up.
     Navigator.of(context).pop();
+  }
+
+  Future<void> _confirmClearStats() async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.settingClearStatsConfirmTitle),
+        content: Text(l10n.settingClearStatsConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await widget.onClearStats();
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.settingStatsCleared)));
   }
 }
 

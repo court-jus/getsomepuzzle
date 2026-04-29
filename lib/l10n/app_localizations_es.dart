@@ -517,6 +517,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingTutorialRestarted => 'Estadísticas del tutorial borradas.';
 
   @override
+  String get settingClearStats => 'Borrar todas las estadísticas';
+
+  @override
+  String get settingClearStatsConfirmTitle => '¿Borrar todas las estadísticas?';
+
+  @override
+  String get settingClearStatsConfirmBody =>
+      'Se borrará todo el historial de partidas: tiempos, valoraciones, estados jugado/saltado. Esta acción no se puede deshacer.';
+
+  @override
+  String get settingStatsCleared => 'Todas las estadísticas borradas.';
+
+  @override
   String get someConstraintsInvalid => 'Algunas restricciones no son válidas.';
 
   @override

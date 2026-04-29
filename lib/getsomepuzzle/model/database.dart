@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
 import 'package:flutter/services.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart'
+    as equilibrium;
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:intl/intl.dart';
@@ -178,6 +180,35 @@ class Filters {
     prefs.setStringList("wantedFlagsFilter", wantedFlags.toList());
     prefs.setStringList("bannedFlagsFilter", bannedFlags.toList());
   }
+}
+
+/// Recency-weighted observed distribution over the size and slug axes,
+/// computed from the player's [Database.puzzles] history. Used by
+/// [Database.getPuzzlesByLevel] to bias selection toward
+/// under-represented categories.
+///
+/// `slugCounts[s]` and `sizeCounts[(w,h)]` are sums of exponentially
+/// decaying weights (one weight per played puzzle). `totalPuzzles` is the
+/// total weight (Σ weights), and `totalSlugUses` accumulates
+/// `weight × |distinct slugs|` for each play — together they let the
+/// gap formula compute `expected_share = avgK / nSlugs` exactly like
+/// `_scoreAll` does in the generator.
+class WeightedSelectionStats {
+  final Map<String, double> slugCounts;
+  final Map<(int, int), double> sizeCounts;
+  final double totalPuzzles;
+  final double totalSlugUses;
+  final List<(int, int)> allowedSizes;
+  final int nSlugs;
+
+  const WeightedSelectionStats({
+    required this.slugCounts,
+    required this.sizeCounts,
+    required this.totalPuzzles,
+    required this.totalSlugUses,
+    required this.allowedSizes,
+    required this.nSlugs,
+  });
 }
 
 class Database {
@@ -422,7 +453,6 @@ class Database {
 
   Future<void> writeStats() async {
     final List<String> stats = getStats();
-    log.fine("Writing stats");
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList("stats", stats);
@@ -524,6 +554,57 @@ class Database {
     }
   }
 
+  /// Wipe **every** persisted stat (tutorial + every collection + the
+  /// recency window that drives [computePlayerLevel] and the variety
+  /// bias) and reset the in-memory flags on every loaded puzzle.
+  /// Destructive — there is no undo. The stored player level in
+  /// [Settings] is intentionally left alone (it's outside the scope of
+  /// "stats").
+  Future<void> clearAllStats() async {
+    for (final puz in puzzles) {
+      puz.played = false;
+      puz.finished = null;
+      puz.skipped = null;
+      puz.liked = null;
+      puz.disliked = null;
+      puz.pleasure = null;
+      puz.duration = 0;
+      puz.failures = 0;
+      puz.hints = 0;
+      puz.cellEdits = 0;
+      puz.firstClickMs = 0;
+      puz.longestGapMs = 0;
+      puz.stats = null;
+      puz.started = null;
+    }
+
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in prefs.getKeys().toList()) {
+        if (key.startsWith('stats')) {
+          await prefs.remove(key);
+        }
+      }
+    } else {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final dirPath = p.join(documentsDirectory.path, 'getsomepuzzle');
+      final dir = Directory(dirPath);
+      if (await dir.exists()) {
+        // Remove every `stats*` file, not just `stats.txt`. Older
+        // collections leave behind `stats_<collection>.txt` files that
+        // are still loaded by `loadPuzzlesFile` — leaving them in place
+        // would silently restore play history on the next launch.
+        for (final entry in dir.listSync()) {
+          if (entry is File && p.basename(entry.path).startsWith('stats')) {
+            await entry.delete();
+          }
+        }
+      }
+    }
+
+    preparePlaylist();
+  }
+
   void removePuzzleFromPlaylist(PuzzleData puz) {
     playlist.remove(puz);
   }
@@ -542,30 +623,39 @@ class Database {
   /// Expected duration (seconds) for a puzzle of given `cplx`, `cells`,
   /// `failures`, and `nConstraints` (the puzzle's constraint count).
   ///
-  /// Refit by OLS on real plays:
-  ///   log(dur) ≈ 2.155 + 0.0366·cplx + 0.442·log(cells)
-  ///                    + 0.136·failures + 0.082·n_constraints
-  ///   ≈ 8.62 · cells^0.442 · exp(cplx/27.3)
-  ///        · 1.145^failures · 1.085^n_constraints       (R²=0.70, MAPE=29 %)
+  /// Refit by OLS on real plays after stricter outlier rejection (see
+  /// notes below). Anchored model:
+  ///   log(dur) ≈ 1.197 + 0.00808·cplx + 0.515·log(cells)
+  ///                    + 0.151·failures + 0.102·n_constraints
+  ///   ≈ 3.31 · cells^0.515 · exp(cplx/123.8)
+  ///        · 1.163^failures · 1.107^n_constraints       (R²=0.50, MAPE=50 %)
   ///
-  /// The intercept is anchored so the calibration cohort's mean `level_i`
-  /// lands on **50** rather than on the cohort's mean `cplx`. Concretely:
-  /// a player who solves at the same pace as the calibration cohort
-  /// converges to level 50; faster players go above, slower below. This
-  /// puts the "average" right in the middle of [0, 100] instead of in the
-  /// low single digits.
+  /// The intercept is anchored so that — on the calibration corpus — the
+  /// **mean** `level_i` lands on 50 rather than on the corpus's mean
+  /// `cplx`. Concretely: a player who solves at the same pace as the
+  /// calibration corpus converges to level 50; faster players go above,
+  /// slower below. This places the "average" right in the middle of
+  /// [0, 100] instead of bunching at the low end.
   ///
-  /// The new `n_constraints` term captures parsing/setup cost: a 4×4 puzzle
-  /// with 12 constraints takes meaningfully longer than the same grid with
-  /// 3 constraints, even at identical `cplx`. Adding it lifts R² from 0.61
-  /// (cplx + cells + failures only) to 0.70.
+  /// **Why these constants and not the previous ones (8.62, 27.3, …)**:
+  /// the earlier fit used an AFK-tolerant outlier rule (cap at 1800 s but
+  /// no idle-gap filter), which let plays with multi-minute idle gaps
+  /// inflate the `exp(cplx/27.3)` slope to absurd levels (predicted
+  /// duration ~30 min for cplx=80, ~1.6 h for cplx=100 8×8). Refiltering
+  /// on `longestGapMs ≤ 30 s` flattens the cplx slope to its true
+  /// behaviour on the data. The new R²/MAPE are slightly worse than the
+  /// stale model's because we deliberately stop fitting the AFK tail —
+  /// what we lose in residual variance we gain in not pretending high-cplx
+  /// puzzles take half an hour.
   ///
-  /// See `bin/analyze_stats.dart` for the regression tool.
-  static const _kBase = 8.62;
-  static const _kCellsExp = 0.442;
-  static const _kCplxScale = 27.3;
-  static const _kFailMul = 1.145;
-  static const _kNConsMul = 1.085;
+  /// See `bin/analyze_stats.dart` for the regression tool (it both
+  /// applies the same cleaning and prints anchored constants ready to
+  /// paste back here).
+  static const _kBase = 3.3108;
+  static const _kCellsExp = 0.5146;
+  static const _kCplxScale = 123.82;
+  static const _kFailMul = 1.1627;
+  static const _kNConsMul = 1.1069;
 
   static double _expectedDuration(
     int cplx,
@@ -661,31 +751,68 @@ class Database {
   /// out of in-tier candidates.
   static const double selectionSigma = 5.0;
 
+  /// Half-life (in plays) of the exponential decay used to build the
+  /// recency-weighted observed distribution that drives the variety bias.
+  /// Larger = more memory of past plays (slower variety push); smaller =
+  /// forgets older plays faster (more aggressive switching). 30 keeps
+  /// ~25 % weight on a puzzle played 60 plays ago, ~10 % on one played
+  /// 100 plays ago. The full played history is used (no truncation) — the
+  /// decay alone determines the effective window.
+  static const double selectionVarietyHalfLife = 30.0;
+
+  /// Strength of the variety multiplier applied on top of the
+  /// Gaussian-on-cplx weight. Final weight = w_cplx · (1 + α · gap). With
+  /// α=1.5, a candidate puzzle that fully fills a maximally
+  /// underrepresented size or slug bin gets a ×2-3 boost; a candidate
+  /// whose categories are already saturated by recent plays gets ×1 (no
+  /// boost). Set to 0 to disable the variety bias entirely.
+  static const double selectionVarietyAlpha = 1.5;
+
   // Random source for puzzle sampling. Exposed as a package-private setter
   // so tests can pin it to a seeded Random for reproducibility.
   math.Random _samplingRandom = math.Random();
   // ignore: unused_element
   set samplingRandom(math.Random r) => _samplingRandom = r;
 
-  /// Filtered catalog ordered by Gaussian-weighted draw centred on `level
-  /// + selectionOffset`, std `selectionSigma`. The first puzzles in the
-  /// returned list are most likely to be near the player's skill; later
-  /// ones drift toward the tails. Empty list ⇒ the filtered catalog
-  /// itself is empty (every puzzle played / skipped / disliked, or
-  /// filters too restrictive).
+  /// Filtered catalog ordered by a weighted draw combining two factors:
   ///
-  /// Implementation: Efraimidis-Spirakis weighted reservoir / sort
-  /// trick. Each item gets a key `−ln(uniform()) / weight`; sorting by
-  /// key ascending is equivalent to sampling without replacement
-  /// proportionally to the weights.
+  /// 1. **Skill match (cplx)** — Gaussian on `puzzle.cplx − (level +
+  ///    selectionOffset)` with std [selectionSigma]. Keeps the bulk of
+  ///    proposals near the player's level, with a long tail so a
+  ///    fast-progressing player still occasionally sees harder ones.
+  ///
+  /// 2. **Variety bias** — multiplicative factor `(1 + α · gap)` where
+  ///    `α = [selectionVarietyAlpha]` and `gap` is how
+  ///    under-represented this puzzle's *size* and *slug* categories are
+  ///    in the player's recency-weighted observed distribution (decay
+  ///    half-life [selectionVarietyHalfLife]). Targets reuse the
+  ///    generator's equilibrium shapes (`sizeRawWeight`, slug
+  ///    `avgK / nSlugs`) so the offered catalog drifts toward the same
+  ///    balance the corpus is generated against. A puzzle whose categories
+  ///    are already saturated by recent plays gets factor ≈ 1 — so the
+  ///    player can comfortably chain a few similar puzzles before the
+  ///    variety bias starts pushing.
+  ///
+  /// Empty list ⇒ the filtered catalog itself is empty (every puzzle
+  /// played / skipped / disliked, or filters too restrictive).
+  ///
+  /// Implementation: Efraimidis-Spirakis weighted reservoir / sort trick.
+  /// Each item gets key `−ln(uniform()) / weight`; sorting ascending is
+  /// equivalent to sampling without replacement proportionally to the
+  /// weights.
   List<PuzzleData> getPuzzlesByLevel(int level) {
     final mu = level + selectionOffset;
     final twoSigmaSq = 2 * selectionSigma * selectionSigma;
-    final keyed = filter().map((p) {
+    final filtered = filter().toList();
+    final varietyStats = _buildRecencyWeightedStats(filtered);
+    final keyed = filtered.map((p) {
       final d = p.cplx - mu;
       // Clamp the exponent to avoid `exp` underflow producing key = +∞ for
       // every puzzle on the tail (which would then sort arbitrarily).
-      final w = math.exp(-math.min(d * d / twoSigmaSq, 700));
+      final wCplx = math.exp(-math.min(d * d / twoSigmaSq, 700));
+      final gap = _varietyGapForPuzzle(p, varietyStats);
+      final wVariety = 1 + selectionVarietyAlpha * gap;
+      final w = wCplx * wVariety;
       // The +1e-300 below guards against `nextDouble() == 0`, which would
       // make `−ln(u)` infinite and corrupt the sort.
       final u = _samplingRandom.nextDouble() + 1e-300;
@@ -693,6 +820,116 @@ class Database {
       return (p, key);
     }).toList()..sort((a, b) => a.$2.compareTo(b.$2));
     return keyed.map((e) => e.$1).toList();
+  }
+
+  /// Build the recency-weighted observed distribution over size and slug
+  /// axes. Iterates the played history (recent-first) and applies an
+  /// exponential decay with half-life [selectionVarietyHalfLife]. The
+  /// universe (set of reachable slugs / sizes) is derived from
+  /// [filteredCatalog] so that categories the player has filtered out (or
+  /// that simply don't exist in the current collection) don't contribute
+  /// phantom gaps.
+  @visibleForTesting
+  WeightedSelectionStats buildRecencyWeightedStats(
+    Iterable<PuzzleData> filteredCatalog,
+  ) => _buildRecencyWeightedStats(filteredCatalog);
+
+  WeightedSelectionStats _buildRecencyWeightedStats(
+    Iterable<PuzzleData> filteredCatalog,
+  ) {
+    final played =
+        puzzles
+            .where(
+              (p) =>
+                  p.played &&
+                  p.finished != null &&
+                  p.skipped == null &&
+                  p.duration > 0,
+            )
+            .toList()
+          ..sort((a, b) => b.finished!.compareTo(a.finished!));
+
+    final slugCounts = <String, double>{};
+    final sizeCounts = <(int, int), double>{};
+    double total = 0;
+    double totalSlugUses = 0;
+    for (var i = 0; i < played.length; i++) {
+      final p = played[i];
+      final w = math.pow(0.5, i / selectionVarietyHalfLife).toDouble();
+      total += w;
+      final key = (p.width, p.height);
+      sizeCounts[key] = (sizeCounts[key] ?? 0) + w;
+      final distinct = p.rules.toSet();
+      for (final s in distinct) {
+        slugCounts[s] = (slugCounts[s] ?? 0) + w;
+      }
+      totalSlugUses += w * distinct.length;
+    }
+
+    final allowedSlugs = <String>{};
+    final allowedSizes = <(int, int)>{};
+    for (final p in filteredCatalog) {
+      allowedSlugs.addAll(p.rules);
+      allowedSizes.add((p.width, p.height));
+    }
+
+    return WeightedSelectionStats(
+      slugCounts: slugCounts,
+      sizeCounts: sizeCounts,
+      totalPuzzles: total,
+      totalSlugUses: totalSlugUses,
+      allowedSizes: allowedSizes.toList(),
+      nSlugs: allowedSlugs.length,
+    );
+  }
+
+  /// Variety gap for a single candidate puzzle: how much its size and
+  /// slug categories are under-represented in the recency-weighted
+  /// observed distribution. Returns 0 when the history is empty (gracefully
+  /// degrades to the legacy cplx-only behaviour).
+  ///
+  /// Slug gap is averaged over the puzzle's distinct slugs (not summed) so
+  /// puzzles with many constraints aren't artificially advantaged. Size
+  /// gap reuses [equilibrium.sizeRawWeight] normalized over the currently
+  /// reachable size set.
+  @visibleForTesting
+  double varietyGapForPuzzle(PuzzleData p, WeightedSelectionStats stats) =>
+      _varietyGapForPuzzle(p, stats);
+
+  double _varietyGapForPuzzle(PuzzleData p, WeightedSelectionStats stats) {
+    if (stats.totalPuzzles <= 0) return 0.0;
+
+    double slugGap = 0.0;
+    final distinct = p.rules.toSet();
+    if (distinct.isNotEmpty && stats.nSlugs > 0) {
+      final avgK = stats.totalSlugUses / stats.totalPuzzles;
+      final expSlug = avgK / stats.nSlugs;
+      for (final s in distinct) {
+        final c = stats.slugCounts[s] ?? 0;
+        final share = c / stats.totalPuzzles;
+        final gap = expSlug - share;
+        if (gap > 0) slugGap += gap;
+      }
+      slugGap /= distinct.length;
+    }
+
+    double sizeGap = 0.0;
+    if (stats.allowedSizes.isNotEmpty) {
+      final raw = equilibrium.sizeRawWeight(p.width, p.height);
+      if (raw > 0) {
+        final totalRaw = stats.allowedSizes.fold<double>(
+          0.0,
+          (sum, sz) => sum + equilibrium.sizeRawWeight(sz.$1, sz.$2),
+        );
+        final expSize = totalRaw > 0 ? raw / totalRaw : 0.0;
+        final c = stats.sizeCounts[(p.width, p.height)] ?? 0;
+        final share = c / stats.totalPuzzles;
+        final gap = expSize - share;
+        if (gap > 0) sizeGap = gap;
+      }
+    }
+
+    return slugGap + sizeGap;
   }
 
   /// Whether any unplayed puzzle exists in the catalog when user-configured

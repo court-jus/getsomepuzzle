@@ -613,6 +613,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         loadPuzzle();
                         setState(() {});
                       },
+                      onClearStats: () async {
+                        if (database == null) return;
+                        await database!.clearAllStats();
+                        // Drop any in-progress puzzle so the next puzzle is
+                        // picked from the freshly empty playlist; without
+                        // this, the player would be stuck on whatever was
+                        // currently displayed (now flagged unplayed again
+                        // but still selected as `current`).
+                        game.clearPuzzle();
+                        loadPuzzle();
+                        setState(() {});
+                      },
                       onSettingsChange: (newValue) {
                         final autoLevelTurnedOn =
                             newValue.autoLevel == true && !settings.autoLevel;

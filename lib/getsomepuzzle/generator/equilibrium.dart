@@ -89,8 +89,10 @@ double targetShare(Axis axis, Object category, int categoryCount) {
 }
 
 /// Raw (un-normalized) size weight: asymmetric Gaussian on grid area
-/// peaking at [kSizePeakArea]. Used internally by `sizeTargetShare`.
-double _sizeRawWeight(int width, int height) {
+/// peaking at [kSizePeakArea]. Public so callers without a [TargetUniverse]
+/// (e.g. selection-time variety bias) can compute the same target shape and
+/// normalize over their own size set.
+double sizeRawWeight(int width, int height) {
   final area = (width * height).toDouble();
   final dx = area - kSizePeakArea;
   final sigma = dx <= 0 ? kSizeSigmaLeft : kSizeSigmaRight;
@@ -101,11 +103,11 @@ double _sizeRawWeight(int width, int height) {
 /// equals 1. This is what `_scoreAll` and `pickWeightedSize` consume — it
 /// replaces the previous uniform `1/nSizes`.
 double sizeTargetShare(int width, int height, TargetUniverse universe) {
-  final raw = _sizeRawWeight(width, height);
+  final raw = sizeRawWeight(width, height);
   if (raw <= 0) return 0.0;
   final total = universe.allowedSizes.fold<double>(
     0.0,
-    (sum, p) => sum + _sizeRawWeight(p.$1, p.$2),
+    (sum, p) => sum + sizeRawWeight(p.$1, p.$2),
   );
   return total > 0 ? raw / total : 0.0;
 }

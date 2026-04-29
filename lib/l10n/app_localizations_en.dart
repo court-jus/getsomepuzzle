@@ -513,6 +513,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingTutorialRestarted => 'Tutorial stats cleared.';
 
   @override
+  String get settingClearStats => 'Clear all stats';
+
+  @override
+  String get settingClearStatsConfirmTitle => 'Clear all stats?';
+
+  @override
+  String get settingClearStatsConfirmBody =>
+      'Every play history will be erased: timings, ratings, played/skipped flags. This cannot be undone.';
+
+  @override
+  String get settingStatsCleared => 'All stats cleared.';
+
+  @override
   String get someConstraintsInvalid => 'Some constraints are not valid.';
 
   @override

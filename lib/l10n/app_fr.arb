@@ -188,6 +188,10 @@
     "settingRestartTutorialConfirmTitle": "Recommencer le didacticiel ?",
     "settingRestartTutorialConfirmBody": "Votre progression sur les puzzles du didacticiel sera effacée. Cette action est irréversible.",
     "settingTutorialRestarted": "Statistiques du didacticiel effacées.",
+    "settingClearStats": "Effacer toutes les statistiques",
+    "settingClearStatsConfirmTitle": "Effacer toutes les statistiques ?",
+    "settingClearStatsConfirmBody": "Tout l'historique de jeu sera supprimé : temps, notes, statuts joué/passé. Cette action est irréversible.",
+    "settingStatsCleared": "Toutes les statistiques ont été effacées.",
     "someConstraintsInvalid": "Certaines contraintes ne sont pas valides.",
     "errorsCount": "{count} erreurs."
 }

@@ -364,18 +364,12 @@ class Puzzle {
               forceDepth: r.moves,
             );
             depth = r.moves;
-          } else if (r.moves > 0 && clone.complete) {
-            // Cascade reached completion → the tested value is consistent
-            // and forced (the opposite would have failed elsewhere).
-            candidate = Move(
-              idx,
-              value,
-              clone.constraints.first,
-              isForce: true,
-              forceDepth: r.moves,
-            );
-            depth = r.moves;
           } else {
+            // Cascade reached a stuck or complete-and-consistent state.
+            // We cannot conclude anything: a complete-and-consistent
+            // cascade only proves the value is *possible*, not forced —
+            // claiming "the opposite would have failed" is circular,
+            // since this routine is itself how we test for refutation.
             continue;
           }
         }

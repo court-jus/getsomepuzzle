@@ -188,6 +188,10 @@
     "settingRestartTutorialConfirmTitle": "¿Reiniciar el tutorial?",
     "settingRestartTutorialConfirmBody": "Tu progreso en los puzles del tutorial se borrará. Esta acción no se puede deshacer.",
     "settingTutorialRestarted": "Estadísticas del tutorial borradas.",
+    "settingClearStats": "Borrar todas las estadísticas",
+    "settingClearStatsConfirmTitle": "¿Borrar todas las estadísticas?",
+    "settingClearStatsConfirmBody": "Se borrará todo el historial de partidas: tiempos, valoraciones, estados jugado/saltado. Esta acción no se puede deshacer.",
+    "settingStatsCleared": "Todas las estadísticas borradas.",
     "someConstraintsInvalid": "Algunas restricciones no son válidas.",
     "errorsCount": "{count} errores."
 }
