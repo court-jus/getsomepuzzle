@@ -26,6 +26,7 @@ import 'package:getsomepuzzle/widgets/generate_page.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
 import 'package:getsomepuzzle/widgets/pause_overlay.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
+import 'package:getsomepuzzle/widgets/save_progress_dialog.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
 import 'package:getsomepuzzle/widgets/timer_bottom_bar.dart';
@@ -206,10 +207,33 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   void openPuzzle(PuzzleData puz) {
-    game.openPuzzle(puz, database!.playlist.length);
+    game.openPuzzle(
+      puz,
+      database!.playlist.length,
+      progressRestoredText: AppLocalizations.of(context)!.progressRestored,
+    );
     if (settings.hintType == HintType.addConstraint) {
       game.startHintConstraintComputation();
     }
+  }
+
+  /// Ask the player which playlist to save the in-progress puzzle to,
+  /// then append the puzzle's line representation (with the trailing
+  /// play-state field) to that playlist.
+  Future<void> _saveProgress() async {
+    if (database == null || game.currentPuzzle == null) return;
+    final loc = AppLocalizations.of(context)!;
+    final target = await showSaveProgressDialog(
+      context: context,
+      database: database!,
+    );
+    if (target == null) return;
+    final line = game.currentPuzzle!.lineWithPlayState();
+    await database!.addToPlaylist(target, line);
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.progressSaved)));
   }
 
   void _openCreatePage() {
@@ -576,6 +600,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 onTap: () {
                   Navigator.pop(context);
                   _openCreatePage();
+                },
+              ),
+            if (database != null && game.currentPuzzle != null)
+              ListTile(
+                leading: Icon(Icons.save_outlined),
+                title: Text(AppLocalizations.of(context)!.saveProgress),
+                onTap: () {
+                  Navigator.pop(context);
+                  _saveProgress();
                 },
               ),
             if (database != null)

@@ -157,7 +157,11 @@ class GameModel extends ChangeNotifier {
   // Puzzle lifecycle
   // ---------------------------------------------------------------------------
 
-  void openPuzzle(PuzzleData puz, int playlistLength) {
+  void openPuzzle(
+    PuzzleData puz,
+    int playlistLength, {
+    String? progressRestoredText,
+  }) {
     _beforeMutation();
     _cancelIdleTimer();
     dbSize = playlistLength;
@@ -167,6 +171,10 @@ class GameModel extends ChangeNotifier {
     betweenPuzzles = false;
     _stoppedForCompletion = false;
     _autoPauseReason = null;
+    if (progressRestoredText != null &&
+        currentPuzzle?.hasRestoredProgress == true) {
+      setTopMessage(text: progressRestoredText, color: Colors.blue.shade700);
+    }
     _afterMutation();
   }
 

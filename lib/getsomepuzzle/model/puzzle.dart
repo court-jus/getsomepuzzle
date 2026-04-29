@@ -116,6 +116,12 @@ class Puzzle {
   /// value or options change via `Cell.onMutate`.
   List<List<int>>? cachedGroups;
 
+  /// True when the line representation carried a saved play-state field
+  /// (trailing `_p:<values>`) and that state has been applied to the
+  /// non-readonly cells. Consumers (the game model) read it once on open
+  /// to surface a "progress restored" message.
+  bool hasRestoredProgress = false;
+
   List<Cell> get cells => _cells;
   set cells(List<Cell> value) {
     _cells = value;
@@ -162,7 +168,38 @@ class Puzzle {
             .toList();
       }
     }
+    // Optional trailing play-state field "p:<cellvalues>" (length must
+    // match the grid). Values for readonly cells are ignored — those
+    // already carry the puzzle's initial state. Non-zero values for the
+    // remaining cells are applied so the player resumes where they left
+    // off. Backward compatible: missing field = no saved progress.
+    for (var i = 6; i < attributesStr.length; i++) {
+      final field = attributesStr[i];
+      if (!field.startsWith('p:')) continue;
+      final values = field.substring(2);
+      if (values.length != cells.length) break;
+      for (int j = 0; j < cells.length; j++) {
+        if (cells[j].readonly) continue;
+        final v = int.tryParse(values[j]);
+        if (v != null && v != 0) cells[j].setValue(v);
+      }
+      hasRestoredProgress = true;
+      break;
+    }
     _aggregateLetterGroups();
+  }
+
+  /// Build a line representation that carries the player's current cell
+  /// values as a trailing `_p:<values>` field. The leading fields
+  /// (initial readonly cells, constraints, solution, complexity) are
+  /// preserved verbatim from the original [lineRepresentation]; any
+  /// existing play-state suffix is replaced.
+  String lineWithPlayState() {
+    final parts = lineRepresentation.split('_');
+    parts.removeWhere((p) => p.startsWith('p:'));
+    final playStr = cellValues.map((v) => v.toString()).join('');
+    parts.add('p:$playStr');
+    return parts.join('_');
   }
 
   /// Merge `LT:<letter>....` constraints sharing the same letter into a

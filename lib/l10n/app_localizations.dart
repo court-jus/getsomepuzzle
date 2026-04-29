@@ -976,6 +976,36 @@ abstract class AppLocalizations {
   /// **'New playlist...'**
   String get newPlaylist;
 
+  /// Tooltip / label of the AppBar button that saves the current puzzle in its current state to a playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Save progress'**
+  String get saveProgress;
+
+  /// Title of the dialog that asks where to save the current puzzle
+  ///
+  /// In en, this message translates to:
+  /// **'Save current state'**
+  String get saveProgressTitle;
+
+  /// Default name suggested for the playlist that holds saved-but-not-finished puzzles
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get inProgressPlaylistName;
+
+  /// Snackbar shown after a puzzle has been saved with its current play state
+  ///
+  /// In en, this message translates to:
+  /// **'Progress saved'**
+  String get progressSaved;
+
+  /// Top message shown when a puzzle is opened with a saved partial play state
+  ///
+  /// In en, this message translates to:
+  /// **'Your progress has been restored'**
+  String get progressRestored;
+
   /// No description provided for @createFixedCellMode.
   ///
   /// In en, this message translates to:

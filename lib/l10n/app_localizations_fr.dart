@@ -467,6 +467,21 @@ class AppLocalizationsFr extends AppLocalizations {
   String get newPlaylist => 'Nouvelle playlist...';
 
   @override
+  String get saveProgress => 'Enregistrer la progression';
+
+  @override
+  String get saveProgressTitle => 'Enregistrer l\'état actuel';
+
+  @override
+  String get inProgressPlaylistName => 'En cours';
+
+  @override
+  String get progressSaved => 'Progression enregistrée';
+
+  @override
+  String get progressRestored => 'Votre progression a été restaurée';
+
+  @override
   String get createFixedCellMode => 'Fixer la couleur';
 
   @override

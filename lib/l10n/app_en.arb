@@ -495,6 +495,26 @@
     "confirmDeletePlaylist": "Delete this playlist and all its puzzles?",
     "targetPlaylist": "Save to",
     "newPlaylist": "New playlist...",
+    "saveProgress": "Save progress",
+    "@saveProgress": {
+        "description": "Tooltip / label of the AppBar button that saves the current puzzle in its current state to a playlist"
+    },
+    "saveProgressTitle": "Save current state",
+    "@saveProgressTitle": {
+        "description": "Title of the dialog that asks where to save the current puzzle"
+    },
+    "inProgressPlaylistName": "In progress",
+    "@inProgressPlaylistName": {
+        "description": "Default name suggested for the playlist that holds saved-but-not-finished puzzles"
+    },
+    "progressSaved": "Progress saved",
+    "@progressSaved": {
+        "description": "Snackbar shown after a puzzle has been saved with its current play state"
+    },
+    "progressRestored": "Your progress has been restored",
+    "@progressRestored": {
+        "description": "Top message shown when a puzzle is opened with a saved partial play state"
+    },
     "createFixedCellMode": "Fix cell color",
     "createFixBlack": "Fix to black",
     "createFixWhite": "Fix to white",
