@@ -307,6 +307,71 @@ void main() {
     });
   });
 
+  group('GroupSize.apply path articulation', () {
+    test('cell on every growth path is forced (deep bottleneck)', () {
+      // 4x3 grid:
+      //   1 0 2
+      //   0 0 2
+      //   2 0 2
+      //   2 0 2
+      // GS:0.4 — seed at idx 0 (value 1), target size 4. The seed has two
+      // immediate exits (idx 1 and idx 3) so the single-exit rule does NOT
+      // fire. Both branches funnel into idx 4 (the centre of the upper 2x2
+      // bay): blocking idx 4 leaves only {0,1,3} reachable (=3 < 4), so
+      // every length-4 completion goes through idx 4 → forced to colour 1.
+      // This is the path-based deduction described in docs/dev/todo.md.
+      final p = makePuzzle('''
+        102
+        002
+        202
+        202
+      ''');
+      final gs = GroupSize('0.4');
+      p.constraints.add(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 4);
+      expect(move.value, 1);
+    });
+
+    test('no force when multiple disjoint completions exist', () {
+      // 3x3 grid with seed at (0,0) and an open board: the group of size 3
+      // can grow rightward, downward, or via a diagonal step, so no empty
+      // cell appears in every completion. apply must NOT fabricate a
+      // path-based deduction. (Other deductions also don't fire here:
+      // groupFreeNeighbors=2, no other same-colour groups to merge.)
+      final p = makePuzzle('''
+        100
+        000
+        000
+      ''');
+      final gs = GroupSize('0.3');
+      p.constraints.add(gs);
+      final move = gs.apply(p);
+      expect(move, isNull);
+    });
+
+    test('reachable region too small → impossible', () {
+      // 3x3, seed at (0,0)=1, target size 4, but the colour-2 wall traps
+      // the seed in a 4-cell region of size 4 — wait, exactly 4: {0,1,3,6}.
+      // Bumping the target to 5 makes growth physically impossible without
+      // dropping the single-exit rule, so apply must report infeasibility.
+      // groupFreeNeighbors={1,3} so single-exit does NOT fire; the new
+      // baseline reachability check is what catches it.
+      final p = makePuzzle('''
+        102
+        022
+        022
+      ''');
+      final gs = GroupSize('0.5');
+      p.constraints.add(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+  });
+
   group('DifferentFromConstraint.verify', () {
     test('right: different values → valid', () {
       // Cell (1,1)=N and cell (2,1)=B are different

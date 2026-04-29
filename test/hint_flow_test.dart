@@ -139,6 +139,45 @@ void main() {
         game.dispose();
       },
     );
+
+    test(
+      'non-useful candidate is delivered when player asks past usefulCount',
+      () {
+        // When the puzzle is already solvable by propagation, the ranker
+        // pushes every candidate to the non-useful tail (usefulCount == 0).
+        // The button must stay enabled and a tap must still attach a
+        // constraint — the player explicitly asked for help, even if the
+        // extra constraint is redundant.
+        final game = GameModel();
+        final settings = Settings(hintType: HintType.addConstraint);
+        game.openPuzzle(_emptyFixture(), 1);
+
+        // Simulate a completed ranker pass: list populated, but every
+        // candidate landed in the non-useful tail (usefulCount stays 0).
+        // We bypass the Isolate path by writing the public fields directly.
+        game.availableHintConstraints = ['FM:11', 'FM:22'];
+        game.hintConstraintsReady = true;
+
+        expect(
+          game.canAddHintConstraint,
+          isTrue,
+          reason: 'button must stay enabled while any candidate remains',
+        );
+
+        final constraintsBefore = game.currentPuzzle!.constraints.length;
+        game.onHintTap(settings, _texts); // stage 0 → 1 (errors pass)
+        game.onHintTap(settings, _texts); // stage 1 → terminal
+
+        expect(
+          game.currentPuzzle!.constraints.length,
+          constraintsBefore + 1,
+          reason: 'a non-useful candidate must still be attached on demand',
+        );
+        expect(game.hintText, 'constraint added');
+
+        game.dispose();
+      },
+    );
   });
 
   group('Hint cycle reset', () {

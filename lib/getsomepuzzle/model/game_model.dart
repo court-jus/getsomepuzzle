@@ -716,17 +716,24 @@ class GameModel extends ChangeNotifier {
     _hintRankWorker = null;
   }
 
-  /// Pick the first useful constraint and add it to the puzzle.
+  /// Pick the front candidate and add it to the puzzle. Useful candidates
+  /// (those that unlock new propagation) come first; once they're exhausted
+  /// the player can still request a constraint and gets one from the
+  /// non-useful tail — adding redundant constraints is harmless and lets a
+  /// player who asks for help past the propagation horizon receive
+  /// something rather than a blank "none available" message.
   /// Returns true if a constraint was added.
   bool addHintConstraint() {
-    if (currentPuzzle == null || _usefulHintCount <= 0) return false;
+    if (currentPuzzle == null || availableHintConstraints.isEmpty) {
+      return false;
+    }
 
     // Clear previous highlights before adding a new one
     currentPuzzle!.clearHighlights();
 
-    // Take the first useful constraint (ranking puts them at the front)
+    // Front of the list: useful first, then non-useful tail.
     final serialized = availableHintConstraints.removeAt(0);
-    _usefulHintCount--;
+    if (_usefulHintCount > 0) _usefulHintCount--;
 
     // Parse "SLUG:params" and create the constraint
     final colonIdx = serialized.indexOf(':');
@@ -747,7 +754,10 @@ class GameModel extends ChangeNotifier {
   }
 
   /// Whether the "add constraint" hint button should be enabled.
-  bool get canAddHintConstraint => hintConstraintsReady && _usefulHintCount > 0;
+  /// True as long as any candidate remains, regardless of whether it's
+  /// "useful" — the player can opt to add a redundant constraint anyway.
+  bool get canAddHintConstraint =>
+      hintConstraintsReady && availableHintConstraints.isNotEmpty;
 
   // ---------------------------------------------------------------------------
   // Help computation (debounced)

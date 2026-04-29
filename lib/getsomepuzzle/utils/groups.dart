@@ -151,6 +151,61 @@ bool blockingDisconnectsMembers(
   return members.any((m) => !visited.contains(m));
 }
 
+/// Size of the connected component reachable from [seed] through cells of
+/// value [color] or 0. [seed] itself is included even when its own value
+/// differs from [color] (callers typically pass a member of a [color] group).
+int reachableComponentSize(Puzzle puzzle, int seed, int color) {
+  final visited = <int>{seed};
+  final queue = Queue<int>()..add(seed);
+  while (queue.isNotEmpty) {
+    final cur = queue.removeFirst();
+    for (final nei in puzzle.getNeighbors(cur)) {
+      if (visited.contains(nei)) continue;
+      final v = puzzle.cellValues[nei];
+      if (v != color && v != 0) continue;
+      visited.add(nei);
+      queue.add(nei);
+    }
+  }
+  return visited.length;
+}
+
+/// True iff treating [blocked] as the opposite colour (removing it from the
+/// merge graph) leaves fewer than [minSize] cells reachable from [seed]
+/// through cells whose value is [color] or 0.
+///
+/// Sibling of [blockingDisconnectsMembers]: same BFS, different post-check.
+/// Used by `GS` to detect cells that lie on every possible growth path of
+/// a group of target size [minSize] — if the seed's connected
+/// [color]-or-empty region can't reach [minSize] cells without going
+/// through [blocked], then [blocked] must take [color].
+///
+/// Returns false when [seed] equals [blocked] (vacuous: the seed itself is
+/// excluded, so the predicate is undefined).
+bool blockingShrinksReachableBelow(
+  Puzzle puzzle,
+  int blocked,
+  int color,
+  int seed,
+  int minSize,
+) {
+  if (seed == blocked) return false;
+  final visited = <int>{seed};
+  final queue = Queue<int>()..add(seed);
+  while (queue.isNotEmpty) {
+    final cur = queue.removeFirst();
+    for (final nei in puzzle.getNeighbors(cur)) {
+      if (nei == blocked) continue;
+      if (visited.contains(nei)) continue;
+      final v = puzzle.cellValues[nei];
+      if (v != color && v != 0) continue;
+      visited.add(nei);
+      queue.add(nei);
+    }
+  }
+  return visited.length < minSize;
+}
+
 bool canMergeGroups(Puzzle puzzle, List<int> groupA, List<int> groupB) {
   // Check if there exists a path of free cells (value 0 or same color) connecting groupA and groupB
   // Perform flood fill from all cells in groupA, through cells that are either empty (0) or same color

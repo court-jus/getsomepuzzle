@@ -130,7 +130,10 @@ is tracked in `docs/todo.md` for future exploration.
 ### Per-tap flow
 
 1. **Selection:** take the front of `availableHintConstraints`
-   (ranking has put useful candidates there).
+   (ranking has put useful candidates there). When the useful prefix is
+   exhausted, the front is a non-useful (redundant) candidate — the player
+   still gets a constraint if they ask for one, just one that doesn't
+   unlock new deductions.
 2. **Add:** attach the constraint to `currentPuzzle.constraints`, as if
    the puzzle had been created with this extra rule. This is
    effectively a new, easier puzzle.
@@ -142,8 +145,9 @@ is tracked in `docs/todo.md` for future exploration.
    session.
 5. **Stats:** `currentMeta.hints` ticks once per added constraint. No
    other scoring impact.
-6. **Exhaustion:** when `_usefulHintCount` hits 0,
-   `canAddHintConstraint` flips false and the button disables.
+6. **Exhaustion:** the button only disables when `availableHintConstraints`
+   is fully empty. While the list still contains non-useful candidates,
+   `canAddHintConstraint` stays true.
 
 ### Cancel / restart
 

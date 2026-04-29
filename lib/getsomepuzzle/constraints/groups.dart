@@ -179,6 +179,20 @@ class GroupSize extends CellsCentricConstraint {
           return Move(boundary, myOpposite, this);
         }
       }
+      // Path-based articulation: any empty cell whose blocking would shrink
+      // the reachable myColor/empty region below `size` lies on every
+      // possible growth path and must take myColor. Generalises the
+      // single-exit rule to bottlenecks several steps away from the group.
+      final seed = myGroup.first;
+      if (reachableComponentSize(puzzle, seed, myColor) < size) {
+        return Move(0, 0, this, isImpossible: this);
+      }
+      for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
+        if (puzzle.cellValues[idx] != 0) continue;
+        if (blockingShrinksReachableBelow(puzzle, idx, myColor, seed, size)) {
+          return Move(idx, myColor, this);
+        }
+      }
     }
     return null;
   }
