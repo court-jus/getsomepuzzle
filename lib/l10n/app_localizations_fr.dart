@@ -482,6 +482,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get progressRestored => 'Votre progression a été restaurée';
 
   @override
+  String get sharePuzzle => 'Partager le puzzle';
+
+  @override
+  String get shareLinkCopied => 'Lien copié dans le presse-papiers';
+
+  @override
   String get createFixedCellMode => 'Fixer la couleur';
 
   @override

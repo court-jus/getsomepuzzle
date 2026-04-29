@@ -178,6 +178,8 @@
     "inProgressPlaylistName": "En curso",
     "progressSaved": "Progreso guardado",
     "progressRestored": "Tu progreso ha sido restaurado",
+    "sharePuzzle": "Compartir puzzle",
+    "shareLinkCopied": "Enlace copiado al portapapeles",
     "createFixedCellMode": "Fijar color de celda",
     "createFixBlack": "Fijar a negro",
     "createFixWhite": "Fijar a blanco",

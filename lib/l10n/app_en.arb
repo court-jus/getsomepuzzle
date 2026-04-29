@@ -515,6 +515,14 @@
     "@progressRestored": {
         "description": "Top message shown when a puzzle is opened with a saved partial play state"
     },
+    "sharePuzzle": "Share puzzle",
+    "@sharePuzzle": {
+        "description": "Drawer entry that lets the player share a link to the current puzzle"
+    },
+    "shareLinkCopied": "Link copied to clipboard",
+    "@shareLinkCopied": {
+        "description": "Snackbar shown after the share URL was placed on the clipboard (desktop/web fallback)"
+    },
     "createFixedCellMode": "Fix cell color",
     "createFixBlack": "Fix to black",
     "createFixWhite": "Fix to white",

@@ -482,6 +482,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get progressRestored => 'Tu progreso ha sido restaurado';
 
   @override
+  String get sharePuzzle => 'Compartir puzzle';
+
+  @override
+  String get shareLinkCopied => 'Enlace copiado al portapapeles';
+
+  @override
   String get createFixedCellMode => 'Fijar color de celda';
 
   @override

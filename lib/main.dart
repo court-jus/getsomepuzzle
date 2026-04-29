@@ -31,6 +31,9 @@ import 'package:getsomepuzzle/widgets/settings_page.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
 import 'package:getsomepuzzle/widgets/timer_bottom_bar.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
+import 'package:getsomepuzzle/utils/share_link_stub.dart'
+    if (dart.library.html) 'package:getsomepuzzle/utils/share_link_html.dart'
+    if (dart.library.io) 'package:getsomepuzzle/utils/share_link_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -38,16 +41,55 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 const versionText = "Version 1.6.2";
 
-void main() {
+/// Where the GitHub Pages web build lives. Share links target this URL with
+/// a `?puzzle=<line>` query — works as a browser fallback everywhere, and
+/// later as the App Links / Universal Links target on mobile when set up.
+const kShareBaseUrl = 'https://court-jus.github.io/getsomepuzzle/';
+
+/// Extract a puzzle line passed at startup, either via web URL
+/// (`?puzzle=v2_...`) or as a desktop CLI argument (raw `v2_...` line, or
+/// any URL embedding `?puzzle=...`). Returns null if no line was found or
+/// the input doesn't parse — the caller falls back to the playlist.
+///
+/// Top-level (and not behind kIsWeb) so it can be unit-tested by injecting
+/// a synthetic [args] list.
+String? parseSharedPuzzleLine(List<String> args, {Uri? webUri}) {
+  final candidates = <String>[];
+  // Web: query of the loaded URL.
+  final fromWeb = webUri?.queryParameters['puzzle'];
+  if (fromWeb != null && fromWeb.isNotEmpty) candidates.add(fromWeb);
+  // Native: first CLI arg, accepted as raw line or URL.
+  if (args.isNotEmpty) {
+    final arg = args.first;
+    if (arg.startsWith('v2_')) {
+      candidates.add(arg);
+    } else {
+      try {
+        final fromArg = Uri.parse(arg).queryParameters['puzzle'];
+        if (fromArg != null && fromArg.isNotEmpty) candidates.add(fromArg);
+      } catch (_) {}
+    }
+  }
+  for (final c in candidates) {
+    if (c.startsWith('v2_')) return c;
+  }
+  return null;
+}
+
+void main(List<String> args) {
   Logger.root.level = Level.ALL; // defaults to Level.INFO
   Logger.root.onRecord.listen((record) {
     print('${record.level.name}: ${record.time}: ${record.message}');
   });
-  runApp(const MyApp());
+  final shared = parseSharedPuzzleLine(args, webUri: kIsWeb ? Uri.base : null);
+  runApp(MyApp(initialSharedLine: shared));
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.initialSharedLine});
+
+  /// Puzzle line extracted from the launch URL or CLI args, if any.
+  final String? initialSharedLine;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -73,7 +115,11 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: MyHomePage(title: 'Get Some Puzzle', setAppLocale: setAppLocale),
+      home: MyHomePage(
+        title: 'Get Some Puzzle',
+        setAppLocale: setAppLocale,
+        initialSharedLine: widget.initialSharedLine,
+      ),
     );
   }
 }
@@ -83,10 +129,15 @@ class MyHomePage extends StatefulWidget {
     super.key,
     required this.title,
     required this.setAppLocale,
+    this.initialSharedLine,
   });
 
   final String title;
   final ValueChanged<String> setAppLocale;
+
+  /// Puzzle line forwarded from main(args)/Uri.base. Consumed once on first
+  /// database init; subsequent loads fall back to the playlist.
+  final String? initialSharedLine;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -161,8 +212,26 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     await db.loadPuzzlesFile();
     setState(() {
       database = db;
-      loadPuzzle();
+      // A shared-puzzle URL/CLI takes precedence over the playlist's next
+      // entry. If parsing fails (malformed line), fall through silently.
+      if (!_openSharedPuzzleIfAny()) {
+        loadPuzzle();
+      }
     });
+  }
+
+  /// Try to open the puzzle line passed via launch URL / CLI. Returns
+  /// true on success so the caller can skip the regular `loadPuzzle()`.
+  bool _openSharedPuzzleIfAny() {
+    final line = widget.initialSharedLine;
+    if (line == null || line.isEmpty) return false;
+    try {
+      openPuzzle(PuzzleData(line));
+      return true;
+    } catch (e, st) {
+      log.warning('Failed to open shared puzzle: $e\n$st');
+      return false;
+    }
   }
 
   Future<void> initializeLocale() async {
@@ -215,6 +284,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (settings.hintType == HintType.addConstraint) {
       game.startHintConstraintComputation();
     }
+  }
+
+  /// Build a share URL for the current puzzle (carrying the player's
+  /// current play state) and hand it off to share_plus on mobile, or copy
+  /// it to the clipboard on desktop/web. Recipients clicking the link
+  /// land on the GitHub Pages web build, which parses `?puzzle=` at
+  /// startup and opens the puzzle directly.
+  Future<void> _sharePuzzle() async {
+    if (game.currentPuzzle == null) return;
+    final loc = AppLocalizations.of(context)!;
+    final line = game.currentPuzzle!.lineWithPlayState();
+    final url = '$kShareBaseUrl?puzzle=${Uri.encodeQueryComponent(line)}';
+    final shared = await shareUrl(url);
+    if (!mounted || shared) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.shareLinkCopied)));
   }
 
   /// Ask the player which playlist to save the in-progress puzzle to,
@@ -609,6 +695,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 onTap: () {
                   Navigator.pop(context);
                   _saveProgress();
+                },
+              ),
+            if (database != null && game.currentPuzzle != null)
+              ListTile(
+                leading: Icon(Icons.share_outlined),
+                title: Text(AppLocalizations.of(context)!.sharePuzzle),
+                onTap: () {
+                  Navigator.pop(context);
+                  _sharePuzzle();
                 },
               ),
             if (database != null)

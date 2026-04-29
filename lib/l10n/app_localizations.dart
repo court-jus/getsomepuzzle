@@ -1006,6 +1006,18 @@ abstract class AppLocalizations {
   /// **'Your progress has been restored'**
   String get progressRestored;
 
+  /// Drawer entry that lets the player share a link to the current puzzle
+  ///
+  /// In en, this message translates to:
+  /// **'Share puzzle'**
+  String get sharePuzzle;
+
+  /// Snackbar shown after the share URL was placed on the clipboard (desktop/web fallback)
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied to clipboard'**
+  String get shareLinkCopied;
+
   /// No description provided for @createFixedCellMode.
   ///
   /// In en, this message translates to:
