@@ -223,6 +223,7 @@ class Database {
     'tutorial',
     'default',
     'collection2',
+    'collection3',
     'custom',
   };
 
@@ -239,6 +240,7 @@ class Database {
       ('tutorial', 'Tutorial', UniconsLine.baby_carriage),
       ('default', 'Collection 1', UniconsLine.puzzle_piece),
       ('collection2', 'Collection 2', UniconsLine.puzzle_piece),
+      ('collection3', 'Collection 3', UniconsLine.puzzle_piece),
       ('custom', customLabel, Icons.build),
     ])
       (

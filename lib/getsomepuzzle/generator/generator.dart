@@ -165,7 +165,6 @@ class PuzzleGenerator {
           allConstraints.add(constraint);
         }
       }
-      print("$slug : ${params.length} constraints");
     }
 
     final total = allConstraints.length;
