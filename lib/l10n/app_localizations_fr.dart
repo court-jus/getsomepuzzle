@@ -247,6 +247,21 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String hintComplicity(String c1, String c2) {
+    return 'Cette cellule peut être déduite en combinant les contraintes $c1 et $c2';
+  }
+
+  @override
+  String hintComplicityTwin(String c) {
+    return 'Cette cellule peut être déduite en combinant deux contraintes $c';
+  }
+
+  @override
+  String hintComplicityWithAny(String c) {
+    return 'Cette cellule peut être déduite en combinant la contrainte $c avec une autre';
+  }
+
+  @override
   String get hintForce =>
       'Cette cellule peut être déduite en combinant plusieurs contraintes';
 
@@ -517,6 +532,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get constraintEyes => 'yeux';
+
+  @override
+  String get complicityOtherConstraint => 'une autre contrainte';
 
   @override
   String get collectionMyPuzzles => 'Mes puzzles';

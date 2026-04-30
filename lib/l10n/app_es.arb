@@ -92,6 +92,9 @@
     "endOfPlaylistTutorialStartPlaying": "Empezar a jugar",
     "endOfPlaylistTutorialAutoLevelNote": "La dificultad se adaptará automáticamente a tu habilidad. Puedes desactivarlo en los ajustes.",
     "hintDeducedFrom": "Esta celda se puede deducir gracias a la restricción: {constraintName}",
+    "hintComplicity": "Esta celda se puede deducir combinando las restricciones {c1} y {c2}",
+    "hintComplicityTwin": "Esta celda se puede deducir combinando dos restricciones {c}",
+    "hintComplicityWithAny": "Esta celda se puede deducir combinando la restricción {c} con otra",
     "hintForce": "Esta celda se puede deducir combinando múltiples restricciones",
     "hintImpossible": "Una restricción está violada — se ha cometido un error",
     "hintConstraintAdded": "Se ha añadido una nueva restricción",
@@ -190,6 +193,7 @@
     "@constraintColumnCount": {
         "description": "Name of the column count constraint"
     },
+    "complicityOtherConstraint": "otra restricción",
     "settingTutorialSection": "Tutorial",
     "settingRestartTutorial": "Reiniciar el tutorial",
     "settingRestartTutorialConfirmTitle": "¿Reiniciar el tutorial?",

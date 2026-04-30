@@ -21,6 +21,9 @@ class SHGSComplicity extends Complicity {
   String serialize() => "SHGSComplicity";
 
   @override
+  (String, String) get slugs => ('SH', 'GS');
+
+  @override
   bool isPresent(Puzzle puzzle) {
     final shs = puzzle.constraints.whereType<ShapeConstraint>();
     final gss = puzzle.constraints.whereType<GroupSize>();

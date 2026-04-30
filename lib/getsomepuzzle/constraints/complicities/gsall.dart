@@ -25,8 +25,19 @@ class GSAllComplicity extends Complicity {
   /// With merges the real number of decisions is often much smaller.
   static const int _maxGap = 6;
 
+  /// Slug of the constraint that explains this particular deduction
+  /// alongside `GS`. Set when [apply] returns a move whose sealings
+  /// were all rejected by the same single constraint type. Falls back
+  /// to `'*'` (any) when blockers are heterogeneous or absent.
+  final String _secondSlug;
+
+  GSAllComplicity([this._secondSlug = '*']);
+
   @override
   String serialize() => "GSAllComplicity";
+
+  @override
+  (String, String) get slugs => ('GS', _secondSlug);
 
   @override
   bool isPresent(Puzzle puzzle) {
@@ -42,22 +53,45 @@ class GSAllComplicity extends Complicity {
     return null;
   }
 
+  /// Wrap `move` so its `givenBy` carries the unique blocker slug when
+  /// there is one. Lets the hint UI render "GS + FM" instead of
+  /// "GS + other constraints" whenever the deduction was actually
+  /// caused by a single constraint type rejecting every other sealing.
+  Move _attachBlocker(Move move, Set<String> blockers) {
+    if (blockers.length != 1) return move;
+    final tagged = GSAllComplicity(blockers.first);
+    return Move(
+      move.idx,
+      move.value,
+      tagged,
+      isImpossible: move.isImpossible == null ? null : tagged,
+      complexity: move.complexity,
+    );
+  }
+
   Move? _solveGS(GroupSize gs, Puzzle puzzle) {
     final anchor = gs.indices.first;
     final c = puzzle.cellValues[anchor];
     if (c != 0) {
-      final survivors = _enumerateForColor(puzzle, gs, anchor, c);
+      final blockers = <String>{};
+      final survivors = _enumerateForColor(puzzle, gs, anchor, c, blockers);
       if (survivors == null) return null;
-      if (survivors.isEmpty) return Move(0, 0, this, isImpossible: this);
-      return _forceFromSurvivors(puzzle, survivors, c);
+      if (survivors.isEmpty) {
+        return _attachBlocker(Move(0, 0, this, isImpossible: this), blockers);
+      }
+      final move = _forceFromSurvivors(puzzle, survivors, c);
+      return move == null ? null : _attachBlocker(move, blockers);
     }
 
-    // Empty anchor: try each domain colour.
+    // Empty anchor: try each domain colour. Track blockers across
+    // both hypotheses so the hint surfaces a single rejecting
+    // constraint when one is responsible for collapsing the choice.
     final feasible = <int>[];
+    final blockers = <String>{};
     for (final color in puzzle.domain) {
       final hyp = puzzle.clone();
       hyp.cells[anchor].setForSolver(color);
-      final survivors = _enumerateForColor(hyp, gs, anchor, color);
+      final survivors = _enumerateForColor(hyp, gs, anchor, color, blockers);
       if (survivors == null) {
         // Gap too big to enumerate — assume feasible (don't risk a
         // false force).
@@ -67,29 +101,36 @@ class GSAllComplicity extends Complicity {
       }
     }
     if (feasible.isEmpty) {
-      return Move(0, 0, this, isImpossible: this);
+      return _attachBlocker(Move(0, 0, this, isImpossible: this), blockers);
     }
     if (feasible.length == 1) {
       // Tier 4: trying both colours and concluding only one works
       // is a step harder than the coloured-anchor case (per
       // docs/dev/constraint_complicity.md).
-      return Move(anchor, feasible.first, this, complexity: 4);
+      return _attachBlocker(
+        Move(anchor, feasible.first, this, complexity: 4),
+        blockers,
+      );
     }
     return null;
   }
 
   /// Returns the list of surviving sealings for the given anchor
-  /// colour, or null when the gap is too large to enumerate.
+  /// colour, or null when the gap is too large to enumerate. Slugs
+  /// of every constraint that rejected at least one sealing are
+  /// added to [blockers] so the caller can surface a meaningful
+  /// secondary slug in the hint.
   List<_Survivor>? _enumerateForColor(
     Puzzle puzzle,
     GroupSize gs,
     int anchor,
     int color,
+    Set<String> blockers,
   ) {
     final group = _floodFill(puzzle, anchor, color);
     if (group.length > gs.size) return [];
     if (group.length == gs.size) {
-      return _checkSealedTarget(puzzle, group, color);
+      return _checkSealedTarget(puzzle, group, color, blockers);
     }
     final gap = gs.size - group.length;
     if (gap > _maxGap) return null;
@@ -107,7 +148,10 @@ class GSAllComplicity extends Complicity {
         }
       }
       for (final cst in puzzle.constraints) {
-        if (!cst.verify(clone)) return;
+        if (!cst.verify(clone)) {
+          blockers.add(cst.slug);
+          return;
+        }
       }
       survivors.add(_Survivor(g, s));
     });
@@ -115,8 +159,14 @@ class GSAllComplicity extends Complicity {
   }
 
   /// Group already at target size — verify that sealing the frontier
-  /// is consistent. Returns a single survivor or empty.
-  List<_Survivor> _checkSealedTarget(Puzzle puzzle, Set<int> group, int color) {
+  /// is consistent. Returns a single survivor or empty. Records the
+  /// rejecting constraint's slug in [blockers] when sealing fails.
+  List<_Survivor> _checkSealedTarget(
+    Puzzle puzzle,
+    Set<int> group,
+    int color,
+    Set<String> blockers,
+  ) {
     final opposite = puzzle.domain.firstWhere((v) => v != color);
     final sealed = <int>{};
     for (final m in group) {
@@ -131,7 +181,10 @@ class GSAllComplicity extends Complicity {
       clone.cells[idx].setForSolver(opposite);
     }
     for (final cst in puzzle.constraints) {
-      if (!cst.verify(clone)) return [];
+      if (!cst.verify(clone)) {
+        blockers.add(cst.slug);
+        return [];
+      }
     }
     return [_Survivor(group, sealed)];
   }

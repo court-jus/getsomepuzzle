@@ -77,14 +77,42 @@ deduction except articulation/enumeration.
 > `docs/dev/todo.md`) — the relative ordering matters more than the
 > absolute number.
 
-### UI hooks
+### UI hooks — constraint names
 
 `Move.givenBy.isHighlighted` is only valid when `givenBy is Constraint`.
 The hint system (`game_model.dart`) type-checks before assigning
-`isHighlighted` or `isValid`. The constraint-name lookup
-(`main.dart::_constraintName`) falls back to `givenBy.serialize()` for
-sources it doesn't recognise — so a complicity hint shows e.g.
-"LTFMComplicity" rather than an empty string.
+`isHighlighted` or `isValid`.
+
+Each `Complicity` subclass exposes a `(String, String) get slugs` getter
+returning the constraint-registry slugs of the two constraint types
+whose combined reasoning produced the move (e.g. `('LT', 'FM')`). The
+hint callback in `main.dart::_buildHintTexts` detects
+`givenBy is Complicity`, destructures the pair, and routes to one of
+three localized templates depending on the slugs:
+
+- `hintComplicity(c1, c2)` — two **different** named constraints. EN
+  `"This cell can be deduced by combining the {c1} and {c2} constraints"`.
+- `hintComplicityTwin(c)` — the **same** slug twice (`FMFMComplicity`,
+  `GSGSComplicity`). EN `"This cell can be deduced by combining two {c}
+  constraints"` — avoids the awkward "the X and X constraints" rendering.
+- `hintComplicityWithAny(c)` — the secondary slug is the wildcard `'*'`,
+  meaning the helper saw multiple distinct rejecting constraint types
+  (currently only `GSAllComplicity` can produce this). EN `"This cell
+  can be deduced by combining the {c} constraint with another"`.
+
+`_constraintNameBySlug(slug)` in `main.dart` is the **single** source of
+truth for the constraint → l10n mapping. `_constraintName(givenBy)` for
+constraint instances simply forwards through `givenBy.slug` — there is
+no longer a parallel `is`-based table to keep in sync. The switch
+asserts in debug if it ever sees an unmapped slug.
+
+`GSAllComplicity` records the slug of every constraint that rejected at
+least one candidate sealing during `apply`. When all rejections come
+from the same constraint type, the move's `givenBy` is a
+`GSAllComplicity` instance whose `slugs` are `('GS', <thatSlug>)`,
+producing a precise hint (e.g. "Group Size and Forbidden Pattern"). Only
+when blockers are heterogeneous does it fall back to `('GS', '*')` and
+render via `hintComplicityWithAny`.
 
 ## Complicity: LT + FM (Connectivity × Motif)
 

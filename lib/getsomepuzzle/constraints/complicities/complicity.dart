@@ -19,4 +19,11 @@ abstract class Complicity extends CanApply {
   /// a cross-constraint deduction is found, null otherwise.
   @override
   Move? apply(Puzzle puzzle);
+
+  /// Slugs of the constraint types involved in this complicity, used
+  /// for generating user-facing hint text — e.g. `('LT', 'FM')`. The
+  /// slug `'*'` denotes "any constraint" (used by `GSAllComplicity`
+  /// when the blocking constraint isn't unique across the rejected
+  /// sealings).
+  (String, String) get slugs;
 }

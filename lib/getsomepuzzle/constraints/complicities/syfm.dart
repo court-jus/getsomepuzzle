@@ -33,6 +33,9 @@ class SYFMComplicity extends Complicity {
   String serialize() => "SYFMComplicity";
 
   @override
+  (String, String) get slugs => ('SY', 'FM');
+
+  @override
   bool isPresent(Puzzle puzzle) {
     return puzzle.constraints.whereType<SymmetryConstraint>().isNotEmpty &&
         puzzle.constraints.whereType<ForbiddenMotif>().isNotEmpty;

@@ -27,6 +27,9 @@ class GSGSComplicity extends Complicity {
   String serialize() => "GSGSComplicity";
 
   @override
+  (String, String) get slugs => ('GS', 'GS');
+
+  @override
   bool isPresent(Puzzle puzzle) {
     final gss = puzzle.constraints.whereType<GroupSize>().toList();
     if (gss.length < 2) return false;

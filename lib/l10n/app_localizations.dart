@@ -556,6 +556,24 @@ abstract class AppLocalizations {
   /// **'This cell can be deduced from the {constraintName} constraint'**
   String hintDeducedFrom(String constraintName);
 
+  /// Hint message shown when a complicity combines two distinct constraint types to deduce a cell
+  ///
+  /// In en, this message translates to:
+  /// **'This cell can be deduced by combining the {c1} and {c2} constraints'**
+  String hintComplicity(String c1, String c2);
+
+  /// Hint message shown when a complicity combines two constraints of the same type
+  ///
+  /// In en, this message translates to:
+  /// **'This cell can be deduced by combining two {c} constraints'**
+  String hintComplicityTwin(String c);
+
+  /// Hint message shown when a complicity combines one named constraint with several other constraints (no single secondary type identified)
+  ///
+  /// In en, this message translates to:
+  /// **'This cell can be deduced by combining the {c} constraint with another'**
+  String hintComplicityWithAny(String c);
+
   /// Hint message shown when a force step is required
   ///
   /// In en, this message translates to:
@@ -1077,6 +1095,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'eyes'**
   String get constraintEyes;
+
+  /// Fallback name used when a complicity's secondary slug is the wildcard '*' (kept as a safety fallback; the dedicated 'hintComplicityWithAny' template is preferred for the wildcard case)
+  ///
+  /// In en, this message translates to:
+  /// **'another constraint'**
+  String get complicityOtherConstraint;
 
   /// Label of the custom puzzles collection
   ///

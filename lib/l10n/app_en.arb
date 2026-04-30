@@ -317,6 +317,36 @@
             }
         }
     },
+    "hintComplicity": "This cell can be deduced by combining the {c1} and {c2} constraints",
+    "@hintComplicity": {
+        "description": "Hint message shown when a complicity combines two distinct constraint types to deduce a cell",
+        "placeholders": {
+            "c1": {
+                "type": "String"
+            },
+            "c2": {
+                "type": "String"
+            }
+        }
+    },
+    "hintComplicityTwin": "This cell can be deduced by combining two {c} constraints",
+    "@hintComplicityTwin": {
+        "description": "Hint message shown when a complicity combines two constraints of the same type",
+        "placeholders": {
+            "c": {
+                "type": "String"
+            }
+        }
+    },
+    "hintComplicityWithAny": "This cell can be deduced by combining the {c} constraint with another",
+    "@hintComplicityWithAny": {
+        "description": "Hint message shown when a complicity combines one named constraint with several other constraints (no single secondary type identified)",
+        "placeholders": {
+            "c": {
+                "type": "String"
+            }
+        }
+    },
     "hintForce": "This cell can be deduced by combining multiple constraints",
     "@hintForce": {
         "description": "Hint message shown when a force step is required"
@@ -547,6 +577,10 @@
     "constraintEyes": "eyes",
     "@constraintEyes": {
         "description": "Name of the eyes constraint"
+    },
+    "complicityOtherConstraint": "another constraint",
+    "@complicityOtherConstraint": {
+        "description": "Fallback name used when a complicity's secondary slug is the wildcard '*' (kept as a safety fallback; the dedicated 'hintComplicityWithAny' template is preferred for the wildcard case)"
     },
     "collectionMyPuzzles": "My puzzles",
     "@collectionMyPuzzles": {

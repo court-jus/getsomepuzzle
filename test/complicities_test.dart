@@ -1,13 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/fmfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsall.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsgs.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/ltfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/ltgs.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/pafm.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/shgs.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/syfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
@@ -636,5 +639,62 @@ void main() {
         expect(fmfm.apply(puzzle), isNull);
       },
     );
+  });
+
+  group('Complicity.slugs hint coverage', () {
+    test('every registered complicity has hint-renderable slugs', () {
+      // Guarantees that a hint produced by any complicity routes through
+      // a known constraint name in main.dart::_constraintNameBySlug. The
+      // wildcard '*' is the only non-constraint slug the UI knows how to
+      // render (via hintComplicityWithAny). If a future complicity uses
+      // an unmapped slug, this test fails before reaching production.
+      final knownSlugs = {...constraintSlugs, '*'};
+      for (final c in allComplicities()) {
+        final (s1, s2) = c.slugs;
+        expect(
+          knownSlugs,
+          contains(s1),
+          reason:
+              '${c.runtimeType} primary slug "$s1" is not handled by '
+              'main.dart::_constraintNameBySlug',
+        );
+        expect(
+          knownSlugs,
+          contains(s2),
+          reason:
+              '${c.runtimeType} secondary slug "$s2" is not handled by '
+              'main.dart::_constraintNameBySlug',
+        );
+      }
+    });
+  });
+
+  group('GSAllComplicity blocker tracking', () {
+    test('apply records the rejecting constraint slug when it is unique', () {
+      // Same setup as the existing GS×FM unanimity test (`apply forces
+      // the unique connected expansion that survives FM filtering`):
+      // every rejected sealing is rejected by the same FM motif, so the
+      // move's complicity carries slugs=('GS', 'FM') — letting the hint
+      // UI surface "Group Size + Forbidden Pattern" instead of the lossy
+      // "Group Size + another constraint".
+      final puzzle = Puzzle('v2_12_3x3_000000211_GS:8.3;FM:12.01_0:0_100');
+      final gsall = puzzle.complicities.whereType<GSAllComplicity>().first;
+      final move = gsall.apply(puzzle);
+      expect(move, isNotNull);
+      final tagged = move!.givenBy as Complicity;
+      expect(tagged, isA<GSAllComplicity>());
+      expect(tagged.slugs, ('GS', 'FM'));
+    });
+
+    test('singleton in puzzle.complicities still uses wildcard slugs', () {
+      // The instance kept in `puzzle.complicities` is the no-arg
+      // singleton (used by `isPresent` at construction time and by the
+      // propagation loop's `whereType` lookups). It must keep the
+      // wildcard so it doesn't accidentally inherit a blocker slug from
+      // a prior unrelated deduction.
+      final puzzle = Puzzle('v2_12_3x3_000000211_GS:8.3;FM:12.01_0:0_100');
+      final gsall = puzzle.complicities.whereType<GSAllComplicity>().first;
+      expect(gsall.slugs, ('GS', '*'));
+    });
   });
 }

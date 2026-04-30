@@ -40,6 +40,9 @@ class FMFMComplicity extends Complicity {
   String serialize() => "FMFMComplicity";
 
   @override
+  (String, String) get slugs => ('FM', 'FM');
+
+  @override
   bool isPresent(Puzzle puzzle) {
     final fms = puzzle.constraints.whereType<ForbiddenMotif>().toList();
     if (fms.length < 2) return false;

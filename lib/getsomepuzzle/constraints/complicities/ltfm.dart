@@ -13,6 +13,9 @@ class LTFMComplicity extends Complicity {
   String serialize() => "LTFMComplicity";
 
   @override
+  (String, String) get slugs => ('LT', 'FM');
+
+  @override
   bool isPresent(Puzzle puzzle) {
     final ltConstraints = puzzle.constraints.whereType<LetterGroup>();
     final fmConstraints = puzzle.constraints.whereType<ForbiddenMotif>();

@@ -7,18 +7,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
@@ -441,22 +431,52 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // Hint (l10n resolved here, state mutation in GameModel)
   // ---------------------------------------------------------------------------
 
-  String _constraintName(CanApply givenBy) {
+  /// Localized name for a single constraint identified by its registry
+  /// slug. Single source of truth for the constraint → l10n mapping;
+  /// callers that hold a constraint instance route through the
+  /// instance's `slug` getter.
+  String _constraintNameBySlug(String slug) {
     final l10n = AppLocalizations.of(context)!;
-    if (givenBy is ForbiddenMotif) return l10n.constraintForbiddenPattern;
-    if (givenBy is ShapeConstraint) return l10n.constraintShape;
-    if (givenBy is GroupSize) return l10n.constraintGroupSize;
-    if (givenBy is LetterGroup) return l10n.constraintLetterGroup;
-    if (givenBy is ParityConstraint) return l10n.constraintParity;
-    if (givenBy is QuantityConstraint) return l10n.constraintQuantity;
-    if (givenBy is SymmetryConstraint) return l10n.constraintSymmetry;
-    if (givenBy is DifferentFromConstraint) return l10n.constraintDifferentFrom;
-    if (givenBy is ColumnCountConstraint) return l10n.constraintColumnCount;
-    if (givenBy is GroupCountConstraint) return l10n.constraintGroupCount;
-    if (givenBy is NeighborCountConstraint) return l10n.constraintNeighborCount;
-    if (givenBy is EyesConstraint) return l10n.constraintEyes;
-    // Complicities (and any unknown source): fall back to serialize() so
-    // the player sees something like "LTFMComplicity" rather than empty.
+    switch (slug) {
+      case 'FM':
+        return l10n.constraintForbiddenPattern;
+      case 'SH':
+        return l10n.constraintShape;
+      case 'GS':
+        return l10n.constraintGroupSize;
+      case 'LT':
+        return l10n.constraintLetterGroup;
+      case 'PA':
+        return l10n.constraintParity;
+      case 'QA':
+        return l10n.constraintQuantity;
+      case 'SY':
+        return l10n.constraintSymmetry;
+      case 'DF':
+        return l10n.constraintDifferentFrom;
+      case 'CC':
+        return l10n.constraintColumnCount;
+      case 'GC':
+        return l10n.constraintGroupCount;
+      case 'NC':
+        return l10n.constraintNeighborCount;
+      case 'EY':
+        return l10n.constraintEyes;
+      case '*':
+        return l10n.complicityOtherConstraint;
+      default:
+        // Hard fail in debug so the omission is caught in tests; keep
+        // a graceful fallback in release rather than crashing the UI.
+        assert(false, 'Unmapped constraint slug "$slug"');
+        return slug;
+    }
+  }
+
+  String _constraintName(CanApply givenBy) {
+    if (givenBy is Constraint) return _constraintNameBySlug(givenBy.slug);
+    // Unreachable for known sources (Complicity is handled at the call
+    // site and routes through `slugs` instead).
+    assert(false, 'Unexpected hint source ${givenBy.runtimeType}');
     return givenBy.serialize();
   }
 
@@ -469,7 +489,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       hintCellDeducible: l10n.hintCellDeducible,
       hintImpossible: l10n.hintImpossible,
       hintForce: l10n.hintForce,
-      hintDeducedFrom: (c) => l10n.hintDeducedFrom(_constraintName(c)),
+      hintDeducedFrom: (c) {
+        if (c is Complicity) {
+          final (s1, s2) = c.slugs;
+          if (s1 == s2) {
+            return l10n.hintComplicityTwin(_constraintNameBySlug(s1));
+          }
+          return l10n.hintComplicity(
+            _constraintNameBySlug(s1),
+            _constraintNameBySlug(s2),
+          );
+        }
+        return l10n.hintDeducedFrom(_constraintName(c));
+      },
       hintConstraintAdded: l10n.hintConstraintAdded,
       hintConstraintNone: l10n.hintConstraintNone,
     );

@@ -37,6 +37,9 @@ class PAFMComplicity extends Complicity {
   String serialize() => "PAFMComplicity";
 
   @override
+  (String, String) get slugs => ('PA', 'FM');
+
+  @override
   bool isPresent(Puzzle puzzle) {
     if (!_domainIsOneTwo(puzzle)) return false;
     final pas = puzzle.constraints.whereType<ParityConstraint>();

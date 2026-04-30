@@ -24,6 +24,9 @@ class LTGSComplicity extends Complicity {
   String serialize() => "LTGSComplicity";
 
   @override
+  (String, String) get slugs => ('LT', 'GS');
+
+  @override
   bool isPresent(Puzzle puzzle) {
     final lts = puzzle.constraints.whereType<LetterGroup>().toList();
     final gss = puzzle.constraints.whereType<GroupSize>().toList();
