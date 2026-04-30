@@ -91,12 +91,12 @@ class DifferentFromConstraint extends CellsCentricConstraint {
 
     if (cell1.value != 0) {
       final opposite = puzzle.domain.firstWhere((v) => v != cell1.value);
-      return Move(nidx, opposite, this);
+      return Move(nidx, opposite, this, complexity: 0);
     }
 
     if (cell2.value != 0) {
       final opposite = puzzle.domain.firstWhere((v) => v != cell2.value);
-      return Move(idx, opposite, this);
+      return Move(idx, opposite, this, complexity: 0);
     }
 
     return null;

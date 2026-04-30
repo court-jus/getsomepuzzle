@@ -62,10 +62,10 @@ class QuantityConstraint extends Constraint {
     }
     if (myValues.length == count) {
       // I'm already complete, all the rest of the puzzle should be myOpposite
-      return Move(firstFreeCell, myOpposite, this);
+      return Move(firstFreeCell, myOpposite, this, complexity: 0);
     } else if (count - myValues.length == freeCells.length) {
       // The number of free cells match what I need, I take all them
-      return Move(firstFreeCell, value, this);
+      return Move(firstFreeCell, value, this, complexity: 0);
     }
     return null;
   }

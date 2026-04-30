@@ -171,7 +171,7 @@ class EyesConstraint extends CellsCentricConstraint {
       if (minD > d.seen) {
         for (int i = 0; i < d.empties.length; i++) {
           if (d.emptyPositions[i] < minD) {
-            return Move(d.empties[i], color, this);
+            return Move(d.empties[i], color, this, complexity: 2);
           }
         }
       }
@@ -193,7 +193,12 @@ class EyesConstraint extends CellsCentricConstraint {
           }
         }
         if (unique != null && !multiple) {
-          return Move(unique, opposite, this);
+          // When the eye already sees the target count (which includes the
+          // count == 0 case), the upper bound is just "stop seeing more" —
+          // a trivial close-the-line move. Otherwise the player needs to
+          // juggle per-direction budgets across the four directions.
+          final int weight = view.totalSeen == count ? 0 : 3;
+          return Move(unique, opposite, this, complexity: weight);
         }
       }
     }

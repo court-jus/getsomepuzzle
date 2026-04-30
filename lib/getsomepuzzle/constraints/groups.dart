@@ -97,7 +97,7 @@ class GroupSize extends CellsCentricConstraint {
             final oppositeColor = puzzle.domain
                 .whereNot((v) => v == neighborColor)
                 .first;
-            return Move(idx, oppositeColor, this);
+            return Move(idx, oppositeColor, this, complexity: 1);
           }
         }
       }
@@ -126,7 +126,7 @@ class GroupSize extends CellsCentricConstraint {
         }
       }
       if (forcedColor != null) {
-        return Move(idx, forcedColor, this);
+        return Move(idx, forcedColor, this, complexity: 3);
       }
     }
     if (myGroup == null) return null;
@@ -137,7 +137,7 @@ class GroupSize extends CellsCentricConstraint {
             .getNeighbors(member)
             .where((nei) => puzzle.cellValues[nei] == 0);
         if (freeNeighbors.isNotEmpty) {
-          return Move(freeNeighbors.first, myOpposite, this);
+          return Move(freeNeighbors.first, myOpposite, this, complexity: 0);
         }
       }
     } else if (myGroup.length > size) {
@@ -151,7 +151,7 @@ class GroupSize extends CellsCentricConstraint {
         );
       }
       if (groupFreeNeighbors.length == 1) {
-        return Move(groupFreeNeighbors.first, myColor, this);
+        return Move(groupFreeNeighbors.first, myColor, this, complexity: 1);
       } else if (myGroup.length < size && groupFreeNeighbors.isEmpty) {
         return Move(0, 0, this, isImpossible: this);
       }
@@ -176,7 +176,7 @@ class GroupSize extends CellsCentricConstraint {
           }
         }
         if (mergedSize >= margin) {
-          return Move(boundary, myOpposite, this);
+          return Move(boundary, myOpposite, this, complexity: 2);
         }
       }
       // Path-based articulation: any empty cell whose blocking would shrink
@@ -190,7 +190,7 @@ class GroupSize extends CellsCentricConstraint {
       for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
         if (puzzle.cellValues[idx] != 0) continue;
         if (blockingShrinksReachableBelow(puzzle, idx, myColor, seed, size)) {
-          return Move(idx, myColor, this);
+          return Move(idx, myColor, this, complexity: 4);
         }
       }
     }
@@ -304,7 +304,7 @@ class LetterGroup extends CellsCentricConstraint {
         return Move(member, myColor, this, isImpossible: this);
       }
       if (memberValue == 0) {
-        return Move(member, myColor, this);
+        return Move(member, myColor, this, complexity: 0);
       }
     }
     final allGroups = getGroups(puzzle);
@@ -324,7 +324,7 @@ class LetterGroup extends CellsCentricConstraint {
         return Move(nei, myOpposite, this, isImpossible: this);
       }
       if (neiValue == 0) {
-        return Move(nei, myOpposite, this);
+        return Move(nei, myOpposite, this, complexity: 1);
       }
     }
 
@@ -350,7 +350,7 @@ class LetterGroup extends CellsCentricConstraint {
       for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
         if (puzzle.getValue(idx) != 0) continue;
         if (blockingDisconnectsMembers(puzzle, idx, myColor, indices)) {
-          return Move(idx, myColor, this);
+          return Move(idx, myColor, this, complexity: 4);
         }
       }
     }
@@ -385,7 +385,7 @@ class LetterGroup extends CellsCentricConstraint {
             .getNeighbors(groupFreeNeighbor)
             .where((nei) => otherGroups.contains(nei));
         if (neighborsWithOther.isNotEmpty) {
-          return Move(groupFreeNeighbor, myOpposite, this);
+          return Move(groupFreeNeighbor, myOpposite, this, complexity: 2);
         }
       }
     }

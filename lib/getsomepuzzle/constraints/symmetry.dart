@@ -81,7 +81,7 @@ class SymmetryConstraint extends CellsCentricConstraint {
       }
       // This cell's symmetry is free
       if (puzzle.getValue(sym) == 0) {
-        return Move(sym, myValue, this);
+        return Move(sym, myValue, this, complexity: 1);
       }
     }
     // Now, look for cells neighboring my group
@@ -93,14 +93,14 @@ class SymmetryConstraint extends CellsCentricConstraint {
           // so its symmetry should be myOpposite too (if it exists and is free)
           final sym = _computeSymmetry(puzzle, neighbor);
           if (sym != null && puzzle.cellValues[sym] == 0) {
-            return Move(sym, myOpposite, this);
+            return Move(sym, myOpposite, this, complexity: 2);
           }
         } else if (puzzle.cellValues[neighbor] == 0) {
           // This cell is free. If its symmetry is not free, we know
           // that it cannot be made part of our group
           final sym = _computeSymmetry(puzzle, neighbor);
           if (sym == null || puzzle.cellValues[sym] != 0) {
-            return Move(neighbor, myOpposite, this);
+            return Move(neighbor, myOpposite, this, complexity: 2);
           }
         }
       }

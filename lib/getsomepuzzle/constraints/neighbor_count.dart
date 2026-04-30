@@ -89,7 +89,7 @@ class NeighborCountConstraint extends CellsCentricConstraint {
     if (targetColorNeighbors.length == count) {
       // I already have all my colored neighbors, the rest must be the opposite color
       final opposite = puzzle.domain.whereNot((i) => i == color).first;
-      return Move(freeNeighbors.first, opposite, this);
+      return Move(freeNeighbors.first, opposite, this, complexity: 0);
     }
 
     if (targetColorNeighbors.length + freeNeighbors.length < count) {
@@ -99,7 +99,7 @@ class NeighborCountConstraint extends CellsCentricConstraint {
 
     if (targetColorNeighbors.length + freeNeighbors.length == count) {
       // All my free neighbors must match my target color
-      return Move(freeNeighbors.first, color, this);
+      return Move(freeNeighbors.first, color, this, complexity: 0);
     }
 
     // I don't have all my colored neighbors but there are more free cells than

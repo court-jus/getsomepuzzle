@@ -127,6 +127,10 @@ class ForbiddenMotif extends Motif {
 
   @override
   Move? apply(Puzzle puzzle) {
+    // Weight grows with motif size: a wildcard inside a 1x2/2x1 motif is
+    // trivial, but recognising the same wildcard inside a 3x3 motif
+    // requires far more visual scanning.
+    final weight = (motif.length * motif[0].length - 2).clamp(0, 3);
     for (var row = 0; row < motif.length; row++) {
       for (var col = 0; col < motif[0].length; col++) {
         final car = motif[row][col];
@@ -142,7 +146,7 @@ class ForbiddenMotif extends Motif {
           final targetIdx = (posRow + row) * puzzle.width + (posCol + col);
           if (puzzle.cellValues[targetIdx] == 0) {
             final opposite = puzzle.domain.whereNot((v) => v == car).first;
-            return Move(targetIdx, opposite, this);
+            return Move(targetIdx, opposite, this, complexity: weight);
           }
           if (puzzle.cellValues[targetIdx] == car) {
             return Move(0, 0, this, isImpossible: this);

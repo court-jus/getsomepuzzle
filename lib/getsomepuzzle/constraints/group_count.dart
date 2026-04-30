@@ -98,7 +98,7 @@ class GroupCountConstraint extends Constraint {
         final probe = puzzle.clone();
         probe.cells[mergeCell].setForSolver(opposite);
         if (calculateMinGroups(probe, color) > count) {
-          return Move(mergeCell, color, this);
+          return Move(mergeCell, color, this, complexity: 3);
         }
       }
     } else if (currentCount < count) {
@@ -114,7 +114,7 @@ class GroupCountConstraint extends Constraint {
         if (_candidatesHaveAdjacency(puzzle, candidates)) {
           return Move(0, 0, this, isImpossible: this);
         }
-        return Move(candidates.first, color, this);
+        return Move(candidates.first, color, this, complexity: 3);
       }
     } else if (currentCount == count && !puzzle.complete) {
       final opposite = puzzle.domain.firstWhere((c) => c != color);
@@ -126,7 +126,7 @@ class GroupCountConstraint extends Constraint {
         // every merge-cell must be opposite.
         final forcedCells = getCellsThatMergeColorGroups(puzzle, color);
         if (forcedCells.isNotEmpty) {
-          return Move(forcedCells.first, opposite, this);
+          return Move(forcedCells.first, opposite, this, complexity: 3);
         }
       } else {
         // Simulation-based probe: for each candidate, simulate colouring
@@ -144,7 +144,7 @@ class GroupCountConstraint extends Constraint {
           final clone = puzzle.clone();
           clone.cells[cand].setForSolver(color);
           if (calculateMinGroups(clone, color) > count) {
-            return Move(cand, opposite, this);
+            return Move(cand, opposite, this, complexity: 4);
           }
         }
       }

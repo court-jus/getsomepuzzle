@@ -129,6 +129,14 @@ class ParityConstraint extends CellsCentricConstraint {
   @override
   Move? apply(Puzzle puzzle) {
     final sides = _getSideCells(puzzle);
+    // Weight by the largest side covered: with 2 cells per side, the second
+    // cell is read directly off the first; 4 cells require parity counting;
+    // 6+ cells need real bookkeeping. For 2-side variants (horizontal /
+    // vertical) we take the max — the player must still scan the long side.
+    final int maxSide = sides
+        .map((s) => s.length)
+        .reduce((a, b) => a > b ? a : b);
+    final int weight = maxSide <= 2 ? 0 : (maxSide <= 4 ? 1 : 2);
     for (var side in sides) {
       final int even = side
           .where((v) => v.$2.value != 0 && v.$2.value % 2 == 0)
@@ -146,11 +154,11 @@ class ParityConstraint extends CellsCentricConstraint {
       final firstFreeCell = side.firstWhere((element) => element.$2.value == 0);
       if (even == half) {
         // Empty cells should be odd
-        return Move(firstFreeCell.$2.idx, 1, this);
+        return Move(firstFreeCell.$2.idx, 1, this, complexity: weight);
       }
       if (odd == half) {
         // Empty cells should be even
-        return Move(firstFreeCell.$2.idx, 2, this);
+        return Move(firstFreeCell.$2.idx, 2, this, complexity: weight);
       }
     }
     return null;

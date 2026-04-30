@@ -531,12 +531,12 @@ class Puzzle {
   /// Compute puzzle complexity on a 0-100 scale.
   ///
   /// Three components:
-  /// - **Force effort** (0-90): each forced deduction costs `1 + depth`
-  ///   where `depth` is the propagation chain length to refutation. The
-  ///   sum is multiplied by 5 and capped at 90. A round with an immediate
-  ///   contradiction (depth 0) costs 5; one that requires the player to
-  ///   trace 8 cascading steps in their head costs 45. 100 if the puzzle
-  ///   isn't deductively solvable at all.
+  /// - **Effort** (0-90): sum of per-move weights along the deduction chain.
+  ///   A propagation move contributes `Move.complexity` (0-5 tier; see
+  ///   docs/dev/complexity.md for the per-deduction inventory). A force
+  ///   move contributes `5 + 5 * forceDepth`, matching the pre-existing
+  ///   `(1 + depth) * 5` scaling so old scores stay in the same band. 100
+  ///   if the puzzle isn't deductively solvable at all.
   /// - **Rule diversity** (0-4): number of distinct constraint types.
   ///   1 type=0, 2=1, 3=2, 4-5=3, 6+=4.
   /// - **Emptiness** (0-6): proportion of free cells.
@@ -574,12 +574,12 @@ class Puzzle {
     // Emptiness: ratio of free cells, scaled to 0-6
     final emptiness = (totalFree / size * 6).round();
 
-    // Force effort: run findAMove to fixpoint, summing (1 + forceDepth)
-    // for each forced deduction so deep cascades cost more than shallow
-    // refutations. Any contradiction → puzzle isn't deductively solvable
-    // → complexity 100.
+    // Effort: run findAMove to fixpoint, accumulating each move's player-
+    // effort weight. Propagation moves carry a 0-5 weight set by the
+    // constraint's apply(); force moves carry `5 + 5 * forceDepth`. Any
+    // contradiction → puzzle isn't deductively solvable → complexity 100.
     final test = clone();
-    int forceEffort = 0;
+    int effort = 0;
     for (int step = 0; step < 1000; step++) {
       final m = test.findAMove(checkErrors: false);
       if (m == null) break;
@@ -588,7 +588,11 @@ class Puzzle {
         return 100;
       }
       test.setValue(m.idx, m.value);
-      if (m.isForce) forceEffort += 1 + m.forceDepth;
+      if (m.isForce) {
+        effort += 5 + 5 * m.forceDepth;
+      } else {
+        effort += m.complexity;
+      }
       if (test.complete) break;
     }
     if (test.freeCells().isNotEmpty) {
@@ -597,7 +601,7 @@ class Puzzle {
     }
 
     cachedSolution = test.cellValues;
-    final forceScore = (forceEffort * 5).clamp(0, 90);
+    final forceScore = effort.clamp(0, 90);
     cachedComplexity = (forceScore + ruleDiversity + emptiness).clamp(0, 100);
     return cachedComplexity!;
   }

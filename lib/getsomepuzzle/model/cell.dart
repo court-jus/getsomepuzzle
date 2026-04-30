@@ -67,6 +67,11 @@ class Move {
   // contradiction (shorter = easier for a human to verify). 0 for
   // propagation moves and for force moves whose refutation is immediate.
   int forceDepth;
+  // Player-effort tier of this propagation deduction (0..5). 0 = trivial
+  // saturation, 5 = combinatorial probing. See docs/dev/complexity.md for
+  // the per-deduction inventory. Always 0 for force moves (scoring branches
+  // on `isForce`).
+  int complexity;
 
   Move(
     this.idx,
@@ -75,5 +80,6 @@ class Move {
     this.isImpossible,
     this.isForce = false,
     this.forceDepth = 0,
+    this.complexity = 0,
   });
 }

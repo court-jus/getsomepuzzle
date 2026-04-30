@@ -271,7 +271,7 @@ class ShapeConstraint extends Motif {
       // Example: SH:111 and group is [0,1,2] (a line of 3) with cell 3 free.
       //   → cell 3 must be the opposite color.
       if (group.length == shapeSize && _groupMatchesAVariant(group, puzzle)) {
-        return Move(freeNeighbors.first, opposite, this);
+        return Move(freeNeighbors.first, opposite, this, complexity: 0);
       }
 
       // --- Level 3: open group can't fit in any variant → impossible ---
@@ -287,7 +287,7 @@ class ShapeConstraint extends Motif {
       //   line variant → cell 4 must be opposite.
       for (final neighbor in freeNeighbors) {
         if (!_groupCanFitInSomeVariant([...group, neighbor], puzzle)) {
-          return Move(neighbor, opposite, this);
+          return Move(neighbor, opposite, this, complexity: 2);
         }
       }
 
@@ -304,14 +304,14 @@ class ShapeConstraint extends Motif {
       final mandatory = completions.reduce((a, b) => a.intersection(b));
       for (final idx in mandatory) {
         if (puzzle.cellValues[idx] == 0) {
-          return Move(idx, color, this);
+          return Move(idx, color, this, complexity: 4);
         }
       }
       // Free neighbor that appears in NO completion → must be opposite.
       final anyCompletion = completions.expand((c) => c).toSet();
       for (final neighbor in freeNeighbors) {
         if (!anyCompletion.contains(neighbor)) {
-          return Move(neighbor, opposite, this);
+          return Move(neighbor, opposite, this, complexity: 4);
         }
       }
     }
@@ -346,7 +346,7 @@ class ShapeConstraint extends Motif {
           merged.addAll(colorGroups[gi]);
         }
         if (!_groupCanFitInSomeVariant(merged, puzzle)) {
-          return Move(idx, opposite, this);
+          return Move(idx, opposite, this, complexity: 3);
         }
       }
     }

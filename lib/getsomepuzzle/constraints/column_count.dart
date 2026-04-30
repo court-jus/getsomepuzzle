@@ -68,11 +68,11 @@ class ColumnCountConstraint extends Constraint {
     }
     if (colorCount == count) {
       // All color cells placed — remaining free cells get the opposite value
-      return Move(freeCells.first.idx, opposite, this);
+      return Move(freeCells.first.idx, opposite, this, complexity: 0);
     }
     if (count - colorCount == freeCells.length) {
       // Exactly as many free cells as needed — they must all be color
-      return Move(freeCells.first.idx, color, this);
+      return Move(freeCells.first.idx, color, this, complexity: 0);
     }
     return null;
   }
