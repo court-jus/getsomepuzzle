@@ -28,7 +28,9 @@ const HintTexts _texts = HintTexts(
   hintConstraintNone: 'no more constraints',
 );
 
-String _hintDeducedFrom(Constraint givenBy) => 'deduced from ${givenBy.slug}';
+String _hintDeducedFrom(CanApply givenBy) => givenBy is Constraint
+    ? 'deduced from ${givenBy.slug}'
+    : 'deduced from ${givenBy.serialize()}';
 
 void main() {
   group('Hint multi-tap flow — deducibleCell mode', () {

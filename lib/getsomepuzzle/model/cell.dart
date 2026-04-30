@@ -60,8 +60,8 @@ class Cell {
 class Move {
   int idx;
   int value;
-  Constraint givenBy;
-  Constraint? isImpossible;
+  CanApply givenBy;
+  CanApply? isImpossible;
   bool isForce;
   // For a force move, length of the propagation chain that exposed the
   // contradiction (shorter = easier for a human to verify). 0 for

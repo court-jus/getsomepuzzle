@@ -1,5 +1,8 @@
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.dart'
+    as complicities_registry;
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
@@ -109,6 +112,10 @@ class Puzzle {
   int height = 0;
   List<Cell> _cells = [];
   List<Constraint> constraints = [];
+  // Cross-constraint deductions detected for this puzzle. Populated once
+  // at construction time by `_detectComplicities()`. Tried only after all
+  // constraints are stuck in the propagation loop.
+  List<Complicity> complicities = [];
   int? cachedComplexity;
   List<int>? cachedSolution;
 
@@ -187,6 +194,17 @@ class Puzzle {
       break;
     }
     _aggregateLetterGroups();
+    _detectComplicities();
+  }
+
+  /// Scan the constraint list against the complicity registry and keep
+  /// the ones that fire on this puzzle. Called once at construction time
+  /// and after `clone()` since the constraint set is immutable thereafter.
+  void _detectComplicities() {
+    complicities = [
+      for (final c in complicities_registry.allComplicities())
+        if (c.isPresent(this)) c,
+    ];
   }
 
   /// Build a line representation that carries the player's current cell
@@ -328,6 +346,14 @@ class Puzzle {
 
   Move? apply() {
     for (var c in constraints) {
+      final move = c.apply(this);
+      if (move != null) return move;
+    }
+    // Second level: try complicities once individual constraints are
+    // exhausted. The next iteration of the outer propagation loop will
+    // call apply() again and constraints get another chance with the
+    // freshly placed cell.
+    for (var c in complicities) {
       final move = c.apply(this);
       if (move != null) return move;
     }
@@ -478,6 +504,10 @@ class Puzzle {
     // and the original, else exploratory solver work on the clone (force,
     // findAMove) leaks state into the original puzzle.
     p.constraints = constraints.map(_cloneConstraint).toList();
+    // Re-detect complicities against the cloned constraint list. Cheap,
+    // and avoids relying on the parent's references (a clone may want to
+    // modify constraints in place during exploratory work).
+    p._detectComplicities();
     return p;
   }
 

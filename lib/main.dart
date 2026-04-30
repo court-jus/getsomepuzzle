@@ -7,11 +7,17 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
@@ -435,15 +441,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // Hint (l10n resolved here, state mutation in GameModel)
   // ---------------------------------------------------------------------------
 
-  String _constraintName(Constraint constraint) {
+  String _constraintName(CanApply givenBy) {
     final l10n = AppLocalizations.of(context)!;
-    if (constraint is ForbiddenMotif) return l10n.constraintForbiddenPattern;
-    if (constraint is GroupSize) return l10n.constraintGroupSize;
-    if (constraint is LetterGroup) return l10n.constraintLetterGroup;
-    if (constraint is ParityConstraint) return l10n.constraintParity;
-    if (constraint is QuantityConstraint) return l10n.constraintQuantity;
-    if (constraint is SymmetryConstraint) return l10n.constraintSymmetry;
-    return "";
+    if (givenBy is ForbiddenMotif) return l10n.constraintForbiddenPattern;
+    if (givenBy is ShapeConstraint) return l10n.constraintShape;
+    if (givenBy is GroupSize) return l10n.constraintGroupSize;
+    if (givenBy is LetterGroup) return l10n.constraintLetterGroup;
+    if (givenBy is ParityConstraint) return l10n.constraintParity;
+    if (givenBy is QuantityConstraint) return l10n.constraintQuantity;
+    if (givenBy is SymmetryConstraint) return l10n.constraintSymmetry;
+    if (givenBy is DifferentFromConstraint) return l10n.constraintDifferentFrom;
+    if (givenBy is ColumnCountConstraint) return l10n.constraintColumnCount;
+    if (givenBy is GroupCountConstraint) return l10n.constraintGroupCount;
+    if (givenBy is NeighborCountConstraint) return l10n.constraintNeighborCount;
+    if (givenBy is EyesConstraint) return l10n.constraintEyes;
+    // Complicities (and any unknown source): fall back to serialize() so
+    // the player sees something like "LTFMComplicity" rather than empty.
+    return givenBy.serialize();
   }
 
   HintTexts _buildHintTexts() {

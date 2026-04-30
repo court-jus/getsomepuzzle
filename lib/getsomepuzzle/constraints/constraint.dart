@@ -2,7 +2,16 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-class Constraint {
+/// Common contract for any object that can drive deductions on a Puzzle.
+/// Both regular [Constraint]s and cross-constraint [Complicity]s implement
+/// this — the propagation loop only needs `apply` and a way to identify
+/// the source of a [Move].
+abstract class CanApply {
+  Move? apply(Puzzle puzzle);
+  String serialize();
+}
+
+class Constraint extends CanApply {
   bool isValid = true;
   bool isHighlighted = false;
   bool isComplete = false;
@@ -18,6 +27,7 @@ class Constraint {
     return toString();
   }
 
+  @override
   String serialize() {
     return '';
   }
@@ -36,6 +46,7 @@ class Constraint {
 
   bool isCompleteFor(Puzzle puzzle) => false;
 
+  @override
   Move? apply(Puzzle puzzle) {
     final clone = puzzle.clone();
     for (var cell in clone.cellValues.indexed) {

@@ -1,7 +1,7 @@
 import 'dart:io';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
@@ -46,30 +46,21 @@ void _solvePuzzle(String line) {
 
   int step = 0;
   while (!p.complete) {
-    Move? move;
-    Constraint? source;
-    String? foundBy;
-    for (final constraint in p.constraints) {
-      move = constraint.apply(p);
-      if (move != null) {
-        source = constraint;
-        foundBy = "constraint";
-        break;
-      }
-    }
-
+    // p.apply() tries constraints first, then complicities — same order
+    // as the production solver. findAMove falls back to force when both
+    // levels are stuck.
+    Move? move = p.apply();
+    String foundBy = move == null
+        ? 'findAMove'
+        : (move.givenBy is Complicity ? 'complicity' : 'constraint');
+    move ??= p.findAMove();
     if (move == null) {
-      move = p.findAMove();
-      if (move == null) {
-        print('Stuck — no deduction possible');
-        break;
-      } else {
-        foundBy = "findAMove";
-        source = move.givenBy;
-      }
+      print('Stuck — no deduction possible');
+      break;
     }
+    final source = move.givenBy;
     if (move.isImpossible != null) {
-      print('IMPOSSIBLE detected by ${source!.serialize()}');
+      print('IMPOSSIBLE detected by ${source.serialize()}');
       break;
     }
 
@@ -79,7 +70,7 @@ void _solvePuzzle(String line) {
     final colorName = move.value == 1 ? 'BLACK' : 'WHITE';
     p.cells[move.idx].setForSolver(move.value);
     print(
-      'Step $step: ($r,$c) = $colorName  [$foundBy - ${source!.serialize()}]',
+      'Step $step: ($r,$c) = $colorName  [$foundBy - ${source.serialize()}]',
     );
   }
 

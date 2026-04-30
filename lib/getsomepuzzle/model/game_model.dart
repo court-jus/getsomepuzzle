@@ -554,7 +554,11 @@ class GameModel extends ChangeNotifier {
     if (helpMove == null) return;
     currentPuzzle!.clearHighlights();
     if (helpMove!.isImpossible != null) {
-      helpMove!.isImpossible!.isValid = false;
+      final impossibleSource = helpMove!.isImpossible;
+      // Only Constraints carry the `isValid` UI flag; complicities
+      // currently have no on-screen representation, so we just skip the
+      // highlight in that branch.
+      if (impossibleSource is Constraint) impossibleSource.isValid = false;
       hintText = texts.hintImpossible;
       hintIsError = true;
     } else {
@@ -562,9 +566,10 @@ class GameModel extends ChangeNotifier {
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
         hintText = texts.hintForce;
       } else {
-        helpMove!.givenBy.isHighlighted = true;
+        final givenBy = helpMove!.givenBy;
+        if (givenBy is Constraint) givenBy.isHighlighted = true;
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-        hintText = texts.hintDeducedFrom(helpMove!.givenBy);
+        hintText = texts.hintDeducedFrom(givenBy);
       }
       hintIsError = false;
     }
@@ -806,7 +811,7 @@ class HintTexts {
   final String hintCellDeducible;
   final String hintImpossible;
   final String hintForce;
-  final String Function(Constraint givenBy) hintDeducedFrom;
+  final String Function(CanApply givenBy) hintDeducedFrom;
   final String hintConstraintAdded;
   final String hintConstraintNone;
 
