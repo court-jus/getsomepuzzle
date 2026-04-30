@@ -56,7 +56,7 @@ class SymmetryConstraint extends CellsCentricConstraint {
     final myValue = puzzle.getValue(idx);
     if (myValue == 0) return true;
     for (final cellidx in myGroup) {
-      final sym = _computeSymmetry(puzzle, cellidx);
+      final sym = computeSymmetry(puzzle, cellidx);
       if (sym == null) return false;
       if (puzzle.getValue(sym) == 0) continue;
       if (puzzle.getValue(sym) != myValue) return false;
@@ -74,7 +74,7 @@ class SymmetryConstraint extends CellsCentricConstraint {
     if (myGroup == null) return null;
     final myOpposite = puzzle.domain.whereNot((e) => e == myValue).first;
     for (final cellidx in myGroup) {
-      final sym = _computeSymmetry(puzzle, cellidx);
+      final sym = computeSymmetry(puzzle, cellidx);
       // This cell's symmetry is outside the boundaries of the puzzle
       if (sym == null) {
         return Move(0, 0, this, isImpossible: this);
@@ -91,14 +91,14 @@ class SymmetryConstraint extends CellsCentricConstraint {
         if (puzzle.cellValues[neighbor] == myOpposite) {
           // This cell is filled with my opposite color
           // so its symmetry should be myOpposite too (if it exists and is free)
-          final sym = _computeSymmetry(puzzle, neighbor);
+          final sym = computeSymmetry(puzzle, neighbor);
           if (sym != null && puzzle.cellValues[sym] == 0) {
             return Move(sym, myOpposite, this, complexity: 2);
           }
         } else if (puzzle.cellValues[neighbor] == 0) {
           // This cell is free. If its symmetry is not free, we know
           // that it cannot be made part of our group
-          final sym = _computeSymmetry(puzzle, neighbor);
+          final sym = computeSymmetry(puzzle, neighbor);
           if (sym == null || puzzle.cellValues[sym] != 0) {
             return Move(neighbor, myOpposite, this, complexity: 2);
           }
@@ -109,7 +109,7 @@ class SymmetryConstraint extends CellsCentricConstraint {
     return null;
   }
 
-  int? _computeSymmetry(Puzzle puzzle, int cellidx) {
+  int? computeSymmetry(Puzzle puzzle, int cellidx) {
     final idx = indices[0];
     final int x = idx % puzzle.width;
     final int y = (idx / puzzle.width).floor();

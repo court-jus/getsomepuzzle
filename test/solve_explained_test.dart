@@ -21,8 +21,12 @@ void main() {
   });
 
   test('solveExplained includes force steps when needed', () {
-    // This puzzle requires force (no prefilled cells, must reason by contradiction)
-    final p = Puzzle('v2_12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top_0:0_2');
+    // This puzzle still requires force even after the complicity
+    // layer: two LT groups + several FMs leave at least one cell
+    // that no single constraint or complicity can deduce on its own.
+    final p = Puzzle(
+      'v2_12_3x3_000000000_LT:A.8.2;LT:B.4.6;FM:1.2.2;FM:122;GS:0.1_0:0_100',
+    );
     final steps = p.solveExplained();
 
     // Should determine all 9 cells
