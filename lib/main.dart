@@ -413,6 +413,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  void _onDrawerChanged(bool isOpened) {
+    if (isOpened && game.currentPuzzle != null && !game.betweenPuzzles) {
+      game.pause();
+    }
+  }
+
   /// Subtitle to display under the pause icon, or null for a manual pause
   /// where the user already knows why the game is paused.
   String? _pauseSubtitle(BuildContext context) {
@@ -577,6 +583,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
 
     return Scaffold(
+      onDrawerChanged: _onDrawerChanged,
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
