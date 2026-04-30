@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 import 'helpers/make_puzzle.dart';
@@ -1050,6 +1051,128 @@ void main() {
       expect(move, isNotNull);
       expect(move!.idx, 1);
       expect(move.value, 1);
+    });
+  });
+
+  group('SymmetryConstraint.apply with empty anchor', () {
+    test('coloured neighbour with free mirror forces the mirror', () {
+      // 5×3 grid, anchor cell 7 (centre row 1) with axis 5 (point).
+      // Cell 6 (left of anchor) = 1. Mirror via point centre = cell 8.
+      //   . . . . .
+      //   . 1 ? . .   anchor at col 2; we expect cell 8 = 1
+      //   . . . . .
+      // Whether the anchor ends up 1 (cell 6 in group, sym=1) or 2
+      // (cell 6 = myOpposite, sym must mirror to myOpposite = 1), the
+      // mirror is forced to 1 in both branches.
+      final p = makePuzzle('''
+        00000
+        01000
+        00000
+      ''');
+      final sy = SymmetryConstraint('7.5');
+      p.constraints.add(sy);
+      final move = sy.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 8);
+      expect(move.value, 1);
+    });
+
+    test('coloured neighbour with out-of-bounds mirror forces anchor', () {
+      // 3×3 grid, anchor cell 4 (centre) axis 2 = vertical mirror through
+      // col 1. Cell 3 = 1, its mirror via vertical = cell 5 (in grid).
+      // Set anchor far enough that the mirror leaves the grid: use a
+      // 5-wide row with anchor at col 4 (rightmost), neighbour at col 3.
+      //   . . . 1 ?   neighbour cell 3 (col 3), anchor cell 4 (col 4)
+      // Mirror of (0,3) via vertical axis col 4 → (0,5) → out of bounds.
+      // So anchor cannot be 1 (would require neighbour's mirror) → must
+      // be 2.
+      final p = makePuzzle('''
+        00010
+      ''');
+      final sy = SymmetryConstraint('4.2');
+      p.constraints.add(sy);
+      final move = sy.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 4);
+      expect(move.value, 2);
+    });
+
+    test(
+      'coloured neighbour with conflicting coloured mirror is impossible',
+      () {
+        // 5-wide row, anchor cell 2 axis 2 = vertical mirror through col 2.
+        // Cell 1 = 1, cell 3 = 2. Mirror of cell 1 via col 2 = cell 3.
+        // No anchor colour can satisfy SY: anchor=1 would need sym(1)=1
+        // but sym=2; anchor=2 would force sym(neighbour myOpposite=1)=1
+        // but sym=2.
+        final p = makePuzzle('''
+        01020
+      ''');
+        final sy = SymmetryConstraint('2.2');
+        p.constraints.add(sy);
+        final move = sy.apply(p);
+        expect(move, isNotNull);
+        expect(move!.isImpossible, equals(sy));
+      },
+    );
+
+    test('all neighbours empty → no deduction', () {
+      final p = makePuzzle('''
+        000
+        000
+        000
+      ''');
+      final sy = SymmetryConstraint('4.5');
+      p.constraints.add(sy);
+      expect(sy.apply(p), isNull);
+    });
+  });
+
+  group('SymmetryConstraint.apply look-ahead', () {
+    test(
+      'free cell whose myValue extension would mirror to opposite is forced',
+      () {
+        // 3x3 grid, anchor cell 7 = 1 (bottom-middle), axis 2 = vertical
+        // mirror through col 1:
+        //   . . .
+        //   1 . 2
+        //   . 1 .
+        // Cell 4 (centre) is free and self-symmetric, and its mirror is
+        // free, so the existing single-step rules can't conclude. But if
+        // cell 4 = 1, the anchor's group would absorb cell 3 (=1, adjacent
+        // to cell 4); cell 3's mirror = cell 5 = 2 ≠ 1, so the merged
+        // group could never be symmetric. Therefore cell 4 must be 2.
+        final p = makePuzzle('''
+        000
+        102
+        010
+      ''');
+        final sy = SymmetryConstraint('7.2');
+        p.constraints.add(sy);
+        final move = sy.apply(p);
+        expect(move, isNotNull);
+        expect(move!.isImpossible, isNull);
+        expect(move.idx, 4);
+        expect(move.value, 2);
+        expect(move.complexity, 3);
+      },
+    );
+
+    test('look-ahead does not fire when extension chain is clean', () {
+      // Same geometry but cell 5 = 1 instead of 2: now if cell 4 = 1 the
+      // merged group {3, 4, 5, 7} is internally symmetric (sym(3) = 5,
+      // both myValue), so no contradiction surfaces and apply must not
+      // force cell 4.
+      final p = makePuzzle('''
+        000
+        101
+        010
+      ''');
+      final sy = SymmetryConstraint('7.2');
+      p.constraints.add(sy);
+      expect(sy.apply(p), isNull);
     });
   });
 }

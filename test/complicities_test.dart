@@ -327,20 +327,31 @@ void main() {
     );
 
     test('empty anchor: forces the anchor when one colour is infeasible', () {
-      // 3×3 grid with a configuration that makes only one anchor
-      // colour feasible. We use the same setup as the user's
-      // example but pre-fill cell 5 = 1 so that anchor = 1 directly
-      // contradicts (cell 5 in group + cell 5 sym = cell 3 = 2 ≠ 1).
-      // Anchor = 2 stays feasible. Therefore the anchor is forced
+      // 3×3 grid:
+      //   1 . 2
+      //   1 1 .
+      //   . . .
+      // SY:7.2 anchor cell 7 is empty, axis 2 = vertical mirror
+      // through col 1. FM:01.20 forbids the 2×2 pattern (?, 1, 2, ?).
+      //
+      // Anchor = 1 hypothesis: cell 7 = 1 grows the 1-group along
+      // the chain 7-4-3-0, so the group contains cell 0. But
+      // sym(cell 0) = cell 2 = 2 ≠ 1, so SY.verify fails after
+      // propagation → infeasible.
+      // Anchor = 2 hypothesis: cell 7 = 2 leaves the 2-group at
+      // {7} (no 2-coloured neighbour); SY is trivially satisfied
+      // and FM never finds a window with both TR = 1 and BL = 2,
+      // even after propagation forces cells 5, 6, 8 → feasible.
+      //
+      // Only colour 2 is feasible, so the anchor must be forced
       // to 2.
-      final puzzle = Puzzle('v2_12_3x3_000211101_FM:01.20;SY:7.2_0:0_100');
+      final puzzle = Puzzle('v2_12_3x3_102110000_FM:01.20;SY:7.2_0:0_100');
       final syfm = puzzle.complicities.whereType<SYFMComplicity>().first;
       final move = syfm.apply(puzzle);
       expect(move, isNotNull);
-      // The complicity might force the anchor (cell 7) directly, or
-      // a downstream cell determined by both hypotheses; either way
-      // the move's value must be 2.
-      expect(move!.value, 2);
+      expect(move!.idx, 7);
+      expect(move.value, 2);
+      expect(move.complexity, 4);
     });
   });
 

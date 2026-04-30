@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
@@ -69,7 +71,34 @@ class SymmetryConstraint extends CellsCentricConstraint {
     final groups = getGroups(puzzle);
     final idx = indices[0];
     final myValue = puzzle.getValue(idx);
-    if (myValue == 0) return null;
+    if (myValue == 0) {
+      // Anchor still empty: a coloured direct neighbour `n` of value `c`
+      // already forces its mirror, regardless of what colour the anchor
+      // eventually takes. If the anchor takes `c`, `n` joins the anchor's
+      // group and SY forces sym(n) = c. If the anchor takes the opposite,
+      // `n` is on the group's frontier as myOpposite = c, and SY's
+      // frontier rule forces sym(n) = myOpposite = c. Both branches
+      // agree on sym(n) = c. If sym(n) is out of bounds, the anchor
+      // cannot take colour `c` (it would need n's mirror to exist), so
+      // the anchor itself is forced to the opposite.
+      for (final neighbor in puzzle.getNeighbors(idx)) {
+        final nv = puzzle.cellValues[neighbor];
+        if (nv == 0) continue;
+        final sym = computeSymmetry(puzzle, neighbor);
+        if (sym == null) {
+          final opposite = puzzle.domain.firstWhere((v) => v != nv);
+          return Move(idx, opposite, this, complexity: 2);
+        }
+        final sv = puzzle.cellValues[sym];
+        if (sv == 0) {
+          return Move(sym, nv, this, complexity: 2);
+        }
+        if (sv != nv) {
+          return Move(0, 0, this, isImpossible: this);
+        }
+      }
+      return null;
+    }
     final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
     if (myGroup == null) return null;
     final myOpposite = puzzle.domain.whereNot((e) => e == myValue).first;
@@ -101,6 +130,42 @@ class SymmetryConstraint extends CellsCentricConstraint {
           final sym = computeSymmetry(puzzle, neighbor);
           if (sym == null || puzzle.cellValues[sym] != 0) {
             return Move(neighbor, myOpposite, this, complexity: 2);
+          }
+        }
+      }
+    }
+
+    // Look-ahead: a free cell `n` adjacent to the group whose own
+    // symmetry is free can still be impossible to colour myValue.
+    // Setting `n = myValue` would also pull every myValue cell
+    // reachable from `n` (through cells already coloured myValue) into
+    // the anchor's group. If any cell in that closure has its
+    // symmetry out of bounds or already filled with myOpposite, the
+    // merged group could never be symmetric — so `n` must be
+    // myOpposite.
+    for (var member in myGroup) {
+      for (var neighbor in puzzle.getNeighbors(member)) {
+        if (puzzle.cellValues[neighbor] != 0) continue;
+        final merged = <int>{neighbor};
+        final queue = Queue<int>()..add(neighbor);
+        while (queue.isNotEmpty) {
+          final cur = queue.removeFirst();
+          for (final nei in puzzle.getNeighbors(cur)) {
+            if (merged.contains(nei)) continue;
+            if (puzzle.cellValues[nei] == myValue) {
+              merged.add(nei);
+              queue.add(nei);
+            }
+          }
+        }
+        // The single-cell case is handled by the previous loop.
+        if (merged.length == 1) continue;
+        for (final m in merged) {
+          final sym = computeSymmetry(puzzle, m);
+          if (sym == null ||
+              (puzzle.cellValues[sym] != 0 &&
+                  puzzle.cellValues[sym] != myValue)) {
+            return Move(neighbor, myOpposite, this, complexity: 3);
           }
         }
       }
