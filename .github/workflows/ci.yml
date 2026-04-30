@@ -27,8 +27,41 @@ jobs:
         run: dart format --output=none --set-exit-if-changed .
       - name: Run tests
         run: flutter test
+  auto-tag:
+    if: github.ref_type == 'branch' && github.ref == 'refs/heads/master'
+    needs: [check]
+    runs-on: ubuntu-latest
+    outputs:
+      tag_created: ${{ steps.tag.outputs.tag_created }}
+      tag_name: ${{ steps.tag.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Auto-tag
+        id: tag
+        run: |
+          VERSION=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
+          TAG="v${VERSION}"
+          echo "tag_name=$TAG" >> "$GITHUB_OUTPUT"
+
+          if git ls-remote --exit-code origin "refs/tags/${TAG}" > /dev/null 2>&1; then
+            echo "Tag ${TAG} already exists."
+            echo "tag_created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "tag_created=true" >> "$GITHUB_OUTPUT"
   build-apk:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [auto-tag]
+    if: |
+      !failure() && !cancelled() && (
+        needs.auto-tag.outputs.tag_created == 'true' ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     name: Build APK
     steps:
@@ -49,7 +82,13 @@ jobs:
           name: ApkReleases
           path: build/app/outputs/flutter-apk/app-release.apk
   build-windows:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [auto-tag]
+    if: |
+      !failure() && !cancelled() && (
+        needs.auto-tag.outputs.tag_created == 'true' ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: windows-latest
     name: Build Windows
     steps:
@@ -74,7 +113,13 @@ jobs:
           name: WindowsRelease
           path: build/windows-build.tgz
   build-web:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [auto-tag]
+    if: |
+      !failure() && !cancelled() && (
+        needs.auto-tag.outputs.tag_created == 'true' ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     name: Build Web
     steps:
@@ -127,7 +172,7 @@ jobs:
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ github.ref_name }}
+          tag: v${{ env.VERSION }}
           name: v${{ env.VERSION }}
           artifacts: "artifacts/apk/app-release.apk,artifacts/windows/windows-build.tgz,artifacts/web/web-build.tgz"
   deploy-pages:
