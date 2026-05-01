@@ -871,94 +871,132 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           ],
         ),
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            spacing: 2,
-            children: <Widget>[
-              Text(
-                game.topMessage,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: game.topMessageColor,
-                  fontWeight: FontWeight.bold,
+      body: LayoutBuilder(
+        builder: (context, viewportConstraints) {
+          // Anchor the puzzle to the bottom while playing so hint messages
+          // appearing above don't push the grid down. In modal-like states
+          // (pause, between puzzles, loading, locale picker) center instead,
+          // since there's no grid to stabilise.
+          final hasActivePuzzle =
+              initialized &&
+              !shouldChooseLocale &&
+              !game.betweenPuzzles &&
+              !game.paused &&
+              game.currentPuzzle != null;
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: viewportConstraints.maxHeight,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    mainAxisAlignment: hasActivePuzzle
+                        ? MainAxisAlignment.end
+                        : MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    spacing: 2,
+                    children: <Widget>[
+                      Text(
+                        game.topMessage,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: game.topMessageColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      (initialized && !shouldChooseLocale)
+                          ? Stack(
+                              alignment: AlignmentGeometry.center,
+                              children: [
+                                if (game.betweenPuzzles)
+                                  BetweenPuzzles(
+                                    like: like,
+                                    loadPuzzle: loadPuzzle,
+                                  )
+                                else if (game.paused)
+                                  PauseOverlay(
+                                    onResume: togglePause,
+                                    width: contextWidth,
+                                    height: contextHeight,
+                                    iconSize: cellSize * 3,
+                                    subtitle: _pauseSubtitle(context),
+                                  )
+                                else
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      if (game.currentPuzzle != null)
+                                        PuzzleWidget(
+                                          currentPuzzle: game.currentPuzzle!,
+                                          onCellTap: handlePuzzleTap,
+                                          onCellDrag: handlePuzzleDrag,
+                                          onCellDragEnd: handlePuzzleDragEnd,
+                                          onCellRightDrag: isDesktopOrWeb
+                                              ? handlePuzzleRightDrag
+                                              : null,
+                                          onCellRightDragEnd: isDesktopOrWeb
+                                              ? handlePuzzleRightDragEnd
+                                              : null,
+                                          cellSize: cellSize,
+                                          locale: locale,
+                                          hintText: game.hintText,
+                                          hintIsError: game.hintIsError,
+                                        )
+                                      else
+                                        EndOfPlaylist(
+                                          currentLevel: settings.playerLevel,
+                                          isTutorial:
+                                              database?.collection ==
+                                              'tutorial',
+                                          onStartPlaying: () async {
+                                            if (database == null) return;
+                                            settings.change(
+                                              ChangeableSettings(
+                                                playerLevel: 0,
+                                                autoLevel: true,
+                                              ),
+                                            );
+                                            database!.setPlayerLevel(0);
+                                            // Must be awaited before loadPuzzlesFile:
+                                            // loadPuzzlesFile reads shouldShuffle from
+                                            // prefs, so the flip must be persisted first.
+                                            await database!.setShouldShuffle(
+                                              false,
+                                            );
+                                            await database!.loadPuzzlesFile(
+                                              'default',
+                                            );
+                                            if (database!.playlist.isNotEmpty) {
+                                              loadPuzzle();
+                                            }
+                                            setState(() {});
+                                          },
+                                          filtersBlocking:
+                                              database
+                                                  ?.hasUnplayedIgnoringFilters() ??
+                                              false,
+                                        ),
+                                    ],
+                                  ),
+                              ],
+                            )
+                          : (shouldChooseLocale
+                                ? InitialLocaleChooser(
+                                    selectLocale: toggleLocale,
+                                  )
+                                : Text("Loading...")),
+                    ],
+                  ),
                 ),
               ),
-              (initialized && !shouldChooseLocale)
-                  ? Stack(
-                      alignment: AlignmentGeometry.center,
-                      children: [
-                        if (game.betweenPuzzles)
-                          BetweenPuzzles(like: like, loadPuzzle: loadPuzzle)
-                        else if (game.paused)
-                          PauseOverlay(
-                            onResume: togglePause,
-                            width: contextWidth,
-                            height: contextHeight,
-                            iconSize: cellSize * 3,
-                            subtitle: _pauseSubtitle(context),
-                          )
-                        else
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              if (game.currentPuzzle != null)
-                                PuzzleWidget(
-                                  currentPuzzle: game.currentPuzzle!,
-                                  onCellTap: handlePuzzleTap,
-                                  onCellDrag: handlePuzzleDrag,
-                                  onCellDragEnd: handlePuzzleDragEnd,
-                                  onCellRightDrag: isDesktopOrWeb
-                                      ? handlePuzzleRightDrag
-                                      : null,
-                                  onCellRightDragEnd: isDesktopOrWeb
-                                      ? handlePuzzleRightDragEnd
-                                      : null,
-                                  cellSize: cellSize,
-                                  locale: locale,
-                                  hintText: game.hintText,
-                                  hintIsError: game.hintIsError,
-                                )
-                              else
-                                EndOfPlaylist(
-                                  currentLevel: settings.playerLevel,
-                                  isTutorial:
-                                      database?.collection == 'tutorial',
-                                  onStartPlaying: () async {
-                                    if (database == null) return;
-                                    settings.change(
-                                      ChangeableSettings(
-                                        playerLevel: 0,
-                                        autoLevel: true,
-                                      ),
-                                    );
-                                    database!.setPlayerLevel(0);
-                                    // Must be awaited before loadPuzzlesFile:
-                                    // loadPuzzlesFile reads shouldShuffle from
-                                    // prefs, so the flip must be persisted first.
-                                    await database!.setShouldShuffle(false);
-                                    await database!.loadPuzzlesFile('default');
-                                    if (database!.playlist.isNotEmpty) {
-                                      loadPuzzle();
-                                    }
-                                    setState(() {});
-                                  },
-                                  filtersBlocking:
-                                      database?.hasUnplayedIgnoringFilters() ??
-                                      false,
-                                ),
-                            ],
-                          ),
-                      ],
-                    )
-                  : (shouldChooseLocale
-                        ? InitialLocaleChooser(selectLocale: toggleLocale)
-                        : Text("Loading...")),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
       bottomNavigationBar: (initialized && !shouldChooseLocale)
           ? TimerBottomBar(
