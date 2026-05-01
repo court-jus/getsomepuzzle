@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
@@ -35,21 +36,24 @@ void _processFile(String path) {
     }
 
     try {
-      // Drop exact-duplicate constraints (same slug + same params) before
-      // recomputing. Some legacy lines have constraints repeated verbatim
-      // (e.g. `SH:111.001.001;SH:111.001.001;...`); keeping them inflates
-      // the constraint count and skews the duration / complexity model
-      // downstream without changing the puzzle's logic.
+      // Drop exact-duplicate constraints (same slug + same params) and
+      // sort them before recomputing. Some legacy lines have constraints
+      // repeated verbatim (e.g. `SH:111.001.001;SH:111.001.001;...`);
+      // keeping them inflates the constraint count and skews the
+      // duration / complexity model downstream without changing the
+      // puzzle's logic. Sorting matches the canonical ordering used by
+      // the in-app stats matching, so two recompute outputs of
+      // structurally equal puzzles share the same constraint section.
       final fields = line.split('_');
-      final dedupedConstraintsField = _dedupeConstraints(fields[4]);
+      final dedupedConstraintsField = dedupAndSortConstraints(fields[4]);
       final removed =
           fields[4].split(';').length -
           dedupedConstraintsField.split(';').length;
       if (removed > 0) {
         dedupedPuzzles++;
         dedupedConstraints += removed;
-        fields[4] = dedupedConstraintsField;
       }
+      fields[4] = dedupedConstraintsField;
       final dedupedLine = fields.join('_');
 
       final puzzle = Puzzle(dedupedLine);
@@ -80,16 +84,4 @@ void _processFile(String path) {
   stderr.writeln(
     '\r$path: $processed puzzles in ${sw.elapsed.inSeconds}s -> $outPath$dedupSummary',
   );
-}
-
-/// Drop exact-duplicate constraints from the `;`-separated constraint field
-/// (slug + params must match exactly). First occurrence wins, original
-/// order is preserved.
-String _dedupeConstraints(String field) {
-  final seen = <String>{};
-  final kept = <String>[];
-  for (final c in field.split(';')) {
-    if (seen.add(c)) kept.add(c);
-  }
-  return kept.join(';');
 }

@@ -9,6 +9,7 @@ import 'package:logging/logging.dart';
 import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart'
     as equilibrium;
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:intl/intl.dart';
@@ -86,7 +87,12 @@ class PuzzleData {
       "${firstClickMs}fc",
       "${longestGapMs}lg",
     ].join(" - ");
-    return "$finishedForLog ${duration}s ${failures}f $lineRepresentation - $sld - $extraFields";
+    // Normalize the constraints section (sort + dedup) but keep the v2
+    // grammar intact so downstream tools that parse positional fields
+    // (e.g. bin/analyze_stats.dart) keep working. The runtime match key
+    // is `canonicalPuzzleKey` — applied at load time, not at write time.
+    final stored = normalizeV2Line(lineRepresentation);
+    return "$finishedForLog ${duration}s ${failures}f $stored - $sld - $extraFields";
   }
 
   Puzzle begin() {
@@ -313,15 +319,18 @@ class Database {
 
   void loadStats(List<String> rawStats) {
     log.finest("loadStats");
+    // Index by canonical key (identity-only): old stats lines that embed
+    // a stale complexity score or constraint order still match the current
+    // puzzle line. See lib/getsomepuzzle/model/canonical.dart.
     final Map<String, StatEntry> solvedPuzzles = {};
     for (final line in rawStats) {
       final entry = StatEntry.parse(line);
       if (entry == null) continue;
-      solvedPuzzles[entry.puzzleLine] = entry;
+      solvedPuzzles[canonicalPuzzleKey(entry.puzzleLine)] = entry;
     }
     log.finest("solved $solvedPuzzles");
     for (final puz in puzzles) {
-      final entry = solvedPuzzles[puz.lineRepresentation];
+      final entry = solvedPuzzles[canonicalPuzzleKey(puz.lineRepresentation)];
       if (entry == null) continue;
       puz.played = true;
       if (entry.finished != null) {
@@ -501,15 +510,18 @@ class Database {
   /// player can replay the tutorial from scratch.
   Future<void> restartTutorial() async {
     final tutorialAsset = await rootBundle.loadString('assets/tutorial.txt');
-    final tutorialLines = tutorialAsset
+    final tutorialKeys = tutorialAsset
         .split('\n')
         .map((l) => l.trim())
         .where((l) => l.isNotEmpty && !l.startsWith('#'))
+        .map(canonicalPuzzleKey)
         .toSet();
 
     // Reset in-memory flags on any currently-loaded tutorial puzzle.
     for (final puz in puzzles) {
-      if (!tutorialLines.contains(puz.lineRepresentation)) continue;
+      if (!tutorialKeys.contains(canonicalPuzzleKey(puz.lineRepresentation))) {
+        continue;
+      }
       puz.played = false;
       puz.finished = null;
       puz.skipped = null;
@@ -526,7 +538,8 @@ class Database {
     // file in-place, keeping every entry that doesn't belong to the tutorial.
     bool keepLine(String line) {
       final entry = StatEntry.parse(line);
-      return entry == null || !tutorialLines.contains(entry.puzzleLine);
+      return entry == null ||
+          !tutorialKeys.contains(canonicalPuzzleKey(entry.puzzleLine));
     }
 
     if (kIsWeb) {
