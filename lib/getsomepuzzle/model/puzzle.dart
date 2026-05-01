@@ -20,6 +20,12 @@ class SolveStep {
   // For a force step, length of the propagation chain that exposed the
   // contradiction. Same semantic as `Move.forceDepth`. 0 for propagation.
   final int forceDepth;
+  // Player-effort tier of this propagation deduction (0..5). Mirrors
+  // `Move.complexity`. Always 0 for force steps.
+  final int complexity;
+  // True when the propagation step was issued by a `Complicity` rather
+  // than an individual `Constraint`. Always false for force steps.
+  final bool isComplicity;
 
   const SolveStep({
     required this.cellIdx,
@@ -27,6 +33,8 @@ class SolveStep {
     required this.constraint,
     required this.method,
     this.forceDepth = 0,
+    this.complexity = 0,
+    this.isComplicity = false,
   });
 
   @override
@@ -658,6 +666,8 @@ class Puzzle {
           constraint: m.isForce ? '' : m.givenBy.serialize(),
           method: m.isForce ? SolveMethod.force : SolveMethod.propagation,
           forceDepth: m.isForce ? m.forceDepth : 0,
+          complexity: m.isForce ? 0 : m.complexity,
+          isComplicity: !m.isForce && m.givenBy is Complicity,
         ),
       );
       if (test.complete) return steps;

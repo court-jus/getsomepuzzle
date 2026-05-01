@@ -45,4 +45,28 @@ void main() {
     p.solveExplained();
     expect(p.cellValues, before);
   });
+
+  test(
+    'solveExplained reports complexity and complicity flag on prop steps',
+    () {
+      // FM:2.1;PA:8.top is the canonical PAFMComplicity case (see
+      // complicities_test.dart): individual constraints can't deduce
+      // cell 2 alone, only the cross-constraint complicity can. So the
+      // resolution trace must contain at least one step flagged
+      // isComplicity=true with complexity=3.
+      final p = Puzzle('v2_12_3x3_000000000_FM:2.1;PA:8.top_0:0_100');
+      final steps = p.solveExplained();
+
+      // At least one prop step is flagged as a complicity.
+      expect(steps.any((s) => s.isComplicity), isTrue);
+      // That complicity step should carry a non-zero complexity tier
+      // (PAFMComplicity defaults to 3).
+      expect(steps.any((s) => s.isComplicity && s.complexity > 0), isTrue);
+      // Force steps never set those fields.
+      for (final s in steps.where((s) => s.method == SolveMethod.force)) {
+        expect(s.complexity, 0);
+        expect(s.isComplicity, isFalse);
+      }
+    },
+  );
 }
