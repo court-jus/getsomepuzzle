@@ -135,7 +135,7 @@ class PuzzleGenerator {
     }
 
     // Force the SH constraint in the puzzle if it was added by the preFill
-    pu.constraints.addAll(solved.constraints);
+    pu.addAllConstraints(solved.constraints);
 
     // Collect readonly cell indices for DF constraint generation
     final Set<int> readonlyIndices = {};
@@ -183,7 +183,7 @@ class PuzzleGenerator {
     });
 
     if (allConstraints.isEmpty) return null;
-    pu.constraints.add(allConstraints.removeAt(0));
+    pu.addConstraint(allConstraints.removeAt(0));
 
     // 4. Iteratively add constraints that improve the puzzle
     var currentRatio = pu.computeRatio();
@@ -211,12 +211,12 @@ class PuzzleGenerator {
         cloned.solve();
         final ratioBefore = cloned.computeRatio();
         // Add candidate and solve again
-        cloned.constraints.add(constraint);
+        cloned.addConstraint(constraint);
         cloned.solve();
         final ratioAfter = cloned.computeRatio();
 
         if (ratioAfter < ratioBefore) {
-          pu.constraints.add(constraint);
+          pu.addConstraint(constraint);
           currentRatio = ratioAfter;
           found = true;
           break;
@@ -281,7 +281,7 @@ class PuzzleGenerator {
     final sc = ShapeConstraint(chosenMotif);
     _placeInitialVariant(solved, sc);
     _fillRemainingWithOpposite(solved, sc.color);
-    solved.constraints.add(sc);
+    solved.addConstraint(sc);
     _placeAdditionalVariants(solved);
     return solved;
   }

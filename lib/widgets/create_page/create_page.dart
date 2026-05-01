@@ -162,7 +162,7 @@ class _CreatePageState extends State<CreatePage> {
       p.cells[entry.key].setForSolver(entry.value);
       p.cells[entry.key].readonly = true;
     }
-    p.constraints = List.from(_constraints);
+    p.replaceConstraints(_constraints);
     return p;
   }
 

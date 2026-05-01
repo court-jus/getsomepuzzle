@@ -23,7 +23,7 @@ void main() {
   test('Puzzle.lineExport produces parseable format', () {
     final p = Puzzle.empty(3, 3, [1, 2]);
     p.cells[0].setForSolver(1);
-    p.constraints.add(ForbiddenMotif('11'));
+    p.addConstraint(ForbiddenMotif('11'));
     final line = p.lineExport();
     expect(line, startsWith('v2_12_3x3_'));
     expect(line, contains('FM:11'));
@@ -48,9 +48,9 @@ void main() {
     // a 3x3 puzzle with no prefilled cells — stresses cross-constraint
     // propagation, not covered by single-constraint tests above.
     final p = Puzzle.empty(3, 3, [1, 2]);
-    p.constraints.add(ForbiddenMotif('1.2'));
-    p.constraints.add(GroupSize('0.1'));
-    p.constraints.add(ParityConstraint('8.top'));
+    p.addConstraint(ForbiddenMotif('1.2'));
+    p.addConstraint(GroupSize('0.1'));
+    p.addConstraint(ParityConstraint('8.top'));
     expect(p.clone().solve(), isTrue);
   });
 
@@ -60,8 +60,8 @@ void main() {
     final p = Puzzle.empty(3, 3, [1, 2]);
     p.cells[0].setForSolver(1);
     p.cells[0].readonly = true;
-    p.constraints.add(ForbiddenMotif('11'));
-    p.constraints.add(QuantityConstraint('1.3'));
+    p.addConstraint(ForbiddenMotif('11'));
+    p.addConstraint(QuantityConstraint('1.3'));
 
     final cloned = p.clone();
     cloned.solve();
@@ -76,7 +76,7 @@ void main() {
     p.cells[0].readonly = true;
     // FM:11 means "11" pattern is forbidden horizontally
     final fm = ForbiddenMotif('11');
-    p.constraints.add(fm);
+    p.addConstraint(fm);
 
     // Cell 1 is next to cell 0 (value=1). Setting cell 1 to 1 would create "11".
     // So apply should deduce cell 1 = 2
@@ -162,12 +162,12 @@ void main() {
     print('Initial ratio: $bestRatio');
     for (final constraint in validConstraints) {
       final testPu = pu.clone();
-      testPu.constraints.addAll(pu.constraints);
-      testPu.constraints.add(constraint);
+      testPu.addAllConstraints(pu.constraints);
+      testPu.addConstraint(constraint);
       testPu.solve();
       final ratio = testPu.computeRatio();
       if (ratio < bestRatio) {
-        pu.constraints.add(constraint);
+        pu.addConstraint(constraint);
         bestRatio = ratio;
         print('Added ${constraint.serialize()}, ratio now $bestRatio');
         if (bestRatio == 0) break;

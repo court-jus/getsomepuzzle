@@ -111,7 +111,7 @@ class SYFMComplicity extends Complicity {
       // calls of this very complicity (and others). Plain constraint
       // propagation is enough for the SY × FM interactions we want
       // to capture here.
-      hyp.complicities = [];
+      hyp.disableComplicities();
       hyp.cells[anchor].setForSolver(color);
 
       bool failed = false;

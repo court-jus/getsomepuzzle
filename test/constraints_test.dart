@@ -193,7 +193,7 @@ void main() {
         000
       ''');
       final gs = GroupSize('0.2');
-      p.constraints.add(gs);
+      p.addConstraint(gs);
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 1);
@@ -212,7 +212,7 @@ void main() {
         000
       ''');
       final gs = GroupSize('3.3');
-      p.constraints.add(gs);
+      p.addConstraint(gs);
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 4);
@@ -232,7 +232,7 @@ void main() {
         000
       ''');
       final gs = GroupSize('3.4');
-      p.constraints.add(gs);
+      p.addConstraint(gs);
       final move = gs.apply(p);
       // Should NOT return a merge-blocking move on idx 4
       // (it might return null or a different deduction, but not blocking idx 4)
@@ -259,7 +259,7 @@ void main() {
         000
       ''');
       final gs = GroupSize('7.5');
-      p.constraints.add(gs);
+      p.addConstraint(gs);
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 7);
@@ -284,7 +284,7 @@ void main() {
         101
       ''');
       final gs = GroupSize('7.6');
-      p.constraints.add(gs);
+      p.addConstraint(gs);
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
@@ -302,7 +302,7 @@ void main() {
         000
       ''');
       final gs = GroupSize('4.3');
-      p.constraints.add(gs);
+      p.addConstraint(gs);
       final move = gs.apply(p);
       expect(move, isNull);
     });
@@ -328,7 +328,7 @@ void main() {
         202
       ''');
       final gs = GroupSize('0.4');
-      p.constraints.add(gs);
+      p.addConstraint(gs);
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
@@ -348,7 +348,7 @@ void main() {
         000
       ''');
       final gs = GroupSize('0.3');
-      p.constraints.add(gs);
+      p.addConstraint(gs);
       final move = gs.apply(p);
       expect(move, isNull);
     });
@@ -366,7 +366,7 @@ void main() {
         022
       ''');
       final gs = GroupSize('0.5');
-      p.constraints.add(gs);
+      p.addConstraint(gs);
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNotNull);
@@ -518,7 +518,7 @@ void main() {
     test('contradiction when groups cannot merge enough', () {
       final p = makePuzzle('100\n022\n021');
       final gc = GroupCountConstraint('1.1'); // target: 1 group - impossible
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       final move = gc.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNotNull);
@@ -528,7 +528,7 @@ void main() {
       // Only one cell can merge both groups → force color it black
       final p = makePuzzle('100\n000\n120');
       final gc = GroupCountConstraint('1.1');
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       final move = gc.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 3);
@@ -548,7 +548,7 @@ void main() {
         '2222222',
       );
       final gc = GroupCountConstraint('1.3');
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       final move = gc.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNotNull);
@@ -563,7 +563,7 @@ void main() {
       // apply() returns no isImpossible.
       final p = Puzzle('v2_12_7x4_1000000000020000000000001000__0:0_0');
       final gc = GroupCountConstraint('1.1');
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       expect(gc.verify(p), isTrue);
       final move = gc.apply(p);
       if (move != null) expect(move.isImpossible, isNull);
@@ -580,7 +580,7 @@ void main() {
         // not return Move(23, 1).
         final p = Puzzle('v2_12_7x4_1100111122121202111110101121__0:0_0');
         final gc = GroupCountConstraint('1.1');
-        p.constraints.add(gc);
+        p.addConstraint(gc);
         final move = gc.apply(p);
         if (move != null) {
           expect(move.idx != 23 || move.value != 1, isTrue);
@@ -593,7 +593,7 @@ void main() {
     test('contradiction when not enough cells to create groups', () {
       final p = makePuzzle('112\n122\n011');
       final gc = GroupCountConstraint('2.3');
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       final move = gc.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNotNull);
@@ -602,7 +602,7 @@ void main() {
     test('force fill when exactly remaining cells needed', () {
       final p = makePuzzle('100');
       final gc = GroupCountConstraint('1.2');
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       final move = gc.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 2);
@@ -617,7 +617,7 @@ void main() {
         // Target unreachable → impossible detected up-front.
         final p = makePuzzle('000');
         final gc = GroupCountConstraint('1.3');
-        p.constraints.add(gc);
+        p.addConstraint(gc);
         final move = gc.apply(p);
         expect(move, isNotNull);
         expect(move!.isImpossible, isNotNull);
@@ -631,7 +631,7 @@ void main() {
       // first one to black.
       final p = makePuzzle('02020');
       final gc = GroupCountConstraint('1.3');
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       final move = gc.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
@@ -649,7 +649,7 @@ void main() {
       // current=2, target=2, candidates=0 → force opposite (color 2) on any cell that would merge
       final p = makePuzzle('10\n01');
       final gc = GroupCountConstraint('1.2');
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       final move = gc.apply(p);
       expect(move, isNotNull);
       // Any cell that would merge, force to white instead
@@ -666,7 +666,7 @@ void main() {
       // candidate to the existing group.
       final p = makePuzzle('100\n000\n000');
       final gc = GroupCountConstraint('1.1');
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       expect(gc.apply(p), isNull);
     });
 
@@ -681,7 +681,7 @@ void main() {
       // should defer to force/backtracking.
       final p = makePuzzle('101\n000\n000');
       final gc = GroupCountConstraint('1.2');
-      p.constraints.add(gc);
+      p.addConstraint(gc);
       final move = gc.apply(p);
       expect(move, isNull);
     });
@@ -695,7 +695,7 @@ void main() {
         // so reachable = {3}. Target 2 is unreachable, so cell 4 must be 2.
         final p = makePuzzle('122\n202\n221');
         final gc = GroupCountConstraint('1.2');
-        p.constraints.add(gc);
+        p.addConstraint(gc);
         final move = gc.apply(p);
         expect(move, isNotNull);
         expect(move!.isImpossible, isNull);
@@ -1006,7 +1006,7 @@ void main() {
       // share a group.
       final p = makePuzzle('100\n200\n001');
       final lt = LetterGroup('A.0.8');
-      p.constraints.add(lt);
+      p.addConstraint(lt);
       final move = lt.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
@@ -1021,7 +1021,7 @@ void main() {
       // would then force the others one by one.)
       final p = makePuzzle('10001');
       final lt = LetterGroup('A.0.4');
-      p.constraints.add(lt);
+      p.addConstraint(lt);
       final move = lt.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 1);
@@ -1034,7 +1034,7 @@ void main() {
       // impossibility, not silently return null.
       final p = makePuzzle('10201');
       final lt = LetterGroup('A.0.4');
-      p.constraints.add(lt);
+      p.addConstraint(lt);
       final move = lt.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNotNull);
@@ -1046,7 +1046,7 @@ void main() {
       // forced first. Exercises an aggregated LetterGroup with N>2.
       final p = makePuzzle('10101');
       final lt = LetterGroup('A.0.2.4');
-      p.constraints.add(lt);
+      p.addConstraint(lt);
       final move = lt.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 1);
@@ -1070,7 +1070,7 @@ void main() {
         00000
       ''');
       final sy = SymmetryConstraint('7.5');
-      p.constraints.add(sy);
+      p.addConstraint(sy);
       final move = sy.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
@@ -1091,7 +1091,7 @@ void main() {
         00010
       ''');
       final sy = SymmetryConstraint('4.2');
-      p.constraints.add(sy);
+      p.addConstraint(sy);
       final move = sy.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
@@ -1111,7 +1111,7 @@ void main() {
         01020
       ''');
         final sy = SymmetryConstraint('2.2');
-        p.constraints.add(sy);
+        p.addConstraint(sy);
         final move = sy.apply(p);
         expect(move, isNotNull);
         expect(move!.isImpossible, equals(sy));
@@ -1125,7 +1125,7 @@ void main() {
         000
       ''');
       final sy = SymmetryConstraint('4.5');
-      p.constraints.add(sy);
+      p.addConstraint(sy);
       expect(sy.apply(p), isNull);
     });
   });
@@ -1150,7 +1150,7 @@ void main() {
         010
       ''');
         final sy = SymmetryConstraint('7.2');
-        p.constraints.add(sy);
+        p.addConstraint(sy);
         final move = sy.apply(p);
         expect(move, isNotNull);
         expect(move!.isImpossible, isNull);
@@ -1171,7 +1171,7 @@ void main() {
         010
       ''');
       final sy = SymmetryConstraint('7.2');
-      p.constraints.add(sy);
+      p.addConstraint(sy);
       expect(sy.apply(p), isNull);
     });
   });

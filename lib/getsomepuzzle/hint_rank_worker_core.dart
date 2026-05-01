@@ -30,7 +30,7 @@ class HintRankResult {
     final slug = cs.substring(0, colonIdx);
     final p = cs.substring(colonIdx + 1);
     final c = createConstraint(slug, p);
-    if (c != null) puzzle.constraints.add(c);
+    if (c != null) puzzle.addConstraint(c);
   }
   final baseline = puzzle.clone();
   final baselineMoves = baseline.propagateToFixpoint() ?? -1;
@@ -49,7 +49,7 @@ bool classifyCandidate(Puzzle puzzle, String candidate, int baselineMoves) {
   if (constraint == null) return false;
 
   final test = puzzle.clone();
-  test.constraints.add(constraint);
+  test.addConstraint(constraint);
   final testMoves = test.propagateToFixpoint();
   return testMoves != null && testMoves > baselineMoves;
 }

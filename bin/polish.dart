@@ -304,11 +304,11 @@ _PolishResult? _polishOne(
     if (bestMutation == null) break;
 
     if (bestMutation.kind == _MutationKind.remove) {
-      puzzle.constraints.removeAt(bestMutation.index);
+      puzzle.removeConstraintAt(bestMutation.index);
       removes++;
     } else {
       final cand = pool.removeAt(bestMutation.index);
-      puzzle.constraints.add(cand);
+      puzzle.addConstraint(cand);
       adds++;
     }
     currentScore += bestDelta;
@@ -354,10 +354,10 @@ double? _scoreWithMutation(
 }) {
   final clone = puzzle.clone();
   if (removeIndex != null) {
-    clone.constraints.removeAt(removeIndex);
+    clone.removeConstraintAt(removeIndex);
   }
   if (addConstraint != null) {
-    clone.constraints.add(addConstraint);
+    clone.addConstraint(addConstraint);
   }
   // Reset to the puzzle's starting state (only readonly cells set) so that
   // validity / scorePuzzle measure the puzzle fresh, not mid-play.

@@ -756,7 +756,7 @@ class GameModel extends ChangeNotifier {
     if (constraint == null) return false;
 
     constraint.isHighlighted = true;
-    currentPuzzle!.constraints.add(constraint);
+    currentPuzzle!.addConstraint(constraint);
     if (currentMeta != null) {
       currentMeta!.hints += 1;
       currentMeta!.stats?.hints += 1;

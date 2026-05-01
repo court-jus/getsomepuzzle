@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
@@ -119,11 +121,23 @@ class Puzzle {
   int width = 0;
   int height = 0;
   List<Cell> _cells = [];
-  List<Constraint> constraints = [];
-  // Cross-constraint deductions detected for this puzzle. Populated once
-  // at construction time by `_detectComplicities()`. Tried only after all
+  // Mutable backing list. Touched only via the helpers below; external
+  // code reads through the unmodifiable view exposed as `constraints`.
+  // Centralising mutations lets us maintain invariants (LetterGroup
+  // aggregation, complicity cache) automatically on every add/remove.
+  final List<Constraint> _constraints = [];
+  late final List<Constraint> constraints = UnmodifiableListView(_constraints);
+  // Lazy cross-constraint deductions cache. Recomputed on demand the
+  // first time after any constraint mutation; tried only after all
   // constraints are stuck in the propagation loop.
-  List<Complicity> complicities = [];
+  List<Complicity>? _complicitiesCache;
+  List<Complicity> get complicities {
+    return _complicitiesCache ??= [
+      for (final c in complicities_registry.allComplicities())
+        if (c.isPresent(this)) c,
+    ];
+  }
+
   int? cachedComplexity;
   List<int>? cachedSolution;
 
@@ -168,10 +182,10 @@ class Puzzle {
       final slug = constraintAttr[0];
       final params = constraintAttr.length > 1 ? constraintAttr[1] : '';
       if (slug == 'TX') {
-        constraints.add(HelpText(params));
+        addConstraint(HelpText(params));
       } else {
         final c = createConstraint(slug, params);
-        if (c != null) constraints.add(c);
+        if (c != null) addConstraint(c);
       }
     }
     if (attributesStr.length > 5) {
@@ -201,18 +215,72 @@ class Puzzle {
       hasRestoredProgress = true;
       break;
     }
-    _aggregateLetterGroups();
-    _detectComplicities();
   }
 
-  /// Scan the constraint list against the complicity registry and keep
-  /// the ones that fire on this puzzle. Called once at construction time
-  /// and after `clone()` since the constraint set is immutable thereafter.
-  void _detectComplicities() {
-    complicities = [
-      for (final c in complicities_registry.allComplicities())
-        if (c.isPresent(this)) c,
-    ];
+  /// Add a constraint to the puzzle. Goes through the central helper so
+  /// every code path benefits from LetterGroup aggregation (`LT:<letter>`
+  /// pairs sharing the same letter merge into a single N-cell group)
+  /// and from the complicity-cache invalidation. The aggregation must
+  /// happen on every add — not just at parse time — otherwise the
+  /// generator can validate two `LT:D` pairs against their local
+  /// connectivity and miss the combined "all four cells in one group"
+  /// invariant that the constructor enforces after deserialisation.
+  void addConstraint(Constraint c) {
+    if (c is LetterGroup) {
+      final existing = _constraints.firstWhereOrNull(
+        (other) => other is LetterGroup && other.letter == c.letter,
+      );
+      if (existing != null) {
+        final group = existing as LetterGroup;
+        for (final idx in c.indices) {
+          if (!group.indices.contains(idx)) group.indices.add(idx);
+        }
+        _complicitiesCache = null;
+        return;
+      }
+    }
+    _constraints.add(c);
+    _complicitiesCache = null;
+  }
+
+  void addAllConstraints(Iterable<Constraint> cs) {
+    for (final c in cs) {
+      addConstraint(c);
+    }
+  }
+
+  void removeConstraint(Constraint c) {
+    if (_constraints.remove(c)) {
+      _complicitiesCache = null;
+    }
+  }
+
+  Constraint removeConstraintAt(int index) {
+    final removed = _constraints.removeAt(index);
+    _complicitiesCache = null;
+    return removed;
+  }
+
+  /// Insert without aggregation. Used by `removeUselessRules` to put
+  /// back a constraint that was tentatively removed; aggregation is
+  /// already settled at that point.
+  void insertConstraintAt(int index, Constraint c) {
+    _constraints.insert(index, c);
+    _complicitiesCache = null;
+  }
+
+  void replaceConstraints(Iterable<Constraint> cs) {
+    _constraints.clear();
+    _complicitiesCache = null;
+    addAllConstraints(cs);
+  }
+
+  /// Pin the complicity list to empty. Used by hypothetical solver
+  /// passes (SY×FM complicity, measure_complicities) that must not
+  /// recurse through complicities while exploring branches; without
+  /// this they would loop on the very complicity that called them.
+  void disableComplicities() {
+    _complicitiesCache = const [];
   }
 
   /// Build a line representation that carries the player's current cell
@@ -226,32 +294,6 @@ class Puzzle {
     final playStr = cellValues.map((v) => v.toString()).join('');
     parts.add('p:$playStr');
     return parts.join('_');
-  }
-
-  /// Merge `LT:<letter>....` constraints sharing the same letter into a
-  /// single `LetterGroup` whose `indices` list every cell of that letter.
-  /// Generation produces pairs (one `LT` per pair of cells sharing a
-  /// letter), but display and deduction logic are simpler — and stronger —
-  /// when each letter is represented by a single constraint with N cells.
-  void _aggregateLetterGroups() {
-    final byLetter = <String, LetterGroup>{};
-    final newConstraints = <Constraint>[];
-    for (final c in constraints) {
-      if (c is! LetterGroup) {
-        newConstraints.add(c);
-        continue;
-      }
-      final existing = byLetter[c.letter];
-      if (existing == null) {
-        byLetter[c.letter] = c;
-        newConstraints.add(c);
-      } else {
-        for (final idx in c.indices) {
-          if (!existing.indices.contains(idx)) existing.indices.add(idx);
-        }
-      }
-    }
-    constraints = newConstraints;
   }
 
   void restart() {
@@ -510,12 +552,12 @@ class Puzzle {
     // Deep-clone constraints: the mutable UI-state fields (`isValid`,
     // `isHighlighted`, `isComplete`) must not be shared between the clone
     // and the original, else exploratory solver work on the clone (force,
-    // findAMove) leaks state into the original puzzle.
-    p.constraints = constraints.map(_cloneConstraint).toList();
-    // Re-detect complicities against the cloned constraint list. Cheap,
-    // and avoids relying on the parent's references (a clone may want to
-    // modify constraints in place during exploratory work).
-    p._detectComplicities();
+    // findAMove) leaks state into the original puzzle. The cloned
+    // LetterGroup instances are pre-aggregated, so going through
+    // `addConstraint` is a no-op for the merge step but still invalidates
+    // the complicity cache so it gets recomputed against the clone's
+    // own constraint list on first access.
+    p.replaceConstraints(constraints.map(_cloneConstraint));
     return p;
   }
 
@@ -710,10 +752,13 @@ class Puzzle {
     while (i > 0) {
       i--;
       if (constraints[i] is HelpText) continue;
-      final removed = constraints.removeAt(i);
+      final removed = removeConstraintAt(i);
       if (!isDeductivelyUnique()) {
-        // Constraint was needed, put it back.
-        constraints.insert(i, removed);
+        // Constraint was needed, put it back. We bypass aggregation
+        // here because the constraint set is already in the post-
+        // aggregation shape — re-aggregating would be a no-op but
+        // would lose the original index.
+        insertConstraintAt(i, removed);
       }
     }
   }

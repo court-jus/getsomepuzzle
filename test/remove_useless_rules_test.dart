@@ -35,7 +35,7 @@ void main() {
       // (and any earlier-redundant rules) are dropped.
       final p = Puzzle('v2_12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top_0:0_0');
       final originalLength = p.constraints.length;
-      p.constraints.add(ForbiddenMotif('22'));
+      p.addConstraint(ForbiddenMotif('22'));
       expect(p.constraints.length, originalLength + 1);
       p.removeUselessRules();
       expect(p.constraints.length, lessThanOrEqualTo(originalLength));
