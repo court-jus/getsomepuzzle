@@ -30,6 +30,7 @@
     "labelWidgetBannedrules": "Règles refusées",
     "msgCountMatchingPuzzles": "Nombre de puzzles correspondant",
     "btnShareStats": "Partager",
+    "statsCopiedToClipboard": "Stats copiées dans le presse-papier",
     "tooltipPause": "Pause...",
     "pausedDueToIdle": "Mis en pause pour inactivité",
     "pausedDueToFocusLost": "Mis en pause car l'application a perdu le focus",

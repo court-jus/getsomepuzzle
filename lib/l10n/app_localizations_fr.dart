@@ -101,6 +101,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get btnShareStats => 'Partager';
 
   @override
+  String get statsCopiedToClipboard => 'Stats copiées dans le presse-papier';
+
+  @override
   String get tooltipPause => 'Pause...';
 
   @override

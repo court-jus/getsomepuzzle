@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/utils/share_outcome.dart';
 import 'package:getsomepuzzle/utils/share_stub.dart'
     if (dart.library.html) 'package:getsomepuzzle/utils/share_html.dart'
     if (dart.library.io) 'package:getsomepuzzle/utils/share_io.dart';
@@ -28,17 +29,23 @@ class _StatsPageState extends State<StatsPage> {
 
   Future<void> setData() async {
     final content = stats.join("\n");
-    final filename = "stats.txt";
-    shareData(content, filename);
+    final outcome = await shareData(content);
+    if (!mounted) return;
+    if (outcome == ShareOutcome.clipboard) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.statsCopiedToClipboard),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final shareText = kIsWeb
-        ? AppLocalizations.of(context)!.btnShareStats
-        : (Platform.isWindows
-              ? AppLocalizations.of(context)!.open
-              : AppLocalizations.of(context)!.btnShareStats);
+    final isDesktopFile = !kIsWeb && (Platform.isWindows || Platform.isLinux);
+    final shareText = isDesktopFile
+        ? AppLocalizations.of(context)!.open
+        : AppLocalizations.of(context)!.btnShareStats;
     return Scaffold(
       appBar: AppBar(title: Text(AppLocalizations.of(context)!.stats)),
       body: LayoutBuilder(

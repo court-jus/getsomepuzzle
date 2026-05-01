@@ -101,6 +101,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get btnShareStats => 'Share';
 
   @override
+  String get statsCopiedToClipboard => 'Stats copied to clipboard';
+
+  @override
   String get tooltipPause => 'Pause...';
 
   @override

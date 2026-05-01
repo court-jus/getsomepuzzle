@@ -30,6 +30,7 @@
     "labelWidgetBannedrules": "Reglas prohibidas",
     "msgCountMatchingPuzzles": "Puzzles que coinciden con filtros",
     "btnShareStats": "Compartir",
+    "statsCopiedToClipboard": "Estadísticas copiadas al portapapeles",
     "tooltipPause": "Pausa...",
     "pausedDueToIdle": "Pausado por inactividad",
     "pausedDueToFocusLost": "Pausado porque la aplicación perdió el foco",

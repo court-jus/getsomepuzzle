@@ -280,6 +280,12 @@ abstract class AppLocalizations {
   /// **'Share'**
   String get btnShareStats;
 
+  /// Snackbar message shown when sharing the stats fell back to copying them into the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Stats copied to clipboard'**
+  String get statsCopiedToClipboard;
+
   /// Tooltip displayed while the mouse is over the pause menu
   ///
   /// In en, this message translates to:

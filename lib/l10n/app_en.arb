@@ -120,6 +120,10 @@
     "@btnShareStats": {
         "description": "Label on the button that allows to share the stats."
     },
+    "statsCopiedToClipboard": "Stats copied to clipboard",
+    "@statsCopiedToClipboard": {
+        "description": "Snackbar message shown when sharing the stats fell back to copying them into the clipboard."
+    },
     "tooltipPause": "Pause...",
     "@tooltipPause": {
         "description": "Tooltip displayed while the mouse is over the pause menu"
