@@ -15,6 +15,7 @@
 
 import 'dart:io';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 String _gridString(List<int> values, int width) {
@@ -223,10 +224,9 @@ void main(List<String> args) {
         break;
       }
       if (m.isImpossible != null) {
-        stdout.writeln(
-          'CONTRADICTION reported by ${m.isImpossible!.serialize()} '
-          '(${m.isImpossible!.toHuman(branched)})',
-        );
+        final imp = m.isImpossible!;
+        final human = imp is Constraint ? ' (${imp.toHuman(branched)})' : '';
+        stdout.writeln('CONTRADICTION reported by ${imp.serialize()}$human');
         break;
       }
       s++;
