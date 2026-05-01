@@ -69,8 +69,10 @@ expectedDuration(cplx, cells, failures, n_constraints)
   not bottom-of-the-bar.
 - No artificial clamp on `cplx`. Puzzles with `cplx=100` (the legacy
   "non-deductively-solvable" bucket) are no longer emitted by the
-  generator; they're still in legacy `assets/default.txt` lines but no
-  longer biased the calibration once recomputed.
+  generator; they may survive in legacy corpus files (the built-in
+  collection is now split across `assets/1-easy.txt` through
+  `assets/6-mad.txt`, plus `overfilled.txt` and `undetermined.txt`)
+  but no longer bias the calibration once recomputed.
 
 This model sits inside `Database` as `_expectedDuration` and is not exposed:
 nothing outside the level computation needs it. The companion
@@ -144,6 +146,20 @@ User-set filters (size, rules) intersect the catalog before weighting:
 they act as hard constraints the player has chosen to impose. When they
 backfire, `EndOfPlaylist` surfaces it (see below).
 
+### Batch cap and `EndOfPlaylist` rotation
+
+On the six built-in level collections (`1-easy` … `6-mad`),
+`preparePlaylist` truncates the result to **`playlistBatchSize = 20`
+puzzles** (`tutorial`, `custom`, and user playlists are exempt). The
+truncation makes `EndOfPlaylist` fire predictably every ~20 plays —
+without the cap, a collection holding ~1 000 puzzles would never
+exhaust, and we'd never get a natural moment to surface the
+cross-collection suggestion below.
+
+The cap is applied uniformly whether the playlist comes from the
+Gaussian draw or from `shouldShuffle`: it's about pacing the
+`EndOfPlaylist` hook, not about ordering.
+
 The selection knobs `selectionOffset` and `selectionSigma` are
 constants today. Wiring them through `Settings` would unlock UX
 modes like "challenge" (`offset = +5`), "rest" (`offset = −3`) or
@@ -151,19 +167,74 @@ modes like "challenge" (`offset = +5`), "rest" (`offset = −3`) or
 
 ## End of playlist
 
-When `getPuzzlesByLevel` returns an empty list, `loadPuzzle` clears the
-puzzle state and `EndOfPlaylist` takes over. With Gaussian sampling the
-list is empty only when `filter()` itself is empty, which yields just
-two cases — surfaced via `Database.hasUnplayedIgnoringFilters()`:
+`loadPuzzle` clears the puzzle state and shows `EndOfPlaylist` whenever
+the active playlist is empty — which now happens at every batch
+boundary on the six level collections (every ~20 plays), not just when
+the catalog is fully exhausted. The widget reads three signals:
 
-- **Filters are hiding candidates** — at least one unplayed/non-skipped/
-  non-disliked puzzle exists in the catalog but is excluded by the
-  user's filters. The widget invites the player to relax them.
-- **Catalog genuinely exhausted** — every puzzle has been played,
-  skipped or disliked. The widget congratulates the player.
+- **`filtersBlocking`** — `Database.hasUnplayedIgnoringFilters()`: at
+  least one unplayed puzzle exists in the catalog but is hidden by the
+  user's filters. The "relax filters" headline replaces the
+  congratulatory one, but the *Try `<recommended>`* button still shows
+  when applicable — switching collections is a legitimate escape hatch
+  since different collections have different puzzle distributions and
+  the filters may be permissive there. The *Continue* button is always
+  hidden in this branch (re-preparing the playlist would hit the same
+  empty result).
+- **`hasMoreInCurrent`** — `Database.hasMoreCandidatesInCurrentCollection()`:
+  the current collection still has unplayed candidates that weren't in
+  the just-finished batch. Drives the *Continue with `<X>`* button
+  (load another batch of 20).
+- **`recommendedCollectionKey`** (see below) — when non-null and
+  different from the active collection, drives the *Try `<recommended>`*
+  button (switch + new batch).
 
-There is no longer a "jump to the next populated level" affordance:
-with weighted sampling, no level is unreachable by definition.
+Both buttons are surfaced together when both apply; the player can
+keep going in the current palier or graduate. A `Pick another
+collection` text link routes back to `OpenPage` for full agency.
+
+## Cross-collection suggestion
+
+`Database.recommendedCollectionKey` returns the slug of a *different*
+playable collection that better matches `playerLevel`, or `null` when
+no suggestion is appropriate. Returns `null` whenever:
+
+- the active collection is the tutorial (no rotation while teaching);
+- fewer than `_minPlaysForRecommendation = 10` usable plays have been
+  recorded — the rolling average is too noisy to act on;
+- the recommendation matches the active collection (no badge needed).
+
+The mapping `playerLevel → PuzzleLevel` lives in `level.dart` as
+`recommendedLevelFor(int playerLevel)`. Thresholds are deliberately
+hand-picked rather than derived from corpus medians:
+
+```
+< 25     → debutant       (1-easy)
+25 - 39  → joueur         (2-player)
+40 - 49  → avance         (3-advanced)
+50 - 64  → balaise        (4-strong)
+65 - 79  → expert         (5-expert)
+≥ 80     → fouFurieux     (6-mad)
+```
+
+The cohort is anchored at `playerLevel = 50`, so an average-paced
+player lands on the `avance` / `balaise` boundary — half the time the
+suggestion will rotate them between those two paliers, which is the
+intended steady state for the typical user.
+
+A "closest median" rule was considered but rejected: corpus medians
+for `avance` (36), `balaise` (39), and `expert` (37) are not
+monotonic, so a closest-median assignment would flip erratically in
+the [33, 45] band where many players cluster. Explicit thresholds are
+stable and easy to test.
+
+The recommendation surfaces in two places:
+- **`OpenPage` dropdown** — a star badge marks the recommended
+  collection in the dropdown list, with the localised tooltip
+  *"Recommended for you"*.
+- **`EndOfPlaylist`** — at every batch boundary, the *Try `<X>`*
+  button switches to the recommended collection if it differs from
+  the active one.
 
 ## Data model
 

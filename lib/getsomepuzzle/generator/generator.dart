@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
+import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class GeneratorConfig {
@@ -86,8 +87,13 @@ class PuzzleGenerator {
     return stats;
   }
 
-  /// Attempt to generate a single puzzle. Returns the line representation or null on failure.
-  static String? generateOne(
+  /// Attempt to generate a single puzzle.
+  ///
+  /// Returns `(line, level)` on success, `null` on failure.
+  ///
+  /// The classification is computed from the same `solveExplained()`
+  /// trace that validates deductive uniqueness — no extra solve.
+  static ({String line, PuzzleLevel level})? generateOne(
     GeneratorConfig config, {
     void Function(GeneratorProgress)? onProgress,
     bool Function()? shouldStop,
@@ -97,10 +103,10 @@ class PuzzleGenerator {
     final height = config.height;
     final size = width * height;
     // Fraction of cells left empty for the player to deduce. Randomized in
-    // [0.8, 1.0] so most puzzles are fully deductive (ratio=1) but up to 20%
+    // [0.75, 1.0] so most puzzles are fully deductive (ratio=1) but up to 25%
     // of cells may be given as prefilled hints — variety without making
     // generation trivial.
-    final ratio = 0.8 + _rng.nextDouble() * 0.2;
+    final ratio = 0.75 + _rng.nextDouble() * 0.25;
 
     // Build the allowed rule slugs. Callers either pass an explicit set, or
     // let it default to the full registry.
@@ -270,9 +276,26 @@ class PuzzleGenerator {
     // (propagation + force, no backtracking) reaches the unique completion
     // from its readonly cells. This guarantees the player can solve it
     // with the in-game hint system, which uses the same `solve()` engine.
-    if (!pu.isDeductivelyUnique()) return null;
+    //
+    // We use `solveExplained` rather than `isDeductivelyUnique`/`solve`
+    // because the trace it produces is also what the level classifier
+    // needs — running both would mean two solves for the same answer.
+    final steps = pu.solveExplained();
+    final replay = pu.clone();
+    for (final s in steps) {
+      replay.setValue(s.cellIdx, s.value);
+    }
+    final isUnique = replay.complete && replay.check(saveResult: false).isEmpty;
+    if (!isUnique) return null;
 
-    return pu.lineExport();
+    final prefill = pu.cells.where((c) => c.readonly).length / pu.cells.length;
+    final level = classifyTrace(
+      steps: steps,
+      prefillRatio: prefill,
+      solved: true,
+    );
+
+    return (line: pu.lineExport(), level: level);
   }
 
   static Puzzle _preFillSh(int width, int height) {

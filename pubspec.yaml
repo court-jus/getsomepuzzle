@@ -85,9 +85,13 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/tutorial.txt
-    - assets/default.txt
-    - assets/collection2.txt
-    - assets/collection3.txt
+    - assets/1-easy.txt
+    - assets/2-player.txt
+    - assets/3-advanced.txt
+    - assets/4-strong.txt
+    - assets/5-expert.txt
+    - assets/6-mad.txt
+    - assets/overfilled.txt
     - assets/help.en.md
     - assets/help.fr.md
     - assets/help.es.md

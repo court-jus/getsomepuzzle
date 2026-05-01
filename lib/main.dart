@@ -948,38 +948,120 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                           hintIsError: game.hintIsError,
                                         )
                                       else
-                                        EndOfPlaylist(
-                                          currentLevel: settings.playerLevel,
-                                          isTutorial:
-                                              database?.collection ==
-                                              'tutorial',
-                                          onStartPlaying: () async {
-                                            if (database == null) return;
-                                            settings.change(
-                                              ChangeableSettings(
-                                                playerLevel: 0,
-                                                autoLevel: true,
-                                              ),
+                                        Builder(
+                                          builder: (context) {
+                                            final l = AppLocalizations.of(
+                                              context,
+                                            )!;
+                                            final labels = CollectionLabels(
+                                              tutorial: l.collectionTutorial,
+                                              easy: l.collectionEasy,
+                                              player: l.collectionPlayer,
+                                              advanced: l.collectionAdvanced,
+                                              strong: l.collectionStrong,
+                                              expert: l.collectionExpert,
+                                              mad: l.collectionMad,
+                                              myPuzzles: l.collectionMyPuzzles,
+                                              recommendedTooltip: l
+                                                  .tooltipRecommendedCollection,
                                             );
-                                            database!.setPlayerLevel(0);
-                                            // Must be awaited before loadPuzzlesFile:
-                                            // loadPuzzlesFile reads shouldShuffle from
-                                            // prefs, so the flip must be persisted first.
-                                            await database!.setShouldShuffle(
-                                              false,
+                                            final recommendedKey = database
+                                                ?.recommendedCollectionKey;
+                                            return EndOfPlaylist(
+                                              currentLevel:
+                                                  settings.playerLevel,
+                                              isTutorial:
+                                                  database?.collection ==
+                                                  'tutorial',
+                                              onStartPlaying: () async {
+                                                if (database == null) return;
+                                                settings.change(
+                                                  ChangeableSettings(
+                                                    playerLevel: 0,
+                                                    autoLevel: true,
+                                                  ),
+                                                );
+                                                database!.setPlayerLevel(0);
+                                                // Must be awaited before
+                                                // loadPuzzlesFile:
+                                                // loadPuzzlesFile reads
+                                                // shouldShuffle from prefs, so
+                                                // the flip must be persisted
+                                                // first.
+                                                await database!
+                                                    .setShouldShuffle(false);
+                                                await database!.loadPuzzlesFile(
+                                                  Database.entryCollectionKey,
+                                                );
+                                                if (database!
+                                                    .playlist
+                                                    .isNotEmpty) {
+                                                  loadPuzzle();
+                                                }
+                                                setState(() {});
+                                              },
+                                              filtersBlocking:
+                                                  database
+                                                      ?.hasUnplayedIgnoringFilters() ??
+                                                  false,
+                                              hasMoreInCurrent:
+                                                  database
+                                                      ?.hasMoreCandidatesInCurrentCollection() ??
+                                                  false,
+                                              currentCollectionLabel: labels
+                                                  .labelFor(
+                                                    database?.collection ?? '',
+                                                  ),
+                                              recommendedCollectionLabel:
+                                                  recommendedKey == null
+                                                  ? null
+                                                  : labels.labelFor(
+                                                      recommendedKey,
+                                                    ),
+                                              onContinueCurrent: () {
+                                                if (database == null) return;
+                                                database!.preparePlaylist();
+                                                if (database!
+                                                    .playlist
+                                                    .isNotEmpty) {
+                                                  loadPuzzle();
+                                                }
+                                                setState(() {});
+                                              },
+                                              onSwitchToRecommended:
+                                                  recommendedKey == null
+                                                  ? null
+                                                  : () async {
+                                                      if (database == null) {
+                                                        return;
+                                                      }
+                                                      await database!
+                                                          .loadPuzzlesFile(
+                                                            recommendedKey,
+                                                          );
+                                                      if (database!
+                                                          .playlist
+                                                          .isNotEmpty) {
+                                                        loadPuzzle();
+                                                      }
+                                                      setState(() {});
+                                                    },
+                                              onPickAnother: () {
+                                                if (database == null) return;
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute<void>(
+                                                    builder: (context) =>
+                                                        OpenPage(
+                                                          database: database!,
+                                                          onPuzzleSelected:
+                                                              openPuzzle,
+                                                        ),
+                                                  ),
+                                                );
+                                              },
                                             );
-                                            await database!.loadPuzzlesFile(
-                                              'default',
-                                            );
-                                            if (database!.playlist.isNotEmpty) {
-                                              loadPuzzle();
-                                            }
-                                            setState(() {});
                                           },
-                                          filtersBlocking:
-                                              database
-                                                  ?.hasUnplayedIgnoringFilters() ??
-                                              false,
                                         ),
                                     ],
                                   ),

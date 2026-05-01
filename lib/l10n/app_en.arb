@@ -590,6 +590,64 @@
     "@collectionMyPuzzles": {
         "description": "Label of the custom puzzles collection"
     },
+    "collectionTutorial": "Tutorial",
+    "@collectionTutorial": {
+        "description": "Label of the tutorial collection"
+    },
+    "collectionEasy": "Beginner",
+    "@collectionEasy": {
+        "description": "Label of the easiest difficulty collection (1-easy.txt) — puzzles solvable by simple propagation only"
+    },
+    "collectionPlayer": "Player",
+    "@collectionPlayer": {
+        "description": "Label of the second difficulty collection (2-player.txt) — puzzles requiring harder propagation but no complicity nor force"
+    },
+    "collectionAdvanced": "Advanced",
+    "@collectionAdvanced": {
+        "description": "Label of the advanced difficulty collection (3-advanced.txt) — puzzles using simple complicities"
+    },
+    "collectionStrong": "Strong",
+    "@collectionStrong": {
+        "description": "Label of the strong difficulty collection (4-strong.txt) — puzzles using complex complicities"
+    },
+    "collectionExpert": "Expert",
+    "@collectionExpert": {
+        "description": "Label of the expert difficulty collection (5-expert.txt) — puzzles requiring one force move"
+    },
+    "collectionMad": "Crazy hard",
+    "@collectionMad": {
+        "description": "Label of the hardest difficulty collection (6-mad.txt) — puzzles requiring multiple or deep force moves"
+    },
+    "tooltipRecommendedCollection": "Recommended for you",
+    "@tooltipRecommendedCollection": {
+        "description": "Tooltip on the star badge next to the collection that matches the player's current level"
+    },
+    "endOfPlaylistContinueIn": "Continue with {collection}",
+    "@endOfPlaylistContinueIn": {
+        "description": "End-of-playlist primary action: load another batch of puzzles from the same collection",
+        "placeholders": {
+            "collection": {
+                "type": "String"
+            }
+        }
+    },
+    "endOfPlaylistTrySuggested": "Try {collection}",
+    "@endOfPlaylistTrySuggested": {
+        "description": "End-of-playlist primary action: switch to the recommended collection",
+        "placeholders": {
+            "collection": {
+                "type": "String"
+            }
+        }
+    },
+    "endOfPlaylistSuggestedHint": "Based on your level, you might enjoy this collection.",
+    "@endOfPlaylistSuggestedHint": {
+        "description": "Subtle hint below the 'Try X' button explaining why this collection is suggested"
+    },
+    "endOfPlaylistPickAnother": "Pick another collection",
+    "@endOfPlaylistPickAnother": {
+        "description": "End-of-playlist secondary link sending the player to the open page to pick a collection"
+    },
     "settingTutorialSection": "Tutorial",
     "@settingTutorialSection": {
         "description": "Header of the tutorial-related settings section"

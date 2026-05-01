@@ -4,11 +4,11 @@
 //
 // Buckets (cascading, mutually exclusive):
 //   - Fou furieux : >=2 force moves OR a single force with depth > 5
-//   - Expert      : exactly 1 force move with depth <= 5
 //   - Balaise     : no force, >=1 complicity step with complexity >= 4
 //   - Avance      : no force, >=1 complicity step (max complexity <= 3)
-//   - Joueur      : no force, no complicity, max prop complexity >= 4
-//   - Debutant    : no force, no complicity, max prop complexity <= 3
+//   - Expert      : exactly 1 force move with depth <= 5
+//   - Joueur      : no force, no complicity, max prop complexity >= 3
+//   - Debutant    : no force, no complicity, max prop complexity <= 2
 //   - Indetermine : trace stopped before completing the puzzle (timeout
 //                   or contradiction). Reported separately.
 //
@@ -31,6 +31,7 @@ const _categories = [
   'Balaise',
   'Expert',
   'Fou furieux',
+  'Pre-rempli',
   'Indetermine',
 ];
 
@@ -40,16 +41,23 @@ class _Verdict {
   final int maxForceDepth;
   final int maxPropCx;
   final int maxComplCx;
+  final double prefillRatio;
   _Verdict(
     this.category,
     this.forceMoves,
     this.maxForceDepth,
     this.maxPropCx,
     this.maxComplCx,
+    this.prefillRatio,
   );
 }
 
-_Verdict _classify(Puzzle puzzle) {
+_Verdict _classify(Puzzle puzzle, {required double maxPrefill}) {
+  final prefill =
+      puzzle.cells.where((c) => c.readonly).length / puzzle.cells.length;
+  if (prefill > maxPrefill) {
+    return _Verdict('Pre-rempli', 0, 0, 0, 0, prefill);
+  }
   // solveExplained works on a clone so the original puzzle is untouched.
   final steps = puzzle.solveExplained(timeoutMs: 30000);
 
@@ -85,24 +93,36 @@ _Verdict _classify(Puzzle puzzle) {
       maxForceDepth,
       maxPropCx,
       maxComplCx,
+      prefill,
     );
   }
 
   String cat;
   if (forceMoves >= 2 || (forceMoves == 1 && maxForceDepth > 5)) {
     cat = 'Fou furieux';
-  } else if (forceMoves == 1) {
-    cat = 'Expert';
-  } else if (maxComplCx >= 4) {
+  } else if (forceMoves == 0 && maxComplCx >= 4) {
     cat = 'Balaise';
-  } else if (maxComplCx > 0) {
+  } else if (forceMoves == 0 && maxComplCx > 0) {
     cat = 'Avance';
-  } else if (maxPropCx >= 4) {
+  } else if (forceMoves == 1) {
+    // Depth ≤ 5 here, since the Fou furieux branch already captured the
+    // single-force / depth > 5 case.
+    cat = 'Expert';
+  } else if (maxPropCx >= 3) {
+    // No force, no complicity, but the propagation phase needed at least
+    // one complexity-≥3 deduction (3, 4, or 5).
     cat = 'Joueur';
   } else {
     cat = 'Debutant';
   }
-  return _Verdict(cat, forceMoves, maxForceDepth, maxPropCx, maxComplCx);
+  return _Verdict(
+    cat,
+    forceMoves,
+    maxForceDepth,
+    maxPropCx,
+    maxComplCx,
+    prefill,
+  );
 }
 
 List<String> _readLines(String path) {
@@ -172,6 +192,14 @@ void main(List<String> args) {
   int seed = 42;
   String? sampleOut;
   int sampleN = 5;
+  String? splitOut;
+  // Default: 0.30. Slightly more permissive than the current
+  // generator contract (`ratio` ∈ [0.75, 1.0] in generator.dart:103,
+  // i.e. prefill ≤ 0.25) to keep more legacy puzzles in the corpus
+  // while still expurging the heavily pre-filled tail. Any puzzle
+  // with prefill > maxPrefill is bucketed in "Pre-rempli" / written
+  // to `overfilled.txt` when --split-out is set.
+  double maxPrefill = 0.30;
 
   for (int i = 0; i < args.length; i++) {
     final a = args[i];
@@ -185,11 +213,16 @@ void main(List<String> args) {
       sampleOut = args[++i];
     } else if (a == '--sample-n') {
       sampleN = int.parse(args[++i]);
+    } else if (a == '--max-prefill') {
+      maxPrefill = double.parse(args[++i]);
+    } else if (a == '--split-out') {
+      splitOut = args[++i];
     } else if (a == '-h' || a == '--help') {
       stderr.writeln(
         'Usage: dart run bin/classify_difficulty.dart '
         '[--files A,B,...] [--pct N] [--seed N] '
-        '[--sample-out PATH] [--sample-n N]',
+        '[--sample-out PATH] [--sample-n N] [--max-prefill F] '
+        '[--split-out DIR]',
       );
       exit(0);
     } else {
@@ -206,6 +239,22 @@ void main(List<String> args) {
 
   // For sample TSV: per-category list of (verdict, fileLabel, idx, line)
   final samples = <String, List<List<String>>>{
+    for (final cat in _categories) cat: [],
+  };
+
+  // Per-category puzzle lines, only filled when --split-out is set.
+  // Mapping mirrors the playlist filenames requested in docs/dev/levels.md.
+  const splitFilenames = <String, String>{
+    'Debutant': '1-easy.txt',
+    'Joueur': '2-player.txt',
+    'Avance': '3-advanced.txt',
+    'Balaise': '4-strong.txt',
+    'Expert': '5-expert.txt',
+    'Fou furieux': '6-mad.txt',
+    'Pre-rempli': 'overfilled.txt',
+    'Indetermine': 'undetermined.txt',
+  };
+  final splitLines = <String, List<String>>{
     for (final cat in _categories) cat: [],
   };
 
@@ -237,9 +286,9 @@ void main(List<String> args) {
       _Verdict v;
       try {
         final puzzle = Puzzle(line);
-        v = _classify(puzzle);
+        v = _classify(puzzle, maxPrefill: maxPrefill);
       } catch (e) {
-        v = _Verdict('Indetermine', 0, 0, 0, 0);
+        v = _Verdict('Indetermine', 0, 0, 0, 0, 0.0);
       }
       table[v.category]![label] = (table[v.category]![label] ?? 0) + 1;
 
@@ -252,8 +301,12 @@ void main(List<String> args) {
           v.maxForceDepth.toString(),
           v.maxPropCx.toString(),
           v.maxComplCx.toString(),
+          v.prefillRatio.toStringAsFixed(3),
           line,
         ]);
+      }
+      if (splitOut != null) {
+        splitLines[v.category]!.add(line);
       }
       done++;
       if (done % 100 == 0) {
@@ -263,12 +316,19 @@ void main(List<String> args) {
   }
 
   stdout.writeln('');
+  if (maxPrefill < 1.0) {
+    stdout.writeln(
+      'Filter: puzzles with prefill ratio > ${maxPrefill.toStringAsFixed(2)} '
+      'are bucketed in "Pre-rempli" instead of being classified.',
+    );
+    stdout.writeln('');
+  }
   _printTable(table, [for (final f in files) f.split('/').last]);
 
   if (sampleOut != null) {
     final sb = StringBuffer();
     sb.writeln(
-      'category\tfile\tindex\tforceMoves\tmaxForceDepth\tmaxPropCx\tmaxComplCx\tline',
+      'category\tfile\tindex\tforceMoves\tmaxForceDepth\tmaxPropCx\tmaxComplCx\tprefill\tline',
     );
     for (final cat in _categories) {
       for (final row in samples[cat]!) {
@@ -278,5 +338,22 @@ void main(List<String> args) {
     File(sampleOut).writeAsStringSync(sb.toString());
     stdout.writeln('');
     stdout.writeln('Sample TSV written to $sampleOut');
+  }
+
+  if (splitOut != null) {
+    final dir = Directory(splitOut);
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    stdout.writeln('');
+    stdout.writeln('Splitting puzzles into $splitOut/');
+    for (final cat in _categories) {
+      final fname = splitFilenames[cat];
+      if (fname == null) continue;
+      final outPath = '$splitOut/$fname';
+      final lines = splitLines[cat]!;
+      File(
+        outPath,
+      ).writeAsStringSync(lines.join('\n') + (lines.isEmpty ? '' : '\n'));
+      stdout.writeln('  $fname  (${lines.length} puzzles)');
+    }
   }
 }

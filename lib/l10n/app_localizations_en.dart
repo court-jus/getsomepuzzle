@@ -539,6 +539,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get collectionMyPuzzles => 'My puzzles';
 
   @override
+  String get collectionTutorial => 'Tutorial';
+
+  @override
+  String get collectionEasy => 'Beginner';
+
+  @override
+  String get collectionPlayer => 'Player';
+
+  @override
+  String get collectionAdvanced => 'Advanced';
+
+  @override
+  String get collectionStrong => 'Strong';
+
+  @override
+  String get collectionExpert => 'Expert';
+
+  @override
+  String get collectionMad => 'Crazy hard';
+
+  @override
+  String get tooltipRecommendedCollection => 'Recommended for you';
+
+  @override
+  String endOfPlaylistContinueIn(String collection) {
+    return 'Continue with $collection';
+  }
+
+  @override
+  String endOfPlaylistTrySuggested(String collection) {
+    return 'Try $collection';
+  }
+
+  @override
+  String get endOfPlaylistSuggestedHint =>
+      'Based on your level, you might enjoy this collection.';
+
+  @override
+  String get endOfPlaylistPickAnother => 'Pick another collection';
+
+  @override
   String get settingTutorialSection => 'Tutorial';
 
   @override

@@ -45,10 +45,10 @@ class _OpenPageState extends State<OpenPage> {
         widget.database.puzzles.isNotEmpty &&
         widget.database.puzzles.every((p) => p.played);
     if (tutorialDone) {
-      collection = 'default';
+      collection = Database.entryCollectionKey;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        widget.database.loadPuzzlesFile('default').then((_) {
+        widget.database.loadPuzzlesFile(Database.entryCollectionKey).then((_) {
           if (!mounted) return;
           setState(updateMatchingCount);
         });
@@ -312,9 +312,38 @@ class _OpenPageState extends State<OpenPage> {
                               items: [
                                 for (final item
                                     in widget.database.getCollections(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.collectionMyPuzzles,
+                                      CollectionLabels(
+                                        tutorial: AppLocalizations.of(
+                                          context,
+                                        )!.collectionTutorial,
+                                        easy: AppLocalizations.of(
+                                          context,
+                                        )!.collectionEasy,
+                                        player: AppLocalizations.of(
+                                          context,
+                                        )!.collectionPlayer,
+                                        advanced: AppLocalizations.of(
+                                          context,
+                                        )!.collectionAdvanced,
+                                        strong: AppLocalizations.of(
+                                          context,
+                                        )!.collectionStrong,
+                                        expert: AppLocalizations.of(
+                                          context,
+                                        )!.collectionExpert,
+                                        mad: AppLocalizations.of(
+                                          context,
+                                        )!.collectionMad,
+                                        myPuzzles: AppLocalizations.of(
+                                          context,
+                                        )!.collectionMyPuzzles,
+                                        recommendedTooltip: AppLocalizations.of(
+                                          context,
+                                        )!.tooltipRecommendedCollection,
+                                      ),
+                                      recommendedKey: widget
+                                          .database
+                                          .recommendedCollectionKey,
                                     ))
                                   DropdownMenuItem(
                                     value: item.$1,

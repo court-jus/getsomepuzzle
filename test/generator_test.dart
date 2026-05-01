@@ -191,7 +191,7 @@ void main() {
     // Don't assert non-null — 3x3 can legitimately fail
     // But if it succeeds, it should be valid
     if (result != null) {
-      final p = Puzzle(result);
+      final p = Puzzle(result.line);
       expect(p.width, 3);
       expect(p.constraints.isNotEmpty, isTrue);
     }

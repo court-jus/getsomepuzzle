@@ -1114,6 +1114,78 @@ abstract class AppLocalizations {
   /// **'My puzzles'**
   String get collectionMyPuzzles;
 
+  /// Label of the tutorial collection
+  ///
+  /// In en, this message translates to:
+  /// **'Tutorial'**
+  String get collectionTutorial;
+
+  /// Label of the easiest difficulty collection (1-easy.txt) — puzzles solvable by simple propagation only
+  ///
+  /// In en, this message translates to:
+  /// **'Beginner'**
+  String get collectionEasy;
+
+  /// Label of the second difficulty collection (2-player.txt) — puzzles requiring harder propagation but no complicity nor force
+  ///
+  /// In en, this message translates to:
+  /// **'Player'**
+  String get collectionPlayer;
+
+  /// Label of the advanced difficulty collection (3-advanced.txt) — puzzles using simple complicities
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get collectionAdvanced;
+
+  /// Label of the strong difficulty collection (4-strong.txt) — puzzles using complex complicities
+  ///
+  /// In en, this message translates to:
+  /// **'Strong'**
+  String get collectionStrong;
+
+  /// Label of the expert difficulty collection (5-expert.txt) — puzzles requiring one force move
+  ///
+  /// In en, this message translates to:
+  /// **'Expert'**
+  String get collectionExpert;
+
+  /// Label of the hardest difficulty collection (6-mad.txt) — puzzles requiring multiple or deep force moves
+  ///
+  /// In en, this message translates to:
+  /// **'Crazy hard'**
+  String get collectionMad;
+
+  /// Tooltip on the star badge next to the collection that matches the player's current level
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended for you'**
+  String get tooltipRecommendedCollection;
+
+  /// End-of-playlist primary action: load another batch of puzzles from the same collection
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with {collection}'**
+  String endOfPlaylistContinueIn(String collection);
+
+  /// End-of-playlist primary action: switch to the recommended collection
+  ///
+  /// In en, this message translates to:
+  /// **'Try {collection}'**
+  String endOfPlaylistTrySuggested(String collection);
+
+  /// Subtle hint below the 'Try X' button explaining why this collection is suggested
+  ///
+  /// In en, this message translates to:
+  /// **'Based on your level, you might enjoy this collection.'**
+  String get endOfPlaylistSuggestedHint;
+
+  /// End-of-playlist secondary link sending the player to the open page to pick a collection
+  ///
+  /// In en, this message translates to:
+  /// **'Pick another collection'**
+  String get endOfPlaylistPickAnother;
+
   /// Header of the tutorial-related settings section
   ///
   /// In en, this message translates to:

@@ -38,11 +38,13 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 
 The solver uses two levels of deduction. **Backtracking is intentionally not
 implemented:** the project-wide convention is that *a puzzle is valid iff
-`solve()` (propagation + force) reaches `ratio == 0` from its readonly
-cells*. Any puzzle that would require backtracking to be solved is
-considered invalid by definition — players use the same deductive solver
-in-game, so a non-deductive puzzle wouldn't be solvable for them anyway.
-See `Puzzle.isDeductivelyUnique()` for the validity check used everywhere.
+`solveExplained()` (propagation + force) produces a trace that completes
+the puzzle from its readonly cells*. Any puzzle that would require
+backtracking to be solved is considered invalid by definition — players use
+the same deductive solver in-game, so a non-deductive puzzle wouldn't be
+solvable for them anyway. The helper `Puzzle.isDeductivelyUnique()` wraps
+`solve()` and remains available for one-shot checks outside the generation
+pipeline.
 
 ### Level 1: Constraint Propagation
 
@@ -84,7 +86,7 @@ Create an empty grid and fill each cell with a random domain value (1 or 2). Thi
 
 ### Step 2: Pre-fill Cells
 
-Select a random subset of cells (controlled by a ratio parameter, typically 80-100% of cells left empty) and lock their values from the solution. These become the puzzle's given cells.
+Select a random subset of cells (controlled by a ratio parameter, randomly drawn in `[0.75, 1.0]`, so 75–100% of cells stay empty for the player) and lock the remaining cells' values from the solution. These become the puzzle's given cells. Up to 25% of the grid may thus be provided as readonly hints.
 
 ### Step 3: Enumerate Valid Constraints
 
@@ -108,18 +110,23 @@ After each successful addition, remaining candidates are reshuffled with priorit
 ### Step 5: Finalization
 
 - If the solved ratio reaches 0: the puzzle is fully determined by its
-  constraints. Verify `isDeductivelyUnique()` (always true at ratio=0) and
-  export.
+  constraints.
 - If 0 < ratio ≤ 0.25: fill remaining cells from the known solution as
-  readonly hints, then verify `isDeductivelyUnique()` on the augmented
-  puzzle. If `solve()` still leaves cells free *with* the hints, the
-  puzzle isn't deductively solvable even with help — discard.
+  readonly hints.
 - If ratio > 0.25: too under-determined. Discard and retry.
 
-There is no `countSolutions()` / backtracking unicity check. The
-`isDeductivelyUnique()` test is sufficient because reaching `ratio == 0`
-through propagation + force mechanically implies a single completion
-(every cell was deductively determined, leaving no ambiguity).
+The final validity gate uses `solveExplained()` on the puzzle (with any
+hint cells now locked as readonly). The trace is replayed on a clone; the
+puzzle is accepted only when `replay.complete && replay.check().isEmpty`,
+meaning the solver reached the unique completion deductively. This single
+`solveExplained()` call also produces the `SolveStep` trace used to
+classify the puzzle's difficulty level (see `lib/getsomepuzzle/level.dart`
+and `docs/dev/levels.md`) — no additional solve is required.
+
+There is no `countSolutions()` / backtracking uniqueness check. The replay
+check is sufficient: reaching a complete, violation-free state through
+propagation and force mechanically implies a single completion (every cell
+was deductively determined, leaving no ambiguity).
 
 ### Retry Strategy
 
@@ -128,57 +135,28 @@ The worker retries generation with new random grids until the requested number o
 ## Complexity Scoring
 
 Complexity measures how hard a puzzle is to solve, on a scale of 0 to 100.
-
-### Formula
-
-Complexity is the sum of three components, on a 0–100 scale:
+The detailed per-constraint weight table and the current formula are
+documented in `docs/dev/complexity.md`. The summary is:
 
 ```
-complexity = force_score + rule_diversity + emptiness
+complexity = forceScore + ruleDiversity + emptiness   (clamped 0..100)
+
+forceScore  = sum(move.complexity for propagation moves)
+            + sum(5 + 5 * move.forceDepth for force moves)
+            (clamped to 0..90)
 ```
 
-**Force score (0–90):** The solver first applies constraint propagation, then repeatedly forces one cell at a time (testing each value, detecting contradictions) and re-propagates. Each "force round" determines one cell that could not be found by propagation alone.
+`move.complexity` is a 0–5 weight assigned by each constraint's `apply()`
+reflecting estimated player effort (trivial counting = 0, articulation
+point reasoning or combinatorial probing = 4–5).
 
-```
-force_score = min(90, force_rounds * 10)
-```
+`ruleDiversity` (0–4) rewards multi-constraint puzzles. `emptiness` (0–6)
+reflects the proportion of cells left for the player to deduce.
 
-If the puzzle isn't deductively solvable (force itself can't close it):
-complexity = 100. Such puzzles are no longer produced by the generator —
-they would fail `isDeductivelyUnique()` — but legacy entries with
-`cplx=100` survive in `assets/default.txt` and are tagged this way.
-
-**Rule diversity (0–4):** Number of distinct constraint types in the puzzle.
-
-| Distinct types | Score |
-|---------------|-------|
-| 1 | 0 |
-| 2 | 1 |
-| 3 | 2 |
-| 4–5 | 3 |
-| 6+ | 4 |
-
-**Emptiness (0–6):** Proportion of free (non pre-filled) cells, scaled to 0–6.
-
-```
-emptiness = round(free_cells / total_cells * 6)
-```
-
-A fully empty grid scores 6, a 50% pre-filled grid scores 3.
-
-### Interpretation
-
-| Range | Difficulty | Meaning |
-|-------|-----------|---------|
-| 0–9 | Trivial | Solved by propagation alone, few rule types |
-| 10–29 | Easy | 1–2 force rounds, moderate diversity |
-| 30–59 | Medium | 3–5 force rounds |
-| 60–90 | Hard | 6–9 force rounds, high diversity |
-| 100 | (legacy) | Not deductively solvable — only present in legacy entries; the current generator rejects these |
-
-### Rationale
-
-The dominant factor is force rounds (up to 90 points), because each round represents a point where the player must hypothesize ("what if this cell is black?") and reason by contradiction. Rule diversity adds a small bonus because juggling multiple constraint types increases cognitive load. Emptiness contributes marginally because a mostly-empty grid offers fewer starting anchors for deduction.
+If the puzzle is not deductively solvable, complexity is forced to 100.
+Such puzzles are no longer produced by the generator but may survive in
+the legacy corpus files (see `docs/dev/levels.md` for the bucket
+`indetermine`).
 
 ## Background Execution
 

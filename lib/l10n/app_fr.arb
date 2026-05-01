@@ -190,6 +190,32 @@
     "createRemoveFixed": "Retirer la couleur fixée",
     "createPasteHint": "Coller une représentation de puzzle pour l'éditer",
     "collectionMyPuzzles": "Mes puzzles",
+    "collectionTutorial": "Tutoriel",
+    "collectionEasy": "Débutant",
+    "collectionPlayer": "Joueur",
+    "collectionAdvanced": "Avancé",
+    "collectionStrong": "Balaise",
+    "collectionExpert": "Expert",
+    "collectionMad": "Fou furieux",
+    "tooltipRecommendedCollection": "Recommandé pour toi",
+    "endOfPlaylistContinueIn": "Continuer dans {collection}",
+    "@endOfPlaylistContinueIn": {
+        "placeholders": {
+            "collection": {
+                "type": "String"
+            }
+        }
+    },
+    "endOfPlaylistTrySuggested": "Essayer {collection}",
+    "@endOfPlaylistTrySuggested": {
+        "placeholders": {
+            "collection": {
+                "type": "String"
+            }
+        }
+    },
+    "endOfPlaylistSuggestedHint": "D'après ton niveau, tu pourrais aimer cette collection.",
+    "endOfPlaylistPickAnother": "Choisir une autre collection",
     "constraintColumnCount": "cellules par colonne",
     "@constraintColumnCount": {
         "description": "Name of the column count constraint"

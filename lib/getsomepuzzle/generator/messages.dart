@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 
 /// Message types sent from the worker to the UI or CLI.
 sealed class GeneratorMessage {}
@@ -10,7 +11,12 @@ class GeneratorProgressMessage extends GeneratorMessage {
 
 class GeneratorPuzzleMessage extends GeneratorMessage {
   final String puzzleLine;
-  GeneratorPuzzleMessage(this.puzzleLine);
+
+  /// Difficulty palier as classified by the generator's own
+  /// `solveExplained` trace — the same trace it used to validate
+  /// deductive uniqueness, so this comes for free.
+  final PuzzleLevel level;
+  GeneratorPuzzleMessage(this.puzzleLine, this.level);
 }
 
 /// Emitted whenever a worker picks a new equilibrium target for the next

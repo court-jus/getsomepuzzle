@@ -26,9 +26,9 @@ grid, then collects the constraints that characterise it best.
    with a valid Shape motif before completion, so a Shape constraint will
    always be satisfiable.
 
-2. **Pre-fill a few cells.** A random ratio in `[0.8, 1.0]` decides what
+2. **Pre-fill a few cells.** A random ratio in `[0.75, 1.0]` decides what
    fraction of cells stays empty for the player; the others are locked
-   (`readonly`) at their solution value. So 0–20 % of the grid is given
+   (`readonly`) at their solution value. So 0–25 % of the grid is given
    as hints.
 
 3. **Enumerate every valid constraint.** For each registered slug
@@ -61,11 +61,17 @@ grid, then collects the constraints that characterise it best.
    - If `0 < ratio ≤ kMaxAcceptableRatio` (= 0.25): fill the remaining
      cells with the known solution as readonly hints.
    - Otherwise: discard.
-   - Final gate: `Puzzle.isDeductivelyUnique()` — `solve()` must close
-     the puzzle from the readonly cells. This replaced the old
-     `countSolutions() == 1` check (which relied on backtracking) and is
-     stricter: every shipped puzzle is solvable by the in-game hint
-     system, with no guessing required.
+   - Final gate: `Puzzle.solveExplained()` runs on the puzzle (with any
+     hint cells now readonly). The resulting `SolveStep` trace is
+     replayed on a clone; the puzzle is accepted only when
+     `replay.complete && replay.check().isEmpty`. This is stricter than
+     the old `countSolutions() == 1` check (which relied on
+     backtracking): every accepted puzzle is solvable by the in-game
+     hint system, with no guessing required. The same trace is reused
+     immediately by `classifyTrace()` (see `lib/getsomepuzzle/level.dart`)
+     to assign a difficulty level — no extra solve is performed.
+   - `generateOne` returns `({String line, PuzzleLevel level})?` so that
+     callers receive the classification alongside the serialised puzzle.
 
 ### 1.2. Why this design
 

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 
 /// Minimal-but-valid `PuzzleData` line. The constraint section repeats
@@ -356,5 +357,96 @@ void main() {
         expect(db.hasUnplayedIgnoringFilters(), isFalse);
       },
     );
+  });
+
+  group('recommendedLevelFor', () {
+    // The threshold function maps a `playerLevel` (0..100, anchored at 50
+    // = cohort average) to a playable PuzzleLevel via hand-picked
+    // boundaries. These tests pin the bucket boundaries and the edge
+    // cases so a future tweak forces a deliberate test update.
+
+    test('low playerLevel maps to debutant', () {
+      expect(recommendedLevelFor(0), PuzzleLevel.debutant);
+      expect(recommendedLevelFor(24), PuzzleLevel.debutant);
+    });
+
+    test('cohort-average playerLevel sits on the avance/balaise boundary', () {
+      // 49 → avance, 50 → balaise. The boundary is intentional: an
+      // average-paced player (per the cohort anchor) should sample from
+      // both adjacent paliers depending on day-to-day variation.
+      expect(recommendedLevelFor(49), PuzzleLevel.avance);
+      expect(recommendedLevelFor(50), PuzzleLevel.balaise);
+    });
+
+    test('high playerLevel maps to fouFurieux', () {
+      expect(recommendedLevelFor(80), PuzzleLevel.fouFurieux);
+      expect(recommendedLevelFor(120), PuzzleLevel.fouFurieux);
+    });
+
+    test('every threshold transition is covered', () {
+      // Each named boundary returns the bucket immediately below.
+      expect(recommendedLevelFor(25), PuzzleLevel.joueur);
+      expect(recommendedLevelFor(40), PuzzleLevel.avance);
+      expect(recommendedLevelFor(65), PuzzleLevel.expert);
+    });
+  });
+
+  group('Database.recommendedCollectionKey', () {
+    // Stats lines that parse to a finished, non-skipped entry. The
+    // recommendation uses the global stats count (not the currently
+    // loaded `puzzles` list), so a returning player who has played 100
+    // puzzles in another collection still sees the badge as soon as
+    // they switch collections — no need to grind 10 plays again.
+    List<String> nFinishedStatLines(int n) => List.generate(
+      n,
+      (i) =>
+          '2026-01-0${(i % 9) + 1}T12:00:00 30s 0f v2_12_4x4_0000000000000000_FM:1_0:0_$i',
+    );
+
+    test('null while fewer than 10 usable plays — onboarding noise floor', () {
+      final db = Database(playerLevel: 50);
+      db.collection = '1-easy';
+      db.loadStats(nFinishedStatLines(5));
+      expect(db.recommendedCollectionKey, isNull);
+    });
+
+    test('null when the recommendation matches the current collection', () {
+      // playerLevel 50 maps to balaise → '4-strong'. With current
+      // collection already '4-strong', no badge / banner needed.
+      final db = Database(playerLevel: 50);
+      db.collection = '4-strong';
+      db.loadStats(nFinishedStatLines(15));
+      expect(db.recommendedCollectionKey, isNull);
+    });
+
+    test('returns recommended key when it differs from current', () {
+      // playerLevel 80 → fouFurieux ('6-mad'). Player is in '2-player'.
+      final db = Database(playerLevel: 80);
+      db.collection = '2-player';
+      db.loadStats(nFinishedStatLines(15));
+      expect(db.recommendedCollectionKey, '6-mad');
+    });
+
+    test('null when the active collection is the tutorial', () {
+      // Don't suggest a graduation while the player is still in the
+      // pedagogical track.
+      final db = Database(playerLevel: 80);
+      db.collection = 'tutorial';
+      db.loadStats(nFinishedStatLines(15));
+      expect(db.recommendedCollectionKey, isNull);
+    });
+
+    test('counts plays globally — the loaded `puzzles` list is irrelevant', () {
+      // Returning player: 0 puzzles loaded in memory (e.g., they just
+      // switched to a fresh collection mid-session), but their stats
+      // history holds 12 finished plays from other collections. The
+      // recommendation must surface immediately, not wait for 10 fresh
+      // plays in the current bucket.
+      final db = Database(playerLevel: 80);
+      db.collection = '2-player';
+      db.puzzles = []; // nothing loaded in memory
+      db.loadStats(nFinishedStatLines(12));
+      expect(db.recommendedCollectionKey, '6-mad');
+    });
   });
 }

@@ -7,6 +7,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
+import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 
 class GeneratorWorker {
   StreamController<GeneratorMessage>? _controller;
@@ -96,7 +97,12 @@ class GeneratorWorker {
             ),
           );
         } else if (type == 'puzzle') {
-          _controller?.add(GeneratorPuzzleMessage(message['line'] as String));
+          _controller?.add(
+            GeneratorPuzzleMessage(
+              message['line'] as String,
+              PuzzleLevel.values[message['level'] as int],
+            ),
+          );
         } else if (type == 'target') {
           _controller?.add(GeneratorTargetMessage(message['label'] as String?));
         } else if (type == 'done') {
@@ -313,9 +319,9 @@ void _isolateEntryPoint(_IsolateParams params) {
     int lastTotalConstraints = 0;
     double lastRatio = 1.0;
 
-    String? line;
+    ({String line, PuzzleLevel level})? result;
     try {
-      line = PuzzleGenerator.generateOne(
+      result = PuzzleGenerator.generateOne(
         config,
         usageStats: usageStats,
         onProgress: (p) {
@@ -344,11 +350,11 @@ void _isolateEntryPoint(_IsolateParams params) {
       );
     } catch (e, st) {
       log('  exception during generateOne: $e\n$st');
-      line = null;
+      result = null;
     }
 
     final attemptDurationMs = stopwatch.elapsedMilliseconds - attemptStartMs;
-    if (line != null) {
+    if (result != null) {
       log(
         '  result: SUCCESS in ${attemptDurationMs}ms '
         '(tried=$lastTried/$lastTotalConstraints)',
@@ -361,9 +367,14 @@ void _isolateEntryPoint(_IsolateParams params) {
       );
     }
 
-    if (line != null) {
+    if (result != null) {
       generated++;
-      params.sendPort.send({'type': 'puzzle', 'line': line});
+      final line = result.line;
+      params.sendPort.send({
+        'type': 'puzzle',
+        'line': line,
+        'level': result.level.index,
+      });
 
       // Update legacy usageStats (slug-only bias).
       final parts = line.split('_');

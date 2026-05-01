@@ -50,7 +50,7 @@ class GeneratorWorker {
       if (_cancelled) break;
 
       try {
-        final line = PuzzleGenerator.generateOne(
+        final result = PuzzleGenerator.generateOne(
           config,
           usageStats: usageStats,
           onProgress: (p) {
@@ -69,9 +69,9 @@ class GeneratorWorker {
           shouldStop: () => _cancelled || stopwatch.elapsed > config.maxTime,
         );
 
-        if (line != null) {
+        if (result != null) {
           generated++;
-          _controller?.add(GeneratorPuzzleMessage(line));
+          _controller?.add(GeneratorPuzzleMessage(result.line, result.level));
           _controller?.add(
             GeneratorProgressMessage(
               GeneratorProgress(

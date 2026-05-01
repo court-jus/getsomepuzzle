@@ -9,6 +9,7 @@ import 'package:logging/logging.dart';
 import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart'
     as equilibrium;
+import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
@@ -217,6 +218,54 @@ class WeightedSelectionStats {
   });
 }
 
+/// Bundle of localised labels for built-in collections. Built by the
+/// caller from `AppLocalizations` so `Database` stays out of the l10n
+/// dependency graph.
+class CollectionLabels {
+  final String tutorial;
+  final String easy;
+  final String player;
+  final String advanced;
+  final String strong;
+  final String expert;
+  final String mad;
+  final String myPuzzles;
+  final String recommendedTooltip;
+
+  const CollectionLabels({
+    required this.tutorial,
+    required this.easy,
+    required this.player,
+    required this.advanced,
+    required this.strong,
+    required this.expert,
+    required this.mad,
+    required this.myPuzzles,
+    required this.recommendedTooltip,
+  });
+
+  /// Localised label for a built-in playable level collection key.
+  /// Returns null for non-playable keys (tutorial, custom, user_*).
+  String? labelFor(String collectionKey) {
+    switch (collectionKey) {
+      case '1-easy':
+        return easy;
+      case '2-player':
+        return player;
+      case '3-advanced':
+        return advanced;
+      case '4-strong':
+        return strong;
+      case '5-expert':
+        return expert;
+      case '6-mad':
+        return mad;
+      default:
+        return null;
+    }
+  }
+}
+
 class Database {
   List<PuzzleData> puzzles = [];
   String collection = "tutorial";
@@ -227,11 +276,20 @@ class Database {
   final log = Logger("Database");
   static const _builtInCollectionKeys = {
     'tutorial',
-    'default',
-    'collection2',
-    'collection3',
+    '1-easy',
+    '2-player',
+    '3-advanced',
+    '4-strong',
+    '5-expert',
+    '6-mad',
     'custom',
   };
+
+  /// Slug of the entry-level collection — what we send the player to once
+  /// the tutorial is done, and the fallback target for legacy stored
+  /// values like "default" / "collection2" / "collection3" that no longer
+  /// exist post-merge.
+  static const entryCollectionKey = '1-easy';
 
   Database({required this.playerLevel});
 
@@ -241,19 +299,48 @@ class Database {
 
   List<String> userPlaylistNames = [];
 
-  List<(String, Widget)> getCollections(String customLabel) => [
+  /// Order matters: the dropdown is rendered in this exact sequence,
+  /// so the player progresses naturally from tutorial through the six
+  /// difficulty paliers, then to their own playlists.
+  ///
+  /// Icons follow a cognitive progression — smile (easy & friendly) →
+  /// brain (start to think) → graduation cap (advanced knowledge) →
+  /// medal (distinction) → trophy (achievement) → fire (extreme).
+  List<(String, Widget)> getCollections(
+    CollectionLabels labels, {
+    String? recommendedKey,
+  }) => [
     for (final (key, label, icon) in [
-      ('tutorial', 'Tutorial', UniconsLine.baby_carriage),
-      ('default', 'Collection 1', UniconsLine.puzzle_piece),
-      ('collection2', 'Collection 2', UniconsLine.puzzle_piece),
-      ('collection3', 'Collection 3', UniconsLine.puzzle_piece),
-      ('custom', customLabel, Icons.build),
+      ('tutorial', labels.tutorial, UniconsLine.baby_carriage),
+      ('1-easy', labels.easy, UniconsLine.smile),
+      ('2-player', labels.player, UniconsLine.brain),
+      ('3-advanced', labels.advanced, UniconsLine.graduation_cap),
+      ('4-strong', labels.strong, UniconsLine.medal),
+      ('5-expert', labels.expert, UniconsLine.trophy),
+      ('6-mad', labels.mad, UniconsLine.fire),
+      ('custom', labels.myPuzzles, Icons.build),
     ])
       (
         key,
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [Text(label), Icon(icon)],
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label),
+            Icon(icon),
+            if (key == recommendedKey)
+              Tooltip(
+                message: labels.recommendedTooltip,
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: Icon(
+                    Icons.star_rounded,
+                    size: 16,
+                    color: Colors.amber,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     for (final name in userPlaylistNames)
@@ -317,17 +404,29 @@ class Database {
         .toList();
   }
 
+  /// Number of stats entries that count as "usable plays" — finished,
+  /// not skipped — across the entire stats history, not just the
+  /// currently loaded collection. Used by [recommendedCollectionKey] to
+  /// decide whether the player has played enough overall to act on the
+  /// recommendation. Reset on every [loadStats] call.
+  int _globalUsablePlays = 0;
+
   void loadStats(List<String> rawStats) {
     log.finest("loadStats");
     // Index by canonical key (identity-only): old stats lines that embed
     // a stale complexity score or constraint order still match the current
     // puzzle line. See lib/getsomepuzzle/model/canonical.dart.
     final Map<String, StatEntry> solvedPuzzles = {};
+    int usablePlays = 0;
     for (final line in rawStats) {
       final entry = StatEntry.parse(line);
       if (entry == null) continue;
       solvedPuzzles[canonicalPuzzleKey(entry.puzzleLine)] = entry;
+      if (entry.finished != null && entry.skipped == null) {
+        usablePlays++;
+      }
     }
+    _globalUsablePlays = usablePlays;
     log.finest("solved $solvedPuzzles");
     for (final puz in puzzles) {
       final entry = solvedPuzzles[canonicalPuzzleKey(puz.lineRepresentation)];
@@ -416,7 +515,17 @@ class Database {
       ...userPlaylistNames.map((name) => 'user_${slugify(name)}'),
     };
     if (!validKeys.contains(collectionToLoad)) {
-      collectionToLoad = "tutorial";
+      // Old corpus splits ('default', 'collection2', 'collection3') were
+      // merged then re-split by difficulty. Players who left the app on
+      // one of those should land on the entry-level collection rather
+      // than be bounced back to the tutorial.
+      collectionToLoad =
+          const {
+            'default': entryCollectionKey,
+            'collection2': entryCollectionKey,
+            'collection3': entryCollectionKey,
+          }[collectionToLoad] ??
+          'tutorial';
     }
     collection = collectionToLoad;
     prefs.setString("collectionToLoad", collection);
@@ -489,6 +598,16 @@ class Database {
     preparePlaylist();
   }
 
+  /// Number of puzzles surfaced per playlist batch on the 6 built-in
+  /// level collections. End-of-batch is the natural moment to surface
+  /// a level-rotation suggestion — capping at 20 avoids the player going
+  /// months without seeing it on collections that hold ~1k+ puzzles.
+  /// Tutorial, custom, and user playlists are not capped.
+  static const int playlistBatchSize = 20;
+
+  bool _isPlayableLevel(String key) =>
+      playableCollectionKeyToLevel.containsKey(key);
+
   void preparePlaylist() {
     if (collection == 'tutorial') {
       // Tutorial has a fixed pedagogical order: no shuffle, no level
@@ -497,12 +616,59 @@ class Database {
     } else if (shouldShuffle) {
       playlist = filter().toList();
       playlist.shuffle();
+      _maybeCapBatch();
     } else {
       playlist = getPuzzlesByLevel(playerLevel);
+      _maybeCapBatch();
     }
     log.info(
-      "Playlist prepared with ${playlist.length} puzzles (shuffled: $shouldShuffle)",
+      "Playlist prepared with ${playlist.length} puzzles "
+      "(shuffled: $shouldShuffle, capped: ${_isPlayableLevel(collection)})",
     );
+  }
+
+  void _maybeCapBatch() {
+    if (_isPlayableLevel(collection) && playlist.length > playlistBatchSize) {
+      playlist = playlist.sublist(0, playlistBatchSize);
+    }
+  }
+
+  /// True if at least one playable puzzle in the current collection's
+  /// filtered catalog is not in the active [playlist] (i.e. the player
+  /// can request another batch of 20). Returns false on non-playable
+  /// collections (tutorial, custom, user_*) since they don't use the
+  /// batch concept.
+  bool hasMoreCandidatesInCurrentCollection() {
+    if (!_isPlayableLevel(collection)) return false;
+    final inBatch = playlist.toSet();
+    return filter().any((p) => !inBatch.contains(p));
+  }
+
+  /// Minimum number of usable plays needed before we surface a
+  /// recommendation. Below this, [recommendedCollectionKey] returns
+  /// null — the rolling-average `playerLevel` is too noisy to act on.
+  static const int _minPlaysForRecommendation = 10;
+
+  /// Suggested collection key based on `playerLevel`. Returns null
+  /// when:
+  ///   - tutorial is the active collection (we don't suggest while
+  ///     teaching),
+  ///   - the player has fewer than [_minPlaysForRecommendation] usable
+  ///     plays *globally* (avoid noisy onboarding suggestions). The
+  ///     count comes from [_globalUsablePlays], populated from the raw
+  ///     stats file in [loadStats] — counting only the
+  ///     currently-loaded collection's `puzzles` would miss every play
+  ///     made in another collection during a previous session, which
+  ///     would suppress the badge for any returning player who just
+  ///     switched collections.
+  ///   - the recommendation matches the current collection (no badge
+  ///     needed).
+  String? get recommendedCollectionKey {
+    if (collection == 'tutorial') return null;
+    if (_globalUsablePlays < _minPlaysForRecommendation) return null;
+    final level = recommendedLevelFor(playerLevel);
+    final key = levelToPlayableCollectionKey[level];
+    return (key == null || key == collection) ? null : key;
   }
 
   /// Erase every stat entry belonging to a tutorial puzzle and reset the

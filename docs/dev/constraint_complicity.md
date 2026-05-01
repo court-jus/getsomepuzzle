@@ -50,14 +50,20 @@ A complicity is only tried when individual constraints are exhausted.
 If it unlocks a cell, the outer propagation loop calls `apply()` again
 and constraints get another chance with the freshly placed cell.
 
-### Auto-detection
+### Auto-detection (lazy cache)
 
-At puzzle construction time `Puzzle._detectComplicities()` instantiates
-every entry in `complicities/registry.dart` and keeps the ones whose
-`isPresent(this)` returns `true`. We pay the detection cost once, then
-`apply()` only iterates the relevant subset. `clone()` re-runs the
-detection so an exploratory clone never depends on the parent's
-references.
+The `Puzzle.complicities` getter is backed by a nullable `_complicitiesCache`
+field. On first access after any constraint mutation, it instantiates every
+entry in `complicities/registry.dart`, filters to the ones whose
+`isPresent(this)` returns `true`, and stores the result. Subsequent accesses
+in the same state reuse the cached list at zero cost.
+
+Cache invalidation happens automatically in every constraint-mutation helper
+(`addConstraint`, `addAllConstraints`, `removeConstraint`, `removeConstraintAt`,
+`insertConstraintAt`, `replaceConstraints`): each sets `_complicitiesCache = null`.
+Because `Puzzle.clone()` copies `_constraints` but not the cache, the first
+`apply()` call on a clone transparently recomputes the list — no explicit
+re-detection step is needed.
 
 ### Complexity weight
 

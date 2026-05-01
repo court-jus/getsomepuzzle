@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
+import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
@@ -43,9 +44,34 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     if (!dir.existsSync()) dir.createSync(recursive: true);
   }
 
+  // Two output modes:
+  //   * `--output FILE` → all puzzles appended to a single file (legacy).
+  //   * no `--output`   → puzzles are auto-routed by difficulty palier
+  //                       to `assets/<level>.txt` (1-easy.txt … 6-mad.txt).
+  //                       The classification is computed during generation
+  //                       (no extra solve), see lib/getsomepuzzle/level.dart.
   IOSink? sink;
+  Map<PuzzleLevel, IOSink>? levelSinks;
   if (output != null) {
     sink = File(output).openWrite(mode: FileMode.append);
+  } else {
+    levelSinks = {};
+    for (final level in PuzzleLevel.values) {
+      final fname = levelFilenames[level];
+      if (fname == null) continue;
+      // Skip out-of-cascade buckets: the live generator never produces
+      // them (preRempli is impossible because the prefill ratio is
+      // bounded by the generator's `ratio` knob, indetermine cannot
+      // happen because we only emit lines whose trace completed).
+      if (level == PuzzleLevel.preRempli || level == PuzzleLevel.indetermine) {
+        continue;
+      }
+      final dir = Directory('assets');
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      levelSinks[level] = File(
+        'assets/$fname',
+      ).openWrite(mode: FileMode.append);
+    }
   }
 
   // Initial corpus: read the output file if it exists, otherwise start empty.
@@ -55,6 +81,16 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   List<String> currentLines = const [];
   if (output != null && File(output).existsSync()) {
     currentLines = File(output).readAsLinesSync();
+  } else if (output == null) {
+    // Aggregate stats across the per-level files so the dashboard shows
+    // the full corpus, not just one bucket.
+    final aggregate = <String>[];
+    for (final s in levelSinks!.entries) {
+      final fname = levelFilenames[s.key]!;
+      final f = File('assets/$fname');
+      if (f.existsSync()) aggregate.addAll(f.readAsLinesSync());
+    }
+    currentLines = aggregate;
   }
   // usageStats passed to workers stays a flat slug→count map for the legacy
   // slug bias; recomputed once from the initial corpus.
@@ -202,7 +238,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
             attemptCounts[j]++;
             currentTargets[j] = label;
             render();
-          case GeneratorPuzzleMessage(:final puzzleLine):
+          case GeneratorPuzzleMessage(:final puzzleLine, :final level):
             successCounts[j]++;
             generated++;
             final now = totalSw.elapsedMilliseconds;
@@ -215,7 +251,16 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
               // Re-read the file so stats reflect what's actually on disk.
               currentLines = File(output!).readAsLinesSync();
             } else {
-              stdout.writeln(puzzleLine);
+              final levelSink = levelSinks![level];
+              if (levelSink != null) {
+                levelSink.writeln(puzzleLine);
+                await levelSink.flush();
+              } else {
+                // Should not happen — generator only emits cascade levels.
+                stderr.writeln(
+                  'WARN: out-of-cascade level $level for $puzzleLine',
+                );
+              }
               currentLines = [...currentLines, puzzleLine];
             }
             cachedStats = _CollectionStats.fromLines(currentLines);
