@@ -95,10 +95,6 @@
             }
         }
     },
-    "endOfPlaylistTutorialFinished": "Has terminado el tutorial.",
-    "endOfPlaylistTutorialHaveFun": "¡Diviértete!",
-    "endOfPlaylistTutorialStartPlaying": "Empezar a jugar",
-    "endOfPlaylistTutorialAutoLevelNote": "La dificultad se adaptará automáticamente a tu habilidad. Puedes desactivarlo en los ajustes.",
     "hintDeducedFrom": "Esta celda se puede deducir gracias a la restricción: {constraintName}",
     "hintComplicity": "Esta celda se puede deducir combinando las restricciones {c1} y {c2}",
     "hintComplicityTwin": "Esta celda se puede deducir combinando dos restricciones {c}",
@@ -119,6 +115,39 @@
     "constraintShape": "forma",
     "constraintNeighborCount": "número de vecinos",
     "constraintEyes": "ojos",
+    "newConstraintModalTitle": "¡Regla nueva!",
+    "learning": "Aprendizaje",
+    "learningPageTitle": "Aprendizaje",
+    "learningSeenOn": "Vista por primera vez el {date}",
+    "@learningSeenOn": {
+        "placeholders": {
+            "date": {
+                "type": "String"
+            }
+        }
+    },
+    "learningNeverSeen": "Aún no encontrada",
+    "learningPlayCount": "{count, plural, =0{Ningún puzzle jugado} =1{1 puzzle jugado} other{{count} puzzles jugados}}",
+    "@learningPlayCount": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "learningRefreshButton": "Refrescarme la memoria",
+    "constraintExplainFM": "Cuando se muestra un motivo sobre la cuadrícula con fondo violeta, ese motivo nunca debe aparecer en la cuadrícula.",
+    "constraintExplainSH": "Cuando se muestra un motivo sobre la cuadrícula con fondo azul claro inclinado 45°, todos los grupos de ese color deben tener exactamente esa forma (se permiten rotaciones y simetrías).",
+    "constraintExplainGS": "Cuando una casilla contiene un número, debe pertenecer a un grupo de casillas del mismo color, adyacentes ortogonalmente, cuyo tamaño coincida con ese número.",
+    "constraintExplainPA": "Cuando una casilla contiene una flecha, debe haber el mismo número de casillas negras y blancas delante de la flecha. Una flecha doble extiende la regla a ambos lados.",
+    "constraintExplainLT": "Las casillas marcadas con la misma letra deben pertenecer al mismo grupo. Un grupo no puede contener dos letras diferentes.",
+    "constraintExplainQA": "Un indicador numérico sobre fondo azul encima del puzzle señala cuántas casillas de ese color debe contener la solución en total.",
+    "constraintExplainSY": "Cuando una casilla contiene uno de estos símbolos (⟍, |, ⟋, ―, 🞋), el grupo del que forma parte debe respetar la simetría asociada. La simetría central (🞋) equivale a un giro de media vuelta.",
+    "constraintExplainDF": "Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.",
+    "constraintExplainCC": "Un número dentro de un círculo sobre una columna indica cuántas celdas de ese color deben aparecer en esa columna específica.",
+    "constraintExplainGC": "Un número dentro de un marco con un icono de enlace indica cuántos grupos (componentes conexas) de ese color debe contener la solución.",
+    "constraintExplainNC": "Una casilla mostrada con cruces en sus lados debe tener exactamente el número indicado de vecinos ortogonales del color marcado.",
+    "constraintExplainEY": "Una casilla con un ojo debe « ver » exactamente el número indicado de casillas del color del ojo. La vista avanza en línea recta en las cuatro direcciones ortogonales hasta el borde de la cuadrícula o hasta una casilla del color opuesto (que bloquea la vista).",
     "constraintSymmetry": "simetría",
     "generate": "Generar",
     "generateTitle": "Generar puzzles",
@@ -197,7 +226,6 @@
     "createRemoveFixed": "Quitar color fijo",
     "createPasteHint": "Pegar una representación de puzzle para editarlo",
     "collectionMyPuzzles": "Mis puzzles",
-    "collectionTutorial": "Tutorial",
     "collectionEasy": "Principiante",
     "collectionPlayer": "Jugador",
     "collectionAdvanced": "Avanzado",
@@ -222,17 +250,17 @@
         }
     },
     "endOfPlaylistSuggestedHint": "Según tu nivel, podría gustarte esta colección.",
+    "endOfPlaylistOnboardingNote": "Aún no has visto todas las reglas — sigue jugando para descubrirlas una a una.",
     "endOfPlaylistPickAnother": "Elegir otra colección",
     "constraintColumnCount": "células por columna",
     "@constraintColumnCount": {
         "description": "Name of the column count constraint"
     },
     "complicityOtherConstraint": "otra restricción",
-    "settingTutorialSection": "Tutorial",
-    "settingRestartTutorial": "Reiniciar el tutorial",
-    "settingRestartTutorialConfirmTitle": "¿Reiniciar el tutorial?",
-    "settingRestartTutorialConfirmBody": "Tu progreso en los puzles del tutorial se borrará. Esta acción no se puede deshacer.",
-    "settingTutorialRestarted": "Estadísticas del tutorial borradas.",
+    "settingReplayOnboarding": "Repetir la introducción",
+    "settingReplayOnboardingConfirmTitle": "¿Repetir la introducción?",
+    "settingReplayOnboardingConfirmBody": "Las explicaciones de cada regla aparecerán de nuevo mientras juegas. Tus estadísticas de juego se conservan.",
+    "settingOnboardingReplayed": "Introducción reiniciada.",
     "settingClearStats": "Borrar todas las estadísticas",
     "settingClearStatsConfirmTitle": "¿Borrar todas las estadísticas?",
     "settingClearStatsConfirmBody": "Se borrará todo el historial de partidas: tiempos, valoraciones, estados jugado/saltado. Esta acción no se puede deshacer.",

@@ -233,19 +233,6 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get endOfPlaylistTutorialFinished => 'Has terminado el tutorial.';
-
-  @override
-  String get endOfPlaylistTutorialHaveFun => '¡Diviértete!';
-
-  @override
-  String get endOfPlaylistTutorialStartPlaying => 'Empezar a jugar';
-
-  @override
-  String get endOfPlaylistTutorialAutoLevelNote =>
-      'La dificultad se adaptará automáticamente a tu habilidad. Puedes desactivarlo en los ajustes.';
-
-  @override
   String hintDeducedFrom(String constraintName) {
     return 'Esta celda se puede deducir gracias a la restricción: $constraintName';
   }
@@ -538,13 +525,90 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintEyes => 'ojos';
 
   @override
+  String get newConstraintModalTitle => '¡Regla nueva!';
+
+  @override
+  String get learning => 'Aprendizaje';
+
+  @override
+  String get learningPageTitle => 'Aprendizaje';
+
+  @override
+  String learningSeenOn(String date) {
+    return 'Vista por primera vez el $date';
+  }
+
+  @override
+  String get learningNeverSeen => 'Aún no encontrada';
+
+  @override
+  String learningPlayCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count puzzles jugados',
+      one: '1 puzzle jugado',
+      zero: 'Ningún puzzle jugado',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get learningRefreshButton => 'Refrescarme la memoria';
+
+  @override
+  String get constraintExplainFM =>
+      'Cuando se muestra un motivo sobre la cuadrícula con fondo violeta, ese motivo nunca debe aparecer en la cuadrícula.';
+
+  @override
+  String get constraintExplainSH =>
+      'Cuando se muestra un motivo sobre la cuadrícula con fondo azul claro inclinado 45°, todos los grupos de ese color deben tener exactamente esa forma (se permiten rotaciones y simetrías).';
+
+  @override
+  String get constraintExplainGS =>
+      'Cuando una casilla contiene un número, debe pertenecer a un grupo de casillas del mismo color, adyacentes ortogonalmente, cuyo tamaño coincida con ese número.';
+
+  @override
+  String get constraintExplainPA =>
+      'Cuando una casilla contiene una flecha, debe haber el mismo número de casillas negras y blancas delante de la flecha. Una flecha doble extiende la regla a ambos lados.';
+
+  @override
+  String get constraintExplainLT =>
+      'Las casillas marcadas con la misma letra deben pertenecer al mismo grupo. Un grupo no puede contener dos letras diferentes.';
+
+  @override
+  String get constraintExplainQA =>
+      'Un indicador numérico sobre fondo azul encima del puzzle señala cuántas casillas de ese color debe contener la solución en total.';
+
+  @override
+  String get constraintExplainSY =>
+      'Cuando una casilla contiene uno de estos símbolos (⟍, |, ⟋, ―, 🞋), el grupo del que forma parte debe respetar la simetría asociada. La simetría central (🞋) equivale a un giro de media vuelta.';
+
+  @override
+  String get constraintExplainDF =>
+      'Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.';
+
+  @override
+  String get constraintExplainCC =>
+      'Un número dentro de un círculo sobre una columna indica cuántas celdas de ese color deben aparecer en esa columna específica.';
+
+  @override
+  String get constraintExplainGC =>
+      'Un número dentro de un marco con un icono de enlace indica cuántos grupos (componentes conexas) de ese color debe contener la solución.';
+
+  @override
+  String get constraintExplainNC =>
+      'Una casilla mostrada con cruces en sus lados debe tener exactamente el número indicado de vecinos ortogonales del color marcado.';
+
+  @override
+  String get constraintExplainEY =>
+      'Una casilla con un ojo debe « ver » exactamente el número indicado de casillas del color del ojo. La vista avanza en línea recta en las cuatro direcciones ortogonales hasta el borde de la cuadrícula o hasta una casilla del color opuesto (que bloquea la vista).';
+
+  @override
   String get complicityOtherConstraint => 'otra restricción';
 
   @override
   String get collectionMyPuzzles => 'Mis puzzles';
-
-  @override
-  String get collectionTutorial => 'Tutorial';
 
   @override
   String get collectionEasy => 'Principiante';
@@ -582,26 +646,27 @@ class AppLocalizationsEs extends AppLocalizations {
       'Según tu nivel, podría gustarte esta colección.';
 
   @override
+  String get endOfPlaylistOnboardingNote =>
+      'Aún no has visto todas las reglas — sigue jugando para descubrirlas una a una.';
+
+  @override
   String get endOfPlaylistPickAnother => 'Elegir otra colección';
 
   @override
-  String get settingTutorialSection => 'Tutorial';
-
-  @override
-  String get settingRestartTutorial => 'Reiniciar el tutorial';
-
-  @override
-  String get settingRestartTutorialConfirmTitle => '¿Reiniciar el tutorial?';
-
-  @override
-  String get settingRestartTutorialConfirmBody =>
-      'Tu progreso en los puzles del tutorial se borrará. Esta acción no se puede deshacer.';
-
-  @override
-  String get settingTutorialRestarted => 'Estadísticas del tutorial borradas.';
-
-  @override
   String get settingClearStats => 'Borrar todas las estadísticas';
+
+  @override
+  String get settingReplayOnboarding => 'Repetir la introducción';
+
+  @override
+  String get settingReplayOnboardingConfirmTitle => '¿Repetir la introducción?';
+
+  @override
+  String get settingReplayOnboardingConfirmBody =>
+      'Las explicaciones de cada regla aparecerán de nuevo mientras juegas. Tus estadísticas de juego se conservan.';
+
+  @override
+  String get settingOnboardingReplayed => 'Introducción reiniciada.';
 
   @override
   String get settingClearStatsConfirmTitle => '¿Borrar todas las estadísticas?';

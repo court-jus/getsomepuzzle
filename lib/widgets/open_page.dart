@@ -26,7 +26,7 @@ class OpenPage extends StatefulWidget {
 
 class _OpenPageState extends State<OpenPage> {
   int matchingCount = 0;
-  String collection = "tutorial";
+  String collection = Database.entryCollectionKey;
   bool showAdvanced = false;
   Map<String, bool?> rules = {};
 
@@ -37,25 +37,7 @@ class _OpenPageState extends State<OpenPage> {
   void initState() {
     super.initState();
     collection = widget.database.collection;
-    // If the player just landed on Open-page while the tutorial collection is
-    // fully completed, surface the main collection instead so the list isn't
-    // empty. The actual switch is done async to avoid setState-during-build.
-    final tutorialDone =
-        collection == 'tutorial' &&
-        widget.database.puzzles.isNotEmpty &&
-        widget.database.puzzles.every((p) => p.played);
-    if (tutorialDone) {
-      collection = Database.entryCollectionKey;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        widget.database.loadPuzzlesFile(Database.entryCollectionKey).then((_) {
-          if (!mounted) return;
-          setState(updateMatchingCount);
-        });
-      });
-    } else {
-      updateMatchingCount();
-    }
+    updateMatchingCount();
   }
 
   void applyFilter({
@@ -220,7 +202,7 @@ class _OpenPageState extends State<OpenPage> {
                 orElse: () => slug,
               );
               await widget.database.deleteUserPlaylist(name);
-              chooseCollection('tutorial');
+              chooseCollection(Database.entryCollectionKey);
             },
             child: Text(
               MaterialLocalizations.of(ctx).deleteButtonTooltip,
@@ -318,9 +300,6 @@ class _OpenPageState extends State<OpenPage> {
                                 for (final item
                                     in widget.database.getCollections(
                                       CollectionLabels(
-                                        tutorial: AppLocalizations.of(
-                                          context,
-                                        )!.collectionTutorial,
                                         easy: AppLocalizations.of(
                                           context,
                                         )!.collectionEasy,
@@ -355,8 +334,9 @@ class _OpenPageState extends State<OpenPage> {
                                     child: item.$2,
                                   ),
                               ],
-                              onChanged: (newValue) =>
-                                  chooseCollection(newValue ?? "tutorial"),
+                              onChanged: (newValue) => chooseCollection(
+                                newValue ?? Database.entryCollectionKey,
+                              ),
                             ),
                             IconButton(
                               icon: const Icon(Icons.add),

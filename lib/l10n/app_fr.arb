@@ -95,10 +95,6 @@
             }
         }
     },
-    "endOfPlaylistTutorialFinished": "Vous avez terminé le tutoriel.",
-    "endOfPlaylistTutorialHaveFun": "Amusez-vous bien !",
-    "endOfPlaylistTutorialStartPlaying": "Commencer à jouer",
-    "endOfPlaylistTutorialAutoLevelNote": "La difficulté s'adaptera automatiquement à votre niveau. Vous pouvez désactiver cette option dans les paramètres.",
     "hintDeducedFrom": "Cette cellule peut être déduite grâce à la contrainte : {constraintName}",
     "hintComplicity": "Cette cellule peut être déduite en combinant les contraintes {c1} et {c2}",
     "hintComplicityTwin": "Cette cellule peut être déduite en combinant deux contraintes {c}",
@@ -119,6 +115,39 @@
     "constraintShape": "forme",
     "constraintNeighborCount": "nombre de voisins",
     "constraintEyes": "yeux",
+    "newConstraintModalTitle": "Nouvelle règle !",
+    "learning": "Apprentissage",
+    "learningPageTitle": "Apprentissage",
+    "learningSeenOn": "Vue pour la première fois le {date}",
+    "@learningSeenOn": {
+        "placeholders": {
+            "date": {
+                "type": "String"
+            }
+        }
+    },
+    "learningNeverSeen": "Pas encore rencontrée",
+    "learningPlayCount": "{count, plural, =0{Aucun puzzle joué} =1{1 puzzle joué} other{{count} puzzles joués}}",
+    "@learningPlayCount": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "learningRefreshButton": "Me rafraîchir la mémoire",
+    "constraintExplainFM": "Lorsqu'un motif est affiché au-dessus de la grille sur un fond violet, ce motif ne doit jamais apparaître dans la grille.",
+    "constraintExplainSH": "Lorsqu'un motif est affiché au-dessus de la grille sur un fond bleu clair et incliné à 45°, tous les groupes de cette couleur doivent avoir cette forme exacte (les rotations et symétries sont autorisées).",
+    "constraintExplainGS": "Lorsqu'une case contient un nombre, elle doit faire partie d'un groupe de cases de la même couleur, adjacentes orthogonalement, et la taille de ce groupe doit correspondre au nombre.",
+    "constraintExplainPA": "Lorsqu'une case contient une flèche, il doit y avoir le même nombre de cases noires et de cases blanches devant la flèche. Une double flèche étend la règle aux deux côtés.",
+    "constraintExplainLT": "Les cases marquées de la même lettre doivent appartenir au même groupe. Un groupe ne peut pas contenir deux lettres différentes.",
+    "constraintExplainQA": "Un indice numérique sur fond bleu au-dessus du puzzle indique combien de cases de cette couleur la solution doit contenir au total.",
+    "constraintExplainSY": "Lorsqu'une case contient l'un de ces symboles (⟍, |, ⟋, ―, 🞋), le groupe dont elle fait partie doit respecter la symétrie associée. La symétrie centrale (🞋) équivaut à une rotation d'un demi-tour.",
+    "constraintExplainDF": "Lorsque deux cellules sont séparées par le symbole ≠, elles doivent être de couleurs différentes.",
+    "constraintExplainCC": "Un nombre dans un cercle au-dessus d'une colonne indique combien de cellules de cette couleur doivent apparaître dans cette colonne précise.",
+    "constraintExplainGC": "Un nombre dans un cadre avec une icône de lien indique combien de groupes (composantes connexes) de cette couleur la solution doit contenir.",
+    "constraintExplainNC": "Une case affichée avec des croix sur ses côtés doit avoir exactement le nombre indiqué de voisins orthogonaux de la couleur marquée.",
+    "constraintExplainEY": "Une case contenant un œil doit « voir » exactement le nombre indiqué de cases de la couleur de l'œil. La vue se propage en ligne droite dans les quatre directions orthogonales jusqu'au bord de la grille ou jusqu'à une case de la couleur opposée (qui bloque la vue).",
     "constraintSymmetry": "symétrie",
     "generate": "Générer",
     "generateTitle": "Générer des puzzles",
@@ -197,7 +226,6 @@
     "createRemoveFixed": "Retirer la couleur fixée",
     "createPasteHint": "Coller une représentation de puzzle pour l'éditer",
     "collectionMyPuzzles": "Mes puzzles",
-    "collectionTutorial": "Tutoriel",
     "collectionEasy": "Débutant",
     "collectionPlayer": "Joueur",
     "collectionAdvanced": "Avancé",
@@ -222,17 +250,17 @@
         }
     },
     "endOfPlaylistSuggestedHint": "D'après ton niveau, tu pourrais aimer cette collection.",
+    "endOfPlaylistOnboardingNote": "Tu n'as pas encore croisé toutes les règles — continue à jouer pour les découvrir une par une.",
     "endOfPlaylistPickAnother": "Choisir une autre collection",
     "constraintColumnCount": "cellules par colonne",
     "@constraintColumnCount": {
         "description": "Name of the column count constraint"
     },
     "complicityOtherConstraint": "une autre contrainte",
-    "settingTutorialSection": "Didacticiel",
-    "settingRestartTutorial": "Recommencer le didacticiel",
-    "settingRestartTutorialConfirmTitle": "Recommencer le didacticiel ?",
-    "settingRestartTutorialConfirmBody": "Votre progression sur les puzzles du didacticiel sera effacée. Cette action est irréversible.",
-    "settingTutorialRestarted": "Statistiques du didacticiel effacées.",
+    "settingReplayOnboarding": "Rejouer l'onboarding",
+    "settingReplayOnboardingConfirmTitle": "Rejouer l'onboarding ?",
+    "settingReplayOnboardingConfirmBody": "Les explications de chaque règle réapparaîtront au fur et à mesure de tes parties. Tes statistiques de jeu sont conservées.",
+    "settingOnboardingReplayed": "Onboarding réinitialisé.",
     "settingClearStats": "Effacer toutes les statistiques",
     "settingClearStatsConfirmTitle": "Effacer toutes les statistiques ?",
     "settingClearStatsConfirmBody": "Tout l'historique de jeu sera supprimé : temps, notes, statuts joué/passé. Cette action est irréversible.",

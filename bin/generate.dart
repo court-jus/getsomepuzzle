@@ -69,13 +69,15 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     for (final level in PuzzleLevel.values) {
       final fname = levelFilenames[level];
       if (fname == null) continue;
-      // Skip out-of-cascade buckets: the live generator never produces
-      // them (preRempli is impossible because the prefill ratio is
-      // bounded by the generator's `ratio` knob, indetermine cannot
-      // happen because we only emit lines whose trace completed).
-      if (level == PuzzleLevel.preRempli || level == PuzzleLevel.indetermine) {
-        continue;
-      }
+      // Skip `undetermined`: classifyTrace returns it only when the
+      // trace doesn't complete, which the generator already filters
+      // out before emitting a `GeneratorPuzzleMessage`. The two
+      // `overfilled*` buckets *do* get sinks: the live generator may
+      // emit them when it produces a high-prefill puzzle (its
+      // `ratio` knob mostly bounds prefill but small grids still
+      // sometimes overshoot the 30 % cap, especially with a
+      // `--require` slug).
+      if (level == PuzzleLevel.undetermined) continue;
       final dir = Directory('assets');
       if (!dir.existsSync()) dir.createSync(recursive: true);
       levelSinks[level] = File(

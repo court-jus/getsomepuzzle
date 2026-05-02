@@ -48,17 +48,6 @@ void main() {
       expect(db.playlist.length, Database.playlistBatchSize + 30);
     });
 
-    test('does not cap on `tutorial` (pedagogical order)', () {
-      // Tutorial uses a fixed pedagogical order that must be played
-      // through in full. Cap would break the teaching sequence.
-      final db = Database(playerLevel: 50);
-      db.collection = 'tutorial';
-      final size = Database.playlistBatchSize + 10;
-      db.puzzles = List.generate(size, (i) => _puz(cplx: 5));
-      db.preparePlaylist();
-      expect(db.playlist.length, size);
-    });
-
     test('shuffle mode is also capped on level collections', () {
       // The cap is about end-of-batch UX, not about ordering. Even
       // when the user explicitly shuffles, we still want the

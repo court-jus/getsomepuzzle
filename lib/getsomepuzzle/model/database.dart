@@ -11,6 +11,8 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart'
     as equilibrium;
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:intl/intl.dart';
@@ -222,7 +224,6 @@ class WeightedSelectionStats {
 /// caller from `AppLocalizations` so `Database` stays out of the l10n
 /// dependency graph.
 class CollectionLabels {
-  final String tutorial;
   final String easy;
   final String player;
   final String advanced;
@@ -233,7 +234,6 @@ class CollectionLabels {
   final String recommendedTooltip;
 
   const CollectionLabels({
-    required this.tutorial,
     required this.easy,
     required this.player,
     required this.advanced,
@@ -245,7 +245,7 @@ class CollectionLabels {
   });
 
   /// Localised label for a built-in playable level collection key.
-  /// Returns null for non-playable keys (tutorial, custom, user_*).
+  /// Returns null for non-playable keys (custom, user_*).
   String? labelFor(String collectionKey) {
     switch (collectionKey) {
       case '1-easy':
@@ -268,14 +268,13 @@ class CollectionLabels {
 
 class Database {
   List<PuzzleData> puzzles = [];
-  String collection = "tutorial";
+  String collection = entryCollectionKey;
   Filters currentFilters = Filters();
   bool shouldShuffle = false;
   List<PuzzleData> playlist = [];
   int playerLevel;
   final log = Logger("Database");
   static const _builtInCollectionKeys = {
-    'tutorial',
     '1-easy',
     '2-player',
     '3-advanced',
@@ -285,13 +284,21 @@ class Database {
     'custom',
   };
 
-  /// Slug of the entry-level collection — what we send the player to once
-  /// the tutorial is done, and the fallback target for legacy stored
-  /// values like "default" / "collection2" / "collection3" that no longer
-  /// exist post-merge.
+  /// Slug of the entry-level collection — the default landing collection
+  /// for new players, and the fallback target for legacy stored values
+  /// like "tutorial" / "default" / "collection2" / "collection3" that no
+  /// longer exist post-merge.
   static const entryCollectionKey = '1-easy';
 
-  Database({required this.playerLevel});
+  /// Per-constraint mastery tracker. Populated by [loadStats] from the
+  /// player's history (so reinstalls or device transfers reconstruct
+  /// the map from stats alone) and consulted by the onboarding modal.
+  /// Optional: when null, no first-seen recording happens — callers
+  /// that don't need the onboarding flow (CLI tools, tests) can skip
+  /// wiring it.
+  final ConstraintProgress? progress;
+
+  Database({required this.playerLevel, this.progress});
 
   void setPlayerLevel(int newLevel) {
     playerLevel = newLevel;
@@ -300,8 +307,8 @@ class Database {
   List<String> userPlaylistNames = [];
 
   /// Order matters: the dropdown is rendered in this exact sequence,
-  /// so the player progresses naturally from tutorial through the six
-  /// difficulty paliers, then to their own playlists.
+  /// so the player progresses naturally through the six difficulty
+  /// paliers, then to their own playlists.
   ///
   /// Icons follow a cognitive progression — smile (easy & friendly) →
   /// brain (start to think) → graduation cap (advanced knowledge) →
@@ -311,7 +318,6 @@ class Database {
     String? recommendedKey,
   }) => [
     for (final (key, label, icon) in [
-      ('tutorial', labels.tutorial, UniconsLine.baby_carriage),
       ('1-easy', labels.easy, UniconsLine.smile),
       ('2-player', labels.player, UniconsLine.brain),
       ('3-advanced', labels.advanced, UniconsLine.graduation_cap),
@@ -413,13 +419,131 @@ class Database {
   /// the player accumulates plays mid-session.
   int _globalUsablePlays = 0;
 
+  /// Per-slug count of finished, non-skipped plays the player has
+  /// completed *across every collection in their stats history*.
+  /// Populated by [loadStats] (re-parses each entry's `puzzleLine`)
+  /// and exposed via [playCountForSlug] for the Apprentissage page.
+  /// Distinct from `puzzles.where(...)`-based counts which only see
+  /// the currently loaded collection.
+  final Map<String, int> _playCountBySlug = <String, int>{};
+
+  /// Read-only access to the per-slug play counter. Returns 0 for
+  /// slugs the player has never seen in any played puzzle.
+  int playCountForSlug(String slug) => _playCountBySlug[slug] ?? 0;
+
+  /// Count of finished, non-skipped plays attributed to the
+  /// onboarding journey. Bumped via [notePuzzleCompleted] and
+  /// persisted to `SharedPreferences`. Drives [currentPhase] — every
+  /// 10th completion advances the player to the next onboarding phase
+  /// until they graduate past the last defined phase. Reset to 0 by
+  /// the future "Rejouer l'onboarding" button.
+  int onboardingCompletions = 0;
+
+  static const _onboardingCompletionsKey = 'onboardingCompletions';
+
+  /// Onboarding phase the player is currently in. Returns null once
+  /// they've graduated past the last defined phase, in which case
+  /// [preparePlaylist] reverts to the regular level-based sampler.
+  OnboardingPhase? get currentPhase =>
+      phaseForCompletions(onboardingCompletions);
+
   /// In-session counter increment: bump the global play count after a
   /// non-skipped, finished puzzle. Without this, plays accumulated
   /// during the current session would never reach the recommendation
   /// gate (only the stats-file-loaded count, populated once at app
-  /// start, would matter).
-  void notePuzzleCompleted() {
+  /// start, would matter). Also bumps [onboardingCompletions] so the
+  /// phase progression keeps up with live plays, and the per-slug
+  /// play counter consumed by the Learning page so newly-finished
+  /// puzzles appear in their tally without waiting for a stats
+  /// reload.
+  void notePuzzleCompleted(PuzzleData puz) {
     _globalUsablePlays++;
+    for (final slug in puz.rules.toSet()) {
+      if (slug.isEmpty || slug == 'TX') continue;
+      _playCountBySlug.update(slug, (v) => v + 1, ifAbsent: () => 1);
+    }
+    if (currentPhase != null) {
+      onboardingCompletions++;
+      // Fire-and-forget: persistence failures only mean the counter
+      // resets on next launch, which the player will perceive as a
+      // benign delay (one extra puzzle in the same phase).
+      _persistOnboardingCompletions();
+    }
+  }
+
+  Future<void> _persistOnboardingCompletions() async {
+    // Defensive: SharedPreferences requires the Flutter binding to be
+    // initialized. Some unit-test setups bypass that (they exercise
+    // Database semantics without booting the full app), so we treat
+    // persistence as best-effort. In production a real failure here
+    // only means the counter resets to its last-persisted value on
+    // next launch — the player perceives at most one extra puzzle in
+    // the same phase.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_onboardingCompletionsKey, onboardingCompletions);
+    } catch (e) {
+      log.fine('Failed to persist onboardingCompletions: $e');
+    }
+  }
+
+  /// Reset the onboarding counter so the player re-enters phase 0.
+  /// Pairs with `ConstraintProgress.clear()` for the full
+  /// "Rejouer l'onboarding" workflow.
+  Future<void> resetOnboardingProgress() async {
+    onboardingCompletions = 0;
+    await _persistOnboardingCompletions();
+  }
+
+  /// Mix in puzzles from `assets/overfilled-easy.txt` into the catalog
+  /// while the player is in onboarding on the entry-level collection.
+  ///
+  /// Why: phases 4 (DF) and 5 (CC) — and likely later phases — are
+  /// extremely thin in `1-easy` because the generator naturally
+  /// produces simple-rule, small-grid puzzles with high prefill (they
+  /// classify as `overfilled` even when their solving trace is
+  /// beginner-level). `overfilled-easy.txt` holds exactly those
+  /// puzzles: `overfilled` by prefill ratio, `beginner` by trace
+  /// shape — pedagogically appropriate for onboarding (high prefill
+  /// = the rule does most of the work).
+  ///
+  /// The split is decided at generation time by `classifyTrace`
+  /// (cf. `lib/getsomepuzzle/level.dart`), so the runtime doesn't
+  /// have to second-guess
+  /// classification on every load — anything in `overfilled-easy.txt`
+  /// has been pre-filtered.
+  ///
+  /// Once the player graduates past the last defined phase
+  /// (`currentPhase == null`) the augmentation stops on the next
+  /// `loadPuzzlesFile`, so the regular post-onboarding catalog never
+  /// sees these puzzles.
+  Future<void> _augmentWithOverfilledIfOnboarding() async {
+    if (currentPhase == null) return;
+    if (collection != entryCollectionKey) return;
+    String content;
+    try {
+      content = await rootBundle.loadString('assets/overfilled-easy.txt');
+    } catch (e) {
+      log.fine(
+        'overfilled-easy.txt missing, skipping onboarding augmentation: $e',
+      );
+      return;
+    }
+    int added = 0;
+    for (final line in content.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+      try {
+        puzzles.add(PuzzleData(trimmed));
+        added++;
+      } catch (_) {
+        // Skip malformed lines; the entry-level catalog already
+        // covers the player.
+      }
+    }
+    log.fine(
+      'Augmented onboarding catalog with $added overfilled-easy puzzles',
+    );
   }
 
   void loadStats(List<String> rawStats) {
@@ -429,12 +553,32 @@ class Database {
     // puzzle line. See lib/getsomepuzzle/model/canonical.dart.
     final Map<String, StatEntry> solvedPuzzles = {};
     int usablePlays = 0;
+    _playCountBySlug.clear();
     for (final line in rawStats) {
       final entry = StatEntry.parse(line);
       if (entry == null) continue;
       solvedPuzzles[canonicalPuzzleKey(entry.puzzleLine)] = entry;
       if (entry.finished != null && entry.skipped == null) {
         usablePlays++;
+        final slugs = ConstraintProgress.slugsFromLine(entry.puzzleLine);
+        for (final s in slugs) {
+          _playCountBySlug.update(s, (v) => v + 1, ifAbsent: () => 1);
+        }
+        // Rebuild the constraint-progress map from history: each
+        // finished, non-skipped play counts as having seen every slug
+        // declared in that puzzle. `noteSeen` keeps the earliest date
+        // when called multiple times on the same slug, so the order in
+        // which stat lines are processed doesn't matter — we always
+        // converge to the genuine first-encounter timestamp.
+        final progress = this.progress;
+        if (progress != null && entry.finished != null) {
+          final when = DateTime.tryParse(entry.finished!);
+          if (when != null) {
+            for (final slug in slugs) {
+              progress.noteSeen(slug, when);
+            }
+          }
+        }
       }
     }
     _globalUsablePlays = usablePlays;
@@ -518,28 +662,23 @@ class Database {
   Future<void> loadPuzzlesFile([String? fileToLoad]) async {
     final prefs = await SharedPreferences.getInstance();
     shouldShuffle = prefs.getBool("shouldShuffleCollection") ?? false;
-    String collectionToLoad = (fileToLoad == null)
-        ? (prefs.getString("collectionToLoad") ?? "tutorial")
-        : fileToLoad;
+    String collectionToLoad =
+        fileToLoad ??
+        (prefs.getString("collectionToLoad") ?? entryCollectionKey);
     final validKeys = {
       ..._builtInCollectionKeys,
       ...userPlaylistNames.map((name) => 'user_${slugify(name)}'),
     };
     if (!validKeys.contains(collectionToLoad)) {
-      // Old corpus splits ('default', 'collection2', 'collection3') were
-      // merged then re-split by difficulty. Players who left the app on
-      // one of those should land on the entry-level collection rather
-      // than be bounced back to the tutorial.
-      collectionToLoad =
-          const {
-            'default': entryCollectionKey,
-            'collection2': entryCollectionKey,
-            'collection3': entryCollectionKey,
-          }[collectionToLoad] ??
-          'tutorial';
+      // Legacy stored keys ('tutorial' from before the onboarding
+      // refactor, plus 'default'/'collection2'/'collection3' from the
+      // pre-difficulty-split era) all redirect to the entry-level
+      // collection.
+      collectionToLoad = entryCollectionKey;
     }
     collection = collectionToLoad;
     prefs.setString("collectionToLoad", collection);
+    onboardingCompletions = prefs.getInt(_onboardingCompletionsKey) ?? 0;
     await loadUserPlaylists();
     String assetContent;
     if (collection == 'custom' || collection.startsWith('user_')) {
@@ -549,10 +688,13 @@ class Database {
       try {
         assetContent = await rootBundle.loadString('assets/$collection.txt');
       } catch (_) {
-        assetContent = await rootBundle.loadString('assets/tutorial.txt');
+        assetContent = await rootBundle.loadString(
+          'assets/$entryCollectionKey.txt',
+        );
       }
     }
     load(assetContent.split("\n"));
+    await _augmentWithOverfilledIfOnboarding();
     await currentFilters.load();
     final List<String> stats = [];
     if (kIsWeb) {
@@ -620,22 +762,125 @@ class Database {
       playableCollectionKeyToLevel.containsKey(key);
 
   void preparePlaylist() {
-    if (collection == 'tutorial') {
-      // Tutorial has a fixed pedagogical order: no shuffle, no level
-      // filtering, no user filters — just skip puzzles already completed.
+    if (collection == 'custom' || collection.startsWith('user_')) {
+      // User-curated playlists keep their insertion order — the player
+      // chose this sequence explicitly. Filters and shuffle do not
+      // apply; only "already played" is honoured. The onboarding
+      // phase filter is *not* applied here either: importing or
+      // hand-crafting a playlist is an opt-in that supersedes the
+      // curated track.
       playlist = puzzles.where((p) => !p.played).toList();
-    } else if (shouldShuffle) {
-      playlist = filter().toList();
-      playlist.shuffle();
-      _maybeCapBatch();
     } else {
-      playlist = getPuzzlesByLevel(playerLevel);
+      final phase = currentPhase;
+      if (phase != null && _isPlayableLevel(collection)) {
+        if (shouldShuffle) {
+          // Shuffle within phase-eligible puzzles so the player who
+          // explicitly opted into shuffle still doesn't get
+          // multi-constraint surprises during strict onboarding.
+          playlist =
+              filter()
+                  .where((p) => puzzleEligibleForPhase(p.rules, phase))
+                  .toList()
+                ..shuffle();
+        } else {
+          playlist = _getPuzzlesInPhase(phase);
+        }
+      } else {
+        if (shouldShuffle) {
+          playlist = filter().toList()..shuffle();
+        } else {
+          playlist = getPuzzlesByLevel(playerLevel);
+        }
+        // Soft filter applies whether the player went via shuffle or
+        // the regular sampler — the goal is "≤1 unseen slug per
+        // proposed puzzle" regardless of selection mechanism.
+        playlist = _applySoftOnboardingFilter(playlist);
+      }
       _maybeCapBatch();
     }
     log.info(
       "Playlist prepared with ${playlist.length} puzzles "
-      "(shuffled: $shouldShuffle, capped: ${_isPlayableLevel(collection)})",
+      "(shuffled: $shouldShuffle, capped: ${_isPlayableLevel(collection)}, "
+      "phase: ${currentPhase?.index}, "
+      "softFilter: ${_softFilterActive ? 'on' : 'off'})",
     );
+  }
+
+  /// Whether the post-strict-phase soft filter should constrain the
+  /// playlist. True when the player has cleared the strict phases AND
+  /// still has at least one unseen constraint slug. Once every
+  /// known slug appears in `progress.firstSeen`, the filter becomes a
+  /// no-op and we let the regular sampler run.
+  bool get _softFilterActive {
+    final p = progress;
+    if (p == null) return false;
+    if (currentPhase != null) return false;
+    return p.firstSeen.length < OnboardingPhase.allKnownSlugs.length;
+  }
+
+  /// True iff the player is still in any onboarding state — either a
+  /// strict phase (P0-P3) or the post-strict soft filter mode. Used by
+  /// the UI to surface "you haven't met every rule yet" messaging at
+  /// end-of-batch and to keep the Apprentissage page actionable.
+  bool get isInOnboarding => currentPhase != null || _softFilterActive;
+
+  /// Drop puzzles that would force the player to meet two or more new
+  /// constraints in a single grid. Pure pass-through when the soft
+  /// filter is inactive (no [progress] wired, still in a strict phase,
+  /// or every slug already met).
+  List<PuzzleData> _applySoftOnboardingFilter(List<PuzzleData> input) {
+    if (!_softFilterActive) return input;
+    final p = progress!;
+    return input
+        .where((puz) => puzzlePassesSoftFilter(puz.rules, p.isFirstTimeFor))
+        .toList();
+  }
+
+  /// Phase-aware variant of [getPuzzlesByLevel]: same Gaussian-on-cplx
+  /// + variety bias, plus a multiplicative phase weight that filters
+  /// out-of-phase puzzles (weight 0) and gives a 4× boost to puzzles
+  /// containing the slug being introduced (≈ 80/20 expected ratio
+  /// between introduction and refresh puzzles).
+  ///
+  /// The Gaussian still centers on the player's `playerLevel`: the
+  /// catalog itself is bounded to `1-easy + overfilled-easy`, both of
+  /// which are *beginner* by trace shape, so a fast learner's higher
+  /// level just biases sampling toward the upper end of *that*
+  /// bucket — never out of it.
+  ///
+  /// Falls back to the regular [getPuzzlesByLevel] result when the
+  /// phase filter would leave the playlist empty — this avoids
+  /// stranding a player on an out-of-track collection during
+  /// onboarding (e.g., they wandered from `1-easy` into `6-mad` mid
+  /// onboarding; nothing in 6-mad will satisfy a phase 1 filter, so
+  /// we just give them the regular pick).
+  List<PuzzleData> _getPuzzlesInPhase(OnboardingPhase phase) {
+    final mu = playerLevel + selectionOffset;
+    final twoSigmaSq = 2 * selectionSigma * selectionSigma;
+    final filtered = filter().toList();
+    final eligible = filtered
+        .where((p) => puzzleEligibleForPhase(p.rules, phase))
+        .toList();
+    if (eligible.isEmpty) {
+      // Out-of-track collection (e.g., player jumped from 1-easy to
+      // 6-mad mid-onboarding). Fall through to the regular sampler so
+      // they still get something playable, even if the phase filter
+      // produced nothing.
+      return getPuzzlesByLevel(playerLevel);
+    }
+    final varietyStats = _buildRecencyWeightedStats(eligible);
+    final keyed = eligible.map((p) {
+      final d = p.cplx - mu;
+      final wCplx = math.exp(-math.min(d * d / twoSigmaSq, 700));
+      final gap = _varietyGapForPuzzle(p, varietyStats);
+      final wVariety = 1 + selectionVarietyAlpha * gap;
+      final wPhase = phaseWeight(p.rules, phase);
+      final w = wCplx * wVariety * wPhase;
+      final u = _samplingRandom.nextDouble() + 1e-300;
+      final key = -math.log(u) / w;
+      return (p, key);
+    }).toList()..sort((a, b) => a.$2.compareTo(b.$2));
+    return keyed.map((e) => e.$1).toList();
   }
 
   void _maybeCapBatch() {
@@ -647,8 +892,8 @@ class Database {
   /// True if at least one playable puzzle in the current collection's
   /// filtered catalog is not in the active [playlist] (i.e. the player
   /// can request another batch of 20). Returns false on non-playable
-  /// collections (tutorial, custom, user_*) since they don't use the
-  /// batch concept.
+  /// collections (custom, user_*) since they don't use the batch
+  /// concept.
   bool hasMoreCandidatesInCurrentCollection() {
     if (!_isPlayableLevel(collection)) return false;
     final inBatch = playlist.toSet();
@@ -670,8 +915,12 @@ class Database {
 
   /// Suggested collection key based on `playerLevel`. Returns null
   /// when:
-  ///   - tutorial is the active collection (we don't suggest while
-  ///     teaching),
+  ///   - the player is still in a strict onboarding phase (P0-P3): a
+  ///     fast learner could otherwise be invited to jump straight to
+  ///     `5-expert` despite never having met half the rules. The soft
+  ///     filter (post-P3) is permissive — recommendations resume there
+  ///     so a player progressing nicely can still be nudged toward
+  ///     their natural level.
   ///   - the player has fewer than [_minPlaysForRecommendation] usable
   ///     plays *globally* (avoid noisy onboarding suggestions). The
   ///     count comes from [_globalUsablePlays], populated from the raw
@@ -683,78 +932,14 @@ class Database {
   ///   - the recommendation matches the current collection (no badge
   ///     needed).
   String? get recommendedCollectionKey {
-    if (collection == 'tutorial') return null;
+    if (currentPhase != null) return null;
     if (_globalUsablePlays < _minPlaysForRecommendation) return null;
     final level = recommendedLevelFor(playerLevel);
     final key = levelToPlayableCollectionKey[level];
     return (key == null || key == collection) ? null : key;
   }
 
-  /// Erase every stat entry belonging to a tutorial puzzle and reset the
-  /// in-memory flags on any tutorial puzzle currently loaded. After this the
-  /// player can replay the tutorial from scratch.
-  Future<void> restartTutorial() async {
-    final tutorialAsset = await rootBundle.loadString('assets/tutorial.txt');
-    final tutorialKeys = tutorialAsset
-        .split('\n')
-        .map((l) => l.trim())
-        .where((l) => l.isNotEmpty && !l.startsWith('#'))
-        .map(canonicalPuzzleKey)
-        .toSet();
-
-    // Reset in-memory flags on any currently-loaded tutorial puzzle.
-    for (final puz in puzzles) {
-      if (!tutorialKeys.contains(canonicalPuzzleKey(puz.lineRepresentation))) {
-        continue;
-      }
-      puz.played = false;
-      puz.finished = null;
-      puz.skipped = null;
-      puz.liked = null;
-      puz.disliked = null;
-      puz.pleasure = null;
-      puz.duration = 0;
-      puz.failures = 0;
-      puz.hints = 0;
-    }
-
-    // Remove tutorial entries from the persisted stats. Unlike `writeStats`
-    // (which only sees the currently loaded collection), we rewrite the stats
-    // file in-place, keeping every entry that doesn't belong to the tutorial.
-    bool keepLine(String line) {
-      final entry = StatEntry.parse(line);
-      return entry == null ||
-          !tutorialKeys.contains(canonicalPuzzleKey(entry.puzzleLine));
-    }
-
-    if (kIsWeb) {
-      final prefs = await SharedPreferences.getInstance();
-      for (final key in prefs.getKeys().toList()) {
-        if (!key.startsWith('stats')) continue;
-        final existing = prefs.getStringList(key) ?? [];
-        await prefs.setStringList(key, existing.where(keepLine).toList());
-      }
-    } else {
-      final documentsDirectory = await getApplicationDocumentsDirectory();
-      final statsPath = p.join(
-        documentsDirectory.path,
-        'getsomepuzzle',
-        'stats.txt',
-      );
-      final file = File(statsPath);
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        final kept = content.split('\n').where(keepLine).toList();
-        await file.writeAsString(kept.join('\n'), mode: FileMode.writeOnly);
-      }
-    }
-
-    if (collection == 'tutorial') {
-      preparePlaylist();
-    }
-  }
-
-  /// Wipe **every** persisted stat (tutorial + every collection + the
+  /// Wipe **every** persisted stat (every collection + the
   /// recency window that drives [computePlayerLevel] and the variety
   /// bias) and reset the in-memory flags on every loaded puzzle.
   /// Destructive — there is no undo. The stored player level in

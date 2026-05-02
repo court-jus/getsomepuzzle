@@ -7,7 +7,6 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
@@ -17,7 +16,6 @@ import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/widgets/group_count.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
-import 'package:getsomepuzzle/widgets/textpuzzle.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
 
 class PuzzleWidget extends StatefulWidget {
@@ -28,7 +26,6 @@ class PuzzleWidget extends StatefulWidget {
     required this.onCellDrag,
     required this.onCellDragEnd,
     required this.cellSize,
-    required this.locale,
     this.hintText = "",
     this.hintIsError = false,
     this.onCellRightDrag,
@@ -40,7 +37,6 @@ class PuzzleWidget extends StatefulWidget {
   final ValueChanged<int> onCellDrag;
   final VoidCallback onCellDragEnd;
   final double cellSize;
-  final String locale;
   final String hintText;
   final bool hintIsError;
   final ValueChanged<int>? onCellRightDrag;
@@ -267,14 +263,6 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               )
                               .length,
                           cellSize: topBarConstraintsSize,
-                        )
-                      else if (constraint is HelpText)
-                        SizedBox(
-                          width: totalWidth - 20,
-                          child: TextpuzzleWidget(
-                            textName: constraint.text,
-                            locale: widget.locale,
-                          ),
                         ),
                   ],
                 ),

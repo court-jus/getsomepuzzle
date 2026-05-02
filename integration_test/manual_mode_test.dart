@@ -13,10 +13,10 @@ void main() {
   testWidgets('manual mode does not auto-switch when all cells are filled', (
     tester,
   ) async {
-    await prepareApp({
-      'settingsValidateType': 'manual',
-      'settingsShowRating': 'no',
-    });
+    await prepareApp(
+      {'settingsValidateType': 'manual', 'settingsShowRating': 'no'},
+      customPuzzles: const [fixture3x3],
+    );
     setTestViewport(tester);
 
     await tester.pumpWidget(const MyApp());
@@ -25,7 +25,7 @@ void main() {
       () => find.byType(PuzzleWidget).evaluate().isNotEmpty,
     );
     final initialCellCount = find.byType(CellWidget).evaluate().length;
-    expect(initialCellCount, 9, reason: 'tutorial puzzle 1 is 3x3');
+    expect(initialCellCount, 9, reason: 'fixture3x3 puzzle is 3x3');
 
     // Before filling: validate button is disabled (puzzle incomplete).
     final buttonBefore = tester.widget<TextButton>(

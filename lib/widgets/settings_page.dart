@@ -6,20 +6,21 @@ class SettingsPage extends StatefulWidget {
   final Settings settings;
   final ValueChanged<ChangeableSettings> onSettingsChange;
 
-  /// Callback that wipes the player's stats on tutorial puzzles. Awaited so
-  /// the snackbar only fires after the async work is done.
-  final Future<void> Function() onRestartTutorial;
-
-  /// Callback that wipes **every** persisted stat (tutorial + every
-  /// collection). Awaited for the same reason.
+  /// Callback that wipes **every** persisted stat across every
+  /// collection. Awaited so the snackbar only fires after the async
+  /// work is done.
   final Future<void> Function() onClearStats;
+
+  /// Callback that resets the constraint-discovery progress so the
+  /// new-rule modals fire again. Does **not** touch play stats.
+  final Future<void> Function() onReplayOnboarding;
 
   const SettingsPage({
     super.key,
     required this.settings,
     required this.onSettingsChange,
-    required this.onRestartTutorial,
     required this.onClearStats,
+    required this.onReplayOnboarding,
   });
 
   @override
@@ -206,17 +207,12 @@ class _SettingsPageState extends State<SettingsPage> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    Text(
-                      l10n.settingTutorialSection,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.refresh),
-                        label: Text(l10n.settingRestartTutorial),
-                        onPressed: _confirmRestartTutorial,
+                        icon: const Icon(Icons.replay),
+                        label: Text(l10n.settingReplayOnboarding),
+                        onPressed: _confirmReplayOnboarding,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -246,13 +242,13 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Future<void> _confirmRestartTutorial() async {
+  Future<void> _confirmReplayOnboarding() async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.settingRestartTutorialConfirmTitle),
-        content: Text(l10n.settingRestartTutorialConfirmBody),
+        title: Text(l10n.settingReplayOnboardingConfirmTitle),
+        content: Text(l10n.settingReplayOnboardingConfirmBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -266,11 +262,11 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
     if (confirmed != true) return;
-    await widget.onRestartTutorial();
+    await widget.onReplayOnboarding();
     if (!mounted) return;
-    // Pop back to the game screen so the player lands directly on the first
-    // tutorial puzzle that the callback just queued up.
-    Navigator.of(context).pop();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.settingOnboardingReplayed)));
   }
 
   Future<void> _confirmClearStats() async {

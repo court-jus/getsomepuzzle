@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
@@ -17,6 +18,8 @@ import 'package:getsomepuzzle/widgets/between_puzzles.dart';
 import 'package:getsomepuzzle/widgets/end_of_playlist.dart';
 import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
+import 'package:getsomepuzzle/widgets/learning_page.dart';
+import 'package:getsomepuzzle/widgets/new_constraint_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/create_page.dart';
 import 'package:getsomepuzzle/widgets/generate_page.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
@@ -35,7 +38,7 @@ import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.6.4";
+const versionText = "Version 1.6.5";
 
 /// Where the GitHub Pages web build lives. Share links target this URL with
 /// a `?puzzle=<line>` query — works as a browser fallback everywhere, and
@@ -144,6 +147,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   String locale = "en";
   Database? database;
   Settings settings = Settings();
+  final ConstraintProgress progress = ConstraintProgress();
   bool initialized = false;
   bool shouldChooseLocale = true;
   bool _testingFromEditor = false;
@@ -196,15 +200,20 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> initialize() async {
     var futures = <Future>[];
     await settings.load();
+    await progress.load();
     game.idleTimeoutDuration = settings.idleTimeoutDuration;
     futures.add(initializeDatabase(settings.playerLevel));
     futures.add(initializeLocale());
     await Future.wait(futures);
+    // The database's stats load may have backfilled `progress` from
+    // legacy plays — persist whatever new entries that produced so a
+    // returning player doesn't have to re-derive them on every launch.
+    await progress.save();
     initialized = true;
   }
 
   Future<void> initializeDatabase(int playerLevel) async {
-    final db = Database(playerLevel: playerLevel);
+    final db = Database(playerLevel: playerLevel, progress: progress);
     await db.loadPuzzlesFile();
     setState(() {
       database = db;
@@ -251,6 +260,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       widget.setAppLocale(locale);
     });
     saveChosenLocale(newLocale);
+    // The new-constraint modal was deferred while the locale chooser
+    // was up. Re-trigger it now for the puzzle that's already loaded
+    // behind the chooser, if any.
+    final puz = game.currentMeta;
+    if (puz != null) _surfaceNewConstraintsIfAny(puz);
   }
 
   // ---------------------------------------------------------------------------
@@ -280,7 +294,55 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (settings.hintType == HintType.addConstraint) {
       game.startHintConstraintComputation();
     }
+    _surfaceNewConstraintsIfAny(puz);
   }
+
+  /// If the puzzle declares constraint slugs the player has never
+  /// seen before, surface a single explanation modal listing all the
+  /// new ones. We schedule a post-frame callback so the modal opens
+  /// on top of the already-mounted puzzle widget — opening it during
+  /// the same frame that calls `setState` from the playlist transition
+  /// tends to break the animation pipeline.
+  ///
+  /// While the locale chooser is up the modal would obscure it, so we
+  /// defer the trigger until [toggleLocale] has resolved (the puzzle
+  /// is still loaded behind the chooser so the modal will fire as
+  /// soon as the player picks a language).
+  void _surfaceNewConstraintsIfAny(PuzzleData puz) {
+    // A single puzzle line typically declares the same slug several
+    // times (e.g. two FM: rules with different params). Build a Set
+    // so each slug fires its modal section exactly once.
+    final newSlugs = <String>{
+      for (final slug in puz.rules)
+        if (slug.isNotEmpty && slug != 'TX' && progress.isFirstTimeFor(slug))
+          slug,
+    };
+    if (newSlugs.isEmpty) return;
+    if (_modalInFlight) return;
+    _modalInFlight = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || shouldChooseLocale) {
+        _modalInFlight = false;
+        return;
+      }
+      await NewConstraintDialog.show(context, newSlugs);
+      final now = DateTime.now();
+      for (final slug in newSlugs) {
+        progress.noteSeen(slug, now);
+      }
+      // Persist whatever new slugs were dismissed; failing silently
+      // here only means the player will see the modal again next
+      // launch (no game-state corruption).
+      await progress.save();
+      _modalInFlight = false;
+    });
+  }
+
+  /// True while a new-constraint modal is queued or open. Prevents
+  /// stacking duplicate modals if `openPuzzle` is called twice for the
+  /// same puzzle, or if the post-frame callback re-enters via the
+  /// locale-chooser fallback.
+  bool _modalInFlight = false;
 
   /// Build a share URL for the current puzzle (carrying the player's
   /// current play state) and hand it off to share_plus on mobile, or copy
@@ -386,7 +448,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     // clears as the session progresses — without this the gate only
     // sees the stats loaded at app start and stays stuck below the
     // threshold across an entire session for a fresh player.
-    database?.notePuzzleCompleted();
+    final completedMeta = game.currentMeta;
+    if (completedMeta != null) {
+      database?.notePuzzleCompleted(completedMeta);
+    }
     // Auto-level recompute is deferred to the end of the batch (when
     // the playlist becomes empty). Recomputing after every puzzle would
     // shift `playerLevel` continuously, which then re-runs
@@ -802,14 +867,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   MaterialPageRoute(
                     builder: (context) => SettingsPage(
                       settings: settings,
-                      onRestartTutorial: () async {
-                        if (database == null) return;
-                        await database!.restartTutorial();
-                        // Switch to the tutorial collection (reloads puzzles
-                        // + stats + playlist) and open the first puzzle.
-                        await database!.loadPuzzlesFile('tutorial');
-                        game.clearPuzzle();
-                        loadPuzzle();
+                      onReplayOnboarding: () async {
+                        // Wipe both halves of the onboarding state:
+                        // `firstSeen` so the modale re-fires per
+                        // constraint, and the strict-phase counter so
+                        // the player drops back into phase 0. Play
+                        // stats are deliberately left intact — only
+                        // the discovery-progress overlay is reset.
+                        progress.clear();
+                        await progress.save();
+                        if (database != null) {
+                          await database!.resetOnboardingProgress();
+                          // Re-prepare so the freshly-strict P0
+                          // playlist is in effect on the next puzzle
+                          // load. Without this, the player would keep
+                          // their current batch (selected pre-reset).
+                          database!.preparePlaylist();
+                          game.clearPuzzle();
+                          loadPuzzle();
+                        }
                         setState(() {});
                       },
                       onClearStats: () async {
@@ -876,6 +952,21 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 );
               },
             ),
+            if (database != null)
+              ListTile(
+                leading: const Icon(Icons.school),
+                title: Text(AppLocalizations.of(context)!.learning),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (context) =>
+                          LearningPage(database: database!, progress: progress),
+                    ),
+                  );
+                },
+              ),
             ListTile(
               leading: Icon(Icons.language),
               title: Text(AppLocalizations.of(context)!.tooltipLanguage),
@@ -961,7 +1052,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                               ? handlePuzzleRightDragEnd
                                               : null,
                                           cellSize: cellSize,
-                                          locale: locale,
                                           hintText: game.hintText,
                                           hintIsError: game.hintIsError,
                                         )
@@ -972,7 +1062,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                               context,
                                             )!;
                                             final labels = CollectionLabels(
-                                              tutorial: l.collectionTutorial,
                                               easy: l.collectionEasy,
                                               player: l.collectionPlayer,
                                               advanced: l.collectionAdvanced,
@@ -988,36 +1077,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                             return EndOfPlaylist(
                                               currentLevel:
                                                   settings.playerLevel,
-                                              isTutorial:
-                                                  database?.collection ==
-                                                  'tutorial',
-                                              onStartPlaying: () async {
-                                                if (database == null) return;
-                                                settings.change(
-                                                  ChangeableSettings(
-                                                    playerLevel: 0,
-                                                    autoLevel: true,
-                                                  ),
-                                                );
-                                                database!.setPlayerLevel(0);
-                                                // Must be awaited before
-                                                // loadPuzzlesFile:
-                                                // loadPuzzlesFile reads
-                                                // shouldShuffle from prefs, so
-                                                // the flip must be persisted
-                                                // first.
-                                                await database!
-                                                    .setShouldShuffle(false);
-                                                await database!.loadPuzzlesFile(
-                                                  Database.entryCollectionKey,
-                                                );
-                                                if (database!
-                                                    .playlist
-                                                    .isNotEmpty) {
-                                                  loadPuzzle();
-                                                }
-                                                setState(() {});
-                                              },
                                               filtersBlocking:
                                                   database
                                                       ?.areFiltersBlocking ??
@@ -1031,6 +1090,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                                       .where((p) => p.played)
                                                       .length ??
                                                   0,
+                                              onboardingActive:
+                                                  database?.isInOnboarding ??
+                                                  false,
                                               currentCollectionLabel: labels
                                                   .labelFor(
                                                     database?.collection ?? '',

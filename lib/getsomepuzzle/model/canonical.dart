@@ -55,10 +55,18 @@ String normalizeV2Line(String line) {
 /// then survivors are sorted lexicographically. Constraint order has
 /// no semantic meaning, so two puzzles with the same constraint set in
 /// different orders share an identity.
+///
+/// Also drops every `TX:*` entry: the legacy `HelpText` constraint was
+/// pedagogical metadata (tutorial markdown reference) that doesn't
+/// affect the puzzle's identity, and is removed from the codebase. We
+/// keep this filter here so old stats lines with `TX:` still match the
+/// migrated TX-stripped puzzle lines, and so any leftover `TX:` in a
+/// re-imported playlist canonicalizes the same way.
 String dedupAndSortConstraints(String field) {
   final seen = <String>{};
   final kept = <String>[];
   for (final c in field.split(';')) {
+    if (c.startsWith('TX:') || c == 'TX') continue;
     if (seen.add(c)) kept.add(c);
   }
   kept.sort();

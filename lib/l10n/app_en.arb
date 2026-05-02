@@ -301,22 +301,6 @@
     "@endOfPlaylistMaxLevel": {
         "description": "Message shown when there is no higher level with puzzles available"
     },
-    "endOfPlaylistTutorialFinished": "You've finished the tutorial.",
-    "@endOfPlaylistTutorialFinished": {
-        "description": "Main message shown when the player completes every tutorial puzzle"
-    },
-    "endOfPlaylistTutorialHaveFun": "Have fun!",
-    "@endOfPlaylistTutorialHaveFun": {
-        "description": "Encouragement shown right after the tutorial-finished message"
-    },
-    "endOfPlaylistTutorialStartPlaying": "Start playing",
-    "@endOfPlaylistTutorialStartPlaying": {
-        "description": "Primary button that takes the player to Collection 1 with auto-level enabled"
-    },
-    "endOfPlaylistTutorialAutoLevelNote": "The difficulty will adapt automatically to your skill. You can disable this in settings.",
-    "@endOfPlaylistTutorialAutoLevelNote": {
-        "description": "Small caption below the Start Playing button, explaining auto-level"
-    },
     "hintDeducedFrom": "This cell can be deduced from the {constraintName} constraint",
     "@hintDeducedFrom": {
         "description": "Hint message shown when the player clicks the lightbulb to get a clue",
@@ -587,6 +571,92 @@
     "@constraintEyes": {
         "description": "Name of the eyes constraint"
     },
+    "newConstraintModalTitle": "New rule!",
+    "@newConstraintModalTitle": {
+        "description": "Title of the dialog shown the first time a player encounters a new constraint"
+    },
+    "learning": "Learning",
+    "@learning": {
+        "description": "Menu label for the Apprentissage page (constraint reference + memory refresh)"
+    },
+    "learningPageTitle": "Learning",
+    "@learningPageTitle": {
+        "description": "Title shown at the top of the learning page"
+    },
+    "learningSeenOn": "First seen on {date}",
+    "@learningSeenOn": {
+        "description": "Status line for a constraint the player has already met. {date} is a localised long date.",
+        "placeholders": {
+            "date": {
+                "type": "String"
+            }
+        }
+    },
+    "learningNeverSeen": "Not yet encountered",
+    "@learningNeverSeen": {
+        "description": "Status line for a constraint the player hasn't met yet"
+    },
+    "learningPlayCount": "{count, plural, =0{No puzzles played} =1{1 puzzle played} other{{count} puzzles played}}",
+    "@learningPlayCount": {
+        "description": "Number of finished, non-skipped puzzles containing this constraint, across every collection",
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "learningRefreshButton": "Refresh my memory",
+    "@learningRefreshButton": {
+        "description": "Button on each constraint row that re-displays the explanation modal"
+    },
+    "constraintExplainFM": "A pattern shown above the grid on a violet background must never appear inside the grid.",
+    "@constraintExplainFM": {
+        "description": "Body of the new-constraint explanation modal for the Forbidden Motif (FM) constraint"
+    },
+    "constraintExplainSH": "A pattern shown above the grid on a light blue background tilted at 45° defines an exact shape: every group of that color must take this shape (rotations and reflections allowed).",
+    "@constraintExplainSH": {
+        "description": "Body of the new-constraint explanation modal for the Shape (SH) constraint"
+    },
+    "constraintExplainGS": "A cell carrying a number must belong to a group of orthogonally adjacent same-color cells whose size matches that number.",
+    "@constraintExplainGS": {
+        "description": "Body of the new-constraint explanation modal for the Group Size (GS) constraint"
+    },
+    "constraintExplainPA": "A cell with an arrow demands the same number of black and white cells in front of the arrow. A double-headed arrow extends the rule to both sides.",
+    "@constraintExplainPA": {
+        "description": "Body of the new-constraint explanation modal for the Parity (PA) constraint"
+    },
+    "constraintExplainLT": "Cells marked with the same letter must belong to the same group. A group must not contain two different letters.",
+    "@constraintExplainLT": {
+        "description": "Body of the new-constraint explanation modal for the Letter Group (LT) constraint"
+    },
+    "constraintExplainQA": "A number on a blue background above the grid sets the total number of cells of that color the solution must contain.",
+    "@constraintExplainQA": {
+        "description": "Body of the new-constraint explanation modal for the Quantity (QA) constraint"
+    },
+    "constraintExplainSY": "A cell carrying ⟍, |, ⟋, ― or 🞋 forces its group (same-color connected cells) to be symmetric along that axis. The 🞋 symbol means central symmetry — equivalent to a half-turn.",
+    "@constraintExplainSY": {
+        "description": "Body of the new-constraint explanation modal for the Symmetry (SY) constraint"
+    },
+    "constraintExplainDF": "Two cells separated by a ≠ symbol must be of different colors.",
+    "@constraintExplainDF": {
+        "description": "Body of the new-constraint explanation modal for the Different From (DF) constraint"
+    },
+    "constraintExplainCC": "A circled number above a column tells how many cells of that color must appear in this specific column.",
+    "@constraintExplainCC": {
+        "description": "Body of the new-constraint explanation modal for the Column Count (CC) constraint"
+    },
+    "constraintExplainGC": "A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.",
+    "@constraintExplainGC": {
+        "description": "Body of the new-constraint explanation modal for the Group Count (GC) constraint"
+    },
+    "constraintExplainNC": "A cell shown with crosses on its sides must have exactly the indicated number of orthogonal neighbors of the marked color.",
+    "@constraintExplainNC": {
+        "description": "Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint"
+    },
+    "constraintExplainEY": "A cell with an eye must \"see\" exactly the indicated number of cells of the eye's color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).",
+    "@constraintExplainEY": {
+        "description": "Body of the new-constraint explanation modal for the Eyes (EY) constraint"
+    },
     "complicityOtherConstraint": "another constraint",
     "@complicityOtherConstraint": {
         "description": "Fallback name used when a complicity's secondary slug is the wildcard '*' (kept as a safety fallback; the dedicated 'hintComplicityWithAny' template is preferred for the wildcard case)"
@@ -594,10 +664,6 @@
     "collectionMyPuzzles": "My puzzles",
     "@collectionMyPuzzles": {
         "description": "Label of the custom puzzles collection"
-    },
-    "collectionTutorial": "Tutorial",
-    "@collectionTutorial": {
-        "description": "Label of the tutorial collection"
     },
     "collectionEasy": "Beginner",
     "@collectionEasy": {
@@ -649,33 +715,33 @@
     "@endOfPlaylistSuggestedHint": {
         "description": "Subtle hint below the 'Try X' button explaining why this collection is suggested"
     },
+    "endOfPlaylistOnboardingNote": "You haven't met every rule yet — keep playing to discover them one at a time.",
+    "@endOfPlaylistOnboardingNote": {
+        "description": "Note displayed at end-of-batch while onboarding is still active (strict phase or post-strict soft filter)"
+    },
     "endOfPlaylistPickAnother": "Pick another collection",
     "@endOfPlaylistPickAnother": {
         "description": "End-of-playlist secondary link sending the player to the open page to pick a collection"
     },
-    "settingTutorialSection": "Tutorial",
-    "@settingTutorialSection": {
-        "description": "Header of the tutorial-related settings section"
-    },
-    "settingRestartTutorial": "Restart tutorial",
-    "@settingRestartTutorial": {
-        "description": "Button label that restarts the tutorial by erasing tutorial puzzle stats"
-    },
-    "settingRestartTutorialConfirmTitle": "Restart tutorial?",
-    "@settingRestartTutorialConfirmTitle": {
-        "description": "Title of the confirmation dialog for the restart-tutorial action"
-    },
-    "settingRestartTutorialConfirmBody": "Your progress on tutorial puzzles will be erased. This cannot be undone.",
-    "@settingRestartTutorialConfirmBody": {
-        "description": "Body text of the confirmation dialog for the restart-tutorial action"
-    },
-    "settingTutorialRestarted": "Tutorial stats cleared.",
-    "@settingTutorialRestarted": {
-        "description": "Snackbar message shown after tutorial stats have been cleared"
-    },
     "settingClearStats": "Clear all stats",
     "@settingClearStats": {
-        "description": "Button label that wipes every play stat (tutorial + every collection)"
+        "description": "Button label that wipes every play stat across every collection"
+    },
+    "settingReplayOnboarding": "Replay onboarding",
+    "@settingReplayOnboarding": {
+        "description": "Button label that resets the constraint-discovery progress so the new-rule modals fire again"
+    },
+    "settingReplayOnboardingConfirmTitle": "Replay onboarding?",
+    "@settingReplayOnboardingConfirmTitle": {
+        "description": "Title of the confirmation dialog for the replay-onboarding action"
+    },
+    "settingReplayOnboardingConfirmBody": "The new-rule explanations will appear again as you encounter each constraint. Your play stats are preserved.",
+    "@settingReplayOnboardingConfirmBody": {
+        "description": "Body text of the confirmation dialog for the replay-onboarding action"
+    },
+    "settingOnboardingReplayed": "Onboarding reset.",
+    "@settingOnboardingReplayed": {
+        "description": "Snackbar message shown after the onboarding has been reset"
     },
     "settingClearStatsConfirmTitle": "Clear all stats?",
     "@settingClearStatsConfirmTitle": {

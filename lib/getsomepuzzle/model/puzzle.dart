@@ -8,7 +8,6 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.da
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/helptext.dart';
 
 /// Method used to determine a cell value during solving.
 enum SolveMethod { propagation, force }
@@ -180,13 +179,14 @@ class Puzzle {
     for (var strConstraint in strConstraints) {
       final constraintAttr = strConstraint.split(":");
       final slug = constraintAttr[0];
+      // Legacy `TX:*` (HelpText) entries from the deprecated tutorial
+      // collection are silently dropped — they were pedagogical
+      // markdown references with no effect on solving. Old custom
+      // playlists or imported lines may still carry them.
+      if (slug == 'TX') continue;
       final params = constraintAttr.length > 1 ? constraintAttr[1] : '';
-      if (slug == 'TX') {
-        addConstraint(HelpText(params));
-      } else {
-        final c = createConstraint(slug, params);
-        if (c != null) addConstraint(c);
-      }
+      final c = createConstraint(slug, params);
+      if (c != null) addConstraint(c);
     }
     if (attributesStr.length > 5) {
       final solParts = attributesStr[5].split(':');
@@ -562,7 +562,6 @@ class Puzzle {
   }
 
   static Constraint _cloneConstraint(Constraint c) {
-    if (c is HelpText) return HelpText(c.text);
     final serialized = c.serialize();
     final colonIdx = serialized.indexOf(':');
     if (colonIdx < 0) return c;
@@ -632,10 +631,10 @@ class Puzzle {
       return 0;
     }
 
-    // Count distinct rule types (exclude HelpText)
+    // Count distinct rule types.
     final ruleTypes = constraints
         .map((c) => c.serialize().split(':').first)
-        .where((s) => s.isNotEmpty && s != 'TX')
+        .where((s) => s.isNotEmpty)
         .toSet()
         .length;
 
@@ -751,7 +750,6 @@ class Puzzle {
     int i = constraints.length;
     while (i > 0) {
       i--;
-      if (constraints[i] is HelpText) continue;
       final removed = removeConstraintAt(i);
       if (!isDeductivelyUnique()) {
         // Constraint was needed, put it back. We bypass aggregation
@@ -768,10 +766,7 @@ class Puzzle {
   String lineExport({bool compute = true}) {
     final domainStr = domain.map((v) => v.toString()).join('');
     final valuesStr = cellValues.map((v) => v.toString()).join('');
-    final constraintsStr = constraints
-        .where((c) => c is! HelpText)
-        .map((c) => c.serialize())
-        .join(';');
+    final constraintsStr = constraints.map((c) => c.serialize()).join(';');
     final complexity = compute ? computeComplexity() : 0;
     final sol = cachedSolution;
     final solutionStr = sol != null ? '1:${sol.join('')}' : '0:0';

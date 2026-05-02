@@ -13,7 +13,7 @@ void main() {
   testWidgets('hidden app lifecycle auto-pauses with focus-lost subtitle', (
     tester,
   ) async {
-    await prepareApp({});
+    await prepareApp({}, customPuzzles: const [fixture3x3]);
 
     await tester.pumpWidget(const MyApp());
     await pumpUntil(
@@ -34,7 +34,7 @@ void main() {
   testWidgets('inactive lifecycle auto-pauses with focus-lost subtitle', (
     tester,
   ) async {
-    await prepareApp({});
+    await prepareApp({}, customPuzzles: const [fixture3x3]);
 
     await tester.pumpWidget(const MyApp());
     await pumpUntil(
@@ -52,7 +52,7 @@ void main() {
   testWidgets('resumed lifecycle does not auto-resume the game', (
     tester,
   ) async {
-    await prepareApp({});
+    await prepareApp({}, customPuzzles: const [fixture3x3]);
 
     await tester.pumpWidget(const MyApp());
     await pumpUntil(

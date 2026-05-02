@@ -21,16 +21,19 @@ void main() {
   testWidgets('automatic mode defers the puzzle switch until the 1s debounce', (
     tester,
   ) async {
-    await prepareApp({
-      // Automatic is the default; set explicitly anyway so the test is
-      // self-documenting.
-      'settingsValidateType': 'automatic',
-      // No rating screen → completion routes straight to loadPuzzle.
-      'settingsShowRating': 'no',
-      // "all" keeps live error highlights; completion still flows through
-      // the unified 1s debounce.
-      'settingsLiveCheckType': 'all',
-    });
+    await prepareApp(
+      {
+        // Automatic is the default; set explicitly anyway so the test is
+        // self-documenting.
+        'settingsValidateType': 'automatic',
+        // No rating screen → completion routes straight to loadPuzzle.
+        'settingsShowRating': 'no',
+        // "all" keeps live error highlights; completion still flows through
+        // the unified 1s debounce.
+        'settingsLiveCheckType': 'all',
+      },
+      customPuzzles: const [fixture3x3, fixture5x3],
+    );
     setTestViewport(tester);
 
     await tester.pumpWidget(const MyApp());
@@ -40,7 +43,7 @@ void main() {
     );
     expect(find.byType(CellWidget), findsNWidgets(9));
 
-    // Fill the tutorial puzzle 1 with its known solution "121121111".
+    // Fill the fixture 3x3 puzzle with its known solution "121121111".
     // Cell 0 is a prefilled "1" (readonly).
     await _tapCell(tester, 1, 2); // → 2
     await _tapCell(tester, 2, 1); // → 1
@@ -59,23 +62,26 @@ void main() {
       reason: 'switch must not happen before the 1s debounce elapses',
     );
 
-    // After the full 1s window: tutorial puzzle 2 is loaded (5x3 = 15 cells).
+    // After the full 1s window: fixture 5x3 puzzle is loaded (15 cells).
     await tester.pump(const Duration(milliseconds: 600));
     expect(
       find.byType(CellWidget),
       findsNWidgets(15),
-      reason: 'after the debounce, the next tutorial puzzle must load',
+      reason: 'after the debounce, the next custom puzzle must load',
     );
   });
 
   testWidgets('tapping inside the debounce window cancels the switch', (
     tester,
   ) async {
-    await prepareApp({
-      'settingsValidateType': 'automatic',
-      'settingsShowRating': 'no',
-      'settingsLiveCheckType': 'all',
-    });
+    await prepareApp(
+      {
+        'settingsValidateType': 'automatic',
+        'settingsShowRating': 'no',
+        'settingsLiveCheckType': 'all',
+      },
+      customPuzzles: const [fixture3x3, fixture5x3],
+    );
     setTestViewport(tester);
 
     await tester.pumpWidget(const MyApp());

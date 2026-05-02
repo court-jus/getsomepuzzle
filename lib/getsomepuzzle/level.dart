@@ -8,66 +8,75 @@
 
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-/// Difficulty palier. The numeric ordering is meaningful only inside
-/// the "valid" range (debutant → fouFurieux); `preRempli` and
-/// `indetermine` are out-of-cascade buckets.
+/// Difficulty tier. The numeric ordering is meaningful only inside
+/// the "valid" range (beginner → mad); `overfilledEasy`,
+/// `overfilled` and `undetermined` are out-of-cascade buckets.
+///
+/// `overfilledEasy` is the prefill-bucketed sibling of `beginner`:
+/// puzzles whose prefill ratio exceeds the cap but whose trace shape
+/// would otherwise put them in `beginner`. We split them out so the
+/// onboarding system can mix them into the entry-level catalog
+/// without pulling in genuinely-hard overfilled puzzles.
 enum PuzzleLevel {
-  debutant,
-  joueur,
-  avance,
-  balaise,
+  beginner,
+  player,
+  advanced,
+  strong,
   expert,
-  fouFurieux,
-  preRempli,
-  indetermine,
+  mad,
+  overfilledEasy,
+  overfilled,
+  undetermined,
 }
 
 /// Default playlist filename associated with each level. Used by both
 /// the generator's auto-split mode and `--split-out`.
 const Map<PuzzleLevel, String> levelFilenames = {
-  PuzzleLevel.debutant: '1-easy.txt',
-  PuzzleLevel.joueur: '2-player.txt',
-  PuzzleLevel.avance: '3-advanced.txt',
-  PuzzleLevel.balaise: '4-strong.txt',
+  PuzzleLevel.beginner: '1-easy.txt',
+  PuzzleLevel.player: '2-player.txt',
+  PuzzleLevel.advanced: '3-advanced.txt',
+  PuzzleLevel.strong: '4-strong.txt',
   PuzzleLevel.expert: '5-expert.txt',
-  PuzzleLevel.fouFurieux: '6-mad.txt',
-  PuzzleLevel.preRempli: 'overfilled.txt',
-  PuzzleLevel.indetermine: 'undetermined.txt',
+  PuzzleLevel.mad: '6-mad.txt',
+  PuzzleLevel.overfilledEasy: 'overfilled-easy.txt',
+  PuzzleLevel.overfilled: 'overfilled.txt',
+  PuzzleLevel.undetermined: 'undetermined.txt',
 };
 
 /// Maps the slug of a built-in playable level collection (the asset
 /// filename without the `.txt` suffix) to its [PuzzleLevel]. Excludes
-/// the out-of-cascade buckets `preRempli` and `indetermine`, which are
-/// not surfaced as playable collections.
+/// the out-of-cascade buckets `overfilled*` and `undetermined`, which
+/// are not surfaced as playable collections.
 const Map<String, PuzzleLevel> playableCollectionKeyToLevel = {
-  '1-easy': PuzzleLevel.debutant,
-  '2-player': PuzzleLevel.joueur,
-  '3-advanced': PuzzleLevel.avance,
-  '4-strong': PuzzleLevel.balaise,
+  '1-easy': PuzzleLevel.beginner,
+  '2-player': PuzzleLevel.player,
+  '3-advanced': PuzzleLevel.advanced,
+  '4-strong': PuzzleLevel.strong,
   '5-expert': PuzzleLevel.expert,
-  '6-mad': PuzzleLevel.fouFurieux,
+  '6-mad': PuzzleLevel.mad,
 };
 
 /// Inverse of [playableCollectionKeyToLevel].
 const Map<PuzzleLevel, String> levelToPlayableCollectionKey = {
-  PuzzleLevel.debutant: '1-easy',
-  PuzzleLevel.joueur: '2-player',
-  PuzzleLevel.avance: '3-advanced',
-  PuzzleLevel.balaise: '4-strong',
+  PuzzleLevel.beginner: '1-easy',
+  PuzzleLevel.player: '2-player',
+  PuzzleLevel.advanced: '3-advanced',
+  PuzzleLevel.strong: '4-strong',
   PuzzleLevel.expert: '5-expert',
-  PuzzleLevel.fouFurieux: '6-mad',
+  PuzzleLevel.mad: '6-mad',
 };
 
 /// Human-readable label for tables and CLI output.
 const Map<PuzzleLevel, String> levelLabels = {
-  PuzzleLevel.debutant: 'Debutant',
-  PuzzleLevel.joueur: 'Joueur',
-  PuzzleLevel.avance: 'Avance',
-  PuzzleLevel.balaise: 'Balaise',
+  PuzzleLevel.beginner: 'Beginner',
+  PuzzleLevel.player: 'Player',
+  PuzzleLevel.advanced: 'Advanced',
+  PuzzleLevel.strong: 'Strong',
   PuzzleLevel.expert: 'Expert',
-  PuzzleLevel.fouFurieux: 'Fou furieux',
-  PuzzleLevel.preRempli: 'Pre-rempli',
-  PuzzleLevel.indetermine: 'Indetermine',
+  PuzzleLevel.mad: 'Mad',
+  PuzzleLevel.overfilledEasy: 'Overfilled (beginner)',
+  PuzzleLevel.overfilled: 'Overfilled',
+  PuzzleLevel.undetermined: 'Undetermined',
 };
 
 /// Default upper bound on the prefill ratio. Slightly more permissive
@@ -80,11 +89,12 @@ const double defaultMaxPrefill = 0.30;
 /// [steps] must come from `Puzzle.solveExplained()` on the puzzle in
 /// its initial state (not after partial play). [prefillRatio] is the
 /// fraction of cells already given as readonly; if it exceeds
-/// [maxPrefill] the puzzle is bucketed in [PuzzleLevel.preRempli]
+/// [maxPrefill] the puzzle is bucketed in [PuzzleLevel.overfilled]
+/// (or [PuzzleLevel.overfilledEasy] for trace-easy puzzles)
 /// regardless of the trace.
 ///
 /// [solved] indicates whether the trace actually completed the puzzle
-/// — if false we return [PuzzleLevel.indetermine] (timeout, partial
+/// — if false we return [PuzzleLevel.undetermined] (timeout, partial
 /// trace, or solver got stuck on a contradiction).
 PuzzleLevel classifyTrace({
   required List<SolveStep> steps,
@@ -92,8 +102,7 @@ PuzzleLevel classifyTrace({
   required bool solved,
   double maxPrefill = defaultMaxPrefill,
 }) {
-  if (prefillRatio > maxPrefill) return PuzzleLevel.preRempli;
-  if (!solved) return PuzzleLevel.indetermine;
+  if (!solved) return PuzzleLevel.undetermined;
 
   int forceMoves = 0;
   int maxForceDepth = 0;
@@ -110,36 +119,56 @@ PuzzleLevel classifyTrace({
     }
   }
 
+  // First pass: classify purely by trace shape, as if prefill were
+  // unlimited. This tells us whether the puzzle is pedagogically
+  // simple regardless of how much it's been pre-filled.
+  final PuzzleLevel traceLevel;
   if (forceMoves >= 2 || (forceMoves == 1 && maxForceDepth > 5)) {
-    return PuzzleLevel.fouFurieux;
+    traceLevel = PuzzleLevel.mad;
+  } else if (forceMoves == 0 && maxComplCx >= 4) {
+    traceLevel = PuzzleLevel.strong;
+  } else if (forceMoves == 0 && maxComplCx > 0) {
+    traceLevel = PuzzleLevel.advanced;
+  } else if (forceMoves == 1) {
+    traceLevel = PuzzleLevel.expert;
+  } else if (maxPropCx >= 3) {
+    traceLevel = PuzzleLevel.player;
+  } else {
+    traceLevel = PuzzleLevel.beginner;
   }
-  if (forceMoves == 0 && maxComplCx >= 4) return PuzzleLevel.balaise;
-  if (forceMoves == 0 && maxComplCx > 0) return PuzzleLevel.avance;
-  if (forceMoves == 1) return PuzzleLevel.expert;
-  if (maxPropCx >= 3) return PuzzleLevel.joueur;
-  return PuzzleLevel.debutant;
+
+  // Second pass: route puzzles past the prefill cap to the appropriate
+  // out-of-cascade bucket. Beginner-by-trace puzzles end up in
+  // `overfilledEasy` (mixed into onboarding); everything else ends up
+  // in plain `overfilled`.
+  if (prefillRatio > maxPrefill) {
+    return traceLevel == PuzzleLevel.beginner
+        ? PuzzleLevel.overfilledEasy
+        : PuzzleLevel.overfilled;
+  }
+  return traceLevel;
 }
 
 /// Recommend a playable [PuzzleLevel] from a `playerLevel` (cplx scale,
 /// anchored at 50 = cohort average — see `docs/dev/adapt_to_player.md`).
 ///
 /// Thresholds are deliberately hand-picked rather than derived from the
-/// corpus medians: those medians (`debutant`=7, `joueur`=18, `avance`=36,
-/// `balaise`=39, `expert`=37, `fouFurieux`=67) are not monotonic between
-/// `avance`/`balaise`/`expert`, because cplx tracks predicted duration
+/// corpus medians: those medians (`beginner`=7, `player`=18, `advanced`=36,
+/// `strong`=39, `expert`=37, `mad`=67) are not monotonic between
+/// `advanced`/`strong`/`expert`, because cplx tracks predicted duration
 /// while the cascade tracks cognitive type — they don't align in the
 /// 35-45 zone. A "closest median" rule would flip the recommendation
 /// erratically there. Explicit thresholds are stable and easy to test.
 ///
 /// The cohort anchor at 50 means an average-paced player lands on the
-/// boundary between `avance` and `balaise` — feels right.
+/// boundary between `advanced` and `strong` — feels right.
 PuzzleLevel recommendedLevelFor(int playerLevel) {
-  if (playerLevel < 25) return PuzzleLevel.debutant;
-  if (playerLevel < 40) return PuzzleLevel.joueur;
-  if (playerLevel < 50) return PuzzleLevel.avance;
-  if (playerLevel < 65) return PuzzleLevel.balaise;
+  if (playerLevel < 25) return PuzzleLevel.beginner;
+  if (playerLevel < 40) return PuzzleLevel.player;
+  if (playerLevel < 50) return PuzzleLevel.advanced;
+  if (playerLevel < 65) return PuzzleLevel.strong;
   if (playerLevel < 80) return PuzzleLevel.expert;
-  return PuzzleLevel.fouFurieux;
+  return PuzzleLevel.mad;
 }
 
 /// Convenience over [classifyTrace] when you have a [Puzzle] in its
@@ -154,8 +183,10 @@ PuzzleLevel classifyPuzzle(
 }) {
   final prefill =
       puzzle.cells.where((c) => c.readonly).length / puzzle.cells.length;
-  if (prefill > maxPrefill) return PuzzleLevel.preRempli;
-
+  // No early prefill short-circuit any more: classifyTrace itself now
+  // routes high-prefill puzzles to `overfilledEasy` or `overfilled`
+  // depending on their underlying trace shape. We always run the trace
+  // so the routing is correct.
   final steps = puzzle.solveExplained(timeoutMs: timeoutMs);
   // Replay on a clone to verify the trace actually completes the puzzle.
   final replay = puzzle.clone();

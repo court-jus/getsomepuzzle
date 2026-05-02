@@ -5,16 +5,6 @@ class EndOfPlaylist extends StatelessWidget {
   final int currentLevel;
   final bool filtersBlocking;
 
-  /// When true, the widget shows a tutorial-specific congratulatory message
-  /// and drops everything that would mention the player level / catalog
-  /// ceiling — these concepts don't apply to the tutorial collection.
-  final bool isTutorial;
-
-  /// Primary call-to-action shown only in tutorial mode: sets up the player
-  /// for the main catalog (level 0, auto-level on) and switches to the
-  /// default collection. Ignored when [isTutorial] is false.
-  final VoidCallback? onStartPlaying;
-
   /// True when the current collection still has unplayed candidates that
   /// were not in the just-finished batch. Drives whether we offer
   /// "Continue" as an option.
@@ -46,12 +36,16 @@ class EndOfPlaylist extends StatelessWidget {
   /// longer accurate at every batch boundary.
   final int playedCount;
 
+  /// True while the player is still in onboarding (strict phase or
+  /// post-strict soft filter). Surfaces a "you haven't met every rule
+  /// yet" reminder under the headline so the player understands why
+  /// the recommendation card may push them back to easier collections.
+  final bool onboardingActive;
+
   const EndOfPlaylist({
     super.key,
     required this.currentLevel,
     required this.filtersBlocking,
-    this.isTutorial = false,
-    this.onStartPlaying,
     this.hasMoreInCurrent = false,
     this.currentCollectionLabel,
     this.recommendedCollectionLabel,
@@ -59,45 +53,12 @@ class EndOfPlaylist extends StatelessWidget {
     this.onSwitchToRecommended,
     this.onPickAnother,
     this.playedCount = 0,
+    this.onboardingActive = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    if (isTutorial) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            l.endOfPlaylistTutorialFinished,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          const SizedBox(height: 20),
-          if (onStartPlaying != null)
-            FilledButton.icon(
-              onPressed: onStartPlaying,
-              icon: const Icon(Icons.play_arrow),
-              label: Text(l.endOfPlaylistTutorialStartPlaying),
-            ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              l.endOfPlaylistTutorialAutoLevelNote,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            l.endOfPlaylistTutorialHaveFun,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-        ],
-      );
-    }
     final hasRecommendation =
         recommendedCollectionLabel != null && onSwitchToRecommended != null;
     // "Continue" is meaningless when filters block the current
@@ -125,6 +86,17 @@ class EndOfPlaylist extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(l.endOfPlaylistCurrentLevel(currentLevel)),
+        if (onboardingActive) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              l.endOfPlaylistOnboardingNote,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         if (hasRecommendation) ...[
           Padding(

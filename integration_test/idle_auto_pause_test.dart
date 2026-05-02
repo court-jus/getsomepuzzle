@@ -13,7 +13,10 @@ void main() {
   testWidgets(
     'idle auto-pause surfaces the overlay with an inactivity subtitle',
     (tester) async {
-      await prepareApp({'settingsIdleTimeout': 's5'});
+      await prepareApp(
+        {'settingsIdleTimeout': 's5'},
+        customPuzzles: const [fixture3x3],
+      );
 
       await tester.pumpWidget(const MyApp());
       // Async startup: database load, locale load, settings load, first
@@ -36,7 +39,10 @@ void main() {
   testWidgets('interaction before the deadline keeps the game running', (
     tester,
   ) async {
-    await prepareApp({'settingsIdleTimeout': 's5'});
+    await prepareApp(
+      {'settingsIdleTimeout': 's5'},
+      customPuzzles: const [fixture3x3],
+    );
 
     await tester.pumpWidget(const MyApp());
     await pumpUntil(
@@ -47,7 +53,7 @@ void main() {
     // Wait 4 s, then tap a cell, then wait another 4 s. Total elapsed > 5 s
     // but no 5 s stretch of inactivity: the idle watchdog must stay silent.
     await tester.pump(const Duration(seconds: 4));
-    // Cell 0 is readonly in the tutorial's first puzzle (prefilled "1"), so
+    // Cell 0 is readonly in the fixture3x3 puzzle (prefilled "1"), so
     // tapping it is a no-op. Cell 1 is blank and toggles the timer.
     await tester.tap(find.byType(CellWidget).at(1));
     await tester.pump(const Duration(seconds: 4));

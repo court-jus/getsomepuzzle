@@ -232,19 +232,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get endOfPlaylistTutorialFinished => 'You\'ve finished the tutorial.';
-
-  @override
-  String get endOfPlaylistTutorialHaveFun => 'Have fun!';
-
-  @override
-  String get endOfPlaylistTutorialStartPlaying => 'Start playing';
-
-  @override
-  String get endOfPlaylistTutorialAutoLevelNote =>
-      'The difficulty will adapt automatically to your skill. You can disable this in settings.';
-
-  @override
   String hintDeducedFrom(String constraintName) {
     return 'This cell can be deduced from the $constraintName constraint';
   }
@@ -534,13 +521,90 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintEyes => 'eyes';
 
   @override
+  String get newConstraintModalTitle => 'New rule!';
+
+  @override
+  String get learning => 'Learning';
+
+  @override
+  String get learningPageTitle => 'Learning';
+
+  @override
+  String learningSeenOn(String date) {
+    return 'First seen on $date';
+  }
+
+  @override
+  String get learningNeverSeen => 'Not yet encountered';
+
+  @override
+  String learningPlayCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count puzzles played',
+      one: '1 puzzle played',
+      zero: 'No puzzles played',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get learningRefreshButton => 'Refresh my memory';
+
+  @override
+  String get constraintExplainFM =>
+      'A pattern shown above the grid on a violet background must never appear inside the grid.';
+
+  @override
+  String get constraintExplainSH =>
+      'A pattern shown above the grid on a light blue background tilted at 45° defines an exact shape: every group of that color must take this shape (rotations and reflections allowed).';
+
+  @override
+  String get constraintExplainGS =>
+      'A cell carrying a number must belong to a group of orthogonally adjacent same-color cells whose size matches that number.';
+
+  @override
+  String get constraintExplainPA =>
+      'A cell with an arrow demands the same number of black and white cells in front of the arrow. A double-headed arrow extends the rule to both sides.';
+
+  @override
+  String get constraintExplainLT =>
+      'Cells marked with the same letter must belong to the same group. A group must not contain two different letters.';
+
+  @override
+  String get constraintExplainQA =>
+      'A number on a blue background above the grid sets the total number of cells of that color the solution must contain.';
+
+  @override
+  String get constraintExplainSY =>
+      'A cell carrying ⟍, |, ⟋, ― or 🞋 forces its group (same-color connected cells) to be symmetric along that axis. The 🞋 symbol means central symmetry — equivalent to a half-turn.';
+
+  @override
+  String get constraintExplainDF =>
+      'Two cells separated by a ≠ symbol must be of different colors.';
+
+  @override
+  String get constraintExplainCC =>
+      'A circled number above a column tells how many cells of that color must appear in this specific column.';
+
+  @override
+  String get constraintExplainGC =>
+      'A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.';
+
+  @override
+  String get constraintExplainNC =>
+      'A cell shown with crosses on its sides must have exactly the indicated number of orthogonal neighbors of the marked color.';
+
+  @override
+  String get constraintExplainEY =>
+      'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).';
+
+  @override
   String get complicityOtherConstraint => 'another constraint';
 
   @override
   String get collectionMyPuzzles => 'My puzzles';
-
-  @override
-  String get collectionTutorial => 'Tutorial';
 
   @override
   String get collectionEasy => 'Beginner';
@@ -578,26 +642,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'Based on your level, you might enjoy this collection.';
 
   @override
+  String get endOfPlaylistOnboardingNote =>
+      'You haven\'t met every rule yet — keep playing to discover them one at a time.';
+
+  @override
   String get endOfPlaylistPickAnother => 'Pick another collection';
 
   @override
-  String get settingTutorialSection => 'Tutorial';
-
-  @override
-  String get settingRestartTutorial => 'Restart tutorial';
-
-  @override
-  String get settingRestartTutorialConfirmTitle => 'Restart tutorial?';
-
-  @override
-  String get settingRestartTutorialConfirmBody =>
-      'Your progress on tutorial puzzles will be erased. This cannot be undone.';
-
-  @override
-  String get settingTutorialRestarted => 'Tutorial stats cleared.';
-
-  @override
   String get settingClearStats => 'Clear all stats';
+
+  @override
+  String get settingReplayOnboarding => 'Replay onboarding';
+
+  @override
+  String get settingReplayOnboardingConfirmTitle => 'Replay onboarding?';
+
+  @override
+  String get settingReplayOnboardingConfirmBody =>
+      'The new-rule explanations will appear again as you encounter each constraint. Your play stats are preserved.';
+
+  @override
+  String get settingOnboardingReplayed => 'Onboarding reset.';
 
   @override
   String get settingClearStatsConfirmTitle => 'Clear all stats?';

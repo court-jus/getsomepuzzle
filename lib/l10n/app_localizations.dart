@@ -532,30 +532,6 @@ abstract class AppLocalizations {
   /// **'Current level: {level}'**
   String endOfPlaylistCurrentLevel(int level);
 
-  /// Main message shown when the player completes every tutorial puzzle
-  ///
-  /// In en, this message translates to:
-  /// **'You\'ve finished the tutorial.'**
-  String get endOfPlaylistTutorialFinished;
-
-  /// Encouragement shown right after the tutorial-finished message
-  ///
-  /// In en, this message translates to:
-  /// **'Have fun!'**
-  String get endOfPlaylistTutorialHaveFun;
-
-  /// Primary button that takes the player to Collection 1 with auto-level enabled
-  ///
-  /// In en, this message translates to:
-  /// **'Start playing'**
-  String get endOfPlaylistTutorialStartPlaying;
-
-  /// Small caption below the Start Playing button, explaining auto-level
-  ///
-  /// In en, this message translates to:
-  /// **'The difficulty will adapt automatically to your skill. You can disable this in settings.'**
-  String get endOfPlaylistTutorialAutoLevelNote;
-
   /// Hint message shown when the player clicks the lightbulb to get a clue
   ///
   /// In en, this message translates to:
@@ -1102,6 +1078,120 @@ abstract class AppLocalizations {
   /// **'eyes'**
   String get constraintEyes;
 
+  /// Title of the dialog shown the first time a player encounters a new constraint
+  ///
+  /// In en, this message translates to:
+  /// **'New rule!'**
+  String get newConstraintModalTitle;
+
+  /// Menu label for the Apprentissage page (constraint reference + memory refresh)
+  ///
+  /// In en, this message translates to:
+  /// **'Learning'**
+  String get learning;
+
+  /// Title shown at the top of the learning page
+  ///
+  /// In en, this message translates to:
+  /// **'Learning'**
+  String get learningPageTitle;
+
+  /// Status line for a constraint the player has already met. {date} is a localised long date.
+  ///
+  /// In en, this message translates to:
+  /// **'First seen on {date}'**
+  String learningSeenOn(String date);
+
+  /// Status line for a constraint the player hasn't met yet
+  ///
+  /// In en, this message translates to:
+  /// **'Not yet encountered'**
+  String get learningNeverSeen;
+
+  /// Number of finished, non-skipped puzzles containing this constraint, across every collection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No puzzles played} =1{1 puzzle played} other{{count} puzzles played}}'**
+  String learningPlayCount(int count);
+
+  /// Button on each constraint row that re-displays the explanation modal
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh my memory'**
+  String get learningRefreshButton;
+
+  /// Body of the new-constraint explanation modal for the Forbidden Motif (FM) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A pattern shown above the grid on a violet background must never appear inside the grid.'**
+  String get constraintExplainFM;
+
+  /// Body of the new-constraint explanation modal for the Shape (SH) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A pattern shown above the grid on a light blue background tilted at 45° defines an exact shape: every group of that color must take this shape (rotations and reflections allowed).'**
+  String get constraintExplainSH;
+
+  /// Body of the new-constraint explanation modal for the Group Size (GS) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A cell carrying a number must belong to a group of orthogonally adjacent same-color cells whose size matches that number.'**
+  String get constraintExplainGS;
+
+  /// Body of the new-constraint explanation modal for the Parity (PA) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A cell with an arrow demands the same number of black and white cells in front of the arrow. A double-headed arrow extends the rule to both sides.'**
+  String get constraintExplainPA;
+
+  /// Body of the new-constraint explanation modal for the Letter Group (LT) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'Cells marked with the same letter must belong to the same group. A group must not contain two different letters.'**
+  String get constraintExplainLT;
+
+  /// Body of the new-constraint explanation modal for the Quantity (QA) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A number on a blue background above the grid sets the total number of cells of that color the solution must contain.'**
+  String get constraintExplainQA;
+
+  /// Body of the new-constraint explanation modal for the Symmetry (SY) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A cell carrying ⟍, |, ⟋, ― or 🞋 forces its group (same-color connected cells) to be symmetric along that axis. The 🞋 symbol means central symmetry — equivalent to a half-turn.'**
+  String get constraintExplainSY;
+
+  /// Body of the new-constraint explanation modal for the Different From (DF) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'Two cells separated by a ≠ symbol must be of different colors.'**
+  String get constraintExplainDF;
+
+  /// Body of the new-constraint explanation modal for the Column Count (CC) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A circled number above a column tells how many cells of that color must appear in this specific column.'**
+  String get constraintExplainCC;
+
+  /// Body of the new-constraint explanation modal for the Group Count (GC) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.'**
+  String get constraintExplainGC;
+
+  /// Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A cell shown with crosses on its sides must have exactly the indicated number of orthogonal neighbors of the marked color.'**
+  String get constraintExplainNC;
+
+  /// Body of the new-constraint explanation modal for the Eyes (EY) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).'**
+  String get constraintExplainEY;
+
   /// Fallback name used when a complicity's secondary slug is the wildcard '*' (kept as a safety fallback; the dedicated 'hintComplicityWithAny' template is preferred for the wildcard case)
   ///
   /// In en, this message translates to:
@@ -1113,12 +1203,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My puzzles'**
   String get collectionMyPuzzles;
-
-  /// Label of the tutorial collection
-  ///
-  /// In en, this message translates to:
-  /// **'Tutorial'**
-  String get collectionTutorial;
 
   /// Label of the easiest difficulty collection (1-easy.txt) — puzzles solvable by simple propagation only
   ///
@@ -1180,47 +1264,47 @@ abstract class AppLocalizations {
   /// **'Based on your level, you might enjoy this collection.'**
   String get endOfPlaylistSuggestedHint;
 
+  /// Note displayed at end-of-batch while onboarding is still active (strict phase or post-strict soft filter)
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t met every rule yet — keep playing to discover them one at a time.'**
+  String get endOfPlaylistOnboardingNote;
+
   /// End-of-playlist secondary link sending the player to the open page to pick a collection
   ///
   /// In en, this message translates to:
   /// **'Pick another collection'**
   String get endOfPlaylistPickAnother;
 
-  /// Header of the tutorial-related settings section
-  ///
-  /// In en, this message translates to:
-  /// **'Tutorial'**
-  String get settingTutorialSection;
-
-  /// Button label that restarts the tutorial by erasing tutorial puzzle stats
-  ///
-  /// In en, this message translates to:
-  /// **'Restart tutorial'**
-  String get settingRestartTutorial;
-
-  /// Title of the confirmation dialog for the restart-tutorial action
-  ///
-  /// In en, this message translates to:
-  /// **'Restart tutorial?'**
-  String get settingRestartTutorialConfirmTitle;
-
-  /// Body text of the confirmation dialog for the restart-tutorial action
-  ///
-  /// In en, this message translates to:
-  /// **'Your progress on tutorial puzzles will be erased. This cannot be undone.'**
-  String get settingRestartTutorialConfirmBody;
-
-  /// Snackbar message shown after tutorial stats have been cleared
-  ///
-  /// In en, this message translates to:
-  /// **'Tutorial stats cleared.'**
-  String get settingTutorialRestarted;
-
-  /// Button label that wipes every play stat (tutorial + every collection)
+  /// Button label that wipes every play stat across every collection
   ///
   /// In en, this message translates to:
   /// **'Clear all stats'**
   String get settingClearStats;
+
+  /// Button label that resets the constraint-discovery progress so the new-rule modals fire again
+  ///
+  /// In en, this message translates to:
+  /// **'Replay onboarding'**
+  String get settingReplayOnboarding;
+
+  /// Title of the confirmation dialog for the replay-onboarding action
+  ///
+  /// In en, this message translates to:
+  /// **'Replay onboarding?'**
+  String get settingReplayOnboardingConfirmTitle;
+
+  /// Body text of the confirmation dialog for the replay-onboarding action
+  ///
+  /// In en, this message translates to:
+  /// **'The new-rule explanations will appear again as you encounter each constraint. Your play stats are preserved.'**
+  String get settingReplayOnboardingConfirmBody;
+
+  /// Snackbar message shown after the onboarding has been reset
+  ///
+  /// In en, this message translates to:
+  /// **'Onboarding reset.'**
+  String get settingOnboardingReplayed;
 
   /// Title of the confirmation dialog for the clear-all-stats action
   ///

@@ -412,28 +412,28 @@ void main() {
     // boundaries. These tests pin the bucket boundaries and the edge
     // cases so a future tweak forces a deliberate test update.
 
-    test('low playerLevel maps to debutant', () {
-      expect(recommendedLevelFor(0), PuzzleLevel.debutant);
-      expect(recommendedLevelFor(24), PuzzleLevel.debutant);
+    test('low playerLevel maps to beginner', () {
+      expect(recommendedLevelFor(0), PuzzleLevel.beginner);
+      expect(recommendedLevelFor(24), PuzzleLevel.beginner);
     });
 
-    test('cohort-average playerLevel sits on the avance/balaise boundary', () {
-      // 49 → avance, 50 → balaise. The boundary is intentional: an
+    test('cohort-average playerLevel sits on the advanced/strong boundary', () {
+      // 49 → advanced, 50 → strong. The boundary is intentional: an
       // average-paced player (per the cohort anchor) should sample from
-      // both adjacent paliers depending on day-to-day variation.
-      expect(recommendedLevelFor(49), PuzzleLevel.avance);
-      expect(recommendedLevelFor(50), PuzzleLevel.balaise);
+      // both adjacent tiers depending on day-to-day variation.
+      expect(recommendedLevelFor(49), PuzzleLevel.advanced);
+      expect(recommendedLevelFor(50), PuzzleLevel.strong);
     });
 
-    test('high playerLevel maps to fouFurieux', () {
-      expect(recommendedLevelFor(80), PuzzleLevel.fouFurieux);
-      expect(recommendedLevelFor(120), PuzzleLevel.fouFurieux);
+    test('high playerLevel maps to mad', () {
+      expect(recommendedLevelFor(80), PuzzleLevel.mad);
+      expect(recommendedLevelFor(120), PuzzleLevel.mad);
     });
 
     test('every threshold transition is covered', () {
       // Each named boundary returns the bucket immediately below.
-      expect(recommendedLevelFor(25), PuzzleLevel.joueur);
-      expect(recommendedLevelFor(40), PuzzleLevel.avance);
+      expect(recommendedLevelFor(25), PuzzleLevel.player);
+      expect(recommendedLevelFor(40), PuzzleLevel.advanced);
       expect(recommendedLevelFor(65), PuzzleLevel.expert);
     });
   });
@@ -451,10 +451,11 @@ void main() {
     );
 
     // The gate is tied to `playlistBatchSize` with a floor of 3. We
-    // pick test sizes well below (1) and well above (≥30, more than
-    // any reasonable batch size) so the tests remain robust to the
-    // constant being tweaked.
-    const enough = 30;
+    // pick test sizes well below (1) and well above (≥40, past the
+    // last strict onboarding phase so the recommendation is no longer
+    // suppressed by `currentPhase != null`) so the tests remain
+    // robust to the constants being tweaked.
+    const enough = 40;
 
     test('null below the onboarding noise floor (1 play)', () {
       final db = Database(playerLevel: 50);
@@ -464,7 +465,7 @@ void main() {
     });
 
     test('null when the recommendation matches the current collection', () {
-      // playerLevel 50 maps to balaise → '4-strong'. With current
+      // playerLevel 50 maps to strong → '4-strong'. With current
       // collection already '4-strong', no badge / banner needed.
       final db = Database(playerLevel: 50);
       db.collection = '4-strong';
@@ -473,20 +474,12 @@ void main() {
     });
 
     test('returns recommended key when it differs from current', () {
-      // playerLevel 80 → fouFurieux ('6-mad'). Player is in '2-player'.
+      // playerLevel 80 → mad ('6-mad'). Player is in '2-player'.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
+      db.onboardingCompletions = enough; // past strict phases
       db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, '6-mad');
-    });
-
-    test('null when the active collection is the tutorial', () {
-      // Don't suggest a graduation while the player is still in the
-      // pedagogical track.
-      final db = Database(playerLevel: 80);
-      db.collection = 'tutorial';
-      db.loadStats(nFinishedStatLines(enough));
-      expect(db.recommendedCollectionKey, isNull);
     });
 
     test('counts plays globally — the loaded `puzzles` list is irrelevant', () {
@@ -497,6 +490,7 @@ void main() {
       // fresh plays in the current bucket.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
+      db.onboardingCompletions = enough; // past strict phases
       db.puzzles = []; // nothing loaded in memory
       db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, '6-mad');
@@ -514,9 +508,28 @@ void main() {
       db.collection = '2-player';
       db.loadStats(const []); // fresh stats, 0 plays
       expect(db.recommendedCollectionKey, isNull);
+      // Synthesize a played puzzle just to satisfy the signature; the
+      // counter increment doesn't depend on the puzzle's content.
+      final puz = PuzzleData('v2_12_3x3_000020000_FM:11_1:212121212_6');
       for (int i = 0; i < enough; i++) {
-        db.notePuzzleCompleted();
+        db.notePuzzleCompleted(puz);
       }
+      expect(db.recommendedCollectionKey, '6-mad');
+    });
+
+    test('null while still in a strict onboarding phase', () {
+      // A fast learner could otherwise see a "try 6-mad" suggestion at
+      // the end of their first batch even though they've barely met
+      // FM. The recommendation is suppressed for the whole strict
+      // window (P0-P3) regardless of how high `playerLevel` climbs.
+      final db = Database(playerLevel: 80);
+      db.collection = '1-easy';
+      db.loadStats(nFinishedStatLines(enough));
+      // Within strict (39 < 40), even though player level says 6-mad.
+      db.onboardingCompletions = 39;
+      expect(db.recommendedCollectionKey, isNull);
+      // Once across the strict boundary, recommendation resumes.
+      db.onboardingCompletions = 40;
       expect(db.recommendedCollectionKey, '6-mad');
     });
   });
