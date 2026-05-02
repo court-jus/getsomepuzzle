@@ -409,6 +409,17 @@ class GameModel extends ChangeNotifier {
     required String Function(int count) errorsCountText,
     required void Function() onPuzzleCompleted,
   }) {
+    // In `complete` (« Attendre ») mode the player asked us to hold
+    // off any validation feedback until the grid is fully filled. The
+    // only useful check before that is "is the puzzle complete?"
+    // (a O(N) "no zero cells" scan) — we skip the full constraint
+    // check entirely in that case. Manual validate-button clicks
+    // bypass the gate so the player can still force a check.
+    if (!manualCheck &&
+        settings.liveCheckType == LiveCheckType.complete &&
+        !currentPuzzle!.complete) {
+      return;
+    }
     final shouldShowErrors =
         settings.liveCheckType == LiveCheckType.all || currentPuzzle!.complete;
     final failedConstraints = currentPuzzle!.check(
