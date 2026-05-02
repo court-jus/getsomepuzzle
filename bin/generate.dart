@@ -52,6 +52,16 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   //                       (no extra solve), see lib/getsomepuzzle/level.dart.
   IOSink? sink;
   Map<PuzzleLevel, IOSink>? levelSinks;
+  // Per-sink write chain. Multiple worker consumers share the same
+  // IOSink (per output, or per level in split mode); without
+  // serialization, two concurrent `writeln + await flush` pairs race
+  // inside IOSink (flush internally binds a stream — a concurrent
+  // writeln then crashes with "Bad state: StreamSink is bound to a
+  // stream"). We funnel each sink's writes through a Future chain so
+  // only one writeln+flush pair runs at a time per sink. Different
+  // sinks (different levels) still parallelise.
+  Future<void> singleSinkChain = Future.value();
+  final levelSinkChains = <PuzzleLevel, Future<void>>{};
   if (output != null) {
     sink = File(output).openWrite(mode: FileMode.append);
   } else {
@@ -246,15 +256,23 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
             lastPuzzleMs = now;
 
             if (sink != null) {
-              sink.writeln(puzzleLine);
-              await sink.flush();
+              singleSinkChain = singleSinkChain.then((_) async {
+                sink!.writeln(puzzleLine);
+                await sink.flush();
+              });
+              await singleSinkChain;
               // Re-read the file so stats reflect what's actually on disk.
               currentLines = File(output!).readAsLinesSync();
             } else {
               final levelSink = levelSinks![level];
               if (levelSink != null) {
-                levelSink.writeln(puzzleLine);
-                await levelSink.flush();
+                final prev = levelSinkChains[level] ?? Future.value();
+                final next = prev.then((_) async {
+                  levelSink.writeln(puzzleLine);
+                  await levelSink.flush();
+                });
+                levelSinkChains[level] = next;
+                await next;
               } else {
                 // Should not happen — generator only emits cascade levels.
                 stderr.writeln(
