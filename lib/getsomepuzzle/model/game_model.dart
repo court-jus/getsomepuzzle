@@ -87,6 +87,14 @@ class GameModel extends ChangeNotifier {
   int? firstRightDragValue;
   int? lastRightDragIdx;
 
+  /// Cell index of an in-flight right-click whose toggle is **deferred**
+  /// until either the user releases the button (single click) or moves
+  /// to another cell (drag start). Without this, the right button's
+  /// `Listener.onPointerDown` would commit the toggle the instant the
+  /// button is pressed — visually inconsistent with the left button,
+  /// where `GestureDetector.onTap` only fires at release.
+  int? _pendingRightClickIdx;
+
   Timer? _helpDebounce;
   final _log = Logger("GameModel");
 
@@ -331,6 +339,10 @@ class GameModel extends ChangeNotifier {
   }
 
   void handleDragEnd() {
+    // Skip when no drag was actually started: the cell-widget's
+    // gesture detector emits drag-end on every gesture release,
+    // including taps that never crossed the pan threshold.
+    if (firstDragValue == null && lastDragIdx == null) return;
     _log.fine('drag end');
     firstDragValue = null;
     lastDragIdx = null;
@@ -343,30 +355,63 @@ class GameModel extends ChangeNotifier {
     if (lastRightDragIdx != null && idx == lastRightDragIdx) return;
     final currentValue = currentPuzzle!.cellValues[idx];
     if (firstRightDragValue == null && currentValue == 1) return;
+
+    if (firstRightDragValue == null) {
+      // First event of a right-button gesture (pointer-down on a cell
+      // whose value is not black). Defer the toggle: we don't know
+      // yet whether this is a single click (commit on release) or a
+      // drag (commit at the moment the user moves to another cell).
+      firstRightDragValue = currentValue == 0 ? 2 : 0;
+      _pendingRightClickIdx = idx;
+      lastRightDragIdx = idx;
+      return;
+    }
+
+    // Subsequent event on a *different* cell: a drag is happening.
+    // Flush the deferred initial click first (logged as a click,
+    // since at the time it was committed the user hadn't moved yet),
+    // then paint the new cell if it sits at the opposite value.
     _beforeMutation();
     lastRightDragIdx = idx;
-    if (firstRightDragValue == null) {
-      firstRightDragValue = currentValue == 0 ? 2 : 0;
-      final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
-      if (changed) {
-        currentMeta?.stats?.recordCellEdit();
-        if (history.isEmpty || history.last != idx) history.add(idx);
-        _log.fine('right-drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
-      }
+    if (_pendingRightClickIdx != null) {
+      _commitRightToggle(_pendingRightClickIdx!, isDrag: false);
+      _pendingRightClickIdx = null;
     }
     final oppositeValue = firstRightDragValue == 0 ? 2 : 0;
-    if (currentPuzzle!.cellValues[idx] == oppositeValue) {
-      final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
-      if (changed) {
-        currentMeta?.stats?.recordCellEdit();
-        if (history.isEmpty || history.last != idx) history.add(idx);
-        _log.fine('right-drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
-      }
+    if (currentValue == oppositeValue) {
+      _commitRightToggle(idx, isDrag: true);
     }
     notifyListeners();
   }
 
+  void _commitRightToggle(int idx, {required bool isDrag}) {
+    final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
+    if (changed) {
+      currentMeta?.stats?.recordCellEdit();
+      if (history.isEmpty || history.last != idx) history.add(idx);
+      _log.fine(
+        '${isDrag ? "right-drag" : "right-click"} cell $idx '
+        '→ ${currentPuzzle!.cellValues[idx]}',
+      );
+    }
+  }
+
   void handleRightDragEnd() {
+    // Skip when no right-drag was actually started: the cell widget's
+    // `Listener.onPointerUp` fires for every pointer release on
+    // desktop/web, including a regular left-click — without this
+    // guard each tap would log a spurious "right-drag end" and
+    // re-run `_afterMutation`.
+    if (firstRightDragValue == null && lastRightDragIdx == null) return;
+    // Commit a deferred right-click that was never converted to a
+    // drag — the user pressed and released without moving. This is
+    // where the symmetric "commit on release" semantics with the
+    // left button live.
+    if (_pendingRightClickIdx != null) {
+      _beforeMutation();
+      _commitRightToggle(_pendingRightClickIdx!, isDrag: false);
+      _pendingRightClickIdx = null;
+    }
     _log.fine('right-drag end');
     firstRightDragValue = null;
     lastRightDragIdx = null;
