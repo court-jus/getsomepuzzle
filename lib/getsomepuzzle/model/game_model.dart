@@ -299,6 +299,7 @@ class GameModel extends ChangeNotifier {
     currentMeta?.stats?.recordCellEdit();
     currentPuzzle!.clearConstraintsValidity();
     if (history.isEmpty || history.last != idx) history.add(idx);
+    _log.fine('tap cell $idx → ${currentPuzzle!.cellValues[idx]}');
     _afterMutation();
     return true;
   }
@@ -317,17 +318,20 @@ class GameModel extends ChangeNotifier {
       currentPuzzle!.setValue(idx, firstDragValue!);
       currentMeta?.stats?.recordCellEdit();
       if (history.isEmpty || history.last != idx) history.add(idx);
+      _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
     }
     if (currentPuzzle!.cellValues[idx] != firstDragValue &&
         currentPuzzle!.cellValues[idx] == 0) {
       currentPuzzle!.setValue(idx, firstDragValue!);
       currentMeta?.stats?.recordCellEdit();
       if (history.isEmpty || history.last != idx) history.add(idx);
+      _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
     }
     notifyListeners();
   }
 
   void handleDragEnd() {
+    _log.fine('drag end');
     firstDragValue = null;
     lastDragIdx = null;
     _afterMutation();
@@ -343,11 +347,11 @@ class GameModel extends ChangeNotifier {
     lastRightDragIdx = idx;
     if (firstRightDragValue == null) {
       firstRightDragValue = currentValue == 0 ? 2 : 0;
-      print("$idx $currentValue $firstRightDragValue");
       final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
       if (changed) {
         currentMeta?.stats?.recordCellEdit();
         if (history.isEmpty || history.last != idx) history.add(idx);
+        _log.fine('right-drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
       }
     }
     final oppositeValue = firstRightDragValue == 0 ? 2 : 0;
@@ -356,12 +360,14 @@ class GameModel extends ChangeNotifier {
       if (changed) {
         currentMeta?.stats?.recordCellEdit();
         if (history.isEmpty || history.last != idx) history.add(idx);
+        _log.fine('right-drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
       }
     }
     notifyListeners();
   }
 
   void handleRightDragEnd() {
+    _log.fine('right-drag end');
     firstRightDragValue = null;
     lastRightDragIdx = null;
     _afterMutation();
@@ -424,6 +430,10 @@ class GameModel extends ChangeNotifier {
     } else {
       setTopMessage();
     }
+    _log.fine(
+      'check: ${failedConstraints.length} failed, '
+      'complete=${currentPuzzle!.complete}',
+    );
     notifyListeners();
 
     final shouldComplete =
@@ -431,6 +441,7 @@ class GameModel extends ChangeNotifier {
         currentPuzzle!.complete &&
         (manualCheck || settings.validateType != ValidateType.manual);
     if (shouldComplete) {
+      _log.info('Puzzle completed');
       _finalizeCompletion(settings, onPuzzleCompleted);
     }
   }
@@ -464,6 +475,7 @@ class GameModel extends ChangeNotifier {
   void onHintTap(Settings settings, HintTexts texts) {
     if (currentPuzzle == null) return;
     final mode = settings.hintType;
+    _log.fine('hint tap: stage=$hintStage mode=$mode');
 
     // Stage 0 → 1: errors, regardless of mode.
     if (hintStage == 0) {
@@ -783,7 +795,6 @@ class GameModel extends ChangeNotifier {
 
   void _computeHelp() {
     if (currentPuzzle == null) return;
-    _log.fine(currentPuzzle!.lineRepresentation);
     // Errors are surfaced by tap 1 of the hint flow ([_revealErrors]); the
     // pre-computed move is purely the next *deducible* move.
     helpMove = currentPuzzle!.findAMove(checkErrors: false);

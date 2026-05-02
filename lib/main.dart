@@ -9,9 +9,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/between_puzzles.dart';
@@ -76,7 +78,12 @@ String? parseSharedPuzzleLine(List<String> args, {Uri? webUri}) {
 }
 
 void main(List<String> args) {
-  Logger.root.level = Level.ALL; // defaults to Level.INFO
+  // Verbose only in debug builds, where we want to "watch" a play
+  // session unfold: cell taps, validation outcomes, hint requests,
+  // playlist transitions. Release builds stick to INFO so the player
+  // sees a single "puzzle loaded" line per puzzle in their console
+  // and nothing else while they play.
+  Logger.root.level = kDebugMode ? Level.ALL : Level.INFO;
   Logger.root.onRecord.listen((record) {
     print('${record.level.name}: ${record.time}: ${record.message}');
   });
@@ -271,14 +278,50 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // Puzzle lifecycle (thin wrappers around GameModel)
   // ---------------------------------------------------------------------------
 
+  /// Emit a debug-only summary of the onboarding state — current
+  /// strict phase (or `soft` / `done` once past P3), completions
+  /// counter, and the slug sets the player has and hasn't met. Pairs
+  /// with the per-puzzle info log so a debug session can reconstruct
+  /// the player's journey from the logs alone.
+  void _logOnboardingState() {
+    if (database == null) return;
+    final db = database!;
+    final seen = progress.firstSeen.keys.toList()..sort();
+    final unseen =
+        OnboardingPhase.allKnownSlugs
+            .where((s) => !progress.firstSeen.containsKey(s))
+            .toList()
+          ..sort();
+    final phaseName = db.currentPhase != null
+        ? 'P${db.currentPhase!.index} (intro=${db.currentPhase!.introducing})'
+        : (db.isInOnboarding ? 'soft' : 'done');
+    log.fine(
+      'Onboarding: phase=$phaseName '
+      'completions=${db.onboardingCompletions} '
+      'seen=$seen unseen=$unseen',
+    );
+  }
+
   void loadPuzzle({bool skipped = false}) {
     if (database == null) return;
     if (game.currentMeta != null && skipped) {
       game.currentMeta!.skipped = DateTime.now();
     }
     final nextPuzzle = database!.next();
-    log.fine("Found ${nextPuzzle?.lineRepresentation}");
     if (nextPuzzle != null) {
+      // The single info-level log emitted per puzzle: short summary
+      // plus the canonical key so the puzzle can be looked up in
+      // stats.txt or in the asset files. The canonical key drops the
+      // version prefix, the cached solution and the cplx tail — the
+      // remaining domain/dims/prefill/sorted-constraints is what
+      // identifies the puzzle across format evolutions.
+      log.info(
+        'Puzzle loaded: ${nextPuzzle.width}x${nextPuzzle.height} '
+        'cplx=${nextPuzzle.cplx} '
+        'rules=${nextPuzzle.rules.toSet().toList()..sort()} '
+        'key=${canonicalPuzzleKey(nextPuzzle.lineRepresentation)}',
+      );
+      _logOnboardingState();
       openPuzzle(nextPuzzle);
     } else {
       game.clearPuzzle();
@@ -1185,7 +1228,9 @@ Future<http.Response?> postMessage(
 ) async {
   if (share == ShareData.no) return null;
   final log = Logger("Network");
-  log.info("Posting message $endpoint with data $body");
+  // FINE rather than INFO: telemetry payloads can include the full
+  // puzzle line and shouldn't be in the player's normal console feed.
+  log.fine("Posting message $endpoint with data $body");
   try {
     return await http.post(
       Uri.parse("https://getsomepuzzle.court-jus.net:444/$endpoint/"),

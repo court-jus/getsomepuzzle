@@ -699,10 +699,9 @@ class Database {
     final List<String> stats = [];
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      print(prefs.getKeys());
       for (final key in prefs.getKeys()) {
         if (key.startsWith("stats")) {
-          log.fine("Loading stats from $key");
+          log.finer("Loading stats from $key");
           stats.addAll(prefs.getStringList(key) ?? []);
         }
       }
@@ -713,7 +712,7 @@ class Database {
       await Directory(path).create(recursive: true);
       for (final file in Directory(path).listSync()) {
         if (file.path.contains(pattern)) {
-          log.fine("Loading stats from ${file.path}");
+          log.finer("Loading stats from ${file.path}");
           final fileIo = File(file.path);
           final content = await fileIo.readAsString();
           stats.addAll(content.split("\n"));
@@ -798,7 +797,7 @@ class Database {
       }
       _maybeCapBatch();
     }
-    log.info(
+    log.fine(
       "Playlist prepared with ${playlist.length} puzzles "
       "(shuffled: $shouldShuffle, capped: ${_isPlayableLevel(collection)}, "
       "phase: ${currentPhase?.index}, "
@@ -996,7 +995,7 @@ class Database {
 
   PuzzleData? next() {
     if (playlist.isEmpty) {
-      log.info("Playlist empty");
+      log.fine("Playlist empty");
       return null;
     }
     final selection = playlist.removeAt(0);
@@ -1087,7 +1086,7 @@ class Database {
         )
         .toList();
     if (playedPuzzles.length < 2) {
-      log.info(
+      log.fine(
         "computePlayerLevel: only ${playedPuzzles.length} usable samples, keeping stored level $fallback",
       );
       return fallback;
@@ -1120,7 +1119,7 @@ class Database {
     }
     if (weightTotal <= 0) return fallback;
     final level = (weightedSum / weightTotal).round().clamp(0, 100);
-    log.info("computePlayerLevel: ${toAnalyze.length} puzzles, level=$level");
+    log.fine("computePlayerLevel: ${toAnalyze.length} puzzles, level=$level");
     return level;
   }
 
