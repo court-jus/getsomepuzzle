@@ -276,9 +276,14 @@
     "@settingAutoLevel": {
         "description": "Setting label for automatic level adaptation"
     },
-    "endOfPlaylistCongrats": "Congratulations! You've solved every puzzle in this collection.",
+    "endOfPlaylistCongrats": "You've played {count} puzzles in this collection.",
     "@endOfPlaylistCongrats": {
-        "description": "Message shown when the player has genuinely exhausted the catalog (no remaining unplayed puzzles)"
+        "description": "Headline shown at the end of a batch — surfaces a running tally rather than a 'you exhausted everything' message, since with the 20-puzzle batch cap EndOfPlaylist fires repeatedly through a long collection.",
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
     },
     "endOfPlaylistFiltersBlocking": "There are still puzzles available, but your current filters exclude them.",
     "@endOfPlaylistFiltersBlocking": {

@@ -17,17 +17,21 @@ PuzzleData _puz({
 
 void main() {
   group('Database.preparePlaylist — batch cap', () {
-    test('caps at 20 on built-in level collections', () {
-      // 50 puzzles loaded into '2-player'. The post-Gaussian playlist
-      // should be sliced to 20 — `EndOfPlaylist` will then fire after
-      // the player has consumed those 20, surfacing the level
-      // rotation suggestion. Without the cap, the player could go
-      // months on this collection and never see the prompt.
+    test('caps at playlistBatchSize on built-in level collections', () {
+      // The post-Gaussian playlist is sliced to `playlistBatchSize` so
+      // `EndOfPlaylist` fires every batch — surfacing the level
+      // rotation suggestion. Without the cap, a collection with ~1k
+      // puzzles would never exhaust and the prompt would never appear.
+      // The exact constant value is a UX knob; the test asserts the
+      // cap is applied, not the magic number.
       final db = Database(playerLevel: 50);
       db.collection = '2-player';
-      db.puzzles = List.generate(50, (i) => _puz(cplx: 20));
+      db.puzzles = List.generate(
+        Database.playlistBatchSize + 30,
+        (i) => _puz(cplx: 20),
+      );
       db.preparePlaylist();
-      expect(db.playlist.length, 20);
+      expect(db.playlist.length, Database.playlistBatchSize);
     });
 
     test('does not cap on `custom` (player-curated)', () {
@@ -36,9 +40,12 @@ void main() {
       // the player chose to make exactly those puzzles.
       final db = Database(playerLevel: 50);
       db.collection = 'custom';
-      db.puzzles = List.generate(50, (i) => _puz(cplx: 20));
+      db.puzzles = List.generate(
+        Database.playlistBatchSize + 30,
+        (i) => _puz(cplx: 20),
+      );
       db.preparePlaylist();
-      expect(db.playlist.length, 50);
+      expect(db.playlist.length, Database.playlistBatchSize + 30);
     });
 
     test('does not cap on `tutorial` (pedagogical order)', () {
@@ -46,40 +53,49 @@ void main() {
       // through in full. Cap would break the teaching sequence.
       final db = Database(playerLevel: 50);
       db.collection = 'tutorial';
-      db.puzzles = List.generate(30, (i) => _puz(cplx: 5));
+      final size = Database.playlistBatchSize + 10;
+      db.puzzles = List.generate(size, (i) => _puz(cplx: 5));
       db.preparePlaylist();
-      expect(db.playlist.length, 30);
+      expect(db.playlist.length, size);
     });
 
     test('shuffle mode is also capped on level collections', () {
       // The cap is about end-of-batch UX, not about ordering. Even
       // when the user explicitly shuffles, we still want the
-      // EndOfPlaylist hook to fire after 20.
+      // EndOfPlaylist hook to fire at the batch boundary.
       final db = Database(playerLevel: 50);
       db.collection = '3-advanced';
       db.shouldShuffle = true;
-      db.puzzles = List.generate(50, (i) => _puz(cplx: 30));
+      db.puzzles = List.generate(
+        Database.playlistBatchSize + 30,
+        (i) => _puz(cplx: 30),
+      );
       db.preparePlaylist();
-      expect(db.playlist.length, 20);
+      expect(db.playlist.length, Database.playlistBatchSize);
     });
   });
 
   group('Database.hasMoreCandidatesInCurrentCollection', () {
     test('true when filtered catalog exceeds the active batch', () {
-      // 30 unplayed puzzles, batch shows 20 → 10 left for next batch.
+      // batchSize+10 unplayed → batch holds batchSize, 10 left over.
       final db = Database(playerLevel: 50);
       db.collection = '2-player';
-      db.puzzles = List.generate(30, (i) => _puz(cplx: 20));
+      db.puzzles = List.generate(
+        Database.playlistBatchSize + 10,
+        (i) => _puz(cplx: 20),
+      );
       db.preparePlaylist();
       expect(db.hasMoreCandidatesInCurrentCollection(), isTrue);
     });
 
     test('false when the entire filtered catalog is in the batch', () {
-      // 15 unplayed puzzles, batch holds them all → nothing left for
-      // a "Continue" affordance to surface.
+      // batchSize-1 unplayed → all fit in the batch, no leftover.
       final db = Database(playerLevel: 50);
       db.collection = '2-player';
-      db.puzzles = List.generate(15, (i) => _puz(cplx: 20));
+      final n = Database.playlistBatchSize > 1
+          ? Database.playlistBatchSize - 1
+          : 1;
+      db.puzzles = List.generate(n, (i) => _puz(cplx: 20));
       db.preparePlaylist();
       expect(db.hasMoreCandidatesInCurrentCollection(), isFalse);
     });
@@ -90,7 +106,10 @@ void main() {
       // avoid confusing UX.
       final db = Database(playerLevel: 50);
       db.collection = 'custom';
-      db.puzzles = List.generate(50, (i) => _puz(cplx: 20));
+      db.puzzles = List.generate(
+        Database.playlistBatchSize + 30,
+        (i) => _puz(cplx: 20),
+      );
       db.preparePlaylist();
       expect(db.hasMoreCandidatesInCurrentCollection(), isFalse);
     });

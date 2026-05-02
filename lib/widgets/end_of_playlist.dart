@@ -39,6 +39,13 @@ class EndOfPlaylist extends StatelessWidget {
   /// collection manually.
   final VoidCallback? onPickAnother;
 
+  /// Number of puzzles the player has played (regardless of skip/like
+  /// state) in the currently loaded collection. Surfaced as a tally in
+  /// the headline message — better fits the new batch-based UX than
+  /// the legacy "you exhausted everything" message, which is no
+  /// longer accurate at every batch boundary.
+  final int playedCount;
+
   const EndOfPlaylist({
     super.key,
     required this.currentLevel,
@@ -51,6 +58,7 @@ class EndOfPlaylist extends StatelessWidget {
     this.onContinueCurrent,
     this.onSwitchToRecommended,
     this.onPickAnother,
+    this.playedCount = 0,
   });
 
   @override
@@ -105,7 +113,7 @@ class EndOfPlaylist extends StatelessWidget {
 
     final headlineMessage = filtersBlocking
         ? l.endOfPlaylistFiltersBlocking
-        : l.endOfPlaylistCongrats;
+        : l.endOfPlaylistCongrats(playedCount);
 
     return Column(
       mainAxisSize: MainAxisSize.min,

@@ -160,6 +160,36 @@ The cap is applied uniformly whether the playlist comes from the
 Gaussian draw or from `shouldShuffle`: it's about pacing the
 `EndOfPlaylist` hook, not about ordering.
 
+The catalog count surfaced in `OpenPage` (the *Puzzles matching
+filters* line) is `filter().length`, not `playlist.length` — the
+player needs to see how many puzzles their filters match against,
+which is independent of the batch the engine is currently feeding
+them.
+
+### When `playerLevel` recomputes (auto mode)
+
+With `autoLevel == true`, `Database.computePlayerLevel` is called
+exactly **at the end of each batch** (when `_onPuzzleCompleted` finds
+`playlist.isEmpty` after the last puzzle of the batch was consumed).
+It is **not** called after every puzzle.
+
+The reason is mechanical: every time the level changes,
+`preparePlaylist` rebuilds the playlist with a fresh Gaussian draw —
+so a per-puzzle recompute would replace the in-flight batch
+continuously, the player would never reach the 20th puzzle, and
+`EndOfPlaylist` would never fire. End-of-batch recompute is the only
+schedule that lets the *Try `<recommended>`* prompt appear at all.
+
+Side effect: the `Lv N*` indicator in `TimerBottomBar` is held steady
+for the whole batch. That's intentional — a stable readout is easier
+to act on than one that jitters per play. The level on screen reflects
+"the level the engine is feeding you puzzles for", which is the right
+signal anyway.
+
+User-initiated changes (toggling `autoLevel` on, moving the manual
+slider, ending the tutorial) still recompute and rebuild immediately;
+the deferral applies only to the per-puzzle automatic loop.
+
 The selection knobs `selectionOffset` and `selectionSigma` are
 constants today. Wiring them through `Settings` would unlock UX
 modes like "challenge" (`offset = +5`), "rest" (`offset = −3`) or
@@ -172,15 +202,18 @@ the active playlist is empty — which now happens at every batch
 boundary on the six level collections (every ~20 plays), not just when
 the catalog is fully exhausted. The widget reads three signals:
 
-- **`filtersBlocking`** — `Database.hasUnplayedIgnoringFilters()`: at
-  least one unplayed puzzle exists in the catalog but is hidden by the
-  user's filters. The "relax filters" headline replaces the
-  congratulatory one, but the *Try `<recommended>`* button still shows
-  when applicable — switching collections is a legitimate escape hatch
-  since different collections have different puzzle distributions and
-  the filters may be permissive there. The *Continue* button is always
-  hidden in this branch (re-preparing the playlist would hit the same
-  empty result).
+- **`filtersBlocking`** — `Database.areFiltersBlocking`: true only
+  when `filter()` is empty *and* unplayed puzzles still exist
+  (`hasUnplayedIgnoringFilters()`). At a normal batch boundary, the
+  ~1000 untouched puzzles are still picked up by `filter()` so this
+  stays false; the "relax filters" headline only fires when user-set
+  filters (size, rules) genuinely exclude every candidate. Keying on
+  `hasUnplayedIgnoringFilters` alone — the previous behaviour — would
+  have surfaced the warning at every batch boundary. The
+  *Try `<recommended>`* button still shows in this branch when
+  applicable (switching collections is a legitimate escape hatch since
+  filters may be permissive in another bucket); the *Continue* button
+  is hidden because re-preparing would hit the same empty result.
 - **`hasMoreInCurrent`** — `Database.hasMoreCandidatesInCurrentCollection()`:
   the current collection still has unplayed candidates that weren't in
   the just-finished batch. Drives the *Continue with `<X>`* button

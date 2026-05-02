@@ -145,7 +145,12 @@ class _OpenPageState extends State<OpenPage> {
 
   void updateMatchingCount() {
     widget.database.preparePlaylist();
-    matchingCount = widget.database.playlist.length;
+    // Show the full filtered catalog count, not the active batch size.
+    // `preparePlaylist` may have capped `playlist` at 20 (the batch size
+    // for in-game pacing), but the open page is meant to surface the
+    // total number of playable candidates so the player understands
+    // what their filters are matching against.
+    matchingCount = widget.database.filter().length;
   }
 
   void selectPuzzle(

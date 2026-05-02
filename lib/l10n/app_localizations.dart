@@ -514,11 +514,11 @@ abstract class AppLocalizations {
   /// **'Auto-adapt'**
   String get settingAutoLevel;
 
-  /// Message shown when the player has genuinely exhausted the catalog (no remaining unplayed puzzles)
+  /// Headline shown at the end of a batch — surfaces a running tally rather than a 'you exhausted everything' message, since with the 20-puzzle batch cap EndOfPlaylist fires repeatedly through a long collection.
   ///
   /// In en, this message translates to:
-  /// **'Congratulations! You\'ve solved every puzzle in this collection.'**
-  String get endOfPlaylistCongrats;
+  /// **'You\'ve played {count} puzzles in this collection.'**
+  String endOfPlaylistCongrats(int count);
 
   /// Message shown when puzzles remain in the catalog but are hidden by user filters
   ///

@@ -382,14 +382,32 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       jsonEncode({"puzzle": game.currentMeta!.lineRepresentation}),
       settings.shareData,
     );
-    if (settings.autoLevel && database != null) {
+    // Bump the global usable-plays counter so the recommendation gate
+    // clears as the session progresses — without this the gate only
+    // sees the stats loaded at app start and stays stuck below the
+    // threshold across an entire session for a fresh player.
+    database?.notePuzzleCompleted();
+    // Auto-level recompute is deferred to the end of the batch (when
+    // the playlist becomes empty). Recomputing after every puzzle would
+    // shift `playerLevel` continuously, which then re-runs
+    // `preparePlaylist` and produces a fresh batch of 20 — meaning the
+    // player would never reach the EndOfPlaylist screen and never see
+    // the cross-collection suggestion. Holding the level steady for one
+    // batch also makes the "Lv N" display feel less jittery.
+    //
+    // The recompute fires exactly when the player has just finished the
+    // last puzzle of the batch (playlist empty post-`next()`), so the
+    // freshly-shown EndOfPlaylist reads an up-to-date `playerLevel` and
+    // a correct `recommendedCollectionKey`. We deliberately do not call
+    // `preparePlaylist` here — the user's explicit Continue/Switch
+    // action will rebuild the batch.
+    if (settings.autoLevel && database != null && database!.playlist.isEmpty) {
       final newLevel = database!.computePlayerLevel(
         fallback: settings.playerLevel,
       );
       if (newLevel != settings.playerLevel) {
         settings.playerLevel = newLevel;
         database!.setPlayerLevel(newLevel);
-        database!.preparePlaylist();
         settings.save();
       }
     }
@@ -1002,12 +1020,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                               },
                                               filtersBlocking:
                                                   database
-                                                      ?.hasUnplayedIgnoringFilters() ??
+                                                      ?.areFiltersBlocking ??
                                                   false,
                                               hasMoreInCurrent:
                                                   database
                                                       ?.hasMoreCandidatesInCurrentCollection() ??
                                                   false,
+                                              playedCount:
+                                                  database?.puzzles
+                                                      .where((p) => p.played)
+                                                      .length ??
+                                                  0,
                                               currentCollectionLabel: labels
                                                   .labelFor(
                                                     database?.collection ?? '',

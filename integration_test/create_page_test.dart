@@ -96,7 +96,7 @@ void main() {
 
   group('Create page', () {
     testWidgets('open editor from drawer', (tester) async {
-      app.main();
+      app.main([]);
       await _waitForAppReady(tester);
 
       await _openCreatePage(tester);
@@ -108,7 +108,7 @@ void main() {
     testWidgets('add a Quantity constraint via color+count dialog', (
       tester,
     ) async {
-      app.main();
+      app.main([]);
       await _waitForAppReady(tester);
       await _openCreatePage(tester);
 
@@ -139,7 +139,7 @@ void main() {
     });
 
     testWidgets('cancel picker adds nothing', (tester) async {
-      app.main();
+      app.main([]);
       await _waitForAppReady(tester);
       await _openCreatePage(tester);
 
@@ -157,7 +157,7 @@ void main() {
     });
 
     testWidgets('fix a cell black from the picker', (tester) async {
-      app.main();
+      app.main([]);
       await _waitForAppReady(tester);
       await _openCreatePage(tester);
 
@@ -191,7 +191,7 @@ void main() {
     testWidgets('delete a top-bar constraint via confirm dialog', (
       tester,
     ) async {
-      app.main();
+      app.main([]);
       await _waitForAppReady(tester);
       await _openCreatePage(tester);
 

@@ -359,6 +359,53 @@ void main() {
     );
   });
 
+  group('Database.areFiltersBlocking', () {
+    test('true when user filters hide every otherwise-eligible puzzle', () {
+      // 8x8 puzzle, maxWidth=5 → filter() empty, but the puzzle exists
+      // unplayed → user filters are the cause. This is the only case
+      // where EndOfPlaylist should invite the player to relax filters.
+      final db = Database(playerLevel: 0);
+      db.puzzles = [_puz(cplx: 20, width: 8, height: 8)];
+      db.currentFilters.maxWidth = 5;
+      expect(db.areFiltersBlocking, isTrue);
+    });
+
+    test(
+      'false at end of batch — unconsumed candidates remain in filter()',
+      () {
+        // Regression: previous logic surfaced "filters hiding" at every
+        // batch boundary because 1000+ unplayed puzzles remained in the
+        // collection while the active 20-puzzle batch had been consumed.
+        // Here we model 5 played + 5 unplayed; filter() returns the 5
+        // unplayed → NOT a filter problem.
+        final db = Database(playerLevel: 0);
+        db.puzzles = [
+          for (int i = 0; i < 5; i++)
+            (_puz(cplx: 20)
+              ..played = true
+              ..finished = DateTime(2026, 1, 1)),
+          for (int i = 0; i < 5; i++) _puz(cplx: 20),
+        ];
+        expect(db.areFiltersBlocking, isFalse);
+      },
+    );
+
+    test('false when the catalog is genuinely exhausted', () {
+      // Every puzzle has been played; filter() empty AND no unplayed
+      // candidates → user is just done, not stuck on filters.
+      final db = Database(playerLevel: 0);
+      db.puzzles = [
+        _puz(cplx: 20)
+          ..played = true
+          ..finished = DateTime(2026, 1, 1),
+        _puz(cplx: 21)
+          ..played = true
+          ..finished = DateTime(2026, 1, 1),
+      ];
+      expect(db.areFiltersBlocking, isFalse);
+    });
+  });
+
   group('recommendedLevelFor', () {
     // The threshold function maps a `playerLevel` (0..100, anchored at 50
     // = cohort average) to a playable PuzzleLevel via hand-picked
@@ -403,10 +450,16 @@ void main() {
           '2026-01-0${(i % 9) + 1}T12:00:00 30s 0f v2_12_4x4_0000000000000000_FM:1_0:0_$i',
     );
 
-    test('null while fewer than 10 usable plays — onboarding noise floor', () {
+    // The gate is tied to `playlistBatchSize` with a floor of 3. We
+    // pick test sizes well below (1) and well above (≥30, more than
+    // any reasonable batch size) so the tests remain robust to the
+    // constant being tweaked.
+    const enough = 30;
+
+    test('null below the onboarding noise floor (1 play)', () {
       final db = Database(playerLevel: 50);
       db.collection = '1-easy';
-      db.loadStats(nFinishedStatLines(5));
+      db.loadStats(nFinishedStatLines(1));
       expect(db.recommendedCollectionKey, isNull);
     });
 
@@ -415,7 +468,7 @@ void main() {
       // collection already '4-strong', no badge / banner needed.
       final db = Database(playerLevel: 50);
       db.collection = '4-strong';
-      db.loadStats(nFinishedStatLines(15));
+      db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, isNull);
     });
 
@@ -423,7 +476,7 @@ void main() {
       // playerLevel 80 → fouFurieux ('6-mad'). Player is in '2-player'.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
-      db.loadStats(nFinishedStatLines(15));
+      db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, '6-mad');
     });
 
@@ -432,20 +485,38 @@ void main() {
       // pedagogical track.
       final db = Database(playerLevel: 80);
       db.collection = 'tutorial';
-      db.loadStats(nFinishedStatLines(15));
+      db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, isNull);
     });
 
     test('counts plays globally — the loaded `puzzles` list is irrelevant', () {
       // Returning player: 0 puzzles loaded in memory (e.g., they just
       // switched to a fresh collection mid-session), but their stats
-      // history holds 12 finished plays from other collections. The
-      // recommendation must surface immediately, not wait for 10 fresh
-      // plays in the current bucket.
+      // history holds enough finished plays from other collections.
+      // The recommendation must surface immediately, not wait for
+      // fresh plays in the current bucket.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
       db.puzzles = []; // nothing loaded in memory
-      db.loadStats(nFinishedStatLines(12));
+      db.loadStats(nFinishedStatLines(enough));
+      expect(db.recommendedCollectionKey, '6-mad');
+    });
+
+    test('notePuzzleCompleted clears the gate during a session', () {
+      // Brand-new player: stats file empty, `loadStats` sees 0 usable
+      // plays. They play their way through `enough` puzzles in the
+      // session — `notePuzzleCompleted` must lift the gate even
+      // before the first writeStats round-trips through the stats
+      // file. Without this hook, the gate would only see the
+      // boot-time count and stay closed across an entire session for
+      // a fresh player.
+      final db = Database(playerLevel: 80);
+      db.collection = '2-player';
+      db.loadStats(const []); // fresh stats, 0 plays
+      expect(db.recommendedCollectionKey, isNull);
+      for (int i = 0; i < enough; i++) {
+        db.notePuzzleCompleted();
+      }
       expect(db.recommendedCollectionKey, '6-mad');
     });
   });

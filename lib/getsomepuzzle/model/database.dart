@@ -408,8 +408,19 @@ class Database {
   /// not skipped — across the entire stats history, not just the
   /// currently loaded collection. Used by [recommendedCollectionKey] to
   /// decide whether the player has played enough overall to act on the
-  /// recommendation. Reset on every [loadStats] call.
+  /// recommendation. Reset on every [loadStats] call and incremented
+  /// in-session via [notePuzzleCompleted] so the gate also clears as
+  /// the player accumulates plays mid-session.
   int _globalUsablePlays = 0;
+
+  /// In-session counter increment: bump the global play count after a
+  /// non-skipped, finished puzzle. Without this, plays accumulated
+  /// during the current session would never reach the recommendation
+  /// gate (only the stats-file-loaded count, populated once at app
+  /// start, would matter).
+  void notePuzzleCompleted() {
+    _globalUsablePlays++;
+  }
 
   void loadStats(List<String> rawStats) {
     log.finest("loadStats");
@@ -603,7 +614,7 @@ class Database {
   /// a level-rotation suggestion — capping at 20 avoids the player going
   /// months without seeing it on collections that hold ~1k+ puzzles.
   /// Tutorial, custom, and user playlists are not capped.
-  static const int playlistBatchSize = 20;
+  static const int playlistBatchSize = 10;
 
   bool _isPlayableLevel(String key) =>
       playableCollectionKeyToLevel.containsKey(key);
@@ -647,7 +658,15 @@ class Database {
   /// Minimum number of usable plays needed before we surface a
   /// recommendation. Below this, [recommendedCollectionKey] returns
   /// null — the rolling-average `playerLevel` is too noisy to act on.
-  static const int _minPlaysForRecommendation = 10;
+  ///
+  /// Tied to `playlistBatchSize` so the gate clears at the first
+  /// end-of-batch boundary regardless of how the constant is tuned.
+  /// We never go below 3 to keep a minimum sanity floor for a brand
+  /// new player on the very first puzzles of a session.
+  static int get _minPlaysForRecommendation {
+    final cap = playlistBatchSize;
+    return cap < 3 ? 3 : cap;
+  }
 
   /// Suggested collection key based on `playerLevel`. Returns null
   /// when:
@@ -1113,15 +1132,33 @@ class Database {
     return slugGap + sizeGap;
   }
 
-  /// Whether any unplayed puzzle exists in the catalog when user-configured
-  /// filters (size, rules) are ignored. Only the baseline exclusions
-  /// (played / skipped / disliked) still apply. Used by `EndOfPlaylist`
-  /// to distinguish "filters are hiding puzzles" from "really exhausted".
+  /// Whether any unplayed puzzle exists in the catalog when
+  /// user-configured filters (size, rules) are ignored. Only the
+  /// baseline exclusions (played / skipped / disliked) still apply.
+  /// Used internally by [areFiltersBlocking] — `EndOfPlaylist` should
+  /// call that getter rather than this one directly.
   bool hasUnplayedIgnoringFilters() {
     return puzzles.any(
       (p) => !p.played && p.skipped == null && p.disliked == null,
     );
   }
+
+  /// True when user-set filters are responsible for an empty playlist:
+  /// `filter()` yields nothing (so the engine cannot pick a next
+  /// batch) while [hasUnplayedIgnoringFilters] confirms playable
+  /// puzzles still exist. In that state `EndOfPlaylist` should invite
+  /// the player to relax filters.
+  ///
+  /// We deliberately do **not** treat the implicit `played` ban as a
+  /// "user filter": after a 20-puzzle batch, those 20 are
+  /// `played=true`, but the remaining ~1000 in the collection are
+  /// still picked up by `filter()` and the playlist just needs to be
+  /// rebuilt — not a filter problem. Keying the message on
+  /// `hasUnplayedIgnoringFilters` alone (the previous behaviour)
+  /// caused the "filters hiding" message to surface at every batch
+  /// boundary.
+  bool get areFiltersBlocking =>
+      filter().isEmpty && hasUnplayedIgnoringFilters();
 
   List<String> getStats() {
     return puzzles

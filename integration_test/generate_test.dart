@@ -17,7 +17,7 @@ void main() {
 
   group('Generate page', () {
     testWidgets('open, start, stop generation', (tester) async {
-      app.main();
+      app.main([]);
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
       await openDrawer(tester);
@@ -63,7 +63,7 @@ void main() {
     });
 
     testWidgets('generation completes with count=1', (tester) async {
-      app.main();
+      app.main([]);
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // Navigate to generate page

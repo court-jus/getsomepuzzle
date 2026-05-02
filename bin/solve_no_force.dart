@@ -1,5 +1,4 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
@@ -20,7 +19,7 @@ void main(List<String> args) {
       break;
     }
     final src = m.givenBy is Complicity
-        ? '${m.givenBy.serialize()}'
+        ? m.givenBy.serialize()
         : m.givenBy.runtimeType.toString();
     p.setValue(m.idx, m.value);
     final r = m.idx ~/ p.width;

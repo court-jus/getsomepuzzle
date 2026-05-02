@@ -78,7 +78,14 @@
     "@settingAutoLevel": {
         "description": "Setting label for automatic level adaptation"
     },
-    "endOfPlaylistCongrats": "¡Felicidades! Has resuelto todos los puzzles de esta colección.",
+    "endOfPlaylistCongrats": "Has jugado {count} puzzles en esta colección.",
+    "@endOfPlaylistCongrats": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
     "endOfPlaylistFiltersBlocking": "Quedan puzzles disponibles, pero tus filtros actuales los excluyen.",
     "endOfPlaylistCurrentLevel": "Nivel actual: {level}",
     "@endOfPlaylistCurrentLevel": {

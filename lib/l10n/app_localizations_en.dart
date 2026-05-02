@@ -218,8 +218,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingAutoLevel => 'Auto-adapt';
 
   @override
-  String get endOfPlaylistCongrats =>
-      'Congratulations! You\'ve solved every puzzle in this collection.';
+  String endOfPlaylistCongrats(int count) {
+    return 'You\'ve played $count puzzles in this collection.';
+  }
 
   @override
   String get endOfPlaylistFiltersBlocking =>
