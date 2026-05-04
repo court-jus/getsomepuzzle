@@ -298,9 +298,6 @@
             }
         }
     },
-    "@endOfPlaylistMaxLevel": {
-        "description": "Message shown when there is no higher level with puzzles available"
-    },
     "hintDeducedFrom": "This cell can be deduced from the {constraintName} constraint",
     "@hintDeducedFrom": {
         "description": "Hint message shown when the player clicks the lightbulb to get a clue",
@@ -559,6 +556,10 @@
     "@constraintColumnCount": {
         "description": "Name of the column count constraint"
     },
+    "constraintRowCount": "cells per row",
+    "@constraintRowCount": {
+        "description": "Name of the row count constraint"
+    },
     "constraintShape": "shape",
     "@constraintShape": {
         "description": "Name of the shape constraint"
@@ -644,6 +645,10 @@
     "constraintExplainCC": "A circled number above a column tells how many cells of that color must appear in this specific column.",
     "@constraintExplainCC": {
         "description": "Body of the new-constraint explanation modal for the Column Count (CC) constraint"
+    },
+    "constraintExplainRC": "A circled number to the left of a row tells how many cells of that color must appear in this specific row.",
+    "@constraintExplainRC": {
+        "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
     },
     "constraintExplainGC": "A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.",
     "@constraintExplainGC": {

@@ -145,58 +145,12 @@
     "constraintExplainSY": "Lorsqu'une case contient l'un de ces symboles (⟍, |, ⟋, ―, 🞋), le groupe dont elle fait partie doit respecter la symétrie associée. La symétrie centrale (🞋) équivaut à une rotation d'un demi-tour.",
     "constraintExplainDF": "Lorsque deux cellules sont séparées par le symbole ≠, elles doivent être de couleurs différentes.",
     "constraintExplainCC": "Un nombre dans un cercle au-dessus d'une colonne indique combien de cellules de cette couleur doivent apparaître dans cette colonne précise.",
-    "constraintExplainGC": "Un nombre dans un cadre avec une icône de lien indique combien de groupes (composantes connexes) de cette couleur la solution doit contenir.",
-    "constraintExplainNC": "Une case affichée avec des croix sur ses côtés doit avoir exactement le nombre indiqué de voisins orthogonaux de la couleur marquée.",
-    "constraintExplainEY": "Une case contenant un œil doit « voir » exactement le nombre indiqué de cases de la couleur de l'œil. La vue se propage en ligne droite dans les quatre directions orthogonales jusqu'au bord de la grille ou jusqu'à une case de la couleur opposée (qui bloque la vue).",
-    "constraintSymmetry": "symétrie",
-    "generate": "Générer",
-    "generateTitle": "Générer des puzzles",
-    "generateWidth": "Largeur",
-    "generateHeight": "Hauteur",
-    "generateRequiredRules": "Règles obligatoires",
-    "generateExcludedRules": "Règles exclues",
-    "generateMaxTime": "Temps max",
-    "generateCount": "Puzzles",
-    "generateStart": "Générer",
-    "generateStop": "Arrêter",
-    "generateProgress": "Généré {current} / {total} puzzles",
-    "generateComplete": "Génération terminée !",
-    "generateConstraints": "Contraintes",
-    "generateFailed": "Aucun puzzle n'a pu être généré avec ces paramètres. Essayez d'autres réglages.",
-    "generatePlay": "Jouer",
-    "generateMore": "Encore",
-    "noCustomPuzzles": "Aucun puzzle personnalisé. Utilisez la page Générer pour en créer !",
-    "create": "Créer",
-    "createTitle": "Créer un puzzle",
-    "createStart": "Commencer",
-    "createTest": "Tester",
-    "createValidate": "Valider",
-    "createSave": "Enregistrer",
-    "createSaved": "Puzzle enregistré !",
-    "createSolvable": "Résoluble",
-    "createNotSolvable": "Non résoluble",
-    "createUniqueSolution": "Solution unique",
-    "createMultipleSolutions": "Solutions multiples",
-    "createNoSolution": "Aucune solution",
-    "createComplexity": "Complexité",
-    "createNoConstraints": "Touchez une cellule pour ajouter une contrainte",
-    "createAddConstraint": "Ajouter une contrainte",
-    "createChooseType": "Type de contrainte",
-    "createChooseSide": "Côté",
-    "createChooseAxis": "Axe de symétrie",
-    "createChooseSize": "Taille du groupe",
-    "createChooseLetter": "Lettre",
-    "createChooseValue": "Valeur",
-    "createChooseCount": "Nombre",
-    "createMotifWidth": "Largeur du motif",
-    "createMotifHeight": "Hauteur du motif",
-    "createLetterGroupMode": "Touchez les cellules pour le groupe {letter}, puis appuyez sur Terminer",
-    "@createLetterGroupMode": {
-        "placeholders": {
-            "letter": {
-                "type": "String"
-            }
-        }
+    "@constraintExplainCC": {
+        "description": "Body of the new-constraint explanation modal for the Column Count (CC) constraint"
+    },
+    "constraintExplainRC": "Un nombre dans un cercle à gauche d'une ligne indique combien de cellules de cette couleur doivent apparaître dans cette ligne précise.",
+    "@constraintExplainRC": {
+        "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
     },
     "createLetterGroupDone": "Terminer",
     "createAddNew": "Ajouter une contrainte",
@@ -255,6 +209,10 @@
     "constraintColumnCount": "cellules par colonne",
     "@constraintColumnCount": {
         "description": "Name of the column count constraint"
+    },
+    "constraintRowCount": "cellules par ligne",
+    "@constraintRowCount": {
+        "description": "Name of the row count constraint"
     },
     "complicityOtherConstraint": "une autre contrainte",
     "settingReplayOnboarding": "Rejouer l'onboarding",

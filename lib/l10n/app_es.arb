@@ -145,58 +145,12 @@
     "constraintExplainSY": "Cuando una casilla contiene uno de estos símbolos (⟍, |, ⟋, ―, 🞋), el grupo del que forma parte debe respetar la simetría asociada. La simetría central (🞋) equivale a un giro de media vuelta.",
     "constraintExplainDF": "Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.",
     "constraintExplainCC": "Un número dentro de un círculo sobre una columna indica cuántas celdas de ese color deben aparecer en esa columna específica.",
-    "constraintExplainGC": "Un número dentro de un marco con un icono de enlace indica cuántos grupos (componentes conexas) de ese color debe contener la solución.",
-    "constraintExplainNC": "Una casilla mostrada con cruces en sus lados debe tener exactamente el número indicado de vecinos ortogonales del color marcado.",
-    "constraintExplainEY": "Una casilla con un ojo debe « ver » exactamente el número indicado de casillas del color del ojo. La vista avanza en línea recta en las cuatro direcciones ortogonales hasta el borde de la cuadrícula o hasta una casilla del color opuesto (que bloquea la vista).",
-    "constraintSymmetry": "simetría",
-    "generate": "Generar",
-    "generateTitle": "Generar puzzles",
-    "generateWidth": "Ancho",
-    "generateHeight": "Alto",
-    "generateRequiredRules": "Reglas obligatorias",
-    "generateExcludedRules": "Reglas excluidas",
-    "generateMaxTime": "Tiempo máx.",
-    "generateCount": "Puzzles",
-    "generateStart": "Generar",
-    "generateStop": "Detener",
-    "generateProgress": "Generados {current} / {total} puzzles",
-    "generateComplete": "¡Generación completada!",
-    "generateConstraints": "Restricciones",
-    "generateFailed": "No se pudieron generar puzzles con estos parámetros. Prueba con otros ajustes.",
-    "generatePlay": "Jugar",
-    "generateMore": "Más",
-    "noCustomPuzzles": "No hay puzzles personalizados. ¡Usa la página Generar para crear algunos!",
-    "create": "Crear",
-    "createTitle": "Crear un puzzle",
-    "createStart": "Comenzar",
-    "createTest": "Probar",
-    "createValidate": "Validar",
-    "createSave": "Guardar",
-    "createSaved": "¡Puzzle guardado!",
-    "createSolvable": "Resoluble",
-    "createNotSolvable": "No resoluble",
-    "createUniqueSolution": "Solución única",
-    "createMultipleSolutions": "Soluciones múltiples",
-    "createNoSolution": "Sin solución",
-    "createComplexity": "Complejidad",
-    "createNoConstraints": "Toca una celda para agregar una restricción",
-    "createAddConstraint": "Agregar una restricción",
-    "createChooseType": "Tipo de restricción",
-    "createChooseSide": "Lado",
-    "createChooseAxis": "Eje de simetría",
-    "createChooseSize": "Tamaño del grupo",
-    "createChooseLetter": "Letra",
-    "createChooseValue": "Valor",
-    "createChooseCount": "Cantidad",
-    "createMotifWidth": "Ancho del patrón",
-    "createMotifHeight": "Alto del patrón",
-    "createLetterGroupMode": "Toca celdas para el grupo {letter}, luego presiona Listo",
-    "@createLetterGroupMode": {
-        "placeholders": {
-            "letter": {
-                "type": "String"
-            }
-        }
+    "@constraintExplainCC": {
+        "description": "Body of the new-constraint explanation modal for the Column Count (CC) constraint"
+    },
+    "constraintExplainRC": "Un número dentro de un círculo a la izquierda de una fila indica cuántas celdas de ese color deben aparecer en esa fila específica.",
+    "@constraintExplainRC": {
+        "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
     },
     "createLetterGroupDone": "Listo",
     "createAddNew": "Agregar restricción",
@@ -255,6 +209,10 @@
     "constraintColumnCount": "células por columna",
     "@constraintColumnCount": {
         "description": "Name of the column count constraint"
+    },
+    "constraintRowCount": "células por fila",
+    "@constraintRowCount": {
+        "description": "Name of the row count constraint"
     },
     "complicityOtherConstraint": "otra restricción",
     "settingReplayOnboarding": "Repetir la introducción",

@@ -512,6 +512,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintColumnCount => 'cells per column';
 
   @override
+  String get constraintRowCount => 'cells per row';
+
+  @override
   String get constraintShape => 'shape';
 
   @override
@@ -587,6 +590,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get constraintExplainCC =>
       'A circled number above a column tells how many cells of that color must appear in this specific column.';
+
+  @override
+  String get constraintExplainRC =>
+      'A circled number to the left of a row tells how many cells of that color must appear in this specific row.';
 
   @override
   String get constraintExplainGC =>

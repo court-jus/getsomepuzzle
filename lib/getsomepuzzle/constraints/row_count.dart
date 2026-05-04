@@ -2,27 +2,27 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dar
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-final class ColumnCountConstraint extends LineCentricConstraint {
+final class RowCountConstraint extends LineCentricConstraint {
   @override
-  String get slug => 'CC';
+  String get slug => 'RC';
 
-  int columnIdx = 0;
+  int rowIdx = 0;
 
-  ColumnCountConstraint(String strParams) {
+  RowCountConstraint(String strParams) {
     final params = strParams.split(".");
-    columnIdx = int.parse(params[0]);
+    rowIdx = int.parse(params[0]);
     color = int.parse(params[1]);
     count = int.parse(params[2]);
   }
 
   @override
-  int getIdx() => columnIdx;
+  int getIdx() => rowIdx;
 
   @override
-  List<Cell> getLine(Puzzle puzzle) => puzzle.getColumns()[getIdx()];
+  List<Cell> getLine(Puzzle puzzle) => puzzle.getRows()[getIdx()];
 
   @override
-  String toHuman(Puzzle puzzle) => 'Col ${getIdx() + 1}: $count';
+  String toHuman(Puzzle puzzle) => 'Row ${getIdx() + 1}: $count';
 
   static List<String> generateAllParameters(
     int width,
@@ -31,10 +31,10 @@ final class ColumnCountConstraint extends LineCentricConstraint {
     Set<int>? excludedIndices,
   ) {
     final List<String> result = [];
-    for (int col = 0; col < width; col++) {
+    for (int row = 0; row < height; row++) {
       for (final c in domain) {
-        for (int n = 1; n < height; n++) {
-          result.add('$col.$c.$n');
+        for (int n = 1; n < width; n++) {
+          result.add('$row.$c.$n');
         }
       }
     }

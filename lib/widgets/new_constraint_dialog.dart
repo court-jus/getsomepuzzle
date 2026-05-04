@@ -75,15 +75,15 @@ class NewConstraintDialog extends StatelessWidget {
   }
 }
 
-/// Localised display name for a constraint slug. Reuses the existing
-/// `constraint<Name>` strings (lowercase by convention — the modal
-/// capitalises the first letter at display time).
+/// Localised display name for a constraint slug.
 String constraintNameForSlug(AppLocalizations l, String slug) {
   switch (slug) {
     case 'FM':
       return l.constraintForbiddenPattern;
     case 'PA':
       return l.constraintParity;
+    case 'RC':
+      return l.constraintRowCount;
     case 'GS':
       return l.constraintGroupSize;
     case 'LT':
@@ -117,6 +117,8 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainFM;
     case 'PA':
       return l.constraintExplainPA;
+    case 'RC':
+      return l.constraintExplainRC;
     case 'GS':
       return l.constraintExplainGS;
     case 'LT':

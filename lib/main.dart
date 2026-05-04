@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
@@ -703,7 +704,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         );
     double cellSize = 32.0;
     if (game.currentPuzzle != null) {
+      final hasRC = game.currentPuzzle!.constraints
+          .whereType<RowCountConstraint>()
+          .isNotEmpty;
       double maxWidth = contextWidth / game.currentPuzzle!.width;
+      if (hasRC) {
+        maxWidth = contextWidth / (game.currentPuzzle!.width + 0.7);
+      }
       double maxHeight = contextHeight / (game.currentPuzzle!.height + 2);
       cellSize = min(maxWidth, maxHeight);
     }

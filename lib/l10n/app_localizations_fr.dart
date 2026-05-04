@@ -291,139 +291,138 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintQuantity => 'quantité';
 
   @override
-  String get constraintSymmetry => 'symétrie';
+  String get constraintSymmetry => 'symmetry';
 
   @override
-  String get generate => 'Générer';
+  String get generate => 'Generate';
 
   @override
-  String get generateTitle => 'Générer des puzzles';
+  String get generateTitle => 'Generate puzzles';
 
   @override
-  String get generateWidth => 'Largeur';
+  String get generateWidth => 'Width';
 
   @override
-  String get generateHeight => 'Hauteur';
+  String get generateHeight => 'Height';
 
   @override
-  String get generateRequiredRules => 'Règles obligatoires';
+  String get generateRequiredRules => 'Required rules';
 
   @override
-  String get generateExcludedRules => 'Règles exclues';
+  String get generateExcludedRules => 'Excluded rules';
 
   @override
-  String get generateMaxTime => 'Temps max';
+  String get generateMaxTime => 'Max time';
 
   @override
   String get generateCount => 'Puzzles';
 
   @override
-  String get generateStart => 'Générer';
+  String get generateStart => 'Generate';
 
   @override
-  String get generateStop => 'Arrêter';
+  String get generateStop => 'Stop';
 
   @override
   String generateProgress(int current, int total) {
-    return 'Généré $current / $total puzzles';
+    return 'Generated $current / $total puzzles';
   }
 
   @override
-  String get generateComplete => 'Génération terminée !';
+  String get generateComplete => 'Generation complete!';
 
   @override
-  String get generateConstraints => 'Contraintes';
+  String get generateConstraints => 'Constraints';
 
   @override
   String get generateFailed =>
-      'Aucun puzzle n\'a pu être généré avec ces paramètres. Essayez d\'autres réglages.';
+      'No puzzles could be generated with these parameters. Try different settings.';
 
   @override
-  String get generatePlay => 'Jouer';
+  String get generatePlay => 'Play';
 
   @override
-  String get generateMore => 'Encore';
+  String get generateMore => 'More';
 
   @override
   String get noCustomPuzzles =>
-      'Aucun puzzle personnalisé. Utilisez la page Générer pour en créer !';
+      'No custom puzzles yet. Use the Generate page to create some!';
 
   @override
-  String get create => 'Créer';
+  String get create => 'Create';
 
   @override
-  String get createTitle => 'Créer un puzzle';
+  String get createTitle => 'Create a puzzle';
 
   @override
-  String get createStart => 'Commencer';
+  String get createStart => 'Start editing';
 
   @override
-  String get createTest => 'Tester';
+  String get createTest => 'Test';
 
   @override
-  String get createValidate => 'Valider';
+  String get createValidate => 'Validate';
 
   @override
-  String get createSave => 'Enregistrer';
+  String get createSave => 'Save';
 
   @override
-  String get createSaved => 'Puzzle enregistré !';
+  String get createSaved => 'Puzzle saved!';
 
   @override
-  String get createSolvable => 'Résoluble';
+  String get createSolvable => 'Solvable';
 
   @override
-  String get createNotSolvable => 'Non résoluble';
+  String get createNotSolvable => 'Not solvable';
 
   @override
-  String get createUniqueSolution => 'Solution unique';
+  String get createUniqueSolution => 'Unique solution';
 
   @override
-  String get createMultipleSolutions => 'Solutions multiples';
+  String get createMultipleSolutions => 'Multiple solutions';
 
   @override
-  String get createNoSolution => 'Aucune solution';
+  String get createNoSolution => 'No solution';
 
   @override
-  String get createComplexity => 'Complexité';
+  String get createComplexity => 'Complexity';
 
   @override
-  String get createNoConstraints =>
-      'Touchez une cellule pour ajouter une contrainte';
+  String get createNoConstraints => 'Tap a cell to add a constraint';
 
   @override
-  String get createAddConstraint => 'Ajouter une contrainte';
+  String get createAddConstraint => 'Add a constraint';
 
   @override
-  String get createChooseType => 'Type de contrainte';
+  String get createChooseType => 'Constraint type';
 
   @override
-  String get createChooseSide => 'Côté';
+  String get createChooseSide => 'Side';
 
   @override
-  String get createChooseAxis => 'Axe de symétrie';
+  String get createChooseAxis => 'Symmetry axis';
 
   @override
-  String get createChooseSize => 'Taille du groupe';
+  String get createChooseSize => 'Group size';
 
   @override
-  String get createChooseLetter => 'Lettre';
+  String get createChooseLetter => 'Letter';
 
   @override
-  String get createChooseValue => 'Valeur';
+  String get createChooseValue => 'Value';
 
   @override
-  String get createChooseCount => 'Nombre';
+  String get createChooseCount => 'Count';
 
   @override
-  String get createMotifWidth => 'Largeur du motif';
+  String get createMotifWidth => 'Pattern width';
 
   @override
-  String get createMotifHeight => 'Hauteur du motif';
+  String get createMotifHeight => 'Pattern height';
 
   @override
   String createLetterGroupMode(String letter) {
-    return 'Touchez les cellules pour le groupe $letter, puis appuyez sur Terminer';
+    return 'Tap cells to add to group $letter, then press Done';
   }
 
   @override
@@ -516,6 +515,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintColumnCount => 'cellules par colonne';
 
   @override
+  String get constraintRowCount => 'cellules par ligne';
+
+  @override
   String get constraintShape => 'forme';
 
   @override
@@ -593,16 +595,20 @@ class AppLocalizationsFr extends AppLocalizations {
       'Un nombre dans un cercle au-dessus d\'une colonne indique combien de cellules de cette couleur doivent apparaître dans cette colonne précise.';
 
   @override
+  String get constraintExplainRC =>
+      'Un nombre dans un cercle à gauche d\'une ligne indique combien de cellules de cette couleur doivent apparaître dans cette ligne précise.';
+
+  @override
   String get constraintExplainGC =>
-      'Un nombre dans un cadre avec une icône de lien indique combien de groupes (composantes connexes) de cette couleur la solution doit contenir.';
+      'A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.';
 
   @override
   String get constraintExplainNC =>
-      'Une case affichée avec des croix sur ses côtés doit avoir exactement le nombre indiqué de voisins orthogonaux de la couleur marquée.';
+      'A cell shown with crosses on its sides must have exactly the indicated number of orthogonal neighbors of the marked color.';
 
   @override
   String get constraintExplainEY =>
-      'Une case contenant un œil doit « voir » exactement le nombre indiqué de cases de la couleur de l\'œil. La vue se propage en ligne droite dans les quatre directions orthogonales jusqu\'au bord de la grille ou jusqu\'à une case de la couleur opposée (qui bloque la vue).';
+      'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).';
 
   @override
   String get complicityOtherConstraint => 'une autre contrainte';

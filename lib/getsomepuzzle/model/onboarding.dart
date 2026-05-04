@@ -1,3 +1,5 @@
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+
 /// Phase definitions for the new-player onboarding.
 ///
 /// Each phase narrows the catalog to a subset of constraint slugs and
@@ -62,20 +64,9 @@ class OnboardingPhase {
   /// (minus the legacy `TX` HelpText slug). Hardcoded here rather than
   /// derived to keep this file Flutter-free; adding a new constraint
   /// is a one-liner update.
-  static const Set<String> allKnownSlugs = {
-    'FM',
-    'PA',
-    'GS',
-    'LT',
-    'QA',
-    'SY',
-    'DF',
-    'SH',
-    'CC',
-    'GC',
-    'NC',
-    'EY',
-  };
+  static final Set<String> allKnownSlugs = constraintRegistry
+      .map((c) => c.slug)
+      .toSet();
 }
 
 /// Returns the strict onboarding phase the player is currently in

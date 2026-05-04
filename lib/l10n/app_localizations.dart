@@ -1060,6 +1060,12 @@ abstract class AppLocalizations {
   /// **'cells per column'**
   String get constraintColumnCount;
 
+  /// Name of the row count constraint
+  ///
+  /// In en, this message translates to:
+  /// **'cells per row'**
+  String get constraintRowCount;
+
   /// Name of the shape constraint
   ///
   /// In en, this message translates to:
@@ -1173,6 +1179,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A circled number above a column tells how many cells of that color must appear in this specific column.'**
   String get constraintExplainCC;
+
+  /// Body of the new-constraint explanation modal for the Row Count (RC) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A circled number to the left of a row tells how many cells of that color must appear in this specific row.'**
+  String get constraintExplainRC;
 
   /// Body of the new-constraint explanation modal for the Group Count (GC) constraint
   ///

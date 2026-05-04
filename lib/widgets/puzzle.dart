@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
@@ -12,6 +13,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/column_count.dart';
+import 'package:getsomepuzzle/widgets/row_count.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/widgets/group_count.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
@@ -146,11 +148,21 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       }
     }
 
-    // Find if the highlighted constraint is a cell-centric one
+    // Build a map of row index → RowCountConstraint for the left-side bar
+    final rcByRow = <int, RowCountConstraint>{};
+    for (final c in widget.currentPuzzle.constraints) {
+      if (c is RowCountConstraint) {
+        rcByRow[c.rowIdx] = c;
+      }
+    }
+
+    // A constraint is "in the top bar" if it's displayed there.
+    // RC is shown on the left side, not in the top bar.
     final bool constraintIsInTopBar =
         highlightedConstraint is Motif ||
         highlightedConstraint is QuantityConstraint ||
-        highlightedConstraint is ColumnCountConstraint;
+        highlightedConstraint is ColumnCountConstraint ||
+        highlightedConstraint is GroupCountConstraint;
 
     // For cell-centric constraints, find the constraint's home cell index
     int? constraintCellIdx;
@@ -267,75 +279,116 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                if (ccByColumn.isNotEmpty)
-                  SizedBox(
-                    width: gridWidth,
-                    child: Row(
-                      children: [
-                        for (
-                          int col = 0;
-                          col < widget.currentPuzzle.width;
-                          col++
-                        )
-                          if (ccByColumn.containsKey(col))
-                            ColumnCountWidget(
-                              key:
-                                  (ccByColumn[col]!.isHighlighted &&
-                                      constraintIsInTopBar)
-                                  ? _constraintKey
-                                  : null,
-                              constraint: ccByColumn[col]!,
-                              cellSize: adjustedCellSize,
-                            )
-                          else
-                            SizedBox(width: adjustedCellSize),
-                      ],
-                    ),
-                  ),
-                SizedBox(
-                  width: gridWidth,
-                  height: gridHeight,
-                  child: Stack(
-                    children: [
-                      Table(
-                        border: TableBorder.all(),
-                        defaultColumnWidth: FixedColumnWidth(adjustedCellSize),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Left side: RC indicators (only if any RC constraints exist)
+                    if (rcByRow.isNotEmpty)
+                      Column(
                         children: [
-                          for (var (rowidx, row)
-                              in widget.currentPuzzle.getRows().indexed)
-                            TableRow(
-                              children: [
-                                for (var (cellidx, cell) in row.indexed)
-                                  _buildCell(
-                                    cell,
-                                    rowidx,
-                                    cellidx,
-                                    adjustedCellSize,
-                                    constraintIsInTopBar,
-                                    constraintCellIdx,
-                                    hasHighlightedCell,
-                                    groups,
-                                  ),
-                              ],
-                            ),
+                          for (
+                            int row = 0;
+                            row < widget.currentPuzzle.height;
+                            row++
+                          )
+                            if (rcByRow.containsKey(row))
+                              RowCountWidget(
+                                key:
+                                    (rcByRow[row]!.isHighlighted &&
+                                        !constraintIsInTopBar)
+                                    ? _constraintKey
+                                    : null,
+                                constraint: rcByRow[row]!,
+                                cellSize: adjustedCellSize,
+                              )
+                            else
+                              SizedBox(
+                                width: adjustedCellSize * 0.7,
+                                height: adjustedCellSize,
+                              ),
                         ],
                       ),
-                      if (hasDF)
-                        IgnorePointer(
-                          child: CustomPaint(
-                            painter: DifferentFromPainter(
-                              constraints: widget.currentPuzzle.constraints
-                                  .whereType<DifferentFromConstraint>()
-                                  .toList(),
-                              cellSize: adjustedCellSize,
-                              gridWidth: widget.currentPuzzle.width,
-                              defaultColor: Colors.black87,
-                              highlightColor: highlightColor,
+                    // Right side: CC row + Grid
+                    Column(
+                      children: [
+                        if (ccByColumn.isNotEmpty)
+                          SizedBox(
+                            width: gridWidth,
+                            child: Row(
+                              children: [
+                                for (
+                                  int col = 0;
+                                  col < widget.currentPuzzle.width;
+                                  col++
+                                )
+                                  if (ccByColumn.containsKey(col))
+                                    ColumnCountWidget(
+                                      key:
+                                          (ccByColumn[col]!.isHighlighted &&
+                                              constraintIsInTopBar)
+                                          ? _constraintKey
+                                          : null,
+                                      constraint: ccByColumn[col]!,
+                                      cellSize: adjustedCellSize,
+                                    )
+                                  else
+                                    SizedBox(width: adjustedCellSize),
+                              ],
                             ),
                           ),
+                        SizedBox(
+                          width: gridWidth,
+                          height: gridHeight,
+                          child: Stack(
+                            children: [
+                              Table(
+                                border: TableBorder.all(),
+                                defaultColumnWidth: FixedColumnWidth(
+                                  adjustedCellSize,
+                                ),
+                                children: [
+                                  for (var (rowidx, row)
+                                      in widget.currentPuzzle.getRows().indexed)
+                                    TableRow(
+                                      children: [
+                                        for (var (cellidx, cell) in row.indexed)
+                                          _buildCell(
+                                            cell,
+                                            rowidx,
+                                            cellidx,
+                                            adjustedCellSize,
+                                            constraintIsInTopBar,
+                                            constraintCellIdx,
+                                            hasHighlightedCell,
+                                            groups,
+                                          ),
+                                      ],
+                                    ),
+                                ],
+                              ),
+                              if (hasDF)
+                                IgnorePointer(
+                                  child: CustomPaint(
+                                    painter: DifferentFromPainter(
+                                      constraints: widget
+                                          .currentPuzzle
+                                          .constraints
+                                          .whereType<DifferentFromConstraint>()
+                                          .toList(),
+                                      cellSize: adjustedCellSize,
+                                      gridWidth: widget.currentPuzzle.width,
+                                      defaultColor: Colors.black87,
+                                      highlightColor: highlightColor,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),

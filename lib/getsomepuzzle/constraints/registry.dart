@@ -1,6 +1,7 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
@@ -39,6 +40,12 @@ final constraintRegistry =
         label: 'Parity',
         fromParams: ParityConstraint.new,
         generateAllParameters: ParityConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'RC',
+        label: 'Row count',
+        fromParams: RowCountConstraint.new,
+        generateAllParameters: RowCountConstraint.generateAllParameters,
       ),
       (
         slug: 'GS',
