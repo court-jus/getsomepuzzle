@@ -647,3 +647,47 @@ broader extension of `ShapeConstraint.apply` itself (it's arguably
 single-constraint reasoning combined with already-known cell values,
 not a true multi-constraint inference). The latter keeps the apply
 path coherent; the former matches how SH + GS is already factored.
+
+### Complicity: PA + LT (Parity × Letter group)
+
+#### Reasoning
+
+A `LetterGroup` forces every listed cell to share the same colour. On a
+domain `{1, 2}` where parity-of-value is the colouring axis, that means
+the LT cells share the same **parity** in any final colouring.
+
+When two or more cells of a single LT lie on the same side of a
+`ParityConstraint`, the parity-balanced enumeration that PA + FM already
+performs can be filtered further: configurations that assign different
+parities to LT-linked cells are invalid. If a single partition survives,
+every free cell in the side is forced.
+
+A "block" view captures the same logic without enumeration: the LT cells
+on a given PA side count as one **same-parity unit** of `k` cells. The
+parity counters on that side become integer linear constraints over
+units rather than cells, and a small case split usually collapses to a
+single feasible split.
+
+#### Concrete example
+
+```
+5-cell row `00020` (cell 3 = 2). Domain {1, 2}.
+LT:B.0.1 — cells 0 and 1 share a colour.
+PA:4.left covers cells {0, 1, 2, 3}, target 2 even / 2 odd.
+
+If {0, 1} are even: side has 3 evens (0, 1, 3) → overshoot, rejected.
+If {0, 1} are odd : side has 1 even, 2 odds → cell 2 must be even.
+
+Surviving config is unique: cells 0, 1 = 1 and cell 2 = 2.
+Neither PA.apply nor LT.apply forces anything on its own at this state.
+```
+
+#### Open question
+
+Whether to implement this as a dedicated `PA + LT` complicity or to
+extend `pafm.dart`'s enumerator to also reject configurations that
+violate any LT (and, by extension, any future "same-colour" constraint
+like SY anchors when both ends sit on the side). The latter is the
+natural generalisation — the current PA-side enumeration already filters
+by every FM, and adding LT as another verifier is a one-line change
+once the enumerator is parametrised by "list of constraints to verify".
