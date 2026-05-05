@@ -156,6 +156,10 @@
     "@constraintExplainNC": {
         "description": "Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint"
     },
+    "constraintExplainEY": "Une case affichée comme un œil doit « voir » exactement le nombre indiqué de cases de la couleur de l'œil. Le regard se propage en ligne droite dans chacune des quatre directions orthogonales jusqu'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue).",
+    "@constraintExplainEY": {
+        "description": "Body of the new-constraint explanation modal for the Eyes (EY) constraint"
+    },
     "createLetterGroupDone": "Terminer",
     "createAddNew": "Ajouter une contrainte",
     "createDeleteConstraint": "Supprimer une contrainte",

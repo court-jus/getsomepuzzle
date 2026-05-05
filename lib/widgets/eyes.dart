@@ -92,25 +92,47 @@ class _EyesPainter extends CustomPainter {
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, strokePaint);
 
-    final textPainter = TextPainter(
+    final fontSize = cellSize * cellSizeToFontSize;
+    // The digit takes the eye's color (= constraint color), so it visually
+    // matches the eye it belongs to. Inside the eye, the digit blends with the
+    // fill, so we draw an outline in the opposite color to keep it readable
+    // (effectively a hollowed-out digit). Outside the eye, the colored digit
+    // shows directly and the outline stays subtle.
+    final outlineWidth = (cellSize * 0.04).clamp(1.0, 2.5);
+    final strokePainter = TextPainter(
       text: TextSpan(
         text: count.toString(),
         style: TextStyle(
-          fontSize: ovalHeight * 0.45,
-          color: textColor,
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          foreground: Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = outlineWidth
+            ..strokeJoin = StrokeJoin.round
+            ..color = textColor,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    final fillTextPainter = TextPainter(
+      text: TextSpan(
+        text: count.toString(),
+        style: TextStyle(
+          fontSize: fontSize,
+          color: fillColor,
           fontWeight: FontWeight.bold,
         ),
       ),
       textDirection: TextDirection.ltr,
     );
-    textPainter.layout();
-    textPainter.paint(
-      canvas,
-      Offset(
-        inset + (s - textPainter.width) / 2,
-        ovalTop + (ovalHeight - textPainter.height) / 2,
-      ),
+    strokePainter.layout();
+    fillTextPainter.layout();
+    final textOffset = Offset(
+      (cellSize - fillTextPainter.width) / 2,
+      (cellSize - fillTextPainter.height) / 2,
     );
+    strokePainter.paint(canvas, textOffset);
+    fillTextPainter.paint(canvas, textOffset);
   }
 
   @override

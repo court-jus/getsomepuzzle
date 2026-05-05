@@ -608,7 +608,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get constraintExplainEY =>
-      'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).';
+      'Une case affichée comme un œil doit « voir » exactement le nombre indiqué de cases de la couleur de l\'œil. Le regard se propage en ligne droite dans chacune des quatre directions orthogonales jusqu\'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue).';
 
   @override
   String get complicityOtherConstraint => 'une autre contrainte';

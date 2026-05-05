@@ -156,6 +156,10 @@
     "@constraintExplainNC": {
         "description": "Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint"
     },
+    "constraintExplainEY": "Una casilla mostrada como un ojo debe «ver» exactamente el número indicado de casillas del color del ojo. La vista se propaga en línea recta en cada una de las cuatro direcciones ortogonales hasta alcanzar el borde de la cuadrícula o una casilla del color opuesto (que bloquea la vista).",
+    "@constraintExplainEY": {
+        "description": "Body of the new-constraint explanation modal for the Eyes (EY) constraint"
+    },
     "createLetterGroupDone": "Listo",
     "createAddNew": "Agregar restricción",
     "createDeleteConstraint": "Eliminar una restricción",
