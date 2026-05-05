@@ -152,6 +152,10 @@
     "@constraintExplainRC": {
         "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
     },
+    "constraintExplainNC": "Una casilla mostrada como una cruz que contiene un número debe tener exactamente ese número de vecinos ortogonales del color indicado.",
+    "@constraintExplainNC": {
+        "description": "Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint"
+    },
     "createLetterGroupDone": "Listo",
     "createAddNew": "Agregar restricción",
     "createDeleteConstraint": "Eliminar una restricción",

@@ -654,7 +654,7 @@
     "@constraintExplainGC": {
         "description": "Body of the new-constraint explanation modal for the Group Count (GC) constraint"
     },
-    "constraintExplainNC": "A cell shown with crosses on its sides must have exactly the indicated number of orthogonal neighbors of the marked color.",
+    "constraintExplainNC": "A cell shown as a cross containing a number must have exactly that number of orthogonal neighbors of the marked color.",
     "@constraintExplainNC": {
         "description": "Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint"
     },

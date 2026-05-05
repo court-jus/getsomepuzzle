@@ -1195,7 +1195,7 @@ abstract class AppLocalizations {
   /// Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint
   ///
   /// In en, this message translates to:
-  /// **'A cell shown with crosses on its sides must have exactly the indicated number of orthogonal neighbors of the marked color.'**
+  /// **'A cell shown as a cross containing a number must have exactly that number of orthogonal neighbors of the marked color.'**
   String get constraintExplainNC;
 
   /// Body of the new-constraint explanation modal for the Eyes (EY) constraint

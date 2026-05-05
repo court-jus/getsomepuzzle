@@ -152,6 +152,10 @@
     "@constraintExplainRC": {
         "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
     },
+    "constraintExplainNC": "Une case affichée sous forme de croix contenant un chiffre doit avoir exactement ce nombre de voisins orthogonaux de la couleur indiquée.",
+    "@constraintExplainNC": {
+        "description": "Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint"
+    },
     "createLetterGroupDone": "Terminer",
     "createAddNew": "Ajouter une contrainte",
     "createDeleteConstraint": "Supprimer une contrainte",

@@ -601,7 +601,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get constraintExplainNC =>
-      'A cell shown with crosses on its sides must have exactly the indicated number of orthogonal neighbors of the marked color.';
+      'A cell shown as a cross containing a number must have exactly that number of orthogonal neighbors of the marked color.';
 
   @override
   String get constraintExplainEY =>
