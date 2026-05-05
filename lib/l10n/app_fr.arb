@@ -117,6 +117,8 @@
     "constraintEyes": "yeux",
     "newConstraintModalTitle": "Nouvelle règle !",
     "newConstraintModalSkip": "Ignorer l'apprentissage",
+    "welcomeModalTitle": "Bienvenue",
+    "welcomeModalBody": "Bienvenue dans Get Some Puzzle ! Votre objectif est de colorer chaque case en noir ou en blanc en respectant un ensemble de contraintes. Les règles de chaque contrainte vous seront expliquées au fur et à mesure que vous les rencontrerez.",
     "learning": "Apprentissage",
     "learningPageTitle": "Apprentissage",
     "learningSeenOn": "Vue pour la première fois le {date}",

@@ -533,6 +533,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get newConstraintModalSkip => 'Saltar aprendizaje';
 
   @override
+  String get welcomeModalTitle => 'Bienvenido';
+
+  @override
+  String get welcomeModalBody =>
+      '¡Bienvenido a Get Some Puzzle! Tu objetivo es colorear cada casilla en negro o blanco respetando un conjunto de restricciones. Las reglas de cada restricción se explicarán a medida que las encuentres por primera vez.';
+
+  @override
   String get learning => 'Aprendizaje';
 
   @override

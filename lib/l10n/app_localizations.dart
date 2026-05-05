@@ -1096,6 +1096,18 @@ abstract class AppLocalizations {
   /// **'Skip learning'**
   String get newConstraintModalSkip;
 
+  /// Title of the intro modal shown once before the first rule explanation, on a brand-new player or right after a 'Replay onboarding' reset.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome'**
+  String get welcomeModalTitle;
+
+  /// Body of the welcome modal — short pitch of the game's core principle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Get Some Puzzle! Your goal is to color each cell black or white while satisfying a set of constraints. The rule of each constraint will be explained as you encounter it for the first time.'**
+  String get welcomeModalBody;
+
   /// Menu label for the Apprentissage page (constraint reference + memory refresh)
   ///
   /// In en, this message translates to:

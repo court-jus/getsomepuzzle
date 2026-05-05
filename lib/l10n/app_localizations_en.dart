@@ -530,6 +530,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newConstraintModalSkip => 'Skip learning';
 
   @override
+  String get welcomeModalTitle => 'Welcome';
+
+  @override
+  String get welcomeModalBody =>
+      'Welcome to Get Some Puzzle! Your goal is to color each cell black or white while satisfying a set of constraints. The rule of each constraint will be explained as you encounter it for the first time.';
+
+  @override
   String get learning => 'Learning';
 
   @override

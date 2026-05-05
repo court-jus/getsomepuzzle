@@ -533,6 +533,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get newConstraintModalSkip => 'Ignorer l\'apprentissage';
 
   @override
+  String get welcomeModalTitle => 'Bienvenue';
+
+  @override
+  String get welcomeModalBody =>
+      'Bienvenue dans Get Some Puzzle ! Votre objectif est de colorer chaque case en noir ou en blanc en respectant un ensemble de contraintes. Les règles de chaque contrainte vous seront expliquées au fur et à mesure que vous les rencontrerez.';
+
+  @override
   String get learning => 'Apprentissage';
 
   @override

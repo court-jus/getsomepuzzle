@@ -31,6 +31,7 @@ import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/save_progress_dialog.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
+import 'package:getsomepuzzle/widgets/welcome_dialog.dart';
 import 'package:getsomepuzzle/widgets/timer_bottom_bar.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
 import 'package:getsomepuzzle/utils/share_link_stub.dart'
@@ -369,11 +370,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         _modalInFlight = false;
         return;
       }
-      final skipped = await NewConstraintDialog.show(
-        context,
-        newSlugs,
-        showSkipButton: true,
-      );
+      // First-ever rule encounter → show the game-intro screen before
+      // the per-rule modal. `firstSeen.isEmpty` is the cleanest signal:
+      // true on a fresh install AND after "Rejouer l'onboarding"
+      // (which clears firstSeen post-loadStats).
+      bool skipped = false;
+      if (progress.firstSeen.isEmpty) {
+        skipped = await WelcomeDialog.show(context);
+        if (!mounted) {
+          _modalInFlight = false;
+          return;
+        }
+      }
+      if (!skipped) {
+        skipped = await NewConstraintDialog.show(
+          context,
+          newSlugs,
+          showSkipButton: true,
+        );
+      }
       final now = DateTime.now();
       if (skipped) {
         // Mark every known slug as seen so the modal never fires

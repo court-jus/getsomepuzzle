@@ -117,6 +117,8 @@
     "constraintEyes": "ojos",
     "newConstraintModalTitle": "¡Regla nueva!",
     "newConstraintModalSkip": "Saltar aprendizaje",
+    "welcomeModalTitle": "Bienvenido",
+    "welcomeModalBody": "¡Bienvenido a Get Some Puzzle! Tu objetivo es colorear cada casilla en negro o blanco respetando un conjunto de restricciones. Las reglas de cada restricción se explicarán a medida que las encuentres por primera vez.",
     "learning": "Aprendizaje",
     "learningPageTitle": "Aprendizaje",
     "learningSeenOn": "Vista por primera vez el {date}",

@@ -580,6 +580,14 @@
     "@newConstraintModalSkip": {
         "description": "Button on the new-rule dialog that lets the player skip onboarding entirely: every rule is marked as seen and the phase counter jumps past all defined phases."
     },
+    "welcomeModalTitle": "Welcome",
+    "@welcomeModalTitle": {
+        "description": "Title of the intro modal shown once before the first rule explanation, on a brand-new player or right after a 'Replay onboarding' reset."
+    },
+    "welcomeModalBody": "Welcome to Get Some Puzzle! Your goal is to color each cell black or white while satisfying a set of constraints. The rule of each constraint will be explained as you encounter it for the first time.",
+    "@welcomeModalBody": {
+        "description": "Body of the welcome modal — short pitch of the game's core principle."
+    },
     "learning": "Learning",
     "@learning": {
         "description": "Menu label for the Apprentissage page (constraint reference + memory refresh)"
