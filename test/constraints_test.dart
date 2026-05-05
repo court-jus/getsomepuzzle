@@ -308,6 +308,129 @@ void main() {
     });
   });
 
+  group('GroupSize.apply anchor overshoot', () {
+    test('every growth path overshoots → opposite colour forced', () {
+      // 3x3:
+      //   . . .
+      //   2 1 1
+      //   . . 1
+      // GS:6.2 — cell 6 (row 2 col 0) empty, target 2.
+      // Reachability for colour 1 = {0,1,2,4,5,6,7,8} (size 8 ≥ 2) — passes
+      // the existing reachability check. But the only free neighbour of the
+      // mandatory starter {6} is cell 7, and cell 7 is adjacent to the
+      // existing colour-1 group {4,5,8} (size 3). Extending into 7 would
+      // make a group ≥ 5 > target 2 → no viable boundary cell, so colour 1
+      // is infeasible at the anchor and cell 6 must take colour 2.
+      final p = makePuzzle('''
+        000
+        211
+        001
+      ''');
+      final gs = GroupSize('6.2');
+      p.addConstraint(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 6);
+      expect(move.value, 2);
+    });
+
+    test('mandatoryGroup absorbs same-colour neighbour with margin left', () {
+      // 3x3:
+      //   . 1 1
+      //   . . .
+      //   . . .
+      // GS:0.5 — cell 0 empty, target 5. Adjacent colour-1 group {1,2} would
+      // be absorbed if cell 0 took colour 1: mandatoryGroup={0,1,2} size 3,
+      // margin 2, boundary {3,4,5} all viable (no external colour-1 group
+      // touches them). Colour 2 also feasible (mandatoryGroup={0}, margin 4,
+      // boundary {3} viable). So apply must NOT deduce a forcing move.
+      final p = makePuzzle('''
+        011
+        000
+        000
+      ''');
+      final gs = GroupSize('0.5');
+      p.addConstraint(gs);
+      final move = gs.apply(p);
+      expect(move, isNull);
+    });
+
+    test('both colours infeasible → isImpossible', () {
+      // 3x3:
+      //   . 1 .
+      //   1 . 1
+      //   . 1 .
+      // GS:4.2 — cell 4 (centre) empty, target 2.
+      // Each colour-1 neighbour is a singleton (size 1 < target 2), so the
+      // immediate-too-big rule does NOT intercept.
+      // Colour 1: mandatoryGroup absorbs all four singleton colour-1
+      //           neighbours → {1,3,4,5,7} size 5 > target 2 → infeasible.
+      // Colour 2: reachable from 4 through (free|2) = {4} only (the four
+      //           orthogonal neighbours are colour 1) → 1 < 2 → infeasible.
+      // Both colours infeasible → apply must report impossible.
+      final p = makePuzzle('''
+        010
+        101
+        010
+      ''');
+      final gs = GroupSize('4.2');
+      p.addConstraint(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+  });
+
+  group('GroupSize.apply single-exit overshoot', () {
+    test('single exit forces overshoot → isImpossible', () {
+      // 3x3:
+      //   1 . 2
+      //   2 1 .
+      //   . . 1
+      // GS:0.2 — anchor at cell 0 (colour 1), target 2.
+      // myGroup={0}, free neighbours of {0} = {1} only (cell 3 is colour 2).
+      // The lone exit (cell 1) is adjacent to cell 4 (colour 1, group {4}
+      // size 1). Coloring cell 1 as 1 would merge {0,1,4} → size 3 > target
+      // 2. Margin = 1, addition = 1 + 1 = 2 > 1. The single-exit must NOT
+      // force the move; it must report impossibility.
+      final p = makePuzzle('''
+        102
+        210
+        001
+      ''');
+      final gs = GroupSize('0.2');
+      p.addConstraint(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('single exit within margin → forcing still applies', () {
+      // 3x3:
+      //   1 . 2
+      //   2 2 .
+      //   . . 2
+      // GS:0.2 — anchor at cell 0 (colour 1), target 2.
+      // myGroup={0}, free neighbours of {0} = {1} only. No external colour-1
+      // group anywhere (cell 0 is the lone colour-1 cell). Margin = 1,
+      // addition = 1 + 0 = 1 ≤ 1. Single-exit rule must still force cell 1
+      // to colour 1 — preserving the previous behaviour for the safe case.
+      final p = makePuzzle('''
+        102
+        220
+        002
+      ''');
+      final gs = GroupSize('0.2');
+      p.addConstraint(gs);
+      final move = gs.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 1);
+      expect(move.value, 1);
+    });
+  });
+
   group('GroupSize.apply path articulation', () {
     test('cell on every growth path is forced (deep bottleneck)', () {
       // 4x3 grid:

@@ -122,3 +122,94 @@ puzzle unsolvable.
 test `multi-merge: groups reachable via intermediate empty cell`:
 reproduces the `121210101` state with `GS:7.6` and checks that
 `apply()` returns `Move(idx=7, value=1)` without `isImpossible`.
+
+## Anchor overshoot via mandatory merge (Phase 1)
+
+The reachability fix above answers "can the anchor *reach* a group of
+the right size for this colour?". It does not check the symmetric
+question: "would colouring the anchor force the resulting group to
+**overshoot**?".
+
+### Failing case
+
+3×3 puzzle in state `000211001`, constraint `GS:6.2`:
+
+```
+. . .
+2 1 1
+. . 1
+```
+
+Cell 6 (bottom-left) is empty and must end up in a group of size 2.
+The existing colour-1 reachability flood-fill returns
+`{0,1,2,4,5,6,7,8}` (size 8 ≥ 2) → reachability check passes.
+
+But the only free neighbour of `{6}` is cell 7, and cell 7 is adjacent
+to cells 4 and 8 of the existing colour-1 group `{4,5,8}` (size 3).
+Any growth toward size 2 forces `{6,7}` to merge with `{4,5,8}`,
+yielding a group of size ≥ 5 > target 2. Colour 1 is therefore
+infeasible at the anchor; cell 6 must take colour 2. `apply()` used to
+return `null`.
+
+### Applied fix
+
+For each candidate colour, the per-colour loop now combines the
+existing reachability check with a **mandatory-merge overshoot** check:
+
+1. Build `mandatoryGroup` = `{idx}` ∪ (every existing same-colour group
+   adjacent to `idx`). These groups are absorbed mechanically the
+   moment the anchor takes that colour.
+2. If `|mandatoryGroup| > size`: the colour is infeasible.
+3. Else if `|mandatoryGroup| < size`: compute
+   `margin = size − |mandatoryGroup|`, the free `boundary` of
+   `mandatoryGroup`, and the same-colour groups not yet absorbed
+   (`externalGroups`). For each `b ∈ boundary`, compute
+   `addition = 1 + Σ |G|` for every external group touching `b`. `b`
+   is *viable* iff `addition ≤ margin`. If no boundary cell is viable
+   and the boundary is non-empty, the colour is infeasible.
+
+The combined check feeds the same `forcedColor` accumulator as
+reachability: zero infeasible colours → no deduction, one → force the
+opposite colour, two → `isImpossible`.
+
+The check examines a single growth step and is therefore sound but not
+complete (rare multi-step traps are left to deeper search). It runs in
+the same complexity tier (3) as reachability.
+
+### Regression test
+
+`test/constraints_test.dart` → group `GroupSize.apply anchor overshoot`:
+- `every growth path overshoots → opposite colour forced` reproduces
+  the `000211001` / `GS:6.2` case above.
+- `mandatoryGroup absorbs same-colour neighbour with margin left`
+  ensures the new check does not over-prune when the boundary is
+  viable.
+- `both colours infeasible → isImpossible` covers the four-singletons
+  centre case `010/101/010` with `GS:4.2`.
+
+## Single-exit overshoot (Phase 2)
+
+Symmetric latent bug in the colored-anchor branch (`myColor != 0`).
+The single-exit rule (`if (groupFreeNeighbors.length == 1) ...`) used
+to force the lone exit to `myColor` unconditionally. If that single
+extension would itself merge with an external same-colour group whose
+total addition exceeds the remaining margin, the constraint is in
+fact unsatisfiable — the rule was producing a wrong forcing move.
+
+### Applied fix
+
+Before forcing the lone exit to `myColor`, sum the sizes of the
+external same-colour groups it would merge with (mirroring the
+multi-merge logic that runs when there are ≥ 2 exits). If
+`1 + mergedSize > margin`, the group cannot grow at all and `apply()`
+returns `Move(0, 0, this, isImpossible: this)`. Otherwise the move is
+forced as before.
+
+### Regression test
+
+`test/constraints_test.dart` → group
+`GroupSize.apply single-exit overshoot`:
+- `single exit forces overshoot → isImpossible` covers the failing
+  case (`102/210/001` with `GS:0.2`).
+- `single exit within margin → forcing still applies` keeps the
+  previous behaviour for the safe case.
