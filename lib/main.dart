@@ -369,16 +369,35 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         _modalInFlight = false;
         return;
       }
-      await NewConstraintDialog.show(context, newSlugs);
+      final skipped = await NewConstraintDialog.show(
+        context,
+        newSlugs,
+        showSkipButton: true,
+      );
       final now = DateTime.now();
-      for (final slug in newSlugs) {
-        progress.noteSeen(slug, now);
+      if (skipped) {
+        // Mark every known slug as seen so the modal never fires
+        // again, then push the phase counter past every strict phase
+        // so the playlist sampler exits onboarding mode immediately.
+        // Together they also defuse [Database._softFilterActive].
+        for (final slug in OnboardingPhase.allKnownSlugs) {
+          progress.noteSeen(slug, now);
+        }
+        if (database != null) {
+          await database!.skipOnboarding();
+          database!.preparePlaylist();
+        }
+      } else {
+        for (final slug in newSlugs) {
+          progress.noteSeen(slug, now);
+        }
       }
       // Persist whatever new slugs were dismissed; failing silently
       // here only means the player will see the modal again next
       // launch (no game-state corruption).
       await progress.save();
       _modalInFlight = false;
+      if (skipped && mounted) setState(() {});
     });
   }
 
@@ -918,21 +937,47 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     builder: (context) => SettingsPage(
                       settings: settings,
                       onReplayOnboarding: () async {
-                        // Wipe both halves of the onboarding state:
-                        // `firstSeen` so the modale re-fires per
-                        // constraint, and the strict-phase counter so
-                        // the player drops back into phase 0. Play
-                        // stats are deliberately left intact — only
-                        // the discovery-progress overlay is reset.
-                        progress.clear();
-                        await progress.save();
+                        // Restart the onboarding journey end-to-end.
+                        // Play stats are deliberately preserved — only
+                        // the discovery overlay (firstSeen + strict
+                        // phase counter), the open-page filters and
+                        // the loaded collection are reset, and the
+                        // in-progress puzzle is dropped (it could be
+                        // from any collection — typically an expert
+                        // puzzle the player wandered into — and has no
+                        // place in a freshly-strict P0 playlist).
                         if (database != null) {
                           await database!.resetOnboardingProgress();
-                          // Re-prepare so the freshly-strict P0
-                          // playlist is in effect on the next puzzle
-                          // load. Without this, the player would keep
-                          // their current batch (selected pre-reset).
+                          // Restore open-page state to first-launch
+                          // defaults: a stale filter would otherwise
+                          // gate the freshly-strict P0 catalog (e.g.
+                          // `wantedRules={EY}` would hide the FM
+                          // puzzles phase 0 needs). Persist filters
+                          // BEFORE loadPuzzlesFile — that call re-
+                          // loads them from prefs.
+                          database!.currentFilters = Filters();
+                          await database!.currentFilters.save();
+                          await database!.setShouldShuffle(false);
+                          await database!.loadPuzzlesFile(
+                            Database.entryCollectionKey,
+                          );
+                          // `firstSeen` must be cleared AFTER
+                          // loadPuzzlesFile: that call's internal
+                          // loadStats() re-populates the map from
+                          // history, so a clear() done earlier is
+                          // silently undone — and the new-rule modal
+                          // would then never re-fire on the P0 puzzle.
+                          progress.clear();
+                          await progress.save();
+                          // Defensive: ensure the playlist is rebuilt
+                          // with the now-empty firstSeen and reset
+                          // counter in scope, even if a future change
+                          // to loadPuzzlesFile drops its trailing
+                          // preparePlaylist() call.
                           database!.preparePlaylist();
+                          // Drop whatever puzzle was on screen and
+                          // hand the player a fresh P0 pick from the
+                          // rebuilt 1-easy playlist.
                           game.clearPuzzle();
                           loadPuzzle();
                         }

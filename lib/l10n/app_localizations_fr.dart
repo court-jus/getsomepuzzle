@@ -530,6 +530,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get newConstraintModalTitle => 'Nouvelle règle !';
 
   @override
+  String get newConstraintModalSkip => 'Ignorer l\'apprentissage';
+
+  @override
   String get learning => 'Apprentissage';
 
   @override

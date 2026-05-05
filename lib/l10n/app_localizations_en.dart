@@ -527,6 +527,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newConstraintModalTitle => 'New rule!';
 
   @override
+  String get newConstraintModalSkip => 'Skip learning';
+
+  @override
   String get learning => 'Learning';
 
   @override

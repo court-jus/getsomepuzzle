@@ -116,6 +116,7 @@
     "constraintNeighborCount": "número de vecinos",
     "constraintEyes": "ojos",
     "newConstraintModalTitle": "¡Regla nueva!",
+    "newConstraintModalSkip": "Saltar aprendizaje",
     "learning": "Aprendizaje",
     "learningPageTitle": "Aprendizaje",
     "learningSeenOn": "Vista por primera vez el {date}",

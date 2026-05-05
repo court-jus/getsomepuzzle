@@ -495,6 +495,17 @@ class Database {
     await _persistOnboardingCompletions();
   }
 
+  /// Push the onboarding counter past every defined phase so
+  /// [currentPhase] is null on the spot. Pairs with marking every slug
+  /// as seen in `ConstraintProgress` to also disable the soft-filter
+  /// (cf. [_softFilterActive]) — together they fully exit the
+  /// onboarding journey, while play stats stay intact.
+  Future<void> skipOnboarding() async {
+    onboardingCompletions =
+        OnboardingPhase.phases.length * OnboardingPhase.phaseLength;
+    await _persistOnboardingCompletions();
+  }
+
   /// Mix in puzzles from `assets/overfilled-easy.txt` into the catalog
   /// while the player is in onboarding on the entry-level collection.
   ///

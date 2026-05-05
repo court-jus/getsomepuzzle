@@ -116,6 +116,7 @@
     "constraintNeighborCount": "nombre de voisins",
     "constraintEyes": "yeux",
     "newConstraintModalTitle": "Nouvelle règle !",
+    "newConstraintModalSkip": "Ignorer l'apprentissage",
     "learning": "Apprentissage",
     "learningPageTitle": "Apprentissage",
     "learningSeenOn": "Vue pour la première fois le {date}",

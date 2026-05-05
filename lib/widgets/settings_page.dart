@@ -264,9 +264,10 @@ class _SettingsPageState extends State<SettingsPage> {
     if (confirmed != true) return;
     await widget.onReplayOnboarding();
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n.settingOnboardingReplayed)));
+    // Close the settings page so the freshly-loaded P0 puzzle (and
+    // its "Nouvelle règle" modal) is revealed immediately — staying
+    // on settings would hide the visible feedback of the reset.
+    Navigator.of(context).pop();
   }
 
   Future<void> _confirmClearStats() async {

@@ -1090,6 +1090,12 @@ abstract class AppLocalizations {
   /// **'New rule!'**
   String get newConstraintModalTitle;
 
+  /// Button on the new-rule dialog that lets the player skip onboarding entirely: every rule is marked as seen and the phase counter jumps past all defined phases.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip learning'**
+  String get newConstraintModalSkip;
+
   /// Menu label for the Apprentissage page (constraint reference + memory refresh)
   ///
   /// In en, this message translates to:

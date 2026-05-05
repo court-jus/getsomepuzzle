@@ -576,6 +576,10 @@
     "@newConstraintModalTitle": {
         "description": "Title of the dialog shown the first time a player encounters a new constraint"
     },
+    "newConstraintModalSkip": "Skip learning",
+    "@newConstraintModalSkip": {
+        "description": "Button on the new-rule dialog that lets the player skip onboarding entirely: every rule is marked as seen and the phase counter jumps past all defined phases."
+    },
     "learning": "Learning",
     "@learning": {
         "description": "Menu label for the Apprentissage page (constraint reference + memory refresh)"

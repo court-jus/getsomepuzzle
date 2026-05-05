@@ -18,23 +18,38 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 /// trivially testable and avoids a setState cycle here.
 class NewConstraintDialog extends StatelessWidget {
   final Set<String> slugs;
+  final bool showSkipButton;
 
-  const NewConstraintDialog({super.key, required this.slugs});
+  const NewConstraintDialog({
+    super.key,
+    required this.slugs,
+    this.showSkipButton = false,
+  });
 
   /// Show the dialog with all the unseen slugs from the puzzle. The
   /// rendering preserves [Set] iteration order (insertion order for
-  /// the default `LinkedHashSet`). Resolves once the player taps OK
-  /// or dismisses the modal.
-  static Future<void> show(BuildContext context, Set<String> slugs) {
-    if (slugs.isEmpty) return Future.value();
-    return showDialog<void>(
+  /// the default `LinkedHashSet`).
+  ///
+  /// Returns `true` iff the player chose to skip onboarding entirely
+  /// (only possible when [showSkipButton] is `true` — set by the
+  /// in-game first-encounter flow, not by the read-only Apprentissage
+  /// page where skipping makes no sense). `false`/null means OK.
+  static Future<bool> show(
+    BuildContext context,
+    Set<String> slugs, {
+    bool showSkipButton = false,
+  }) async {
+    if (slugs.isEmpty) return false;
+    final result = await showDialog<bool>(
       context: context,
-      // Mandatory tap on OK: the modal is the only place we surface
-      // this explanation, so a stray tap outside (which dismisses) would
-      // mean the player never reads it.
+      // Mandatory tap on a button: the modal is the only place we
+      // surface this explanation, so a stray tap outside (which
+      // dismisses) would mean the player never reads it.
       barrierDismissible: false,
-      builder: (_) => NewConstraintDialog(slugs: slugs),
+      builder: (_) =>
+          NewConstraintDialog(slugs: slugs, showSkipButton: showSkipButton),
     );
+    return result ?? false;
   }
 
   @override
@@ -66,8 +81,13 @@ class NewConstraintDialog extends StatelessWidget {
         ),
       ),
       actions: [
+        if (showSkipButton)
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l.newConstraintModalSkip),
+          ),
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(false),
           child: Text(MaterialLocalizations.of(context).okButtonLabel),
         ),
       ],
