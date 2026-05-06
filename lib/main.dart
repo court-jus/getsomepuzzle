@@ -1001,138 +1001,131 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   ),
                 ],
               ),
-            _drawerSection(
-              context,
-              title: AppLocalizations.of(context)!.menuSectionPreferences,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.settings),
-                  title: Text(AppLocalizations.of(context)!.settings),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SettingsPage(
-                          settings: settings,
-                          onReplayOnboarding: () async {
-                            // Restart the onboarding journey end-to-end.
-                            // Play stats are deliberately preserved — only
-                            // the discovery overlay (firstSeen + strict
-                            // phase counter), the open-page filters and
-                            // the loaded collection are reset, and the
-                            // in-progress puzzle is dropped (it could be
-                            // from any collection — typically an expert
-                            // puzzle the player wandered into — and has no
-                            // place in a freshly-strict P0 playlist).
-                            if (database != null) {
-                              await database!.resetOnboardingProgress();
-                              // Restore open-page state to first-launch
-                              // defaults: a stale filter would otherwise
-                              // gate the freshly-strict P0 catalog (e.g.
-                              // `wantedRules={EY}` would hide the FM
-                              // puzzles phase 0 needs). Persist filters
-                              // BEFORE loadPuzzlesFile — that call re-
-                              // loads them from prefs.
-                              database!.currentFilters = Filters();
-                              await database!.currentFilters.save();
-                              await database!.setShouldShuffle(false);
-                              await database!.loadPuzzlesFile(
-                                Database.entryCollectionKey,
-                              );
-                              // `firstSeen` must be cleared AFTER
-                              // loadPuzzlesFile: that call's internal
-                              // loadStats() re-populates the map from
-                              // history, so a clear() done earlier is
-                              // silently undone — and the new-rule modal
-                              // would then never re-fire on the P0 puzzle.
-                              progress.clear();
-                              await progress.save();
-                              // Defensive: ensure the playlist is rebuilt
-                              // with the now-empty firstSeen and reset
-                              // counter in scope, even if a future change
-                              // to loadPuzzlesFile drops its trailing
-                              // preparePlaylist() call.
-                              database!.preparePlaylist();
-                              // Drop whatever puzzle was on screen and
-                              // hand the player a fresh P0 pick from the
-                              // rebuilt 1-easy playlist.
-                              game.clearPuzzle();
-                              loadPuzzle();
-                            }
-                            setState(() {});
-                          },
-                          onClearStats: () async {
-                            if (database == null) return;
-                            await database!.clearAllStats();
-                            // Drop any in-progress puzzle so the next puzzle is
-                            // picked from the freshly empty playlist; without
-                            // this, the player would be stuck on whatever was
-                            // currently displayed (now flagged unplayed again
-                            // but still selected as `current`).
-                            game.clearPuzzle();
-                            loadPuzzle();
-                            setState(() {});
-                          },
-                          onSettingsChange: (newValue) {
-                            final autoLevelTurnedOn =
-                                newValue.autoLevel == true &&
-                                !settings.autoLevel;
-                            var levelChanged =
-                                (newValue.playerLevel != null &&
-                                newValue.playerLevel != settings.playerLevel);
-                            settings.change(newValue);
-                            if (newValue.hintType != null) {
-                              _onHintTypeChanged();
-                            }
-                            if (newValue.idleTimeout != null) {
-                              game.idleTimeoutDuration =
-                                  settings.idleTimeoutDuration;
-                              game.rearmIdleTimer();
-                            }
-                            // Recompute immediately when auto is toggled on, so
-                            // the player doesn't have to finish a puzzle first.
-                            if (autoLevelTurnedOn && database != null) {
-                              final newLevel = database!.computePlayerLevel(
-                                fallback: settings.playerLevel,
-                              );
-                              if (newLevel != settings.playerLevel) {
-                                settings.playerLevel = newLevel;
-                                settings.save();
-                                levelChanged = true;
-                              }
-                            }
-                            if (levelChanged) {
-                              database?.setPlayerLevel(settings.playerLevel);
-                              database?.preparePlaylist();
-                              loadPuzzle();
-                            }
-                            game.refresh();
-                          },
-                          onChangeLanguage: () {
-                            setState(() {
-                              shouldChooseLocale = true;
-                            });
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.help),
-                  title: Text(AppLocalizations.of(context)!.help),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => HelpPage(locale: locale),
-                      ),
-                    );
-                  },
-                ),
-              ],
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: Text(AppLocalizations.of(context)!.settings),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SettingsPage(
+                      settings: settings,
+                      onReplayOnboarding: () async {
+                        // Restart the onboarding journey end-to-end.
+                        // Play stats are deliberately preserved — only
+                        // the discovery overlay (firstSeen + strict
+                        // phase counter), the open-page filters and
+                        // the loaded collection are reset, and the
+                        // in-progress puzzle is dropped (it could be
+                        // from any collection — typically an expert
+                        // puzzle the player wandered into — and has no
+                        // place in a freshly-strict P0 playlist).
+                        if (database != null) {
+                          await database!.resetOnboardingProgress();
+                          // Restore open-page state to first-launch
+                          // defaults: a stale filter would otherwise
+                          // gate the freshly-strict P0 catalog (e.g.
+                          // `wantedRules={EY}` would hide the FM
+                          // puzzles phase 0 needs). Persist filters
+                          // BEFORE loadPuzzlesFile — that call re-
+                          // loads them from prefs.
+                          database!.currentFilters = Filters();
+                          await database!.currentFilters.save();
+                          await database!.setShouldShuffle(false);
+                          await database!.loadPuzzlesFile(
+                            Database.entryCollectionKey,
+                          );
+                          // `firstSeen` must be cleared AFTER
+                          // loadPuzzlesFile: that call's internal
+                          // loadStats() re-populates the map from
+                          // history, so a clear() done earlier is
+                          // silently undone — and the new-rule modal
+                          // would then never re-fire on the P0 puzzle.
+                          progress.clear();
+                          await progress.save();
+                          // Defensive: ensure the playlist is rebuilt
+                          // with the now-empty firstSeen and reset
+                          // counter in scope, even if a future change
+                          // to loadPuzzlesFile drops its trailing
+                          // preparePlaylist() call.
+                          database!.preparePlaylist();
+                          // Drop whatever puzzle was on screen and
+                          // hand the player a fresh P0 pick from the
+                          // rebuilt 1-easy playlist.
+                          game.clearPuzzle();
+                          loadPuzzle();
+                        }
+                        setState(() {});
+                      },
+                      onClearStats: () async {
+                        if (database == null) return;
+                        await database!.clearAllStats();
+                        // Drop any in-progress puzzle so the next puzzle is
+                        // picked from the freshly empty playlist; without
+                        // this, the player would be stuck on whatever was
+                        // currently displayed (now flagged unplayed again
+                        // but still selected as `current`).
+                        game.clearPuzzle();
+                        loadPuzzle();
+                        setState(() {});
+                      },
+                      onSettingsChange: (newValue) {
+                        final autoLevelTurnedOn =
+                            newValue.autoLevel == true && !settings.autoLevel;
+                        var levelChanged =
+                            (newValue.playerLevel != null &&
+                            newValue.playerLevel != settings.playerLevel);
+                        settings.change(newValue);
+                        if (newValue.hintType != null) {
+                          _onHintTypeChanged();
+                        }
+                        if (newValue.idleTimeout != null) {
+                          game.idleTimeoutDuration =
+                              settings.idleTimeoutDuration;
+                          game.rearmIdleTimer();
+                        }
+                        // Recompute immediately when auto is toggled on, so
+                        // the player doesn't have to finish a puzzle first.
+                        if (autoLevelTurnedOn && database != null) {
+                          final newLevel = database!.computePlayerLevel(
+                            fallback: settings.playerLevel,
+                          );
+                          if (newLevel != settings.playerLevel) {
+                            settings.playerLevel = newLevel;
+                            settings.save();
+                            levelChanged = true;
+                          }
+                        }
+                        if (levelChanged) {
+                          database?.setPlayerLevel(settings.playerLevel);
+                          database?.preparePlaylist();
+                          loadPuzzle();
+                        }
+                        game.refresh();
+                      },
+                      onChangeLanguage: () {
+                        setState(() {
+                          shouldChooseLocale = true;
+                        });
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.help),
+              title: Text(AppLocalizations.of(context)!.help),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HelpPage(locale: locale),
+                  ),
+                );
+              },
             ),
           ],
         ),
