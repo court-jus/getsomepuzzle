@@ -54,7 +54,7 @@ class Settings {
 
   Settings({
     this.validateType = ValidateType.intermediate,
-    this.showRating = ShowRating.yes,
+    this.showRating = ShowRating.no,
     this.shareData = ShareData.yes,
     this.liveCheckType = LiveCheckType.complete,
     this.hintType = HintType.deducibleCell,
@@ -110,7 +110,7 @@ class Settings {
         liveCheckType = LiveCheckType.complete;
     }
     final String settingsShowRating =
-        prefs.getString("settingsShowRating") ?? "yes";
+        prefs.getString("settingsShowRating") ?? "no";
     switch (settingsShowRating) {
       case "yes":
         showRating = ShowRating.yes;
