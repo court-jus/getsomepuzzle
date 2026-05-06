@@ -164,8 +164,8 @@ void main(List<String> args) {
 
 /// Returns the leading move sequence as a list of tags.
 /// Each tag is either:
-///   'complicity:<slugA>+<slugB>'  — produced by a Complicity
-///   'constraint'                  — produced by a plain Constraint
+///   'complicity:slugA+slugB'  — produced by a Complicity
+///   'constraint'              — produced by a plain Constraint
 ///
 /// Returns null if parsing fails.
 /// Returns an empty list if propagation produces 0 moves.

@@ -15,16 +15,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get stats => 'Stats';
 
   @override
-  String get newgame => 'Nouveau';
-
-  @override
   String get open => 'Ouvrir';
 
   @override
   String get restart => 'Redémarrer';
-
-  @override
-  String get report => 'Signaler';
 
   @override
   String get pause => 'Pause';
@@ -703,4 +697,22 @@ class AppLocalizationsFr extends AppLocalizations {
   String errorsCount(int count) {
     return '$count erreurs.';
   }
+
+  @override
+  String get menuSectionCurrentPuzzle => 'Puzzle en cours';
+
+  @override
+  String get menuSectionLibrary => 'Bibliothèque';
+
+  @override
+  String get menuSectionProgress => 'Progression';
+
+  @override
+  String get menuSectionPreferences => 'Préférences';
+
+  @override
+  String get nextPuzzle => 'Puzzle suivant';
+
+  @override
+  String get browse => 'Parcourir';
 }

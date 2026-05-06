@@ -15,12 +15,18 @@ class SettingsPage extends StatefulWidget {
   /// new-rule modals fire again. Does **not** touch play stats.
   final Future<void> Function() onReplayOnboarding;
 
+  /// Callback that triggers the full-screen locale chooser. Invoked
+  /// after the settings page pops itself so the chooser is revealed
+  /// in the main scaffold.
+  final VoidCallback onChangeLanguage;
+
   const SettingsPage({
     super.key,
     required this.settings,
     required this.onSettingsChange,
     required this.onClearStats,
     required this.onReplayOnboarding,
+    required this.onChangeLanguage,
   });
 
   @override
@@ -46,6 +52,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 margin: const EdgeInsets.all(8),
                 child: Column(
                   children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(l10n.tooltipLanguage),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.language),
+                          label: Text(_localeDisplayName(context)),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            widget.onChangeLanguage();
+                          },
+                        ),
+                      ],
+                    ),
                     _EnumSettingRow<ValidateType>(
                       label: l10n.settingValidateType,
                       value: widget.settings.validateType,
@@ -298,6 +318,18 @@ class _SettingsPageState extends State<SettingsPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(l10n.settingStatsCleared)));
+  }
+}
+
+String _localeDisplayName(BuildContext context) {
+  final code = Localizations.localeOf(context).languageCode;
+  switch (code) {
+    case 'fr':
+      return 'Français';
+    case 'es':
+      return 'Español';
+    default:
+      return 'English';
   }
 }
 

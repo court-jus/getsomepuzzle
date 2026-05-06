@@ -2,10 +2,8 @@
     "@@locale": "fr",
     "help": "Aide",
     "stats": "Stats",
-    "newgame": "Nouveau",
     "open": "Ouvrir",
     "restart": "Redémarrer",
-    "report": "Signaler",
     "pause": "Pause",
     "msgPuzzleSolved": "Puzzle résolu !",
     "questionFunToPlay": "Il était amusant ?",
@@ -235,5 +233,11 @@
     "settingClearStatsConfirmBody": "Tout l'historique de jeu sera supprimé : temps, notes, statuts joué/passé. Cette action est irréversible.",
     "settingStatsCleared": "Toutes les statistiques ont été effacées.",
     "someConstraintsInvalid": "Certaines contraintes ne sont pas valides.",
-    "errorsCount": "{count} erreurs."
+    "errorsCount": "{count} erreurs.",
+    "menuSectionCurrentPuzzle": "Puzzle en cours",
+    "menuSectionLibrary": "Bibliothèque",
+    "menuSectionProgress": "Progression",
+    "menuSectionPreferences": "Préférences",
+    "nextPuzzle": "Puzzle suivant",
+    "browse": "Parcourir"
 }

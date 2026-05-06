@@ -112,12 +112,6 @@ abstract class AppLocalizations {
   /// **'Stats'**
   String get stats;
 
-  /// Label of the menu choice that allows to choose the next puzzle to play
-  ///
-  /// In en, this message translates to:
-  /// **'New'**
-  String get newgame;
-
   /// Label of the menu choice that allows to manually open a puzzle to play or a file
   ///
   /// In en, this message translates to:
@@ -129,12 +123,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restart'**
   String get restart;
-
-  /// Label of the menu choice that allows to report a buggy puzzle
-  ///
-  /// In en, this message translates to:
-  /// **'Report'**
-  String get report;
 
   /// Tooltip that appears on the pause menu
   ///
@@ -1365,6 +1353,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} errors.'**
   String errorsCount(int count);
+
+  /// Drawer section header that groups actions targeting the puzzle currently displayed
+  ///
+  /// In en, this message translates to:
+  /// **'Current puzzle'**
+  String get menuSectionCurrentPuzzle;
+
+  /// Drawer section header that groups ways to obtain a puzzle to play (browse, generate, create)
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get menuSectionLibrary;
+
+  /// Drawer section header that groups player analytics views (stats, learning)
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get menuSectionProgress;
+
+  /// Drawer section header that groups configuration entries (settings, help)
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get menuSectionPreferences;
+
+  /// Drawer entry that skips the current puzzle and loads the next one in the playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Next puzzle'**
+  String get nextPuzzle;
+
+  /// Drawer entry that opens the puzzle selection page (filters, collections)
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get browse;
 }
 
 class _AppLocalizationsDelegate

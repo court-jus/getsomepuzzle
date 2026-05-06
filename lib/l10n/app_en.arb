@@ -8,10 +8,6 @@
     "@stats": {
         "description": "Label of the menu choice that displays game statistics"
     },
-    "newgame": "New",
-    "@newgame": {
-        "description": "Label of the menu choice that allows to choose the next puzzle to play"
-    },
     "open": "Open",
     "@open": {
         "description": "Label of the menu choice that allows to manually open a puzzle to play or a file"
@@ -19,10 +15,6 @@
     "restart": "Restart",
     "@restart": {
         "description": "Label of the menu choice that allows to restart the current puzzle"
-    },
-    "report": "Report",
-    "@report": {
-        "description": "Label of the menu choice that allows to report a buggy puzzle"
     },
     "pause": "Pause",
     "@pause": {
@@ -784,5 +776,29 @@
                 "type": "int"
             }
         }
+    },
+    "menuSectionCurrentPuzzle": "Current puzzle",
+    "@menuSectionCurrentPuzzle": {
+        "description": "Drawer section header that groups actions targeting the puzzle currently displayed"
+    },
+    "menuSectionLibrary": "Library",
+    "@menuSectionLibrary": {
+        "description": "Drawer section header that groups ways to obtain a puzzle to play (browse, generate, create)"
+    },
+    "menuSectionProgress": "Progress",
+    "@menuSectionProgress": {
+        "description": "Drawer section header that groups player analytics views (stats, learning)"
+    },
+    "menuSectionPreferences": "Preferences",
+    "@menuSectionPreferences": {
+        "description": "Drawer section header that groups configuration entries (settings, help)"
+    },
+    "nextPuzzle": "Next puzzle",
+    "@nextPuzzle": {
+        "description": "Drawer entry that skips the current puzzle and loads the next one in the playlist"
+    },
+    "browse": "Browse",
+    "@browse": {
+        "description": "Drawer entry that opens the puzzle selection page (filters, collections)"
     }
 }
