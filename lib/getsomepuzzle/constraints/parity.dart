@@ -1,6 +1,7 @@
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
 class ParityConstraint extends CellsCentricConstraint {
   @override
@@ -26,6 +27,24 @@ class ParityConstraint extends CellsCentricConstraint {
 
   @override
   String serialize() => 'PA:${indices.first}.$side';
+
+  /// Rotation-90°-CW mapping for the `side` parameter. Cells originally to
+  /// the left of the anchor end up above it in the rotated grid, etc.
+  static const Map<String, String> _rotatedSide = {
+    'left': 'top',
+    'right': 'bottom',
+    'top': 'right',
+    'bottom': 'left',
+    'horizontal': 'vertical',
+    'vertical': 'horizontal',
+  };
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    final newIdx = rotateIdx90CW(indices.first, origWidth, origHeight);
+    final newSide = _rotatedSide[side] ?? side;
+    return ParityConstraint('$newIdx.$newSide');
+  }
 
   @override
   String toHuman(Puzzle puzzle) {

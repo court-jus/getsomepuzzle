@@ -176,6 +176,10 @@ class ShapeConstraint extends Motif {
   @override
   String serialize() => 'SH:$_originalParams';
 
+  @override
+  Constraint rotated(int origWidth, int origHeight) =>
+      ShapeConstraint(_originalParams);
+
   static List<String> generateAllParameters(
     int width,
     int height,

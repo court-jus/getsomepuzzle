@@ -42,7 +42,7 @@ import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.6.7";
+const versionText = "Version 1.6.8";
 
 /// Where the GitHub Pages web build lives. Share links target this URL with
 /// a `?puzzle=<line>` query — works as a browser fallback everywhere, and
@@ -755,6 +755,34 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         64 - // The app bar
         128 // Some margin
         );
+
+    // Auto-rotate the puzzle when its aspect ratio doesn't match the screen
+    // orientation. Without this, a landscape puzzle on a portrait screen
+    // gets cellSize squeezed by the narrow dimension and renders tiny cells
+    // with huge empty bands. Rotation is logically transparent — same
+    // solutions, same constraints (re-expressed) — so the player keeps the
+    // same stats entry across orientations (canonicalPuzzleKey is rotation-
+    // invariant). Scheduled post-frame to avoid mutating state during build.
+    if (game.currentPuzzle != null) {
+      final p = game.currentPuzzle!;
+      if (p.width != p.height) {
+        final screenW = MediaQuery.sizeOf(context).width;
+        final screenH = MediaQuery.sizeOf(context).height;
+        final puzzleLandscape = p.width > p.height;
+        final screenLandscape = screenW > screenH;
+        if (puzzleLandscape != screenLandscape) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            // Re-check the predicate at frame time: another build/rotation
+            // may have already settled the orientation. `identical` ensures
+            // we don't re-rotate the rotation we just produced.
+            if (!identical(game.currentPuzzle, p)) return;
+            game.rotateCurrentPuzzle();
+          });
+        }
+      }
+    }
+
     double cellSize = 32.0;
     if (game.currentPuzzle != null) {
       final hasRC = game.currentPuzzle!.constraints

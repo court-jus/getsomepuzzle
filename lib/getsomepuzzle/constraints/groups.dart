@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
 const _maxGroupSizeRatio = 0.5;
 const _maxGroupSizeAbsolute = 15;
@@ -22,6 +23,12 @@ class GroupSize extends CellsCentricConstraint {
 
   @override
   String serialize() => 'GS:${indices.first}.$size';
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    final newIdx = rotateIdx90CW(indices.first, origWidth, origHeight);
+    return GroupSize('$newIdx.$size');
+  }
 
   @override
   String toString() {
@@ -292,6 +299,14 @@ class LetterGroup extends CellsCentricConstraint {
 
   @override
   String serialize() => 'LT:$letter.${indices.join(".")}';
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    final newIndices = indices
+        .map((i) => rotateIdx90CW(i, origWidth, origHeight))
+        .toList();
+    return LetterGroup('$letter.${newIndices.join(".")}');
+  }
 
   @override
   String toHuman(Puzzle puzzle) {

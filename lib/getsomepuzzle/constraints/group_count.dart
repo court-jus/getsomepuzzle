@@ -20,6 +20,10 @@ class GroupCountConstraint extends Constraint {
   String serialize() => 'GC:$color.$count';
 
   @override
+  Constraint rotated(int origWidth, int origHeight) =>
+      GroupCountConstraint('$color.$count');
+
+  @override
   String toString() {
     return "$color = $count groups";
   }

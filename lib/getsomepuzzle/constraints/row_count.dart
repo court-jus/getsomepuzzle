@@ -1,4 +1,6 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
@@ -23,6 +25,14 @@ final class RowCountConstraint extends LineCentricConstraint {
 
   @override
   String toHuman(Puzzle puzzle) => 'Row ${getIdx() + 1}: $count';
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    // RC at row r on a (W, H) grid → CC at column (H-1-r) on the rotated
+    // (H, W) grid. The cells of row r become the column at newCol = H-1-r
+    // after 90° CW rotation: each (c, r) maps to (newCol = H-1-r, newRow = c).
+    return ColumnCountConstraint('${origHeight - 1 - rowIdx}.$color.$count');
+  }
 
   static List<String> generateAllParameters(
     int width,

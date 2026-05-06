@@ -10,6 +10,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 import 'package:logging/logging.dart';
 
 /// Why the game was automatically paused. Null means either the user paused
@@ -22,6 +23,13 @@ class GameModel extends ChangeNotifier {
   Puzzle? currentPuzzle;
   List<int> history = [];
   int dbSize = 0;
+
+  /// True when `currentPuzzle` has been rotated 90° clockwise from its
+  /// native (database) orientation by the auto-rotation feature. Toggled
+  /// by `rotateCurrentPuzzle`: the next call from the rotated state
+  /// rotates back (CCW) instead of forward, so two consecutive screen-
+  /// orientation flips return the puzzle to its starting layout.
+  bool _isPuzzleRotated = false;
 
   // --- Hint state ---
   /// Next deducible move, refreshed (debounced) by [_scheduleHelpMe] after
@@ -175,6 +183,7 @@ class GameModel extends ChangeNotifier {
     dbSize = playlistLength;
     currentMeta = puz;
     currentPuzzle = currentMeta!.begin();
+    _isPuzzleRotated = false;
     paused = false;
     betweenPuzzles = false;
     _stoppedForCompletion = false;
@@ -186,12 +195,70 @@ class GameModel extends ChangeNotifier {
     _afterMutation();
   }
 
+  /// Toggle the rotation state of `currentPuzzle` between native and 90°
+  /// clockwise, used by the screen-orientation auto-rotation feature.
+  /// No-op for square puzzles, or when no puzzle is loaded.
+  ///
+  /// From native, applies a single 90° CW rotation. From the rotated state,
+  /// applies three 90° CW rotations (= 90° CCW) so the puzzle returns to
+  /// its **original** layout — without this, two successive orientation
+  /// changes would land on a 180°-flipped puzzle instead of the starting
+  /// position.
+  ///
+  /// The rotation is logically transparent (`Puzzle.rotated()` preserves
+  /// cell values, readonly flags, the cached solution, and the player's
+  /// progress) but every positional piece of UI state — the undo history,
+  /// any in-flight drag, the pre-computed help move — points to indices in
+  /// the *old* grid. Drag/click state is dropped; history indices are
+  /// translated through `rotateIdx90CW` so undo still pops the right cells.
+  void rotateCurrentPuzzle() {
+    final p = currentPuzzle;
+    if (p == null) return;
+    if (p.width == p.height) return;
+    // From native (rotated=false) we apply one CW; from rotated (true) we
+    // apply three CW, which sums to 360° relative to the native form and
+    // brings the player back to the original layout.
+    final quarters = _isPuzzleRotated ? 3 : 1;
+    history = history
+        .map((idx) => _rotateIdxCW(idx, p.width, p.height, quarters))
+        .toList();
+    firstDragValue = null;
+    lastDragIdx = null;
+    firstRightDragValue = null;
+    lastRightDragIdx = null;
+    _pendingRightClickIdx = null;
+    helpMove = null;
+    Puzzle next = p;
+    for (int i = 0; i < quarters; i++) {
+      next = next.rotated();
+    }
+    currentPuzzle = next;
+    _isPuzzleRotated = !_isPuzzleRotated;
+    _afterMutation();
+  }
+
+  /// Apply `quarters` (1..3) successive 90° CW transforms to a 1D cell
+  /// index, walking the dimension swap at each step.
+  static int _rotateIdxCW(int idx, int width, int height, int quarters) {
+    var i = idx;
+    var w = width;
+    var h = height;
+    for (int k = 0; k < quarters; k++) {
+      i = rotateIdx90CW(i, w, h);
+      final t = w;
+      w = h;
+      h = t;
+    }
+    return i;
+  }
+
   void clearPuzzle() {
     _cancelCheckDebounce();
     _cancelIdleTimer();
     cancelHintConstraintComputation();
     currentPuzzle = null;
     history = [];
+    _isPuzzleRotated = false;
     betweenPuzzles = false;
     notifyListeners();
   }

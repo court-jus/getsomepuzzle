@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.da
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
 /// Method used to determine a cell value during solving.
 enum SolveMethod { propagation, force }
@@ -759,6 +760,65 @@ class Puzzle {
         insertConstraintAt(i, removed);
       }
     }
+  }
+
+  /// Return a fresh puzzle equivalent to a 90° clockwise rotation of this
+  /// one. Dimensions are swapped, every cell is transposed, and every
+  /// constraint is rotated through `Constraint.rotated`. Cell values,
+  /// readonly flags and any cached solution are preserved (rotated
+  /// alongside the cells), so the returned puzzle is logically equivalent
+  /// — same domain, same solutions, same player progress.
+  Puzzle rotated() {
+    final n = width * height;
+    final newWidth = height;
+    final newHeight = width;
+
+    final newValues = List<int>.filled(n, 0);
+    final newReadonly = List<bool>.filled(n, false);
+    for (int origIdx = 0; origIdx < n; origIdx++) {
+      final newIdx = rotateIdx90CW(origIdx, width, height);
+      newValues[newIdx] = cells[origIdx].value;
+      newReadonly[newIdx] = cells[origIdx].readonly;
+    }
+
+    // Field 3 of the v2 line is the *initial* prefill: only readonly cells
+    // carry their value, the rest is 0. Player progress is restored from
+    // the trailing `_p:` field.
+    final prefillStr = List.generate(
+      n,
+      (i) => newReadonly[i] ? newValues[i] : 0,
+    ).map((v) => v.toString()).join('');
+
+    final domainStr = domain.map((v) => v.toString()).join('');
+    final rotatedConstraintsStr = constraints
+        .map((c) => c.rotated(width, height).serialize())
+        .join(';');
+
+    String solutionStr = '0:0';
+    final sol = cachedSolution;
+    if (sol != null && sol.length == n) {
+      final rotatedSolution = List<int>.filled(n, 0);
+      for (int origIdx = 0; origIdx < n; origIdx++) {
+        rotatedSolution[rotateIdx90CW(origIdx, width, height)] = sol[origIdx];
+      }
+      solutionStr = '1:${rotatedSolution.map((v) => v.toString()).join('')}';
+    }
+
+    final complexityStr = (cachedComplexity ?? 0).toString();
+    var line =
+        'v2_${domainStr}_${newWidth}x$newHeight'
+        '_${prefillStr}_${rotatedConstraintsStr}_${solutionStr}_$complexityStr';
+
+    final hasProgress = List.generate(
+      n,
+      (i) => !newReadonly[i] && newValues[i] != 0,
+    ).any((x) => x);
+    if (hasProgress) {
+      final playStr = newValues.map((v) => v.toString()).join('');
+      line = '${line}_p:$playStr';
+    }
+
+    return Puzzle(line);
   }
 
   /// Export puzzle to the v2 line format.

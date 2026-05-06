@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
 const Map<int, String> axisRepresentation = {
   0: "🕱",
@@ -28,6 +29,19 @@ class SymmetryConstraint extends CellsCentricConstraint {
 
   @override
   String serialize() => 'SY:${indices.first}.$axis';
+
+  /// Rotation-90°-CW remap of axis IDs:
+  ///   1 (⟍ diag) ↔ 3 (⟋ diag)
+  ///   2 (| vertical) ↔ 4 (― horizontal)
+  ///   5 (🞋 point) is invariant.
+  static const Map<int, int> _rotatedAxis = {1: 3, 2: 4, 3: 1, 4: 2, 5: 5};
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    final newIdx = rotateIdx90CW(indices.first, origWidth, origHeight);
+    final newAxis = _rotatedAxis[axis] ?? axis;
+    return SymmetryConstraint('$newIdx.$newAxis');
+  }
 
   @override
   String toString() {

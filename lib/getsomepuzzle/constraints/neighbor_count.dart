@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
 class NeighborCountConstraint extends CellsCentricConstraint {
   @override
@@ -19,6 +20,12 @@ class NeighborCountConstraint extends CellsCentricConstraint {
 
   @override
   String serialize() => '$slug:${indices.first}.$color.$count';
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    final newIdx = rotateIdx90CW(indices.first, origWidth, origHeight);
+    return NeighborCountConstraint('$newIdx.$color.$count');
+  }
 
   @override
   String toString() => '$count';

@@ -1,6 +1,7 @@
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
 class DifferentFromConstraint extends CellsCentricConstraint {
   @override
@@ -36,6 +37,28 @@ class DifferentFromConstraint extends CellsCentricConstraint {
 
   @override
   String serialize() => 'DF:${indices.first}.$direction';
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    final idx = indices.first;
+    if (direction == 'right') {
+      // right@idx pairs (c, r) with (c+1, r). After rotation those become
+      // (H-1-r, c) and (H-1-r, c+1) — same column, different rows. The pair
+      // is now vertical, anchored at the top cell, which is the rotation of
+      // the original anchor → emit `down` at rotated(idx).
+      final newIdx = rotateIdx90CW(idx, origWidth, origHeight);
+      return DifferentFromConstraint('$newIdx.down');
+    } else {
+      // down@idx pairs (c, r) with (c, r+1). After rotation those become
+      // (H-1-r, c) and (H-2-r, c) — same row, different columns. The pair
+      // is now horizontal; the LEFT cell is (H-2-r, c), which is the rotation
+      // of the original `down` neighbor (c, r+1) = orig idx + W. So we re-
+      // anchor on that cell and emit `right`.
+      final neighborIdx = idx + origWidth;
+      final newIdx = rotateIdx90CW(neighborIdx, origWidth, origHeight);
+      return DifferentFromConstraint('$newIdx.right');
+    }
+  }
 
   static List<String> generateAllParameters(
     int width,

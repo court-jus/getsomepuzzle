@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
 /// What an eye sees in a single direction (left, right, up or down).
 class DirectionView {
@@ -67,6 +68,12 @@ class EyesConstraint extends CellsCentricConstraint {
 
   @override
   String serialize() => '$slug:${indices.first}.$color.$count';
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    final newIdx = rotateIdx90CW(indices.first, origWidth, origHeight);
+    return EyesConstraint('$newIdx.$color.$count');
+  }
 
   @override
   String toString() => '$count';

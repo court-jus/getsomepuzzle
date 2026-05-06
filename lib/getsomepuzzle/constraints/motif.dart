@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
 const _allowBigMotifs = false;
 
@@ -27,6 +28,15 @@ class ForbiddenMotif extends Motif {
   @override
   String serialize() {
     return 'FM:${motif.map((row) => row.map((v) => v.toString()).join("")).join(".")}';
+  }
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    final rotatedMotif = rotate2D90CW(motif);
+    final strMotif = rotatedMotif
+        .map((row) => row.map((v) => v.toString()).join(''))
+        .join('.');
+    return ForbiddenMotif(strMotif);
   }
 
   @override

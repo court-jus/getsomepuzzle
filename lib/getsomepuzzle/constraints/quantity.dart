@@ -20,6 +20,10 @@ class QuantityConstraint extends Constraint {
   String serialize() => 'QA:$value.$count';
 
   @override
+  Constraint rotated(int origWidth, int origHeight) =>
+      QuantityConstraint('$value.$count');
+
+  @override
   String toString() {
     return "$value = $count";
   }

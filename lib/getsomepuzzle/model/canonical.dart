@@ -1,3 +1,5 @@
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+
 /// Identity-only key for matching a puzzle across format/algorithm
 /// evolutions. The full line representation
 /// (`v2_<domain>_<wxh>_<prefill>_<constraints>_<solution>_<complexity>[_p:...]`)
@@ -15,23 +17,61 @@
 ///   - removing exact-string duplicates (first occurrence wins)
 ///   - sorting them lexicographically (their order has no semantic meaning)
 ///
+/// **Rotation invariance:** the screen-orientation auto-rotation feature
+/// can swap a puzzle for its 90° clockwise rotation at render time. To
+/// keep the same stats entry across both orientations the key must be
+/// the same for L and `L.rotated()`. Two keys aren't enough — when L's
+/// 180° rotation happens to be lex-smaller, comparing only `{L, rot(L)}`
+/// vs `{rot(L), rot²(L)}` from the other side picks different mins.
+/// We enumerate the full orbit of 4 rotations and return the lex-smallest
+/// identity key — which is then invariant under any rotation.
+///
 /// Robust to both the legacy v2 line and the bare canonical form
 /// (no version prefix, no solution/complexity tail) — that way old
 /// stats lines and any line previously canonicalized both produce the
 /// same key.
-///
-/// Pure-string: no `Puzzle` parsing, safe to call on every line at load.
 String canonicalPuzzleKey(String line) {
+  final base = _identityKey(line);
+  if (base == null) return line.trim();
+  final orbitMin = _orbitMinIdentityKey(line);
+  return orbitMin ?? base;
+}
+
+/// Compute the bare identity key for a v2 line: `domain_dim_prefill_constraints`,
+/// with constraints deduped and sorted. Returns `null` if the line is
+/// malformed enough that the four required fields can't be extracted.
+String? _identityKey(String line) {
   final parts = line.trim().split('_');
   // Skip a leading version tag (`v2`/`v3`/...) if present. The 4 fields
   // we care about (domain, wxh, prefill, constraints) come right after.
   final start = parts.isNotEmpty && _isVersionTag(parts.first) ? 1 : 0;
-  if (parts.length < start + 4) return line.trim();
+  if (parts.length < start + 4) return null;
   final domain = parts[start];
   final dimensions = parts[start + 1];
   final prefill = parts[start + 2];
   final constraints = dedupAndSortConstraints(parts[start + 3]);
   return '${domain}_${dimensions}_${prefill}_$constraints';
+}
+
+/// Compute the lex-smallest identity key across the puzzle's full
+/// rotation orbit (4 rotations). Goes through `Puzzle(...).rotated()`,
+/// which is more expensive than `_identityKey` but only runs at
+/// canonicalization time (stats writes and puzzle open) — never inside
+/// the solver hot path. Returns `null` if the line can't be parsed.
+String? _orbitMinIdentityKey(String line) {
+  try {
+    String? best = _identityKey(line);
+    if (best == null) return null;
+    var p = Puzzle(line);
+    for (int i = 0; i < 3; i++) {
+      p = p.rotated();
+      final k = _identityKey(p.lineRepresentation);
+      if (k != null && k.compareTo(best!) < 0) best = k;
+    }
+    return best;
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Sort and dedup the constraints inside a v2 line, leaving every other

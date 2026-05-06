@@ -46,6 +46,24 @@ class Constraint extends CanApply {
 
   bool isCompleteFor(Puzzle puzzle) => false;
 
+  /// Return a fresh constraint instance equivalent to this one applied to a
+  /// puzzle rotated 90° clockwise. The arguments are the dimensions of the
+  /// **original** puzzle (before rotation). All positional data — cell
+  /// indices, line indices, sides, axes, 2D motifs — must be remapped so the
+  /// returned constraint validates the rotated grid identically.
+  ///
+  /// Constraints whose data is purely global (no position) may return a
+  /// fresh clone of self. Constraints that swap their slug under rotation
+  /// (e.g. `ColumnCount` ↔ `RowCount`) must return an instance of the
+  /// other class.
+  Constraint rotated(int origWidth, int origHeight) {
+    throw UnimplementedError(
+      '$runtimeType does not implement rotated(); '
+      'every Constraint subclass must override this for the puzzle '
+      'rotation feature to work.',
+    );
+  }
+
   @override
   Move? apply(Puzzle puzzle) {
     final clone = puzzle.clone();
