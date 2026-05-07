@@ -604,6 +604,36 @@ abstract class AppLocalizations {
   /// **'This cell can be deduced'**
   String get hintCellDeducible;
 
+  /// Hint message shown on tap 2 of the deducibleCell mode when the next deduction is a removeOption rather than a setValue. The dot for the ruled-out colour will disappear when the hint is applied.
+  ///
+  /// In en, this message translates to:
+  /// **'One of the options for this cell can be ruled out'**
+  String get hintCellOptionRemovable;
+
+  /// Hint message shown on tap 3 for a force-deduced removeOption move
+  ///
+  /// In en, this message translates to:
+  /// **'An option can be ruled out by combining multiple constraints'**
+  String get hintForceRemoveOption;
+
+  /// Hint message shown on tap 3 for a removeOption deduced from a single constraint
+  ///
+  /// In en, this message translates to:
+  /// **'An option can be ruled out from the {constraintName} constraint'**
+  String hintRemoveOptionDeducedFrom(String constraintName);
+
+  /// Hint message shown on tap 3 when a removeOption is deduced by a complicity that combines two distinct constraint types
+  ///
+  /// In en, this message translates to:
+  /// **'An option can be ruled out by combining the {c1} and {c2} constraints'**
+  String hintRemoveOptionComplicity(String c1, String c2);
+
+  /// Hint message shown on tap 3 when a removeOption is deduced by a complicity that combines two constraints of the same type
+  ///
+  /// In en, this message translates to:
+  /// **'An option can be ruled out by combining two {c} constraints'**
+  String hintRemoveOptionComplicityTwin(String c);
+
   /// Name of the forbidden pattern constraint
   ///
   /// In en, this message translates to:

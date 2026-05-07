@@ -11,6 +11,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 
 /// Registry of all player-facing constraint types.
 /// Centralizes slug, label, and factory for each constraint type.
@@ -23,7 +24,7 @@ final constraintRegistry =
         List<String> Function(
           int width,
           int height,
-          List<int> domain,
+          List<CellValue> domain,
           Set<int>? excludedIndices,
         )
         generateAllParameters,
@@ -130,7 +131,7 @@ List<String>? generateAllParameters(
   String slug,
   int width,
   int height,
-  List<int> domain,
+  List<CellValue> domain,
   Set<int>? excludedIndices,
 ) {
   for (final r in constraintRegistry) {

@@ -10,6 +10,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/eyes_dialog.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
@@ -71,10 +72,10 @@ class _CreatePageState extends State<CreatePage> {
   Timer? _solveDebounce;
   Set<int> _propagationCells = {};
   Set<int> _forceCells = {};
-  Map<int, int> _solvedValues = {};
+  Map<int, CellValue> _solvedValues = {};
   int? _autoComplexity;
 
-  final Map<int, int> _fixedCells = {};
+  final Map<int, CellValue> _fixedCells = {};
 
   String _targetPlaylist = 'custom';
 
@@ -121,9 +122,11 @@ class _CreatePageState extends State<CreatePage> {
     if (!mounted) return;
     final propCells = <int>{};
     final frcCells = <int>{};
-    final values = <int, int>{};
+    final values = <int, CellValue>{};
     for (final step in steps) {
-      values[step.cellIdx] = step.value;
+      if (step.value != null) {
+        values[step.cellIdx] = step.value!;
+      }
       if (step.method == SolveMethod.propagation) {
         propCells.add(step.cellIdx);
       } else {
@@ -157,7 +160,7 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Puzzle _buildPuzzle() {
-    final p = Puzzle.empty(_width, _height, [1, 2]);
+    final p = Puzzle.empty(_width, _height, defaultDomain);
     for (final entry in _fixedCells.entries) {
       p.cells[entry.key].setForSolver(entry.value);
       p.cells[entry.key].readonly = true;
@@ -247,9 +250,9 @@ class _CreatePageState extends State<CreatePage> {
         setState(() => _fixedCells.remove(cellIdx));
         _scheduleAutoSolve();
       case CellAction.fixBlack:
-        _setFixedCell(cellIdx, 1);
+        _setFixedCell(cellIdx, CellValue.black);
       case CellAction.fixWhite:
-        _setFixedCell(cellIdx, 2);
+        _setFixedCell(cellIdx, CellValue.white);
     }
   }
 
@@ -330,10 +333,10 @@ class _CreatePageState extends State<CreatePage> {
           height: _height,
         );
       case ConstraintType.fixBlack:
-        _setFixedCell(cellIdx, 1);
+        _setFixedCell(cellIdx, CellValue.black);
         return;
       case ConstraintType.fixWhite:
-        _setFixedCell(cellIdx, 2);
+        _setFixedCell(cellIdx, CellValue.white);
         return;
     }
     if (added != null) _addConstraint(added);
@@ -367,7 +370,7 @@ class _CreatePageState extends State<CreatePage> {
     });
   }
 
-  void _setFixedCell(int cellIdx, int value) {
+  void _setFixedCell(int cellIdx, CellValue value) {
     setState(() {
       if (_fixedCells[cellIdx] == value) {
         _fixedCells.remove(cellIdx);
@@ -663,7 +666,7 @@ class _CreatePageState extends State<CreatePage> {
                     constraint: constraint,
                     actualCount: 0,
                     oppositeActual: 0,
-                    oppositeTotal: (_width * _height) - constraint.value,
+                    oppositeTotal: (_width * _height) - constraint.count,
                     cellSize: topBarSize,
                   ),
                 )
@@ -781,7 +784,7 @@ class _CreatePageState extends State<CreatePage> {
     final fixedValue = _fixedCells[cellIdx];
     final isFixed = fixedValue != null;
 
-    final cellValue = isFixed ? fixedValue : 0;
+    final cellValue = isFixed ? fixedValue : CellValue.free;
 
     Color? borderColor;
     double? borderWidth;

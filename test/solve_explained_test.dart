@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
@@ -7,7 +8,7 @@ void main() {
     final p = Puzzle(
       'v2_12_6x7_002000210001022011020210200200100010202211_FM:12;FM:1.1.2;PA:17.top_0:0_0',
     );
-    final freeCount = p.cellValues.where((v) => v == 0).length;
+    final freeCount = p.cellValues.where((v) => v == CellValue.free).length;
     final steps = p.solveExplained();
 
     // Should determine all free cells
@@ -17,7 +18,7 @@ void main() {
     // Each step should reference a constraint
     expect(steps.every((s) => s.constraint.isNotEmpty), isTrue);
     // The puzzle should not be modified
-    expect(p.cellValues.where((v) => v == 0).length, freeCount);
+    expect(p.cellValues.where((v) => v == CellValue.free).length, freeCount);
   });
 
   test('solveExplained includes force steps when needed', () {
@@ -41,9 +42,56 @@ void main() {
 
   test('solveExplained does not modify the original puzzle', () {
     final p = Puzzle('v2_12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top_0:0_2');
-    final before = List<int>.from(p.cellValues);
+    final before = List<CellValue>.from(p.cellValues);
     p.solveExplained();
     expect(p.cellValues, before);
+  });
+
+  test('solveExplained trace carries removeOption moves end-to-end', () {
+    // Regression: SolveStep used to be built without forwarding
+    // `m.removeOption`, so any constraint that emitted a removeOption
+    // move ended up as a no-op step in the trace. Replaying the trace
+    // then left those cells free and made `replay.complete` false —
+    // every generated 4+-cell 2-colour puzzle was rejected as
+    // "!isUnique" in the generator's validity check.
+    final p = Puzzle(
+      'v2_12_6x7_002000210001022011020210200200100010202211_FM:12;FM:1.1.2;PA:17.top_0:0_0',
+    );
+    final freeCount = p.cellValues.where((v) => v == CellValue.free).length;
+    final steps = p.solveExplained();
+    // The fixture is dominated by FM/PA constraints, all of which now
+    // emit `removeOption` rather than `value`. At least one step must
+    // therefore carry a non-null `removeOption`, otherwise the trace
+    // can't possibly drive the puzzle to completion.
+    expect(
+      steps.any((s) => s.removeOption != null),
+      isTrue,
+      reason: 'fixture should produce at least one removeOption step',
+    );
+    // Replay the trace on a fresh clone and verify completeness. This
+    // is exactly what the generator's validity check does.
+    final replay = p.clone();
+    for (final s in steps) {
+      if (s.value != null) {
+        replay.setValue(s.cellIdx, s.value!);
+      } else if (s.removeOption != null) {
+        replay.removeOption(s.cellIdx, s.removeOption!);
+      }
+    }
+    expect(
+      replay.complete,
+      isTrue,
+      reason: 'replaying every SolveStep should drive the puzzle to '
+          'completion when the trace originally completed; if this '
+          'fails, the trace probably dropped a removeOption.',
+    );
+    expect(
+      replay.cellValues.where((v) => v == CellValue.free).length,
+      0,
+    );
+    // sanity: every free cell was eventually touched.
+    final touched = steps.map((s) => s.cellIdx).toSet();
+    expect(touched.length, freeCount);
   });
 
   test(

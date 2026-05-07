@@ -375,6 +375,45 @@
     "@hintCellDeducible": {
         "description": "Hint message shown on tap 2 of the deducibleCell mode (cell highlighted, source not yet shown)"
     },
+    "hintCellOptionRemovable": "One of the options for this cell can be ruled out",
+    "@hintCellOptionRemovable": {
+        "description": "Hint message shown on tap 2 of the deducibleCell mode when the next deduction is a removeOption rather than a setValue. The dot for the ruled-out colour will disappear when the hint is applied."
+    },
+    "hintForceRemoveOption": "An option can be ruled out by combining multiple constraints",
+    "@hintForceRemoveOption": {
+        "description": "Hint message shown on tap 3 for a force-deduced removeOption move"
+    },
+    "hintRemoveOptionDeducedFrom": "An option can be ruled out from the {constraintName} constraint",
+    "@hintRemoveOptionDeducedFrom": {
+        "description": "Hint message shown on tap 3 for a removeOption deduced from a single constraint",
+        "placeholders": {
+            "constraintName": {
+                "type": "String",
+                "example": "neighbor count"
+            }
+        }
+    },
+    "hintRemoveOptionComplicity": "An option can be ruled out by combining the {c1} and {c2} constraints",
+    "@hintRemoveOptionComplicity": {
+        "description": "Hint message shown on tap 3 when a removeOption is deduced by a complicity that combines two distinct constraint types",
+        "placeholders": {
+            "c1": {
+                "type": "String"
+            },
+            "c2": {
+                "type": "String"
+            }
+        }
+    },
+    "hintRemoveOptionComplicityTwin": "An option can be ruled out by combining two {c} constraints",
+    "@hintRemoveOptionComplicityTwin": {
+        "description": "Hint message shown on tap 3 when a removeOption is deduced by a complicity that combines two constraints of the same type",
+        "placeholders": {
+            "c": {
+                "type": "String"
+            }
+        }
+    },
     "constraintForbiddenPattern": "forbidden pattern",
     "@constraintForbiddenPattern": {
         "description": "Name of the forbidden pattern constraint"

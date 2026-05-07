@@ -7,43 +7,43 @@ class GroupCountConstraint extends Constraint {
   @override
   String get slug => 'GC';
 
-  int color = 0;
+  CellValue color = CellValue.free;
   int count = 0;
 
   GroupCountConstraint(String strParams) {
     final params = strParams.split(".");
-    color = int.parse(params[0]);
+    color = cellRepresentationToValue(params[0]);
     count = int.parse(params[1]);
   }
 
   @override
-  String serialize() => 'GC:$color.$count';
+  String serialize() => 'GC:${cellValueToString(color)}.$count';
 
   @override
   Constraint rotated(int origWidth, int origHeight) =>
-      GroupCountConstraint('$color.$count');
+      GroupCountConstraint('${cellValueToString(color)}.$count');
 
   @override
   String toString() {
-    return "$color = $count groups";
+    return "${cellValueToString(color)} = $count groups";
   }
 
   @override
   String toHuman(Puzzle puzzle) {
-    return "$count groups of color $color";
+    return "$count groups of color ${cellValueToString(color)}";
   }
 
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final maxCount = (width * height / 2).ceil();
     final List<String> result = [];
     for (int count = 1; count <= maxCount; count++) {
       for (final value in domain) {
-        result.add('$value.$count');
+        result.add('${cellValueToString(value)}.$count');
       }
     }
     return result;
@@ -69,9 +69,14 @@ class GroupCountConstraint extends Constraint {
     }
     if (currentCount < count) {
       // Look for free cells where we could put a 'color' cell without
-      // merging into an existing group
-      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
-      if (candidates.length + currentCount < count) {
+      // merging into an existing group. On a 3+ colour domain a cell may
+      // be free *and* have `color` no longer in its options (pruned by
+      // another constraint via `removeOption`); such a cell can never
+      // become `color`, so it must not count as a candidate here.
+      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color)
+          .where((idx) => puzzle.cells[idx].options.contains(color))
+          .length;
+      if (candidates + currentCount < count) {
         return false;
       }
     }
@@ -86,10 +91,10 @@ class GroupCountConstraint extends Constraint {
       final reachable = _safeReachableCountsByMerges(puzzle);
       if (reachable != null) {
         if (!reachable.contains(count)) {
-          return Move(0, 0, this, isImpossible: this);
+          return Move(0, this, isImpossible: this);
         }
       } else if (calculateMinGroups(puzzle, color) > count) {
-        return Move(0, 0, this, isImpossible: this);
+        return Move(0, this, isImpossible: this);
       }
       // Force on a single direct merge-cell only if colouring it opposite
       // would make the target unreachable. The direct-merge enumeration
@@ -98,17 +103,31 @@ class GroupCountConstraint extends Constraint {
       final mergeableCells = getCellsThatMergeColorGroups(puzzle, color);
       if (mergeableCells.length == 1) {
         final mergeCell = mergeableCells.first;
-        final opposite = puzzle.domain.firstWhere((v) => v != color);
+        final anyOpposite = puzzle.domain.firstWhere((v) => v != color);
         final probe = puzzle.clone();
-        probe.cells[mergeCell].setForSolver(opposite);
+        probe.cells[mergeCell].setForSolver(anyOpposite);
         if (calculateMinGroups(probe, color) > count) {
-          return Move(mergeCell, color, this, complexity: 3);
+          // Force the merge-cell to color. If color was already excluded
+          // from its options (3-colour puzzles), the constraint cannot be
+          // satisfied — neither merge nor non-merge keeps the count at
+          // target.
+          if (!puzzle.cells[mergeCell].options.contains(color)) {
+            return Move(0, this, isImpossible: this);
+          }
+          return Move(mergeCell, value: color, this, complexity: 3);
         }
       }
     } else if (currentCount < count) {
-      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
+      // Mirror of the verify-side filter: a free cell without `color`
+      // neighbour is only a real "future new group" candidate when its
+      // options still contain `color`. On a 3+ colour domain, candidates
+      // pruned of `color` could otherwise inflate the count and mask a
+      // real impossibility.
+      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color)
+          .where((idx) => puzzle.cells[idx].options.contains(color))
+          .toList();
       if (candidates.length + currentCount < count) {
-        return Move(0, 0, this, isImpossible: this);
+        return Move(0, this, isImpossible: this);
       }
       if (candidates.length + currentCount == count && candidates.isNotEmpty) {
         // Every candidate would need to become its own isolated group for the
@@ -116,21 +135,28 @@ class GroupCountConstraint extends Constraint {
         // merge into one group, so any adjacency among candidates makes the
         // target unreachable.
         if (_candidatesHaveAdjacency(puzzle, candidates)) {
-          return Move(0, 0, this, isImpossible: this);
+          return Move(0, this, isImpossible: this);
         }
-        return Move(candidates.first, color, this, complexity: 3);
+        // Candidates are already option-filtered; the head is therefore a
+        // safe target for `value: color`.
+        return Move(candidates.first, value: color, this, complexity: 3);
       }
     } else if (currentCount == count && !puzzle.complete) {
-      final opposite = puzzle.domain.firstWhere((c) => c != color);
       final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
       if (candidates.isEmpty) {
         // Candidate set is monotone decreasing: empty now means empty
         // forever, so no new group can ever form. Colouring a merge-cell
         // would drop the count below target with no way to compensate, so
-        // every merge-cell must be opposite.
+        // every merge-cell must be an opposite color.
         final forcedCells = getCellsThatMergeColorGroups(puzzle, color);
         if (forcedCells.isNotEmpty) {
-          return Move(forcedCells.first, opposite, this, complexity: 3);
+          for (var forcedCell in forcedCells) {
+            if (puzzle.cells[forcedCell].options.contains(color)) {
+              return Move(forcedCell, removeOption: color, this, complexity: 3);
+            }
+          }
+          // No forced cell can remove option
+          return Move(0, this, isImpossible: this);
         }
       } else {
         // Simulation-based probe: for each candidate, simulate colouring
@@ -138,7 +164,7 @@ class GroupCountConstraint extends Constraint {
         // currentCount + 1 (a new isolated group appeared). To recover
         // the target we'd need merges. If even the minimum achievable
         // count in the new state exceeds the target, the target is
-        // unreachable → force the candidate to opposite.
+        // unreachable → force the candidate to an opposite color.
         //
         // We use `calculateMinGroups` (flood-fill via free-or-same-color
         // cells) rather than enumerating direct merge-cells, because the
@@ -147,8 +173,9 @@ class GroupCountConstraint extends Constraint {
         for (final cand in candidates) {
           final clone = puzzle.clone();
           clone.cells[cand].setForSolver(color);
-          if (calculateMinGroups(clone, color) > count) {
-            return Move(cand, opposite, this, complexity: 4);
+          if (calculateMinGroups(clone, color) > count &&
+              puzzle.cells[cand].options.contains(color)) {
+            return Move(cand, removeOption: color, this, complexity: 4);
           }
         }
       }
@@ -215,7 +242,7 @@ class GroupCountConstraint extends Constraint {
         final setJ = groups[j].toSet();
         bool found = false;
         for (int idx = 0; idx < puzzle.cellValues.length; idx++) {
-          if (puzzle.cellValues[idx] != 0) continue;
+          if (puzzle.cellValues[idx] != CellValue.free) continue;
           final neighbors = puzzle.getNeighbors(idx);
           final adjI = neighbors.any(setI.contains);
           final adjJ = neighbors.any(setJ.contains);

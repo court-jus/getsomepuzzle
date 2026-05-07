@@ -1,11 +1,20 @@
 import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart' as utils_groups;
 
 class GeneratorConfig {
   final int width;
@@ -32,6 +41,12 @@ class GeneratorConfig {
   final Duration maxTime;
   final int count;
 
+  /// Colour domain used by both the random pre-fill and the generated
+  /// puzzle's declared domain. `defaultDomain` (2 colours) keeps the
+  /// historical CLI behaviour; pass `fullDomain` to enable 3-colour
+  /// generation.
+  final List<CellValue> domain;
+
   const GeneratorConfig({
     required this.width,
     required this.height,
@@ -44,6 +59,7 @@ class GeneratorConfig {
     this.preferredSlugs = const {},
     this.maxTime = const Duration(seconds: 60),
     this.count = 1,
+    this.domain = defaultDomain,
   });
 }
 
@@ -65,7 +81,6 @@ class GeneratorProgress {
 
 class PuzzleGenerator {
   static final _rng = Random();
-  static const _defaultDomain = [1, 2];
 
   /// Count how many puzzles use each constraint type in a collection.
   /// Each type is counted at most once per puzzle.
@@ -121,17 +136,18 @@ class PuzzleGenerator {
     final preferredSlugs = config.preferredSlugs.intersection(allowedSlugs);
     final prioritySlugs = {...requiredSlugs, ...preferredSlugs};
 
+    final domain = config.domain;
     // 1. Create a random solved grid. Whenever SH should be tried (required
     // by user or pushed by an equilibrium / warm-up target), the pre-fill
     // paints a valid Shape motif so the SH constraint is satisfiable.
     final hasSH = prioritySlugs.contains("SH");
     final solved = hasSH
-        ? _preFillSh(width, height)
-        : _preFillRegular(width, height);
+        ? _preFillSh(width, height, domain)
+        : _preFillRegular(width, height, domain);
     final solvedValues = solved.cellValues;
 
     // 2. Create puzzle with some pre-filled cells
-    final pu = Puzzle.empty(width, height, _defaultDomain);
+    final pu = Puzzle.empty(width, height, domain);
     pu.cachedSolution = solvedValues;
     final prefilled = (size * (1 - ratio)).ceil();
     final indices = List.generate(size, (i) => i)..shuffle(_rng);
@@ -159,7 +175,7 @@ class PuzzleGenerator {
             slug,
             width,
             height,
-            _defaultDomain,
+            domain,
             slug == 'DF' ? readonlyIndices : null,
           ) ??
           [];
@@ -171,6 +187,58 @@ class PuzzleGenerator {
           allConstraints.add(constraint);
         }
       }
+    }
+
+    // Per-letter LT pre-filter. An LT pair satisfies `verify(solved)`
+    // iff its two cells share a *connected* same-colour component in
+    // `solved` — but `Puzzle.addConstraint` silently merges same-letter
+    // LTs, and two individually-valid pairs that land in *different*
+    // components (whether of different colours or two disjoint groups
+    // of the same colour) merge into an LT whose union spans several
+    // components. That merged constraint then fails on `solved`, and
+    // the whole generation attempt gets rejected late at
+    // `!isUnique`. We pre-filter so the iterative loop never even
+    // considers a pair that would corrupt a letter once merged: for
+    // each letter, we pick a single component (the one with the most
+    // surviving pairs — likely the most generative) and drop pairs
+    // that sit on any other component. `LetterGroup.generateAllParameters`
+    // cannot do this itself: it doesn't see `solvedValues`.
+    final solvedGroups = utils_groups.getGroups(solved);
+    final cellToComponent = <int, int>{};
+    for (int gi = 0; gi < solvedGroups.length; gi++) {
+      for (final cellIdx in solvedGroups[gi]) {
+        cellToComponent[cellIdx] = gi;
+      }
+    }
+    final ltByLetterComponent = <String, List<LetterGroup>>{};
+    final keptNonLt = <Constraint>[];
+    for (final c in allConstraints) {
+      if (c is LetterGroup) {
+        // verify(solved) guarantees both indices are in the same component,
+        // so we can read it off any index.
+        final comp = cellToComponent[c.indices.first];
+        ltByLetterComponent
+            .putIfAbsent('${c.letter}-c$comp', () => [])
+            .add(c);
+      } else {
+        keptNonLt.add(c);
+      }
+    }
+    final perLetterChosenKey = <String, String>{};
+    for (final key in ltByLetterComponent.keys) {
+      final letter = key.substring(0, key.indexOf('-'));
+      final current = perLetterChosenKey[letter];
+      if (current == null ||
+          ltByLetterComponent[key]!.length >
+              ltByLetterComponent[current]!.length) {
+        perLetterChosenKey[letter] = key;
+      }
+    }
+    allConstraints
+      ..clear()
+      ..addAll(keptNonLt);
+    for (final key in perLetterChosenKey.values) {
+      allConstraints.addAll(ltByLetterComponent[key]!);
     }
 
     final total = allConstraints.length;
@@ -200,6 +268,11 @@ class PuzzleGenerator {
 
       bool found = false;
       while (allConstraints.isNotEmpty) {
+        // Re-check shouldStop inside the inner loop so a long candidate
+        // sweep (hundreds of solve() calls on a hard 3-colour grid)
+        // honours the deadline within seconds rather than waiting for
+        // the next outer iteration.
+        if (shouldStop?.call() == true) return null;
         tried++;
         onProgress?.call(
           GeneratorProgress(
@@ -214,11 +287,42 @@ class PuzzleGenerator {
         final constraint = allConstraints.removeAt(0);
         final cloned = pu.clone();
         // Solve with existing constraints
-        cloned.solve();
+        try {
+          cloned.solve();
+        } catch (error) {
+          print("ERROR $error");
+          rethrow;
+        }
         final ratioBefore = cloned.computeRatio();
         // Add candidate and solve again
         cloned.addConstraint(constraint);
-        cloned.solve();
+        // Invariant guard: `Puzzle.addConstraint` silently merges
+        // same-letter `LetterGroup`s. Two LT:A.x.y pairs that
+        // *individually* verify against `solved` (each pair shares a
+        // colour group) can merge into an LT:A whose union spans
+        // multiple colour groups — that merged constraint no longer
+        // satisfies `solved`. If the iterative loop accepts such a
+        // candidate, the trace at the end of generation converges to
+        // a state that violates the puzzle's own constraints and the
+        // whole attempt is rejected as `!isUnique`. We re-verify the
+        // merged constraint here and skip the candidate when the
+        // merge breaks the invariant; the unmerged constraint stays
+        // available in `allConstraints` for later iterations through
+        // a different prefix.
+        if (constraint is LetterGroup) {
+          final merged = cloned.constraints
+              .whereType<LetterGroup>()
+              .firstWhere((lt) => lt.letter == constraint.letter);
+          if (!merged.verify(solved)) {
+            continue;
+          }
+        }
+        try {
+          cloned.solve();
+        } catch (error) {
+          print("ERROR $error");
+          rethrow;
+        }
         final ratioAfter = cloned.computeRatio();
 
         if (ratioAfter < ratioBefore) {
@@ -283,7 +387,11 @@ class PuzzleGenerator {
     final steps = pu.solveExplained();
     final replay = pu.clone();
     for (final s in steps) {
-      replay.setValue(s.cellIdx, s.value);
+      if (s.value != null) {
+        replay.setValue(s.cellIdx, s.value!);
+      } else if (s.removeOption != null) {
+        replay.removeOption(s.cellIdx, s.removeOption!);
+      }
     }
     final isUnique = replay.complete && replay.check(saveResult: false).isEmpty;
     if (!isUnique) return null;
@@ -295,15 +403,70 @@ class PuzzleGenerator {
       solved: true,
     );
 
+    // Auto-shrink the declared domain. When the validated solution never
+    // uses a colour, and no constraint references it explicitly, the
+    // puzzle is functionally a smaller-domain puzzle — saving it with
+    // the original (larger) domain would expose a never-used colour to
+    // the play UI (option dots, incrValue cycle). For `--domain 3`
+    // runs this auto-promotes purely-2-colour outcomes back to `12`.
+    final usedColours = <CellValue>{};
+    for (final v in replay.cellValues) {
+      if (v != CellValue.free) usedColours.add(v);
+    }
+    final referencedColours = <CellValue>{};
+    for (final c in pu.constraints) {
+      referencedColours.addAll(_colorsReferencedBy(c));
+    }
+    final keep = {...usedColours, ...referencedColours};
+    final shrunkDomain = pu.domain.where(keep.contains).toList();
+    if (shrunkDomain.length < pu.domain.length) {
+      pu.domain = shrunkDomain;
+      for (final cell in pu.cells) {
+        cell.domain = shrunkDomain;
+      }
+      // Complexity was not yet computed for this puzzle, but reset the
+      // cache anyway in case a future caller adds an intermediate
+      // computeComplexity() before lineExport() — the shrunken domain
+      // gives slightly different propagation behaviour and the cache
+      // would otherwise reflect the wrong domain.
+      pu.cachedComplexity = null;
+    }
+
     return (line: pu.lineExport(), level: level);
   }
 
-  static Puzzle _preFillSh(int width, int height) {
-    final solved = Puzzle.empty(width, height, _defaultDomain);
-    final chosenMotif = _pickShapeMotif(width, height);
+  /// Colours referenced by [c] either directly (the `color` field of a
+  /// quantity-style constraint) or implicitly (the non-free values in an
+  /// FM/SH motif). Used by the auto-shrink pass to decide whether a
+  /// colour that is absent from the solution can also be dropped from
+  /// the puzzle's declared domain without orphaning a constraint.
+  /// Constraints with no colour reference (`PA`, `GS`, `LT`, `DF`, `SY`)
+  /// contribute the empty set.
+  static Set<CellValue> _colorsReferencedBy(Constraint c) {
+    if (c is LineCentricConstraint) return {c.color};
+    if (c is GroupCountConstraint) return {c.color};
+    if (c is NeighborCountConstraint) return {c.color};
+    if (c is EyesConstraint) return {c.color};
+    if (c is QuantityConstraint) return {c.color};
+    if (c is ShapeConstraint) return {c.color};
+    if (c is ForbiddenMotif) {
+      final colors = <CellValue>{};
+      for (final row in c.motif) {
+        for (final v in row) {
+          if (v != CellValue.free) colors.add(v);
+        }
+      }
+      return colors;
+    }
+    return const {};
+  }
+
+  static Puzzle _preFillSh(int width, int height, List<CellValue> domain) {
+    final solved = Puzzle.empty(width, height, domain);
+    final chosenMotif = _pickShapeMotif(width, height, domain);
     final sc = ShapeConstraint(chosenMotif);
     _placeInitialVariant(solved, sc);
-    _fillRemainingWithOpposite(solved, sc.color);
+    _fillRemainingWithOpposite(solved, sc.color, domain);
     solved.addConstraint(sc);
     _placeAdditionalVariants(solved);
     return solved;
@@ -311,11 +474,11 @@ class PuzzleGenerator {
 
   /// Pick one motif string via weighted random sampling, where the weight
   /// depends on the motif's bounding-box size (`rows × cols`).
-  static String _pickShapeMotif(int width, int height) {
+  static String _pickShapeMotif(int width, int height, List<CellValue> domain) {
     final possibleMotifs = ShapeConstraint.generateAllParameters(
       width,
       height,
-      _defaultDomain,
+      domain,
       null,
     );
     possibleMotifs.shuffle(_rng);
@@ -356,9 +519,14 @@ class PuzzleGenerator {
     _paintVariant(solved, variant, rowOffset, colOffset);
   }
 
-  /// Fill every still-free cell of [solved] with the color opposite [color].
-  static void _fillRemainingWithOpposite(Puzzle solved, int color) {
-    final opposite = _defaultDomain.whereNot((i) => i == color).first;
+  /// Fill every still-free cell of [solved] with a random opposite color
+  /// drawn from [domain].
+  static void _fillRemainingWithOpposite(
+    Puzzle solved,
+    CellValue color,
+    List<CellValue> domain,
+  ) {
+    final opposite = domain.whereNot((i) => i == color).shuffled().first;
     for (int i = 0; i < solved.width * solved.height; i++) {
       if (!solved.cells[i].isFree) continue;
       solved.cells[i].setForSolver(opposite);
@@ -383,26 +551,24 @@ class PuzzleGenerator {
   /// Write non-zero cells of [variant] onto [solved] at (rowOffset, colOffset).
   static void _paintVariant(
     Puzzle solved,
-    List<List<int>> variant,
+    List<List<CellValue>> variant,
     int rowOffset,
     int colOffset,
   ) {
     for (final (ridx, row) in variant.indexed) {
       for (final (cidx, value) in row.indexed) {
-        if (value == 0) continue;
+        if (value == CellValue.free) continue;
         solved.cells[(ridx + rowOffset) * solved.width + (cidx + colOffset)]
             .setForSolver(value);
       }
     }
   }
 
-  static Puzzle _preFillRegular(int width, int height) {
-    final solved = Puzzle.empty(width, height, _defaultDomain);
+  static Puzzle _preFillRegular(int width, int height, List<CellValue> domain) {
+    final solved = Puzzle.empty(width, height, domain);
     final size = solved.width * solved.height;
     for (int i = 0; i < size; i++) {
-      solved.cells[i].setForSolver(
-        _defaultDomain[_rng.nextInt(_defaultDomain.length)],
-      );
+      solved.cells[i].setForSolver(domain[_rng.nextInt(domain.length)]);
     }
     return solved;
   }

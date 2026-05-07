@@ -67,11 +67,19 @@ void _solvePuzzle(String line) {
     step++;
     final r = move.idx ~/ p.width;
     final c = move.idx % p.width;
-    final colorName = move.value == 1 ? 'BLACK' : 'WHITE';
-    p.cells[move.idx].setForSolver(move.value);
-    print(
-      'Step $step: ($r,$c) = $colorName  [$foundBy - ${source.serialize()}]',
-    );
+    if (move.value != null) {
+      final colorName = move.value!.name;
+      p.cells[move.idx].setForSolver(move.value!);
+      print(
+        'Step $step: ($r,$c) = $colorName  [$foundBy - ${source.serialize()}]',
+      );
+    } else if (move.removeOption != null) {
+      final colorName = move.removeOption!.name;
+      p.cells[move.idx].removeOptionForSolver(move.removeOption!);
+      print(
+        'Step $step: ($r,$c) != $colorName  [$foundBy - ${source.serialize()}]',
+      );
+    }
   }
 
   print('');
@@ -92,11 +100,13 @@ void _printGrid(Puzzle p) {
     for (int c = 0; c < p.width; c++) {
       final v = p.cellValues[r * p.width + c];
       row.add(
-        v == 0
+        v == CellValue.free
             ? '.'
-            : v == 1
+            : v == CellValue.black
             ? 'B'
-            : 'W',
+            : v == CellValue.white
+            ? 'W'
+            : 'P',
       );
     }
     print('  ${row.join(" ")}');

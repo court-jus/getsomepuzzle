@@ -22,6 +22,12 @@ void main() {
 
       await openDrawer(tester);
 
+      // Tap the "Library" menu category
+      final libraryCategory = find.text("LIBRARY");
+      expect(libraryCategory, findsOneWidget);
+      await tester.tap(libraryCategory);
+      await tester.pumpAndSettle();
+
       // Tap the "Generate" menu item (identified by its icon)
       final generateTile = find.byIcon(Icons.auto_fix_high);
       expect(generateTile, findsOneWidget);

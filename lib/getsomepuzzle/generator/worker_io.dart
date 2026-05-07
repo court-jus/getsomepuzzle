@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 
 class GeneratorWorker {
   StreamController<GeneratorMessage>? _controller;
@@ -72,6 +73,7 @@ class GeneratorWorker {
         allowedSlugs: config.allowedSlugs?.toList(),
         maxTimeMs: config.maxTime.inMilliseconds,
         count: config.count,
+        domain: config.domain,
         usageStats: usageStats,
         puzzleLines: puzzleLines,
         equilibriumRequested: equilibriumRequested,
@@ -124,6 +126,7 @@ class _IsolateParams {
   final List<String>? allowedSlugs;
   final int maxTimeMs;
   final int count;
+  final List<CellValue> domain;
   final Map<String, int>? usageStats;
   final List<String>? puzzleLines;
   final bool equilibriumRequested;
@@ -143,6 +146,7 @@ class _IsolateParams {
     this.allowedSlugs,
     required this.maxTimeMs,
     required this.count,
+    required this.domain,
     this.usageStats,
     this.puzzleLines,
     this.equilibriumRequested = false,
@@ -301,6 +305,7 @@ void _isolateEntryPoint(_IsolateParams params) {
       preferredSlugs: preferredSlugs,
       maxTime: maxTime,
       count: 1,
+      domain: params.domain,
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;

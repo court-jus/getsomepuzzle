@@ -63,7 +63,7 @@ class DifferentFromConstraint extends CellsCentricConstraint {
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final List<String> result = [];
@@ -94,32 +94,30 @@ class DifferentFromConstraint extends CellsCentricConstraint {
     final nidx = getNeighborIndex(puzzle.width);
     final val1 = puzzle.cells[idx].value;
     final val2 = puzzle.cells[nidx].value;
-    if (val1 == 0 || val2 == 0) return true;
+    if (val1 == CellValue.free || val2 == CellValue.free) return true;
     return val1 != val2;
   }
 
   @override
   Move? apply(Puzzle puzzle) {
-    final idx = indices.first;
-    final nidx = getNeighborIndex(puzzle.width);
-    final cell1 = puzzle.cells[idx];
-    final cell2 = puzzle.cells[nidx];
+    final cell1idx = indices.first;
+    final cell2idx = getNeighborIndex(puzzle.width);
+    final cell1 = puzzle.cells[cell1idx];
+    final cell2 = puzzle.cells[cell2idx];
 
-    if (cell1.value != 0 && cell2.value != 0) {
+    if (cell1.value != CellValue.free && cell2.value != CellValue.free) {
       if (cell1.value == cell2.value) {
-        return Move(0, 0, this, isImpossible: this);
+        return Move(0, this, isImpossible: this);
       }
       return null;
     }
 
-    if (cell1.value != 0) {
-      final opposite = puzzle.domain.firstWhere((v) => v != cell1.value);
-      return Move(nidx, opposite, this, complexity: 0);
+    if (cell1.value != CellValue.free) {
+      return Move(cell2idx, removeOption: cell1.value, this, complexity: 0);
     }
 
-    if (cell2.value != 0) {
-      final opposite = puzzle.domain.firstWhere((v) => v != cell2.value);
-      return Move(idx, opposite, this, complexity: 0);
+    if (cell2.value != CellValue.free) {
+      return Move(cell1idx, removeOption: cell2.value, this, complexity: 0);
     }
 
     return null;
@@ -130,6 +128,7 @@ class DifferentFromConstraint extends CellsCentricConstraint {
     if (!verify(puzzle)) return false;
     final idx = indices.first;
     final nidx = getNeighborIndex(puzzle.width);
-    return puzzle.cellValues[idx] != 0 && puzzle.cellValues[nidx] != 0;
+    return puzzle.cellValues[idx] != CellValue.free &&
+        puzzle.cellValues[nidx] != CellValue.free;
   }
 }

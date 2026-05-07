@@ -64,7 +64,11 @@ _Verdict _classify(Puzzle puzzle, {required double maxPrefill}) {
   // Replay on a clone to know whether the puzzle was actually solved.
   final replay = puzzle.clone();
   for (final s in steps) {
-    replay.setValue(s.cellIdx, s.value);
+    if (s.value != null) {
+      replay.setValue(s.cellIdx, s.value!);
+    } else if (s.removeOption != null) {
+      replay.removeOption(s.cellIdx, s.removeOption!);
+    }
   }
   final solved = replay.complete && replay.check(saveResult: false).isEmpty;
 

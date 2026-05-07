@@ -18,7 +18,7 @@ import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 // ---------------------------------------------------------------------------
 
 /// Rotate a shape 90° clockwise: (r, c) → (c, rows - 1 - r).
-List<List<int>> _rotate90(List<List<int>> shape) {
+List<List<CellValue>> _rotate90(List<List<CellValue>> shape) {
   final rows = shape.length;
   final cols = shape[0].length;
   // After rotation: new dimensions are cols × rows.
@@ -29,17 +29,19 @@ List<List<int>> _rotate90(List<List<int>> shape) {
 }
 
 /// Mirror a shape horizontally: (r, c) → (r, cols - 1 - c).
-List<List<int>> _mirror(List<List<int>> shape) {
+List<List<CellValue>> _mirror(List<List<CellValue>> shape) {
   return [for (final row in shape) row.reversed.toList()];
 }
 
 /// Remove empty rows/columns on all four edges (trim).
-List<List<int>> _trim(List<List<int>> shape) {
+List<List<CellValue>> _trim(List<List<CellValue>> shape) {
   // Remove empty top rows.
-  var s = shape.skipWhile((row) => row.every((v) => v == 0)).toList();
+  var s = shape
+      .skipWhile((row) => row.every((v) => v == CellValue.free))
+      .toList();
   if (s.isEmpty) return [[]];
   // Remove empty bottom rows.
-  while (s.last.every((v) => v == 0)) {
+  while (s.last.every((v) => v == CellValue.free)) {
     s = s.sublist(0, s.length - 1);
   }
   // Find first and last non-empty columns.
@@ -47,7 +49,7 @@ List<List<int>> _trim(List<List<int>> shape) {
   int maxCol = 0;
   for (final row in s) {
     for (int c = 0; c < row.length; c++) {
-      if (row[c] != 0) {
+      if (row[c] != CellValue.free) {
         if (c < minCol) minCol = c;
         if (c > maxCol) maxCol = c;
       }
@@ -58,15 +60,15 @@ List<List<int>> _trim(List<List<int>> shape) {
 }
 
 /// Serialize a shape to a comparable string (e.g. "110.011").
-String _shapeToString(List<List<int>> shape) {
-  return shape.map((row) => row.join('')).join('.');
+String _shapeToString(List<List<CellValue>> shape) {
+  return shape.map((row) => row.map(cellValueToString).join('')).join('.');
 }
 
 /// Generate all distinct variants of a shape (up to 8: 4 rotations × 2 for
 /// mirror), trimmed and deduplicated.
-List<List<List<int>>> allRotations(List<List<int>> shape) {
+List<List<List<CellValue>>> allRotations(List<List<CellValue>> shape) {
   final seen = <String>{};
-  final result = <List<List<int>>>[];
+  final result = <List<List<CellValue>>>[];
   var current = _trim(shape);
 
   // 4 rotations of the original, then 4 rotations of the mirror.
@@ -86,29 +88,29 @@ List<List<List<int>>> allRotations(List<List<int>> shape) {
 
 /// Return the canonical (normalized) form of a shape: the lexicographically
 /// smallest among all its rotation/mirror variants.
-List<List<int>> normalizeShape(List<List<int>> shape) {
+List<List<CellValue>> normalizeShape(List<List<CellValue>> shape) {
   final variants = allRotations(shape);
   variants.sort((a, b) => _shapeToString(a).compareTo(_shapeToString(b)));
   return variants.first;
 }
 
 /// Check whether two shapes are equivalent under rotation and mirror.
-bool shapesAreEquivalent(List<List<int>> a, List<List<int>> b) {
+bool shapesAreEquivalent(List<List<CellValue>> a, List<List<CellValue>> b) {
   return _shapeToString(normalizeShape(a)) == _shapeToString(normalizeShape(b));
 }
 
 /// Extract the color from a shape (the unique non-zero value).
 /// Throws if the shape contains mixed non-zero values.
-int shapeColor(List<List<int>> shape) {
-  int? color;
+CellValue shapeColor(List<List<CellValue>> shape) {
+  CellValue? color;
   for (final row in shape) {
     for (final v in row) {
-      if (v != 0) {
+      if (v != CellValue.free) {
         if (color == null) {
           color = v;
         } else if (color != v) {
           throw ArgumentError(
-            'Shape contains mixed non-zero values: $color and $v',
+            'Shape contains mixed non-zero values: ${cellValueToString(color)} and ${cellValueToString(v)}',
           );
         }
       }
@@ -133,10 +135,10 @@ class ShapeConstraint extends Motif {
   String get slug => 'SH';
 
   /// The constrained color, inferred from the motif (1 = black, 2 = white).
-  int color = 0;
+  CellValue color = CellValue.free;
 
   /// All distinct rotation/mirror variants of the motif (for matching).
-  List<List<List<int>>> variants = [];
+  List<List<List<CellValue>>> variants = [];
 
   /// Number of occupied (non-zero) cells in the motif.
   int shapeSize = 0;
@@ -152,25 +154,27 @@ class ShapeConstraint extends Motif {
     // Parse exactly like FM: rows separated by '.', each character is a value.
     final parsed = strParams
         .split('.')
-        .map((row) => row.split('').map(int.parse).toList())
+        .map((row) => row.split('').map(cellRepresentationToValue).toList())
         .toList();
 
     color = shapeColor(parsed);
     motif = normalizeShape(parsed);
     variants = allRotations(parsed);
-    shapeSize = parsed.expand((row) => row).where((v) => v != 0).length;
+    shapeSize = parsed
+        .expand((row) => row)
+        .where((v) => v != CellValue.free)
+        .length;
     motifGridSize = parsed.length * parsed[0].length;
   }
 
   @override
   String toString() {
-    return motif.map((row) => row.join('')).join('.');
+    return motif.map((row) => row.map(cellValueToString).join('')).join('.');
   }
 
   @override
   String toHuman(Puzzle puzzle) {
-    final colorName = color == 1 ? 'black' : 'white';
-    return 'All $colorName groups must have shape $this';
+    return 'All ${cellValueToString(color)} groups must have shape $this';
   }
 
   @override
@@ -183,7 +187,7 @@ class ShapeConstraint extends Motif {
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final maxSize = width > height ? width : height;
@@ -211,8 +215,9 @@ class ShapeConstraint extends Motif {
     for (var motif in possibleMotifs) {
       final motifList = motif.split(".");
       if (motifList.length > maxSize || motifList[0].length > maxSize) continue;
-      result.add(motif);
-      result.add(motif.replaceAll("1", "2"));
+      for (var value in domain) {
+        result.add(motif.replaceAll("1", cellValueToString(value)));
+      }
     }
     return result;
   }
@@ -255,7 +260,6 @@ class ShapeConstraint extends Motif {
   @override
   Move? apply(Puzzle puzzle) {
     final groups = getGroups(puzzle);
-    final opposite = puzzle.domain.whereNot((v) => v == color).first;
 
     for (final group in groups) {
       if (puzzle.cellValues[group.first] != color) continue;
@@ -266,22 +270,28 @@ class ShapeConstraint extends Motif {
       // --- Level 1: closed group must match exactly ---
       if (!isOpen) {
         if (!_groupMatchesAVariant(group, puzzle)) {
-          return Move(0, 0, this, isImpossible: this);
+          return Move(0, this, isImpossible: this);
         }
         continue;
       }
 
       // --- Level 2: open group already has the right shape → close borders ---
       // Example: SH:111 and group is [0,1,2] (a line of 3) with cell 3 free.
-      //   → cell 3 must be the opposite color.
+      //   → cell 3 must be an opposite color.
       if (group.length == shapeSize && _groupMatchesAVariant(group, puzzle)) {
-        return Move(freeNeighbors.first, opposite, this, complexity: 0);
+        for (var freeNeighbor in freeNeighbors) {
+          if (puzzle.cells[freeNeighbor].options.contains(color)) {
+            return Move(freeNeighbor, removeOption: color, this, complexity: 0);
+          }
+        }
+        // No freeneighbor has the option to remove
+        return Move(0, this, isImpossible: this);
       }
 
       // --- Level 3: open group can't fit in any variant → impossible ---
       // Reuses the same 3-level check as verify() (cell count, bbox, geometry).
       if (!_groupCanFitInSomeVariant(group, puzzle)) {
-        return Move(0, 0, this, isImpossible: this);
+        return Move(0, this, isImpossible: this);
       }
 
       // --- Level 4: extending by a neighbor breaks compatibility → block ---
@@ -290,8 +300,9 @@ class ShapeConstraint extends Motif {
       //   Adding cell 4 (below cell 0) would create an L → can't fit in any
       //   line variant → cell 4 must be opposite.
       for (final neighbor in freeNeighbors) {
-        if (!_groupCanFitInSomeVariant([...group, neighbor], puzzle)) {
-          return Move(neighbor, opposite, this, complexity: 2);
+        if (!_groupCanFitInSomeVariant([...group, neighbor], puzzle) &&
+            puzzle.cells[neighbor].options.contains(color)) {
+          return Move(neighbor, removeOption: color, this, complexity: 2);
         }
       }
 
@@ -302,20 +313,26 @@ class ShapeConstraint extends Motif {
       if (completions.isEmpty) {
         // No variant can be placed to complete this group → impossible.
         // (More precise than level 3: accounts for grid edges and obstacles.)
-        return Move(0, 0, this, isImpossible: this);
+        return Move(0, this, isImpossible: this);
       }
-      // Cell that appears in ALL completions → must be color.
+      // Cell that appears in ALL completions → must be color. If options
+      // exclude `color` (3-colour puzzles), no completion is actually
+      // viable so the constraint is impossible.
       final mandatory = completions.reduce((a, b) => a.intersection(b));
       for (final idx in mandatory) {
-        if (puzzle.cellValues[idx] == 0) {
-          return Move(idx, color, this, complexity: 4);
+        if (puzzle.cellValues[idx] == CellValue.free) {
+          if (!puzzle.cells[idx].options.contains(color)) {
+            return Move(0, this, isImpossible: this);
+          }
+          return Move(idx, value: color, this, complexity: 4);
         }
       }
       // Free neighbor that appears in NO completion → must be opposite.
       final anyCompletion = completions.expand((c) => c).toSet();
       for (final neighbor in freeNeighbors) {
-        if (!anyCompletion.contains(neighbor)) {
-          return Move(neighbor, opposite, this, complexity: 4);
+        if (!anyCompletion.contains(neighbor) &&
+            puzzle.cells[neighbor].options.contains(color)) {
+          return Move(neighbor, removeOption: color, this, complexity: 4);
         }
       }
     }
@@ -337,7 +354,7 @@ class ShapeConstraint extends Motif {
         }
       }
       for (int idx = 0; idx < puzzle.cellValues.length; idx++) {
-        if (puzzle.cellValues[idx] != 0) continue;
+        if (puzzle.cellValues[idx] != CellValue.free) continue;
         final neighborGroupIndices = <int>{};
         for (final nei in puzzle.getNeighbors(idx)) {
           final gi = cellToGroup[nei];
@@ -349,8 +366,9 @@ class ShapeConstraint extends Motif {
         for (final gi in neighborGroupIndices) {
           merged.addAll(colorGroups[gi]);
         }
-        if (!_groupCanFitInSomeVariant(merged, puzzle)) {
-          return Move(idx, opposite, this, complexity: 3);
+        if (!_groupCanFitInSomeVariant(merged, puzzle) &&
+            puzzle.cells[idx].options.contains(color)) {
+          return Move(idx, removeOption: color, this, complexity: 3);
         }
       }
     }
@@ -364,7 +382,8 @@ class ShapeConstraint extends Motif {
     final result = <int>{};
     for (final idx in group) {
       for (final nei in puzzle.getNeighbors(idx)) {
-        if (puzzle.cellValues[nei] == 0 && !groupSet.contains(nei)) {
+        if (puzzle.cellValues[nei] == CellValue.free &&
+            !groupSet.contains(nei)) {
           result.add(nei);
         }
       }
@@ -430,7 +449,9 @@ class ShapeConstraint extends Motif {
 
           final toFill = variantCells
               .where(
-                (idx) => !groupSet.contains(idx) && puzzle.cellValues[idx] == 0,
+                (idx) =>
+                    !groupSet.contains(idx) &&
+                    puzzle.cellValues[idx] == CellValue.free,
               )
               .toSet();
 
@@ -448,7 +469,7 @@ class ShapeConstraint extends Motif {
   /// Grid indices occupied by `variant` (non-zero cells) when placed with its
   /// top-left corner at (`topRow`, `topCol`).
   Set<int> _variantCellsAt(
-    List<List<int>> variant,
+    List<List<CellValue>> variant,
     int topRow,
     int topCol,
     int width,
@@ -457,7 +478,7 @@ class ShapeConstraint extends Motif {
     for (int r = 0; r < variant.length; r++) {
       final row = variant[r];
       for (int c = 0; c < row.length; c++) {
-        if (row[c] == 0) continue;
+        if (row[c] == CellValue.free) continue;
         cells.add((topRow + r) * width + (topCol + c));
       }
     }
@@ -478,7 +499,7 @@ class ShapeConstraint extends Motif {
     for (final idx in variantCells) {
       if (groupSet.contains(idx)) continue;
       final v = puzzle.cellValues[idx];
-      if (v == 0) continue;
+      if (v == CellValue.free) continue;
       if (v != color) return false;
       final other = cellToGroup[idx];
       if (other == null || other.isEmpty) continue;
@@ -540,7 +561,9 @@ class ShapeConstraint extends Motif {
 
       // Does this group have free (empty) neighbors? If so it can still grow.
       final bool isOpen = group.any(
-        (idx) => puzzle.getNeighbors(idx).any((n) => puzzle.cellValues[n] == 0),
+        (idx) => puzzle
+            .getNeighbors(idx)
+            .any((n) => puzzle.cellValues[n] == CellValue.free),
       );
 
       if (isOpen) {
@@ -612,7 +635,7 @@ class ShapeConstraint extends Motif {
     return false;
   }
 
-  static List<((int, int), List<List<int>>)> findAdditionalPositions(
+  static List<((int, int), List<List<CellValue>>)> findAdditionalPositions(
     Puzzle solved,
   ) {
     final width = solved.width;
@@ -621,7 +644,7 @@ class ShapeConstraint extends Motif {
     final motifValue = sc.color;
     final oppositeColor = solved.domain.whereNot((i) => i == motifValue).first;
 
-    final List<((int, int), List<List<int>>)> results = [];
+    final List<((int, int), List<List<CellValue>>)> results = [];
 
     for (final variant in sc.variants) {
       final variantHeight = variant.length;
@@ -634,7 +657,7 @@ class ShapeConstraint extends Motif {
             for (int vc = 0; vc < variantWidth && canPlace; vc++) {
               final cellValue =
                   solved.cells[(row + vr) * width + (col + vc)].value;
-              if (cellValue != 0 && cellValue != oppositeColor) {
+              if (cellValue != CellValue.free && cellValue != oppositeColor) {
                 canPlace = false;
               }
             }
@@ -646,7 +669,7 @@ class ShapeConstraint extends Motif {
           for (int vr = 0; vr < variantHeight; vr++) {
             for (int vc = 0; vc < variantWidth; vc++) {
               final value = variant[vr][vc];
-              if (value != 0) {
+              if (value != CellValue.free) {
                 testPuzzle.cells[(row + vr) * width + (col + vc)].setForSolver(
                   value,
                 );
@@ -672,7 +695,7 @@ class ShapeConstraint extends Motif {
     // placement remains, colouring any free cell with `color` creates a
     // 1-cell group that fails the shape check → apply level 1 fires. So
     // the only truly permanent state is a fully filled grid.
-    return puzzle.cellValues.every((v) => v != 0);
+    return puzzle.cellValues.every((v) => v != CellValue.free);
   }
 }
 
@@ -682,7 +705,7 @@ class ShapeConstraint extends Motif {
 
 /// Convert a group (list of cell indices) into a 2D matrix within its bounding
 /// box. Occupied cells get [color], empty cells get 0.
-List<List<int>> _groupToMatrix(List<int> group, Puzzle puzzle) {
+List<List<CellValue>> _groupToMatrix(List<int> group, Puzzle puzzle) {
   final color = puzzle.cellValues[group.first];
   int minRow = puzzle.height, maxRow = 0, minCol = puzzle.width, maxCol = 0;
   for (final idx in group) {
@@ -695,15 +718,15 @@ List<List<int>> _groupToMatrix(List<int> group, Puzzle puzzle) {
   }
   final h = maxRow - minRow + 1;
   final w = maxCol - minCol + 1;
-  final matrix = List.generate(h, (_) => List.filled(w, 0));
+  final matrix = List.generate(h, (_) => List.filled(w, CellValue.free));
   for (final idx in group) {
     matrix[idx ~/ puzzle.width - minRow][idx % puzzle.width - minCol] = color;
   }
   return matrix;
 }
 
-/// Deep-compare two 2D int matrices.
-bool _matricesEqual(List<List<int>> a, List<List<int>> b) {
+/// Deep-compare two 2D matrices.
+bool _matricesEqual(List<List<CellValue>> a, List<List<CellValue>> b) {
   if (a.length != b.length) return false;
   for (int r = 0; r < a.length; r++) {
     if (a[r].length != b[r].length) return false;
@@ -718,7 +741,7 @@ bool _matricesEqual(List<List<int>> a, List<List<int>> b) {
 /// by translation, such that every offset lands on an occupied (non-zero) cell.
 bool _groupOffsetsExistInVariant(
   Set<(int, int)> offsets,
-  List<List<int>> variant,
+  List<List<CellValue>> variant,
   int groupH,
   int groupW,
 ) {
@@ -727,7 +750,9 @@ bool _groupOffsetsExistInVariant(
   // Try every valid translation (dr, dc).
   for (int dr = 0; dr <= varH - groupH; dr++) {
     for (int dc = 0; dc <= varW - groupW; dc++) {
-      final allMatch = offsets.every((o) => variant[o.$1 + dr][o.$2 + dc] != 0);
+      final allMatch = offsets.every(
+        (o) => variant[o.$1 + dr][o.$2 + dc] != CellValue.free,
+      );
       if (allMatch) return true;
     }
   }

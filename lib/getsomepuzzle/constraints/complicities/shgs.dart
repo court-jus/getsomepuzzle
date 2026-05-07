@@ -46,24 +46,32 @@ class SHGSComplicity extends Complicity {
     // Map color → mandated group size. In normal generation there is
     // at most one SH per colour; if more were ever added, the first
     // wins (any disagreement would already fail SH.verify on its own).
-    final shapeSizeByColor = <int, int>{};
+    final shapeSizeByColor = <CellValue, int>{};
     for (final sh in shs) {
       shapeSizeByColor.putIfAbsent(sh.color, () => sh.shapeSize);
     }
     for (final gs in puzzle.constraints.whereType<GroupSize>()) {
       final cellIdx = gs.indices.first;
-      if (puzzle.cellValues[cellIdx] != 0) continue;
-      final excluded = <int>[];
+      if (puzzle.cellValues[cellIdx] != CellValue.free) continue;
+      final excluded = <CellValue>[];
       for (final entry in shapeSizeByColor.entries) {
         if (entry.value != gs.size) excluded.add(entry.key);
       }
       if (excluded.isEmpty) continue;
       if (excluded.length >= puzzle.domain.length) {
-        return Move(0, 0, this, isImpossible: this);
+        return Move(0, this, isImpossible: this);
       }
-      final remaining = puzzle.domain.firstWhere((c) => !excluded.contains(c));
       // Combination deduction: tier 3 (see docs/dev/constraint_complicity.md).
-      return Move(cellIdx, remaining, this, complexity: 3);
+      // Each `exColor` in `excluded` is a colour the cell cannot take. On
+      // 2-colour puzzles `excluded` has one element and we can compute the
+      // single survivor, but on 3-colour we emit one removeOption at a
+      // time. If every excluded colour is already gone from the cell's
+      // options, this GS has no deduction left — fall through to the next.
+      for (final exColor in excluded) {
+        if (puzzle.cells[cellIdx].options.contains(exColor)) {
+          return Move(cellIdx, removeOption: exColor, this, complexity: 3);
+        }
+      }
     }
     return null;
   }

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
@@ -242,14 +243,14 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               : null,
                           constraint: constraint,
                           actualCount: widget.currentPuzzle.cellValues
-                              .where((val) => val == constraint.value)
+                              .where((val) => val == constraint.color)
                               .length,
                           oppositeActual: widget.currentPuzzle.cellValues
                               .where(
                                 (val) =>
                                     val ==
                                     widget.currentPuzzle.domain
-                                        .whereNot((v) => v == constraint.value)
+                                        .whereNot((v) => v == constraint.color)
                                         .first,
                               )
                               .length,
@@ -471,6 +472,14 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
         }
         return 0;
       },
+      // Option dots are only meaningful on 3+ colour puzzles: with a
+      // 2-colour domain, every `removeOption` collapses to a `setValue`,
+      // so the cell either has all options or none.
+      optionDots:
+          (widget.currentPuzzle.domain.length > 2 &&
+              cell.value == CellValue.free)
+          ? cell.options
+          : null,
     );
   }
 }

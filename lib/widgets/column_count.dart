@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 
-const _textColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
+final _textColors = {
+  CellValue.free: Colors.transparent,
+  CellValue.black: Colors.black,
+  CellValue.white: Colors.white,
+  CellValue.purple: Colors.purple[100],
+};
 
 class ColumnCountWidget extends StatelessWidget {
   const ColumnCountWidget({

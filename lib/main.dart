@@ -617,6 +617,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return l10n.constraintDifferentFrom;
       case 'CC':
         return l10n.constraintColumnCount;
+      case 'RC':
+        return l10n.constraintRowCount;
       case 'GC':
         return l10n.constraintGroupCount;
       case 'NC':
@@ -665,11 +667,38 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       },
       hintConstraintAdded: l10n.hintConstraintAdded,
       hintConstraintNone: l10n.hintConstraintNone,
+      hintCellOptionRemovable: l10n.hintCellOptionRemovable,
+      hintForceRemoveOption: l10n.hintForceRemoveOption,
+      hintRemoveOptionDeducedFrom: (c) {
+        // Mirrors the dispatch used for the setValue-side
+        // `hintDeducedFrom` callback above: complicities pick the
+        // twin/distinct phrasing, regular constraints use the single-
+        // slot wording. Phrasings are parallel to `hintComplicity` /
+        // `hintComplicityTwin` but anchored on "an option can be ruled
+        // out" rather than "this cell can be deduced".
+        if (c is Complicity) {
+          final (s1, s2) = c.slugs;
+          if (s1 == s2) {
+            return l10n.hintRemoveOptionComplicityTwin(
+              _constraintNameBySlug(s1),
+            );
+          }
+          return l10n.hintRemoveOptionComplicity(
+            _constraintNameBySlug(s1),
+            _constraintNameBySlug(s2),
+          );
+        }
+        return l10n.hintRemoveOptionDeducedFrom(_constraintName(c));
+      },
     );
   }
 
   void showHelpMove() {
-    game.onHintTap(settings, _buildHintTexts());
+    game.onHintTap(
+      settings,
+      _buildHintTexts(),
+      onPuzzleCompleted: _onPuzzleCompleted,
+    );
   }
 
   void _onHintTypeChanged() {

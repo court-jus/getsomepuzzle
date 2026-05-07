@@ -57,7 +57,7 @@ class LTGSComplicity extends Complicity {
         // 1. Impossibility — too far apart for the requested size.
         final lower = _minGroupSize(lt.indices, puzzle.width);
         if (gs.size < lower) {
-          return Move(0, 0, this, isImpossible: this);
+          return Move(0, this, isImpossible: this);
         }
 
         // 2. Collinear LT (all cells on one row or column) with exact
@@ -109,10 +109,10 @@ class LTGSComplicity extends Complicity {
       }
     }
 
-    int? color;
+    CellValue? color;
     for (final idx in lineCells) {
       final v = puzzle.cellValues[idx];
-      if (v != 0) {
+      if (v != CellValue.free) {
         color = v;
         break;
       }
@@ -126,10 +126,15 @@ class LTGSComplicity extends Complicity {
     final ltSet = lt.indices.toSet();
     for (final idx in lineCells) {
       if (ltSet.contains(idx)) continue;
-      if (puzzle.cellValues[idx] == 0) {
+      // Cell must be free AND still carry `color` as an option.
+      // If a cell on the unique path has already excluded `color`,
+      // skip it (3-colour puzzles); the propagation/force loop will
+      // eventually surface the impossibility through other rules.
+      if (puzzle.cellValues[idx] == CellValue.free &&
+          puzzle.cells[idx].options.contains(color)) {
         // Tier 4: combine LT (path-must-form) + GS (size-bounded path)
         // to force every cell on the unique minimum line.
-        return Move(idx, color, this, complexity: 4);
+        return Move(idx, value: color, this, complexity: 4);
       }
     }
     return null;

@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class HintRankResult {
@@ -14,13 +15,13 @@ class HintRankResult {
 (Puzzle, int) prepareRanking({
   required int width,
   required int height,
-  required List<int> domain,
-  required List<int> cellValues,
+  required List<CellValue> domain,
+  required List<CellValue> cellValues,
   required List<String> existingConstraints,
 }) {
   final puzzle = Puzzle.empty(width, height, domain);
   for (int i = 0; i < cellValues.length; i++) {
-    if (cellValues[i] != 0) {
+    if (cellValues[i] != CellValue.free) {
       puzzle.cells[i].setForSolver(cellValues[i]);
     }
   }

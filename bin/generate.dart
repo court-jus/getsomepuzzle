@@ -6,6 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
@@ -17,7 +18,10 @@ Future<void> main(List<String> args) async {
     case 'generate':
       await _runGenerate(parsed);
     case 'check':
-      await _runCheck(parsed['checkFile'] as String);
+      await _runCheck(
+        parsed['checkFile'] as String,
+        debug: parsed['debug'] as bool,
+      );
     case 'read-stats':
       _runReadStats(parsed['statsDir'] as String);
   }
@@ -26,6 +30,7 @@ Future<void> main(List<String> args) async {
 // --- Generate mode ---
 
 Future<void> _runGenerate(Map<String, dynamic> parsed) async {
+  final debug = parsed['debug'] as bool;
   final count = parsed['count'] as int;
   final minWidth = parsed['minWidth'] as int;
   final maxWidth = parsed['maxWidth'] as int;
@@ -39,6 +44,8 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final equilibriumRequested = parsed['equilibrium'] as bool;
   final jobs = (parsed['jobs'] as int).clamp(1, count);
   final logDir = parsed['logDir'] as String?;
+  final domainSize = parsed['domain'] as int;
+  final domain = domainSize == 3 ? fullDomain : defaultDomain;
   if (logDir != null) {
     final dir = Directory(logDir);
     if (!dir.existsSync()) dir.createSync(recursive: true);
@@ -150,6 +157,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final universeSlugs = allowedSlugs ?? constraintSlugs.toSet();
 
   void render() {
+    if (debug) return;
     final liveCount = currentLines.where((l) => l.trim().isNotEmpty).length;
     _renderDashboard(
       generated: generated,
@@ -168,6 +176,9 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       targets: currentTargets,
       attemptCounts: attemptCounts,
       successCounts: successCounts,
+      domainSize: domainSize,
+      requiredRules: requiredRules,
+      bannedRules: bannedRules,
     );
   }
 
@@ -222,6 +233,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       requiredRules: requiredRules,
       allowedSlugs: allowedSlugs,
       count: workerCount,
+      domain: domain,
     );
     final worker = GeneratorWorker();
     workers.add(worker);
@@ -249,7 +261,11 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
             // bin with a different sub-config).
             attemptCounts[j]++;
             currentTargets[j] = label;
-            render();
+            if (debug) {
+              stderr.writeln('[w$j] -> ${label ?? '(idle)'}');
+            } else {
+              render();
+            }
           case GeneratorPuzzleMessage(:final puzzleLine, :final level):
             successCounts[j]++;
             generated++;
@@ -284,10 +300,21 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
               currentLines = [...currentLines, puzzleLine];
             }
             cachedStats = _CollectionStats.fromLines(currentLines);
-            render();
+            if (debug) {
+              stderr.writeln(
+                '[w$j] + generated ${level.name} '
+                'in ${_fmt(totalSw.elapsed)}',
+              );
+            } else {
+              render();
+            }
           case GeneratorDoneMessage():
             currentTargets[j] = null;
-            render();
+            if (debug) {
+              stderr.writeln('[w$j] finished');
+            } else {
+              render();
+            }
         }
       }
     }());
@@ -369,6 +396,9 @@ void _renderDashboard({
   required int maxWidth,
   required int minHeight,
   required int maxHeight,
+  required int domainSize,
+  required Set<String> requiredRules,
+  required Set<String> bannedRules,
   List<String?> targets = const [],
   List<int> attemptCounts = const [],
   List<int> successCounts = const [],
@@ -378,6 +408,18 @@ void _renderDashboard({
   stderr.writeln('Corpus: $existingPuzzles puzzles (live count)');
   stderr.writeln(equilibriumLine);
   stderr.writeln('Jobs: $jobs parallel worker(s)');
+  // Surface the CLI knobs that drove this run, so a glance at the
+  // dashboard explains where the histograms come from. "any" stands in
+  // for an unset filter (no `--require` / no `--ban`).
+  final sizeLabel = (minWidth == maxWidth && minHeight == maxHeight)
+      ? '${minWidth}x$minHeight'
+      : '$minWidth-$maxWidth × $minHeight-$maxHeight';
+  final reqLabel = requiredRules.isEmpty ? 'any' : requiredRules.join(',');
+  final banLabel = bannedRules.isEmpty ? 'none' : bannedRules.join(',');
+  stderr.writeln(
+    'Config: size $sizeLabel | domain $domainSize | '
+    'require $reqLabel | ban $banLabel',
+  );
   stderr.writeln('');
   if (durations.isEmpty) {
     stderr.writeln('[${_fmt(elapsed)}] $generated/$count');
@@ -591,7 +633,7 @@ void _writeHistogram(
 
 // --- Check mode ---
 
-Future<void> _runCheck(String filePath) async {
+Future<void> _runCheck(String filePath, {bool debug = false}) async {
   final file = File(filePath);
   if (!file.existsSync()) {
     stderr.writeln('File not found: $filePath');
@@ -616,6 +658,16 @@ Future<void> _runCheck(String filePath) async {
   var stats = _CollectionStats.fromLines(goodLines);
 
   void render() {
+    if (debug) {
+      final pct = lines.isEmpty
+          ? 0
+          : (100 * (valid + invalid + errored) ~/ lines.length);
+      stderr.writeln(
+        '[${valid + invalid + errored}/${lines.length} ($pct%)] '
+        'valid $valid | invalid $invalid | errors $errored',
+      );
+      return;
+    }
     _renderCheckDashboard(
       filePath: filePath,
       goodPath: goodPath,
@@ -830,6 +882,8 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'equilibrium': true,
     'jobs': Platform.numberOfProcessors,
     'logDir': null,
+    'debug': false,
+    'domain': 2,
   };
 
   for (int i = 0; i < args.length; i++) {
@@ -870,6 +924,15 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['jobs'] = int.parse(args[++i]);
       case '--log-dir':
         result['logDir'] = args[++i];
+      case '--debug':
+        result['debug'] = true;
+      case '--domain':
+        final v = int.parse(args[++i]);
+        if (v != 2 && v != 3) {
+          stderr.writeln('--domain must be 2 or 3 (got $v)');
+          exit(1);
+        }
+        result['domain'] = v;
       case '-h':
       case '--help':
         _printUsage();
@@ -914,6 +977,9 @@ Generation options:
   -o, --output FILE       Output file (default: stdout)
       --ban RULES         Comma-separated rule slugs to exclude (e.g. FM,LT)
       --require RULES     Comma-separated rule slugs to require (e.g. PA,GS)
+      --domain N          Colour domain size: 2 (black/white, default) or 3
+                          (adds purple). 3-colour puzzles use option-pruning
+                          deductions; see docs/dev/third_color.md.
       --no-equilibrium    Disable the multi-axis equilibrium bias.
                           Default: ON. When OFF, only the legacy slug-usage
                           bias is applied (matches pre-equilibrium behavior).
@@ -929,6 +995,8 @@ Generation options:
                           puzzles. Default: no logging.
 
 General:
+      --debug             Enable debug mode: sequential output
+                          instead of the real-time dashboard.
   -h, --help              Show this help
 
 Rule slugs: $rules

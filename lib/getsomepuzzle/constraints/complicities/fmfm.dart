@@ -61,10 +61,11 @@ class FMFMComplicity extends Complicity {
       // of two FMs and combine them mentally.
       return Move(
         move.idx,
-        move.value,
         this,
+        value: move.value,
         isImpossible: move.isImpossible == null ? null : this,
         complexity: 4,
+        removeOption: move.removeOption,
       );
     }
     return null;
@@ -75,7 +76,7 @@ class FMFMComplicity extends Complicity {
   /// point or when [_maxSynth] synthesized FMs have been produced.
   static List<ForbiddenMotif> _synthesizeAll(
     List<ForbiddenMotif> fms,
-    List<int> domain,
+    List<CellValue> domain,
   ) {
     final result = <ForbiddenMotif>[];
     final pool = List<ForbiddenMotif>.from(fms);
@@ -104,14 +105,14 @@ class FMFMComplicity extends Complicity {
   static ForbiddenMotif? _trySynthesize(
     ForbiddenMotif f1,
     ForbiddenMotif f2,
-    List<int> domain,
+    List<CellValue> domain,
   ) {
     if (f1.motif.length != f2.motif.length) return null;
     if (f1.motif[0].length != f2.motif[0].length) return null;
 
     int? diffR;
     int? diffC;
-    int? v1, v2;
+    CellValue? v1, v2;
     for (int r = 0; r < f1.motif.length; r++) {
       for (int c = 0; c < f1.motif[0].length; c++) {
         if (f1.motif[r][c] == f2.motif[r][c]) continue;
@@ -123,17 +124,23 @@ class FMFMComplicity extends Complicity {
       }
     }
     if (diffR == null) return null; // identical
-    if (v1 == 0 || v2 == 0) return null; // one side is already wildcard
-    final values = <int>{v1!, v2!};
-    if (values.length != domain.length) return null;
+    if (v1 == CellValue.free || v2 == CellValue.free) {
+      return null;
+    } // one side is already wildcard
+    final values = <CellValue>{v1!, v2!};
+    if (values.length != domain.length) {
+      return null;
+    }
     for (final d in domain) {
-      if (!values.contains(d)) return null;
+      if (!values.contains(d)) {
+        return null;
+      }
     }
 
-    final newMotif = f1.motif.map((row) => List<int>.from(row)).toList();
-    newMotif[diffR][diffC!] = 0;
+    final newMotif = f1.motif.map((row) => List<CellValue>.from(row)).toList();
+    newMotif[diffR][diffC!] = CellValue.free;
     final paramStr = newMotif
-        .map((row) => row.map((v) => v.toString()).join(''))
+        .map((row) => row.map(cellValueToString).join(''))
         .join('.');
     return ForbiddenMotif(paramStr);
   }

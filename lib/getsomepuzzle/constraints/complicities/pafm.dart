@@ -70,8 +70,8 @@ class PAFMComplicity extends Complicity {
     if (side.length > _maxSideLen) return null;
 
     final current = side.map((idx) => puzzle.cellValues[idx]).toList();
-    final fixed1 = current.where((v) => v == 1).length;
-    final fixed2 = current.where((v) => v == 2).length;
+    final fixed1 = current.where((v) => v == CellValue.black).length;
+    final fixed2 = current.where((v) => v == CellValue.white).length;
     final half = side.length ~/ 2;
     if (fixed1 > half || fixed2 > half) {
       // Existing colouring already fails the parity composition;
@@ -81,22 +81,24 @@ class PAFMComplicity extends Complicity {
 
     final freePositions = <int>[];
     for (int i = 0; i < side.length; i++) {
-      if (current[i] == 0) freePositions.add(i);
+      if (current[i] == CellValue.free) freePositions.add(i);
     }
     if (freePositions.isEmpty) return null;
     final ones = half - fixed1;
     if (ones < 0 || ones > freePositions.length) return null;
 
-    final survivors = <List<int>>[];
+    final survivors = <List<CellValue>>[];
     _enumerate(freePositions.length, ones, (selected) {
       final selSet = selected.toSet();
-      final config = List<int>.from(current);
+      final config = List<CellValue>.from(current);
       for (int i = 0; i < freePositions.length; i++) {
-        config[freePositions[i]] = selSet.contains(i) ? 1 : 2;
+        config[freePositions[i]] = selSet.contains(i)
+            ? CellValue.black
+            : CellValue.white;
       }
       final clone = puzzle.clone();
       for (int i = 0; i < side.length; i++) {
-        if (current[i] == 0) {
+        if (current[i] == CellValue.free) {
           clone.cells[side[i]].setForSolver(config[i]);
         }
       }
@@ -107,7 +109,7 @@ class PAFMComplicity extends Complicity {
     });
 
     if (survivors.isEmpty) {
-      return Move(0, 0, this, isImpossible: this);
+      return Move(0, this, isImpossible: this);
     }
     // Partial determination: any free cell that takes the same value
     // in every surviving configuration is forced. With a single
@@ -117,7 +119,7 @@ class PAFMComplicity extends Complicity {
       if (survivors.every((s) => s[freePos] == v0)) {
         // Combination deduction (PA × FMs): two rules in mind at once.
         // Tier 3 weight per docs/dev/complexity.md.
-        return Move(side[freePos], v0, this, complexity: 3);
+        return Move(side[freePos], value: v0, this, complexity: 3);
       }
     }
     return null;
@@ -152,7 +154,9 @@ class PAFMComplicity extends Complicity {
   /// split coincides with colour counting only on that domain.
   static bool _domainIsOneTwo(Puzzle puzzle) {
     final d = puzzle.domain;
-    return d.length == 2 && d.contains(1) && d.contains(2);
+    return d.length == 2 &&
+        d.contains(CellValue.black) &&
+        d.contains(CellValue.white);
   }
 
   /// Enumerate every k-combination of indices in [0..n) and pass each

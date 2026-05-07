@@ -287,6 +287,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hintCellDeducible => 'This cell can be deduced';
 
   @override
+  String get hintCellOptionRemovable =>
+      'One of the options for this cell can be ruled out';
+
+  @override
+  String get hintForceRemoveOption =>
+      'An option can be ruled out by combining multiple constraints';
+
+  @override
+  String hintRemoveOptionDeducedFrom(String constraintName) {
+    return 'An option can be ruled out from the $constraintName constraint';
+  }
+
+  @override
+  String hintRemoveOptionComplicity(String c1, String c2) {
+    return 'An option can be ruled out by combining the $c1 and $c2 constraints';
+  }
+
+  @override
+  String hintRemoveOptionComplicityTwin(String c) {
+    return 'An option can be ruled out by combining two $c constraints';
+  }
+
+  @override
   String get constraintForbiddenPattern => 'forbidden pattern';
 
   @override

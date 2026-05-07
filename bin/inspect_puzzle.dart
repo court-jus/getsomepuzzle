@@ -16,21 +16,24 @@
 import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-String _gridString(List<int> values, int width) {
+String _gridString(List<CellValue> values, int width) {
   final sb = StringBuffer();
   for (int i = 0; i < values.length; i++) {
     final v = values[i];
     String ch;
-    if (v == 0) {
+    if (v == CellValue.free) {
       ch = '.';
-    } else if (v == 1) {
+    } else if (v == CellValue.black) {
       ch = '#';
-    } else if (v == 2) {
+    } else if (v == CellValue.white) {
       ch = 'o';
+    } else if (v == CellValue.purple) {
+      ch = '¤';
     } else {
-      ch = v.toString();
+      ch = v.name;
     }
     sb.write(ch);
     sb.write(' ');
@@ -47,13 +50,13 @@ String _coord(int idx, int width) {
 
 void _enumerateSolutions(
   Puzzle puzzle,
-  List<List<int>> out, {
+  List<List<CellValue>> out, {
   required int limit,
 }) {
   // Indices of free cells (those whose initial value is 0).
   final freeIdx = <int>[];
   for (int i = 0; i < puzzle.cells.length; i++) {
-    if (puzzle.cells[i].value == 0) freeIdx.add(i);
+    if (puzzle.cells[i].value == CellValue.free) freeIdx.add(i);
   }
 
   void rec(int k) {
@@ -62,7 +65,7 @@ void _enumerateSolutions(
       // All free cells are assigned. Check all constraints.
       final errors = puzzle.check(saveResult: false);
       if (errors.isEmpty) {
-        out.add(List<int>.from(puzzle.cellValues));
+        out.add(List<CellValue>.from(puzzle.cellValues));
       }
       return;
     }
@@ -76,7 +79,7 @@ void _enumerateSolutions(
       }
       if (out.length >= limit) return;
     }
-    puzzle.setValue(idx, 0);
+    puzzle.setValue(idx, CellValue.free);
   }
 
   rec(0);
@@ -86,7 +89,7 @@ void main(List<String> args) {
   String? line;
   int enumLimit = 5;
   bool runEnum = true;
-  final branches = <int, int>{};
+  final branches = <int, CellValue>{};
 
   for (int i = 0; i < args.length; i++) {
     final a = args[i];
@@ -100,7 +103,7 @@ void main(List<String> args) {
         stderr.writeln('--branch expects IDX=VAL');
         exit(1);
       }
-      branches[int.parse(parts[0])] = int.parse(parts[1]);
+      branches[int.parse(parts[0])] = cellRepresentationToValue(parts[1]);
     } else if (a == '-h' || a == '--help') {
       stderr.writeln(
         'Usage: dart run bin/inspect_puzzle.dart "<v2_...>" '
@@ -158,7 +161,11 @@ void main(List<String> args) {
       'step ${(i + 1).toString().padLeft(3)}: '
       '${_coord(s.cellIdx, replay.width)} = ${s.value}  [$method]$reason',
     );
-    replay.setValue(s.cellIdx, s.value);
+    if (s.value != null) {
+      replay.setValue(s.cellIdx, s.value!);
+    } else if (s.removeOption != null) {
+      replay.removeOption(s.cellIdx, s.removeOption!);
+    }
   }
   stdout.writeln('');
   stdout.writeln('Grid after trace:');
@@ -187,7 +194,11 @@ void main(List<String> args) {
       '${branches.entries.map((e) => '${_coord(e.key, branched.width)}=${e.value}').join(', ')}',
     );
     for (int i = 0; i < stopAt; i++) {
-      branched.setValue(steps[i].cellIdx, steps[i].value);
+      if (steps[i].value != null) {
+        branched.setValue(steps[i].cellIdx, steps[i].value!);
+      } else if (steps[i].removeOption != null) {
+        branched.removeOption(steps[i].cellIdx, steps[i].removeOption!);
+      }
     }
     for (final entry in branches.entries) {
       branched.setValue(entry.key, entry.value);
@@ -236,7 +247,11 @@ void main(List<String> args) {
         '${_coord(m.idx, branched.width)} = ${m.value}  [$method] '
         'by ${m.givenBy.serialize()}',
       );
-      branched.setValue(m.idx, m.value);
+      if (m.value != null) {
+        branched.setValue(m.idx, m.value!);
+      } else if (m.removeOption != null) {
+        branched.removeOption(m.idx, m.removeOption!);
+      }
       if (branched.complete) {
         final post = branched.check(saveResult: false);
         if (post.isEmpty) {
@@ -264,7 +279,7 @@ void main(List<String> args) {
   // --- Enumerate up to enumLimit solutions ---
   stdout.writeln('=== Solution enumeration (brute force, max $enumLimit) ===');
   final enumClone = puzzle.clone();
-  final solutions = <List<int>>[];
+  final solutions = <List<CellValue>>[];
   _enumerateSolutions(enumClone, solutions, limit: enumLimit);
   stdout.writeln(
     'Found ${solutions.length} solution(s) (search capped at $enumLimit).',

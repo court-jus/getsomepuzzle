@@ -4,9 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 
-const _bgColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
+final _bgColors = {
+  CellValue.free: Colors.transparent,
+  CellValue.black: Colors.black,
+  CellValue.white: Colors.white,
+  CellValue.purple: Colors.purple[100],
+};
 
 class MotifWidget extends StatelessWidget {
   const MotifWidget({

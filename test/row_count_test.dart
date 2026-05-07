@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
@@ -14,11 +15,11 @@ Puzzle _make(String grid) {
       .toList();
   final h = rows.length;
   final w = rows.first.length;
-  final p = Puzzle.empty(w, h, [1, 2]);
+  final p = Puzzle.empty(w, h, defaultDomain);
   for (int r = 0; r < h; r++) {
     for (int c = 0; c < w; c++) {
-      final v = int.parse(rows[r][c]);
-      if (v != 0) {
+      final v = cellRepresentationToValue(rows[r][c]);
+      if (v != CellValue.free) {
         p.cells[r * w + c].setForSolver(v);
       }
     }
@@ -70,13 +71,13 @@ void main() {
   group('RowCountConstraint.apply', () {
     test('all color cells placed → fills remaining with opposite', () {
       // 2x3 grid, row 0: [1, 0, 0], RC says 1 cell of color 1
-      // → free cells in row 0 should become 2
+      // → free cells in row 0 should remove the option 1
       final p = _make('100\n222');
       final rc = RowCountConstraint('0.1.1');
       final move = rc.apply(p);
       expect(move, isNotNull);
       // free cells in row 0: indices 1 and 2
-      expect(move!.value, 2);
+      expect(move!.removeOption, CellValue.black);
       expect(move.idx, anyOf(1, 2));
     });
 
@@ -87,7 +88,7 @@ void main() {
       final rc = RowCountConstraint('0.1.2');
       final move = rc.apply(p);
       expect(move, isNotNull);
-      expect(move!.value, 1);
+      expect(move!.value, CellValue.black);
       expect(move.idx, anyOf(0, 1));
     });
 
@@ -122,7 +123,7 @@ void main() {
       final rc = RowCountConstraint('2.1.3');
       expect(rc.serialize(), 'RC:2.1.3');
       expect(rc.rowIdx, 2);
-      expect(rc.color, 1);
+      expect(rc.color, CellValue.black);
       expect(rc.count, 3);
     });
   });
@@ -130,23 +131,27 @@ void main() {
   group('RowCountConstraint.generateAllParameters', () {
     test('generates correct number of parameters', () {
       // 3 rows × 2 colors × (width-1) counts = 3 × 2 × 3 = 18
-      final params = RowCountConstraint.generateAllParameters(4, 3, [
-        1,
-        2,
-      ], null);
+      final params = RowCountConstraint.generateAllParameters(
+        4,
+        3,
+        defaultDomain,
+        null,
+      );
       expect(params.length, 18);
     });
 
     test('all parameters are valid', () {
-      final params = RowCountConstraint.generateAllParameters(3, 4, [
-        1,
-        2,
-      ], null);
+      final params = RowCountConstraint.generateAllParameters(
+        3,
+        4,
+        defaultDomain,
+        null,
+      );
       for (final p in params) {
         // Should parse without error
         final rc = RowCountConstraint(p);
         expect(rc.rowIdx, lessThan(4));
-        expect(rc.color, anyOf(1, 2));
+        expect(rc.color, anyOf(CellValue.black, CellValue.white));
         expect(rc.count, greaterThan(0));
         expect(rc.count, lessThan(3));
       }
@@ -183,17 +188,17 @@ void main() {
       //       [2, ?]
       // RC:0.1.1 → row 0 needs 1 black → cell (0,0) must be 1
       // CC:0.1.1 → column 0 needs 1 black → cell (0,0) must be 1 (already)
-      // After applying: [1, 2]
+      // After applying: defaultDomain
       //                [2, ?]
       // RC:1.1.1 → row 1 needs 1 black → cell (1,1) must be 1
       // CC:1.1.1 → column 1 needs 1 black → cell (1,1) must be 1
-      // Solution: [1, 2]
+      // Solution: defaultDomain
       //           [2, 1] — unique by propagation, no force needed
 
-      final p = Puzzle.empty(2, 2, [1, 2]);
+      final p = Puzzle.empty(2, 2, defaultDomain);
       // Pre-fill
-      p.cells[1].setForSolver(2); // (0,1) = white
-      p.cells[2].setForSolver(2); // (1,0) = white
+      p.cells[1].setForSolver(CellValue.white); // (0,1) = white
+      p.cells[2].setForSolver(CellValue.white); // (1,0) = white
       p.cells[1].readonly = true;
       p.cells[2].readonly = true;
 
@@ -208,10 +213,10 @@ void main() {
 
       // Verify unique solution found by propagation
       expect(p.complete, isTrue);
-      expect(p.cells[0].value, 1); // (0,0) = black
-      expect(p.cells[1].value, 2); // (0,1) = white (pre-filled)
-      expect(p.cells[2].value, 2); // (1,0) = white (pre-filled)
-      expect(p.cells[3].value, 1); // (1,1) = black
+      expect(p.cells[0].value, CellValue.black); // (0,0) = black
+      expect(p.cells[1].value, CellValue.white); // (0,1) = white (pre-filled)
+      expect(p.cells[2].value, CellValue.white); // (1,0) = white (pre-filled)
+      expect(p.cells[3].value, CellValue.black); // (1,1) = black
 
       // Verify no force rounds were needed (puzzle was solvable by propagation)
       final solvedPu = p.clone();

@@ -1,12 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 /// Helper: parse a shape string like "111" or "10.11" into a 2D list.
-List<List<int>> _parse(String s) {
+List<List<CellValue>> _parse(String s) {
   return s
       .split('.')
-      .map((row) => row.split('').map(int.parse).toList())
+      .map((row) => row.split('').map(cellRepresentationToValue).toList())
       .toList();
 }
 
@@ -22,11 +23,11 @@ Puzzle _make(String grid) {
       .toList();
   final h = rows.length;
   final w = rows.first.length;
-  final p = Puzzle.empty(w, h, [1, 2]);
+  final p = Puzzle.empty(w, h, defaultDomain);
   for (int r = 0; r < h; r++) {
     for (int c = 0; c < w; c++) {
-      final v = int.parse(rows[r][c]);
-      if (v != 0) {
+      final v = cellRepresentationToValue(rows[r][c]);
+      if (v != CellValue.free) {
         p.cells[r * w + c].setForSolver(v);
       }
     }
@@ -149,9 +150,9 @@ void main() {
     test('trims empty borders before comparing', () {
       // Shape with padding zeros should normalize the same as without.
       final padded = [
-        [0, 0, 0],
-        [0, 1, 1],
-        [0, 0, 0],
+        [CellValue.free, CellValue.free, CellValue.free],
+        [CellValue.free, CellValue.black, CellValue.black],
+        [CellValue.free, CellValue.free, CellValue.free],
       ];
       final clean = normalizeShape(_parse('11'));
       expect(normalizeShape(padded), equals(clean));
@@ -182,11 +183,11 @@ void main() {
 
   group('shapeColor', () {
     test('extracts color 1 from black shape', () {
-      expect(shapeColor(_parse('10.11')), 1);
+      expect(shapeColor(_parse('10.11')), CellValue.black);
     });
 
     test('extracts color 2 from white shape', () {
-      expect(shapeColor(_parse('20.22')), 2);
+      expect(shapeColor(_parse('20.22')), CellValue.white);
     });
 
     test('throws on mixed colors', () {
@@ -203,7 +204,12 @@ void main() {
       // For every candidate motif returned by `generateAllParameters`, the
       // cheap static helper must agree with the full constructor. This is
       // the invariant relied on by the generator's motif-picker.
-      final motifs = ShapeConstraint.generateAllParameters(5, 5, [1, 2], null);
+      final motifs = ShapeConstraint.generateAllParameters(
+        5,
+        5,
+        defaultDomain,
+        null,
+      );
       for (final m in motifs) {
         final viaCtor = ShapeConstraint(m).motifGridSize;
         final viaHelper = ShapeConstraint.motifGridSizeOf(m);
@@ -227,7 +233,7 @@ void main() {
   group('ShapeConstraint', () {
     test('parses black horizontal line', () {
       final c = ShapeConstraint('111');
-      expect(c.color, 1);
+      expect(c.color, CellValue.black);
       expect(c.shapeSize, 3);
       expect(c.slug, 'SH');
       // Canonical form: the lexicographically smallest among "111" and "1.1.1"
@@ -238,7 +244,7 @@ void main() {
 
     test('parses white L-shape', () {
       final c = ShapeConstraint('20.22');
-      expect(c.color, 2);
+      expect(c.color, CellValue.white);
       expect(c.shapeSize, 3);
       expect(c.variants.length, 4);
     });
@@ -255,9 +261,9 @@ void main() {
     });
 
     test('toHuman describes the constraint', () {
-      final p = Puzzle.empty(3, 3, [1, 2]);
-      expect(ShapeConstraint('111').toHuman(p), contains('black'));
-      expect(ShapeConstraint('222').toHuman(p), contains('white'));
+      final p = Puzzle.empty(3, 3, defaultDomain);
+      expect(ShapeConstraint('111').toHuman(p), contains('1.1.1'));
+      expect(ShapeConstraint('222').toHuman(p), contains('2.2.2'));
       expect(ShapeConstraint('111').toHuman(p), contains('shape'));
     });
 
@@ -411,15 +417,15 @@ void main() {
 
     test('level 2: open group already matches → close borders', () {
       // SH:111 (line of 3). Black group [0,1,2] is already a line of 3,
-      // but cell 3 is free. It must be set to white (opposite).
+      // but cell 3 is free. It must lose the option to be black.
       //   1 1 1 0
       //   0 0 0 0
       final p = _make('1110\n0000');
       final sh = ShapeConstraint('111');
       final move = sh.apply(p);
       expect(move, isNotNull);
-      // The move should set a free neighbor of the group to opposite (white=2).
-      expect(move!.value, 2);
+      // The move should remove option to be black from a free neighbor of the group.
+      expect(move!.removeOption, CellValue.black);
       // It should target a free neighbor of the group (cell 3, 4, 5, or 6).
       final groupFreeNeighbors = {3, 4, 5, 6};
       expect(groupFreeNeighbors, contains(move.idx));
@@ -439,7 +445,7 @@ void main() {
       final sh = ShapeConstraint('111');
       final move = sh.apply(p);
       expect(move, isNotNull);
-      expect(move!.value, 2);
+      expect(move!.removeOption, CellValue.black);
       // Cell 3 (right of group) is a valid extension (stays a line) → not blocked.
       // Cell 4 (below cell 0) would create L → blocked.
       // Cell 5 (below cell 1) would create L → blocked.
@@ -459,7 +465,7 @@ void main() {
       final sh = ShapeConstraint('111');
       final move = sh.apply(p);
       expect(move, isNotNull);
-      expect(move!.value, 1);
+      expect(move!.value, CellValue.black);
       expect(move.idx, 1);
     });
 
@@ -474,7 +480,7 @@ void main() {
       final sh = ShapeConstraint('111');
       final move = sh.apply(p);
       expect(move, isNotNull);
-      expect(move!.value, 1);
+      expect(move!.value, CellValue.black);
       expect(move.idx, 2);
     });
 
@@ -515,14 +521,14 @@ void main() {
       // Groups: [3] at (1,0) and [5] at (1,2). Cell 4 at (1,1) between them.
       //
       // Group [3] completions:
-      //   - horizontal [3,4]: cell 4 adj. to [5] → merge → rejected; must be 2
+      //   - horizontal [3,4]: cell 4 adj. to [5] → merge → rejected; must not be 1
       //   - vertical [0,3]: valid → completion {0}
       //   - vertical [3,6]: valid → completion {6}
       final p = _make('000\n101\n000');
       final sh = ShapeConstraint('11');
       final move = sh.apply(p);
       expect(move, isNotNull);
-      expect(move!.value, 2);
+      expect(move!.removeOption, CellValue.black);
       expect(move.idx, 4);
     });
 
@@ -557,7 +563,7 @@ void main() {
       final move = sh.apply(p);
       // L which can't fit in a line-of-3 variant.
       expect(move, isNotNull);
-      expect(move!.value, 2);
+      expect(move!.removeOption, CellValue.black);
       expect(move.idx, 3);
     });
 
@@ -583,35 +589,35 @@ void main() {
         final p = _make('012\n112\n222');
         final move = ShapeConstraint('11.10').apply(p);
         expect(move, isNotNull);
-        expect(move!.value, 2);
+        expect(move!.removeOption, CellValue.black);
         expect(move.idx, 0);
       });
       test('specific scenario, step 2', () {
         final p = _make('210\n112\n222');
         final move = ShapeConstraint('11.10').apply(p);
         expect(move, isNotNull);
-        expect(move!.value, 2);
+        expect(move!.removeOption, CellValue.black);
         expect(move.idx, 2);
       });
       test('specific scenario, step 3', () {
         final p = _make('212\n110\n222');
         final move = ShapeConstraint('11.10').apply(p);
         expect(move, isNotNull);
-        expect(move!.value, 2);
+        expect(move!.removeOption, CellValue.black);
         expect(move.idx, 5);
       });
       test('specific scenario, step 4', () {
         final p = _make('212\n112\n022');
         final move = ShapeConstraint('11.10').apply(p);
         expect(move, isNotNull);
-        expect(move!.value, 2);
+        expect(move!.removeOption, CellValue.black);
         expect(move.idx, 6);
       });
       test('specific scenario, step 5', () {
         final p = _make('212\n112\n202');
         final move = ShapeConstraint('11.10').apply(p);
         expect(move, isNotNull);
-        expect(move!.value, 2);
+        expect(move!.removeOption, CellValue.black);
         expect(move.idx, 7);
       });
     });
@@ -623,8 +629,8 @@ void main() {
     expect(positions.length, 1);
     expect(positions.first.$1, (1, 1));
     expect(positions.first.$2, [
-      [0, 1],
-      [1, 1],
+      [CellValue.free, CellValue.black],
+      [CellValue.black, CellValue.black],
     ]);
   });
 

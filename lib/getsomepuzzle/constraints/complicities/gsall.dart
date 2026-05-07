@@ -62,7 +62,8 @@ class GSAllComplicity extends Complicity {
     final tagged = GSAllComplicity(blockers.first);
     return Move(
       move.idx,
-      move.value,
+      value: move.value,
+      removeOption: move.removeOption,
       tagged,
       isImpossible: move.isImpossible == null ? null : tagged,
       complexity: move.complexity,
@@ -72,12 +73,15 @@ class GSAllComplicity extends Complicity {
   Move? _solveGS(GroupSize gs, Puzzle puzzle) {
     final anchor = gs.indices.first;
     final c = puzzle.cellValues[anchor];
-    if (c != 0) {
+    if (c != CellValue.free) {
       final blockers = <String>{};
       final survivors = _enumerateForColor(puzzle, gs, anchor, c, blockers);
       if (survivors == null) return null;
       if (survivors.isEmpty) {
-        return _attachBlocker(Move(0, 0, this, isImpossible: this), blockers);
+        return _attachBlocker(
+          Move(0, value: CellValue.free, this, isImpossible: this),
+          blockers,
+        );
       }
       final move = _forceFromSurvivors(puzzle, survivors, c);
       return move == null ? null : _attachBlocker(move, blockers);
@@ -86,7 +90,7 @@ class GSAllComplicity extends Complicity {
     // Empty anchor: try each domain colour. Track blockers across
     // both hypotheses so the hint surfaces a single rejecting
     // constraint when one is responsible for collapsing the choice.
-    final feasible = <int>[];
+    final feasible = <CellValue>[];
     final blockers = <String>{};
     for (final color in puzzle.domain) {
       final hyp = puzzle.clone();
@@ -101,14 +105,17 @@ class GSAllComplicity extends Complicity {
       }
     }
     if (feasible.isEmpty) {
-      return _attachBlocker(Move(0, 0, this, isImpossible: this), blockers);
+      return _attachBlocker(
+        Move(0, value: CellValue.free, this, isImpossible: this),
+        blockers,
+      );
     }
     if (feasible.length == 1) {
       // Tier 4: trying both colours and concluding only one works
       // is a step harder than the coloured-anchor case (per
       // docs/dev/constraint_complicity.md).
       return _attachBlocker(
-        Move(anchor, feasible.first, this, complexity: 4),
+        Move(anchor, value: feasible.first, this, complexity: 4),
         blockers,
       );
     }
@@ -124,7 +131,7 @@ class GSAllComplicity extends Complicity {
     Puzzle puzzle,
     GroupSize gs,
     int anchor,
-    int color,
+    CellValue color,
     Set<String> blockers,
   ) {
     final group = _floodFill(puzzle, anchor, color);
@@ -140,10 +147,12 @@ class GSAllComplicity extends Complicity {
     _enumerate(puzzle, group, <int>{}, gs.size, color, (g, s) {
       final clone = puzzle.clone();
       for (final idx in g) {
-        if (puzzle.cellValues[idx] == 0) clone.cells[idx].setForSolver(color);
+        if (puzzle.cellValues[idx] == CellValue.free) {
+          clone.cells[idx].setForSolver(color);
+        }
       }
       for (final idx in s) {
-        if (puzzle.cellValues[idx] == 0) {
+        if (puzzle.cellValues[idx] == CellValue.free) {
           clone.cells[idx].setForSolver(opposite);
         }
       }
@@ -164,7 +173,7 @@ class GSAllComplicity extends Complicity {
   List<_Survivor> _checkSealedTarget(
     Puzzle puzzle,
     Set<int> group,
-    int color,
+    CellValue color,
     Set<String> blockers,
   ) {
     final opposite = puzzle.domain.firstWhere((v) => v != color);
@@ -172,7 +181,7 @@ class GSAllComplicity extends Complicity {
     for (final m in group) {
       for (final nei in puzzle.getNeighbors(m)) {
         if (group.contains(nei)) continue;
-        if (puzzle.cellValues[nei] != 0) continue;
+        if (puzzle.cellValues[nei] != CellValue.free) continue;
         sealed.add(nei);
       }
     }
@@ -189,17 +198,24 @@ class GSAllComplicity extends Complicity {
     return [_Survivor(group, sealed)];
   }
 
-  Move? _forceFromSurvivors(Puzzle puzzle, List<_Survivor> survivors, int c) {
+  Move? _forceFromSurvivors(
+    Puzzle puzzle,
+    List<_Survivor> survivors,
+    CellValue c,
+  ) {
     final candidates = <int>{};
     for (final s in survivors) {
       for (final idx in s.group) {
-        if (puzzle.cellValues[idx] == 0) candidates.add(idx);
+        if (puzzle.cellValues[idx] == CellValue.free) candidates.add(idx);
       }
       for (final idx in s.sealed) {
-        if (puzzle.cellValues[idx] == 0) candidates.add(idx);
+        if (puzzle.cellValues[idx] == CellValue.free) candidates.add(idx);
       }
     }
-    final opposite = puzzle.domain.firstWhere((v) => v != c);
+    // We pass through every candidate looking for an emittable deduction;
+    // a candidate that's "allInGroup but c was already pruned" or
+    // "allInSealed but c was already pruned" simply doesn't yield a move
+    // (the deduction would target an option that has already been removed).
     for (final idx in candidates) {
       bool allInGroup = true;
       bool allInSealed = true;
@@ -208,8 +224,16 @@ class GSAllComplicity extends Complicity {
         if (!s.sealed.contains(idx)) allInSealed = false;
         if (!allInGroup && !allInSealed) break;
       }
-      if (allInGroup) return Move(idx, c, this, complexity: 3);
-      if (allInSealed) return Move(idx, opposite, this, complexity: 3);
+      if (allInGroup && puzzle.cells[idx].options.contains(c)) {
+        return Move(idx, value: c, this, complexity: 3);
+      }
+      // "allInSealed" means the cell is OUTSIDE the gs group in every
+      // surviving sealing → the cell cannot take `c`. On 2-colour
+      // puzzles the original code forced the unique opposite value; on
+      // 3+ colours we express the same fact as `removeOption: c`.
+      if (allInSealed && puzzle.cells[idx].options.contains(c)) {
+        return Move(idx, removeOption: c, this, complexity: 3);
+      }
     }
     return null;
   }
@@ -225,7 +249,7 @@ class GSAllComplicity extends Complicity {
     Set<int> group,
     Set<int> sealed,
     int target,
-    int c,
+    CellValue c,
     void Function(Set<int>, Set<int>) callback,
   ) {
     if (group.length > target) return;
@@ -234,7 +258,7 @@ class GSAllComplicity extends Complicity {
     for (final m in group) {
       for (final nei in puzzle.getNeighbors(m)) {
         if (group.contains(nei)) continue;
-        if (puzzle.cellValues[nei] != 0) continue;
+        if (puzzle.cellValues[nei] != CellValue.free) continue;
         if (sealed.contains(nei)) continue;
         frontier.add(nei);
       }
@@ -266,7 +290,7 @@ class GSAllComplicity extends Complicity {
     Puzzle puzzle,
     Set<int> group,
     int newCell,
-    int c,
+    CellValue c,
   ) {
     final result = {...group, newCell};
     final queue = <int>[newCell];
@@ -284,7 +308,7 @@ class GSAllComplicity extends Complicity {
   }
 
   /// All cells of colour [colour] connected (4-adjacency) to [seed].
-  static Set<int> _floodFill(Puzzle puzzle, int seed, int colour) {
+  static Set<int> _floodFill(Puzzle puzzle, int seed, CellValue colour) {
     final result = <int>{seed};
     final queue = <int>[seed];
     while (queue.isNotEmpty) {

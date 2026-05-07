@@ -17,6 +17,7 @@ import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 import 'trace_score.dart' show scorePuzzle;
@@ -340,7 +341,7 @@ Puzzle? _materializeSolution(Puzzle puzzle) {
   // Fallback: solve from scratch on a fresh clone.
   final p = puzzle.clone();
   p.restart();
-  if (p.solve() && !p.cellValues.contains(0)) return p;
+  if (p.solve() && !p.cellValues.contains(CellValue.free)) return p;
   return null;
 }
 

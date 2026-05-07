@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:isolate';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class HintWorker {
@@ -11,8 +12,8 @@ class HintWorker {
   Future<List<String>> compute({
     required int width,
     required int height,
-    required List<int> domain,
-    required List<int> solution,
+    required List<CellValue> domain,
+    required List<CellValue> solution,
     required Set<String> existingConstraints,
     required Set<int> readonlyIndices,
   }) async {
@@ -58,8 +59,8 @@ class _HintParams {
   final SendPort sendPort;
   final int width;
   final int height;
-  final List<int> domain;
-  final List<int> solution;
+  final List<CellValue> domain;
+  final List<CellValue> solution;
   final List<String> existingConstraints;
   final List<int> readonlyIndices;
 

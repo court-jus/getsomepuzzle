@@ -289,6 +289,29 @@ class AppLocalizationsEs extends AppLocalizations {
   String get hintCellDeducible => 'Esta celda es deducible';
 
   @override
+  String get hintCellOptionRemovable =>
+      'Se puede descartar una opción de esta celda';
+
+  @override
+  String get hintForceRemoveOption =>
+      'Se puede descartar una opción combinando varias restricciones';
+
+  @override
+  String hintRemoveOptionDeducedFrom(String constraintName) {
+    return 'Se puede descartar una opción a partir de la restricción $constraintName';
+  }
+
+  @override
+  String hintRemoveOptionComplicity(String c1, String c2) {
+    return 'Se puede descartar una opción combinando las restricciones $c1 y $c2';
+  }
+
+  @override
+  String hintRemoveOptionComplicityTwin(String c) {
+    return 'Se puede descartar una opción combinando dos restricciones $c';
+  }
+
+  @override
   String get constraintForbiddenPattern => 'patrón prohibido';
 
   @override

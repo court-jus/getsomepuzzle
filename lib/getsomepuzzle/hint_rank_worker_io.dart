@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
 
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+
 import 'hint_rank_worker_core.dart';
 
 export 'hint_rank_worker_core.dart' show HintRankResult;
@@ -12,8 +14,8 @@ class HintRankWorker {
   Future<HintRankResult> rank({
     required int width,
     required int height,
-    required List<int> domain,
-    required List<int> cellValues,
+    required List<CellValue> domain,
+    required List<CellValue> cellValues,
     required List<String> existingConstraints,
     required List<String> candidateConstraints,
   }) async {
@@ -62,8 +64,8 @@ class _RankParams {
   final SendPort sendPort;
   final int width;
   final int height;
-  final List<int> domain;
-  final List<int> cellValues;
+  final List<CellValue> domain;
+  final List<CellValue> cellValues;
   final List<String> existingConstraints;
   final List<String> candidateConstraints;
 

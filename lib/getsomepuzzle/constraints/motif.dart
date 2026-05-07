@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -13,28 +12,28 @@ class ForbiddenMotif extends Motif {
   ForbiddenMotif(String strMotif) {
     final strRows = strMotif.split(".");
     motif = strRows
-        .map((row) => row.split("").map((cel) => int.parse(cel)).toList())
+        .map((row) => row.split("").map(cellRepresentationToValue).toList())
         .toList();
   }
 
   @override
   String toString() {
     final strMotif = motif
-        .map((row) => row.map((v) => v.toString()).join(""))
+        .map((row) => row.map(cellValueToString).join(""))
         .join(".");
     return strMotif;
   }
 
   @override
   String serialize() {
-    return 'FM:${motif.map((row) => row.map((v) => v.toString()).join("")).join(".")}';
+    return 'FM:${motif.map((row) => row.map(cellValueToString).join("")).join(".")}';
   }
 
   @override
   Constraint rotated(int origWidth, int origHeight) {
     final rotatedMotif = rotate2D90CW(motif);
     final strMotif = rotatedMotif
-        .map((row) => row.map((v) => v.toString()).join(''))
+        .map((row) => row.map(cellValueToString).join(''))
         .join('.');
     return ForbiddenMotif(strMotif);
   }
@@ -48,10 +47,10 @@ class ForbiddenMotif extends Motif {
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
-    final all11 = ['0', ...domain.map((v) => v.toString())];
+    final all11 = ['0', ...domain.map(cellValueToString)];
     final all12 = [
       for (var i in all11)
         for (var j in all11) '$i$j',
@@ -144,22 +143,20 @@ class ForbiddenMotif extends Motif {
     for (var row = 0; row < motif.length; row++) {
       for (var col = 0; col < motif[0].length; col++) {
         final car = motif[row][col];
-        if (car == 0) continue;
+        if (car == CellValue.free) continue;
         // Create submotif with this cell as wildcard
-        final submotif = motif.map((r) => List<int>.from(r)).toList();
-        submotif[row][col] = 0;
+        final submotif = motif.map((r) => List<CellValue>.from(r)).toList();
+        submotif[row][col] = CellValue.free;
         // Search for submotif in puzzle
         final positions = Motif.findMotifPositions(submotif, puzzle);
         for (var pos in positions) {
           final posRow = pos ~/ puzzle.width;
           final posCol = pos % puzzle.width;
           final targetIdx = (posRow + row) * puzzle.width + (posCol + col);
-          if (puzzle.cellValues[targetIdx] == 0) {
-            final opposite = puzzle.domain.whereNot((v) => v == car).first;
-            return Move(targetIdx, opposite, this, complexity: weight);
-          }
           if (puzzle.cellValues[targetIdx] == car) {
-            return Move(0, 0, this, isImpossible: this);
+            return Move(0, this, isImpossible: this);
+          } else if (puzzle.cellValues[targetIdx] == CellValue.free && puzzle.cells[targetIdx].options.contains(car)) {
+            return Move(targetIdx, removeOption: car, this, complexity: weight);
           }
         }
       }
@@ -181,10 +178,10 @@ class ForbiddenMotif extends Motif {
         for (int mr = 0; mr < mh && placementStillPossible; mr++) {
           for (int mc = 0; mc < mw && placementStillPossible; mc++) {
             final motifValue = motif[mr][mc];
-            if (motifValue == 0) continue;
+            if (motifValue == CellValue.free) continue;
             final gridIdx = (row + mr) * w + (col + mc);
             final gridValue = puzzle.cellValues[gridIdx];
-            if (gridValue != 0 && gridValue != motifValue) {
+            if (gridValue != CellValue.free && gridValue != motifValue) {
               placementStillPossible = false;
             }
           }

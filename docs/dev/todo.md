@@ -141,3 +141,7 @@ next-deepest gap. Reset on successful generation or on warm-up.
     without GMS, and the user can disable cloud backup system-wide.
   - Decide whether to opt in for *all* app data (simpler) or whitelist
     only the stats subtree (safer in case we ever persist secrets).
+
+## Editor
+
+* The RowCount constraint is missing

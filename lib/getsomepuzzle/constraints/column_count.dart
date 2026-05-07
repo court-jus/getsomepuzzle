@@ -13,7 +13,7 @@ final class ColumnCountConstraint extends LineCentricConstraint {
   ColumnCountConstraint(String strParams) {
     final params = strParams.split(".");
     columnIdx = int.parse(params[0]);
-    color = int.parse(params[1]);
+    color = cellRepresentationToValue(params[1]);
     count = int.parse(params[2]);
   }
 
@@ -24,27 +24,27 @@ final class ColumnCountConstraint extends LineCentricConstraint {
   List<Cell> getLine(Puzzle puzzle) => puzzle.getColumns()[getIdx()];
 
   @override
-  String toHuman(Puzzle puzzle) => 'Col ${getIdx() + 1}: $count';
+  String toHuman(Puzzle puzzle) => 'Col ${getIdx() + 1}: $count ${cellValueToString(color)}';
 
   @override
   Constraint rotated(int origWidth, int origHeight) {
     // CC at column c on a (W, H) grid → RC at row c on the rotated (H, W)
     // grid. The cells of column c become row c after 90° CW rotation: each
     // (c, r) maps to (newCol = H-1-r, newRow = c), so they all share row c.
-    return RowCountConstraint('$columnIdx.$color.$count');
+    return RowCountConstraint('$columnIdx.${cellValueToString(color)}.$count');
   }
 
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final List<String> result = [];
     for (int col = 0; col < width; col++) {
       for (final c in domain) {
         for (int n = 1; n < height; n++) {
-          result.add('$col.$c.$n');
+          result.add('$col.${cellValueToString(c)}.$n');
         }
       }
     }

@@ -1,10 +1,23 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 
+enum CellValue { free, black, white, purple }
+
+/// Every colour the engine knows about, in canonical order. Every concrete
+/// puzzle domain is a prefix of this list. Used by the generator's
+/// `--domain 3` mode and by the option-pruning machinery.
+const fullDomain = [CellValue.black, CellValue.white, CellValue.purple];
+
+/// 2-colour domain. *Must* stay equal to `fullDomain.sublist(0, 2)` — Dart
+/// doesn't let us write that as a const expression (no const indexing of
+/// a List), so the relationship is enforced by a `dart:test` assertion at
+/// the bottom of this file's unit tests, not the type system.
+const defaultDomain = [CellValue.black, CellValue.white];
+
 class Cell {
-  int value = 0;
+  CellValue value = CellValue.free;
   int idx = 0;
-  List<int> domain = [];
-  List<int> options = [];
+  List<CellValue> domain = [];
+  List<CellValue> options = [];
   bool readonly = false;
   bool isHighlighted = false;
 
@@ -14,34 +27,57 @@ class Cell {
   void Function()? onMutate;
 
   Cell(this.value, this.idx, this.domain, this.readonly) {
-    options = domain.toList();
+    if (readonly) {
+      options = [];
+    } else {
+      options = domain.toList();
+    }
   }
 
   @override
   String toString() {
-    return "${idx + 1} = $value";
+    return "${idx + 1} = ${value.name}";
   }
 
-  bool setValue(int newValue) {
+  bool setValue(CellValue newValue, {bool ignoreOptions = false}) {
     if (readonly) return false;
     if (value == newValue) return false;
+    if (!options.contains(newValue) && !ignoreOptions) {
+      throw RangeError(
+        "Cell set to value $newValue which is not in its options : $options.",
+      );
+    }
     value = newValue;
+    options = [];
+    onMutate?.call();
+    return true;
+  }
+
+  bool removeOption(CellValue option) {
+    if (readonly) return false;
+    if (!options.contains(option)) return false;
+    options.remove(option);
+    if (options.length == 1) {
+      // Only one option remains, setValue
+      value = options.first;
+      options = [];
+    }
     onMutate?.call();
     return true;
   }
 
   void reset() {
-    value = 0;
+    value = CellValue.free;
     options = domain.toList();
     onMutate?.call();
   }
 
-  bool get isFree => value == 0 && options.isNotEmpty;
+  bool get isFree => value == CellValue.free && options.isNotEmpty;
 
-  bool get isPossible => value != 0 || options.isNotEmpty;
+  bool get isPossible => value != CellValue.free || options.isNotEmpty;
 
   /// Sets value and clears options — used by the solver/generator.
-  bool setForSolver(int val) {
+  bool setForSolver(CellValue val) {
     if (value == val && options.isEmpty) return false;
     value = val;
     options = [];
@@ -49,17 +85,51 @@ class Cell {
     return true;
   }
 
+  bool removeOptionForSolver(CellValue val) {
+    if (!options.contains(val)) return false;
+    options.remove(val);
+    onMutate?.call();
+    return true;
+  }
+
   Cell clone() {
-    final c = Cell(0, idx, domain, readonly);
+    final c = Cell(CellValue.free, idx, domain, readonly);
     c.value = value;
     c.options = options.toList();
     return c;
   }
 }
 
+CellValue cellRepresentationToValue(String cellRepresentation) {
+  switch (cellRepresentation) {
+    case "1":
+      return CellValue.black;
+    case "2":
+      return CellValue.white;
+    case "3":
+      return CellValue.purple;
+    default:
+      return CellValue.free;
+  }
+}
+
+String cellValueToString(CellValue value) {
+  switch (value) {
+    case CellValue.black:
+      return "1";
+    case CellValue.white:
+      return "2";
+    case CellValue.purple:
+      return "3";
+    default:
+      return "0";
+  }
+}
+
 class Move {
   int idx;
-  int value;
+  CellValue? value;
+  CellValue? removeOption;
   CanApply givenBy;
   CanApply? isImpossible;
   bool isForce;
@@ -73,13 +143,27 @@ class Move {
   // on `isForce`).
   int complexity;
 
+  @override
+  String toString() {
+    if (value != null) {
+      return "Move: Set $idx = $value ($givenBy)";
+    } else if (removeOption != null) {
+      return "Move: Set $idx != $removeOption ($givenBy)";
+    } else if (isImpossible != null) {
+      return "Move isImpossible ($givenBy)";
+    } else {
+      return "Move bizarre";
+    }
+  }
+
   Move(
     this.idx,
-    this.value,
     this.givenBy, {
+    this.value,
     this.isImpossible,
     this.isForce = false,
     this.forceDepth = 0,
     this.complexity = 0,
+    this.removeOption,
   });
 }

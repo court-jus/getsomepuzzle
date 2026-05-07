@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 
-const textColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
+const textColors = {
+  CellValue.free: Colors.transparent,
+  CellValue.black: Colors.black,
+  CellValue.white: Colors.white,
+};
 const oppositeColors = {
-  0: Colors.transparent,
-  1: Colors.white,
-  2: Colors.black,
+  CellValue.free: Colors.transparent,
+  CellValue.black: Colors.white,
+  CellValue.white: Colors.black,
 };
 
 class QuantityWidget extends StatelessWidget {
@@ -57,7 +62,7 @@ class QuantityWidget extends StatelessWidget {
                 oppositeText,
                 style: TextStyle(
                   fontSize: smallFontSize,
-                  color: oppositeColors[constraint.value],
+                  color: oppositeColors[constraint.color],
                 ),
               ),
             ),
@@ -69,7 +74,7 @@ class QuantityWidget extends StatelessWidget {
                   smallText,
                   style: TextStyle(
                     fontSize: smallFontSize,
-                    color: textColors[constraint.value],
+                    color: textColors[constraint.color],
                   ),
                 ),
               ),
@@ -78,7 +83,7 @@ class QuantityWidget extends StatelessWidget {
                 largeText,
                 style: TextStyle(
                   fontSize: largeFontSize,
-                  color: textColors[constraint.value],
+                  color: textColors[constraint.color],
                 ),
               ),
             ),

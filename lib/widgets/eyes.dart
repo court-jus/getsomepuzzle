@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 
@@ -41,7 +42,7 @@ class _EyesPainter extends CustomPainter {
   // `constraint.*` in `shouldRepaint` would always be a no-op.
   final bool isValid;
   final bool isHighlighted;
-  final int color;
+  final CellValue color;
   final int count;
 
   _EyesPainter({required this.constraint, required this.cellSize})
@@ -69,7 +70,11 @@ class _EyesPainter extends CustomPainter {
       ..arcTo(rect, 3.14159, 3.14159, true);
 
     final fillColor = bgColors[color] ?? Colors.grey;
-    final oppositeColor = bgColors[3 - color] ?? Colors.white;
+    final oppositeColor =
+        bgColors[color == CellValue.black
+            ? CellValue.white
+            : CellValue.black] ??
+        Colors.white;
     final textColor = fgColors[color] ?? Colors.black;
 
     final Color strokeColor;

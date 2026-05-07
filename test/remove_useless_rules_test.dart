@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 
@@ -12,7 +13,7 @@ void main() {
     test('returns false for a 2x2 grid with no constraints', () {
       // No constraints at all → multiple valid colorings, deductive solver
       // can't pin a unique answer.
-      final p = Puzzle.empty(2, 2, [1, 2]);
+      final p = Puzzle.empty(2, 2, defaultDomain);
       expect(p.isDeductivelyUnique(), isFalse);
     });
   });

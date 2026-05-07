@@ -16,7 +16,8 @@ enum SolveMethod { propagation, force }
 /// One step in the step-by-step solving trace.
 class SolveStep {
   final int cellIdx;
-  final int value;
+  final CellValue? value;
+  final CellValue? removeOption;
   final String constraint;
   final SolveMethod method;
   // For a force step, length of the propagation chain that exposed the
@@ -31,9 +32,10 @@ class SolveStep {
 
   const SolveStep({
     required this.cellIdx,
-    required this.value,
     required this.constraint,
     required this.method,
+    this.value,
+    this.removeOption,
     this.forceDepth = 0,
     this.complexity = 0,
     this.isComplicity = false,
@@ -41,7 +43,12 @@ class SolveStep {
 
   @override
   String toString() {
-    return '${method.name}: cell $cellIdx = $value${constraint.isNotEmpty ? ' by $constraint' : ''}${method == SolveMethod.force ? ' (depth=$forceDepth)' : ''}';
+    if (value != null) {
+      return '${method.name}: cell $cellIdx = ${value!.name}${constraint.isNotEmpty ? ' by $constraint' : ''}${method == SolveMethod.force ? ' (depth=$forceDepth)' : ''}';
+    } else if (removeOption != null) {
+      return '${method.name}: cell $cellIdx != ${removeOption!.name}${constraint.isNotEmpty ? ' by $constraint' : ''}${method == SolveMethod.force ? ' (depth=$forceDepth)' : ''}';
+    }
+    return '${method.name}: cell $cellIdx ???';
   }
 }
 
@@ -117,7 +124,7 @@ class Stats {
 
 class Puzzle {
   String lineRepresentation;
-  List<int> domain = [];
+  List<CellValue> domain = [];
   int width = 0;
   int height = 0;
   List<Cell> _cells = [];
@@ -139,7 +146,7 @@ class Puzzle {
   }
 
   int? cachedComplexity;
-  List<int>? cachedSolution;
+  List<CellValue>? cachedSolution;
 
   /// Cached result of `getGroups(this)`. Invalidated whenever any cell's
   /// value or options change via `Cell.onMutate`.
@@ -167,14 +174,20 @@ class Puzzle {
   Puzzle(this.lineRepresentation) {
     var attributesStr = lineRepresentation.split("_");
     final dimensions = attributesStr[2].split("x");
-    domain = attributesStr[1].split("").map((e) => int.parse(e)).toList();
+    domain = attributesStr[1].split("").map(cellRepresentationToValue).toList();
     width = int.parse(dimensions[0]);
     height = int.parse(dimensions[1]);
     cells = attributesStr[3]
         .split("")
-        .map((e) => int.parse(e))
         .indexed
-        .map((e) => Cell(e.$2, e.$1, domain, e.$2 > 0))
+        .map(
+          (e) => Cell(
+            cellRepresentationToValue(e.$2),
+            e.$1,
+            domain,
+            cellRepresentationToValue(e.$2) != CellValue.free,
+          ),
+        )
         .toList();
     final strConstraints = attributesStr[4].split(";");
     for (var strConstraint in strConstraints) {
@@ -194,7 +207,7 @@ class Puzzle {
       if (solParts[0] == '1' && solParts.length > 1) {
         cachedSolution = solParts[1]
             .split('')
-            .map((e) => int.parse(e))
+            .map(cellRepresentationToValue)
             .toList();
       }
     }
@@ -210,8 +223,8 @@ class Puzzle {
       if (values.length != cells.length) break;
       for (int j = 0; j < cells.length; j++) {
         if (cells[j].readonly) continue;
-        final v = int.tryParse(values[j]);
-        if (v != null && v != 0) cells[j].setValue(v);
+        final v = values[j];
+        if (v != "0") cells[j].setValue(cellRepresentationToValue(v));
       }
       hasRestoredProgress = true;
       break;
@@ -292,7 +305,7 @@ class Puzzle {
   String lineWithPlayState() {
     final parts = lineRepresentation.split('_');
     parts.removeWhere((p) => p.startsWith('p:'));
-    final playStr = cellValues.map((v) => v.toString()).join('');
+    final playStr = cellValues.map(cellValueToString).join('');
     parts.add('p:$playStr');
     return parts.join('_');
   }
@@ -300,14 +313,14 @@ class Puzzle {
   void restart() {
     for (var cell in cells) {
       if (!cell.readonly) {
-        cell.value = 0;
+        cell.value = CellValue.free;
         cell.options = cell.domain;
       }
     }
     _invalidateCaches();
   }
 
-  List<int> get cellValues => cells.map((cell) => cell.value).toList();
+  List<CellValue> get cellValues => cells.map((e) => e.value).toList();
   Map<int, List<Constraint>> get cellConstraints {
     final Map<int, List<Constraint>> result = {};
     for (var constraint in constraints.whereType<CellsCentricConstraint>()) {
@@ -321,7 +334,7 @@ class Puzzle {
     return result;
   }
 
-  int getValue(int idx) {
+  CellValue getValue(int idx) {
     return cells[idx].value;
   }
 
@@ -358,9 +371,16 @@ class Puzzle {
     return result;
   }
 
-  bool setValue(int idx, int value) {
+  bool setValue(int idx, CellValue value, {bool ignoreOptions = false}) {
     final cell = cells[idx];
-    final result = cell.setValue(value);
+    final result = cell.setValue(value, ignoreOptions: ignoreOptions);
+    updateConstraintStatus();
+    return result;
+  }
+
+  bool removeOption(int idx, CellValue option) {
+    final cell = cells[idx];
+    final result = cell.removeOption(option);
     updateConstraintStatus();
     return result;
   }
@@ -376,13 +396,39 @@ class Puzzle {
     cell.reset();
   }
 
+  /// Manual cycling triggered by a tap. Steps through the puzzle's
+  /// declared `domain` in order:
+  ///   `free → domain[0] → domain[1] → … → domain[last] → free → …`
+  ///
+  /// Wrapping back to free goes through `resetCell` so the cell's
+  /// options are restored to the full domain (otherwise the cell would
+  /// end up in the degenerate `value = free, options = []` state).
+  ///
+  /// `ignoreOptions: true` on the non-free transitions is intentional:
+  /// the player can override a constraint-driven option pruning by
+  /// tapping through to the desired value, even when that value has
+  /// previously been excluded by the solver.
   void incrValue(int idx) {
+    if (domain.isEmpty) return;
     final currentValue = cellValues[idx];
-    setValue(idx, (currentValue + 1) % (domain.length + 1));
+    if (currentValue == CellValue.free) {
+      setValue(idx, domain.first, ignoreOptions: true);
+      return;
+    }
+    final currentDomainIdx = domain.indexOf(currentValue);
+    if (currentDomainIdx < 0 || currentDomainIdx == domain.length - 1) {
+      // Either the current colour isn't part of this puzzle's domain
+      // (legacy data, or a domain narrower than the cell's colour) or
+      // it is the last domain entry — wrap back to free.
+      resetCell(idx);
+      updateConstraintStatus();
+      return;
+    }
+    setValue(idx, domain[currentDomainIdx + 1], ignoreOptions: true);
   }
 
   bool get complete {
-    return !cellValues.any((val) => val == 0);
+    return !cellValues.any((val) => val == CellValue.free);
   }
 
   List<Constraint> check({bool saveResult = true}) {
@@ -432,7 +478,7 @@ class Puzzle {
   }
 
   /// Try setting each free cell to each domain value on a fresh clone; if a
-  /// value leads to contradiction, return the opposite as a forced move.
+  /// value leads to contradiction, remove this option.
   ///
   /// Scans every (cell, value) pair and returns the move whose refutation
   /// requires the **shortest propagation chain** (`forceDepth`). The
@@ -445,12 +491,11 @@ class Puzzle {
     Move? best;
     int bestDepth = -1;
     for (final (idx, cell) in cells.indexed) {
-      if (cell.value != 0) continue;
-      for (final value in domain) {
+      if (cell.value != CellValue.free) continue;
+      for (final value in cell.options) {
         final clone = this.clone();
         clone.setValue(idx, value);
         final r = clone._propagateCount();
-        final opposite = domain.whereNot((v) => v == value).first;
 
         Move? candidate;
         int depth;
@@ -461,8 +506,8 @@ class Puzzle {
           final diag = clone.apply();
           candidate = Move(
             idx,
-            opposite,
             diag?.givenBy ?? clone.constraints.first,
+            removeOption: value,
             isForce: true,
             forceDepth: r.moves,
           );
@@ -472,8 +517,8 @@ class Puzzle {
           if (errors.isNotEmpty) {
             candidate = Move(
               idx,
-              opposite,
               errors.first,
+              removeOption: value,
               isForce: true,
               forceDepth: r.moves,
             );
@@ -507,7 +552,26 @@ class Puzzle {
       final m = findAMove(checkErrors: false, tryForce: false);
       if (m == null) return (moves: moves, failed: false);
       if (m.isImpossible != null) return (moves: moves, failed: true);
-      setValue(m.idx, m.value);
+      if (m.value != null) {
+        // A setValue move whose value is no longer in the cell's options is
+        // a contradiction surfaced by a constraint that has not been
+        // updated to inspect `Cell.options`. In a 2-colour domain this
+        // never happens (removeOption collapses to a setValue of the only
+        // surviving option); on 3+ colours the cell can be free with
+        // several options and a constraint may claim "must be X" after X
+        // was already excluded. Treat as failure rather than throwing.
+        final cell = cells[m.idx];
+        if (cell.value == CellValue.free && !cell.options.contains(m.value!)) {
+          return (moves: moves, failed: true);
+        }
+        setValue(m.idx, m.value!);
+      } else if (m.removeOption != null) {
+        // A no-op removeOption (option already pruned) would loop forever
+        // without progress. Bail out as "stuck".
+        if (!removeOption(m.idx, m.removeOption!)) {
+          return (moves: moves, failed: false);
+        }
+      }
       moves++;
       if (complete) return (moves: moves, failed: false);
     }
@@ -536,14 +600,17 @@ class Puzzle {
     if (sol == null) return null;
     for (int i = 0; i < cells.length; i++) {
       final v = cells[i].value;
-      if (v != 0 && v != sol[i]) return i;
+      if (v != CellValue.free && v != sol[i]) return i;
     }
     return null;
   }
 
   // --- Constructor for empty puzzles (no lineRepresentation parsing) ---
   Puzzle.empty(this.width, this.height, this.domain) : lineRepresentation = '' {
-    cells = List.generate(width * height, (idx) => Cell(0, idx, domain, false));
+    cells = List.generate(
+      width * height,
+      (idx) => Cell(CellValue.free, idx, domain, false),
+    );
   }
 
   Puzzle clone() {
@@ -580,7 +647,7 @@ class Puzzle {
 
   double computeRatio() {
     final values = cellValues;
-    return values.where((v) => v == 0).length / values.length;
+    return values.where((v) => v == CellValue.free).length / values.length;
   }
 
   bool isPossible() {
@@ -599,7 +666,20 @@ class Puzzle {
       final m = findAMove(checkErrors: false, tryForce: false);
       if (m == null) return moves;
       if (m.isImpossible != null) return null;
-      setValue(m.idx, m.value);
+      if (m.value != null) {
+        // See `_propagateCount` for the rationale: a setValue that targets
+        // a value no longer in the cell's options is a contradiction.
+        final cell = cells[m.idx];
+        if (cell.value == CellValue.free && !cell.options.contains(m.value!)) {
+          return null;
+        }
+        setValue(m.idx, m.value!);
+      } else if (m.removeOption != null) {
+        // Bail out on a no-op removeOption (option already pruned).
+        if (!removeOption(m.idx, m.removeOption!)) {
+          return moves;
+        }
+      }
       moves++;
       if (verifyAfterEachMove && check(saveResult: false).isNotEmpty) {
         return null;
@@ -667,7 +747,18 @@ class Puzzle {
         cachedComplexity = 100;
         return 100;
       }
-      test.setValue(m.idx, m.value);
+      if (m.value != null) {
+        // See `_propagateCount`: a setValue against an already-excluded
+        // option is treated as an impossibility surfaced by a constraint.
+        final cell = test.cells[m.idx];
+        if (cell.value == CellValue.free && !cell.options.contains(m.value!)) {
+          cachedComplexity = 100;
+          return 100;
+        }
+        test.setValue(m.idx, m.value!);
+      } else if (m.removeOption != null) {
+        if (!test.removeOption(m.idx, m.removeOption!)) break;
+      }
       if (m.isForce) {
         effort += 5 + 5 * m.forceDepth;
       } else {
@@ -700,11 +791,21 @@ class Puzzle {
       if (timedOut()) return [];
       final m = test.findAMove(checkErrors: false);
       if (m == null || m.isImpossible != null) break;
-      test.setValue(m.idx, m.value);
+      if (m.value != null) {
+        // See `_propagateCount`: bail out on an excluded-option setValue.
+        final cell = test.cells[m.idx];
+        if (cell.value == CellValue.free && !cell.options.contains(m.value!)) {
+          break;
+        }
+        test.setValue(m.idx, m.value!);
+      } else if (m.removeOption != null) {
+        if (!test.removeOption(m.idx, m.removeOption!)) break;
+      }
       steps.add(
         SolveStep(
           cellIdx: m.idx,
           value: m.value,
+          removeOption: m.removeOption,
           constraint: m.isForce ? '' : m.givenBy.serialize(),
           method: m.isForce ? SolveMethod.force : SolveMethod.propagation,
           forceDepth: m.isForce ? m.forceDepth : 0,
@@ -724,7 +825,16 @@ class Puzzle {
     for (int i = 0; i < maxSteps; i++) {
       final m = findAMove(checkErrors: false);
       if (m == null || m.isImpossible != null) break;
-      setValue(m.idx, m.value);
+      if (m.value != null) {
+        // See `_propagateCount`: bail out on an excluded-option setValue.
+        final cell = cells[m.idx];
+        if (cell.value == CellValue.free && !cell.options.contains(m.value!)) {
+          break;
+        }
+        setValue(m.idx, m.value!);
+      } else if (m.removeOption != null) {
+        if (!removeOption(m.idx, m.removeOption!)) break;
+      }
     }
     return complete && check(saveResult: false).isEmpty;
   }
@@ -773,7 +883,7 @@ class Puzzle {
     final newWidth = height;
     final newHeight = width;
 
-    final newValues = List<int>.filled(n, 0);
+    final newValues = List<CellValue>.filled(n, CellValue.free);
     final newReadonly = List<bool>.filled(n, false);
     for (int origIdx = 0; origIdx < n; origIdx++) {
       final newIdx = rotateIdx90CW(origIdx, width, height);
@@ -786,10 +896,10 @@ class Puzzle {
     // the trailing `_p:` field.
     final prefillStr = List.generate(
       n,
-      (i) => newReadonly[i] ? newValues[i] : 0,
-    ).map((v) => v.toString()).join('');
+      (i) => newReadonly[i] ? newValues[i] : CellValue.free,
+    ).map(cellValueToString).join('');
 
-    final domainStr = domain.map((v) => v.toString()).join('');
+    final domainStr = domain.map(cellValueToString).join('');
     final rotatedConstraintsStr = constraints
         .map((c) => c.rotated(width, height).serialize())
         .join(';');
@@ -797,11 +907,11 @@ class Puzzle {
     String solutionStr = '0:0';
     final sol = cachedSolution;
     if (sol != null && sol.length == n) {
-      final rotatedSolution = List<int>.filled(n, 0);
+      final rotatedSolution = List<CellValue>.filled(n, CellValue.free);
       for (int origIdx = 0; origIdx < n; origIdx++) {
         rotatedSolution[rotateIdx90CW(origIdx, width, height)] = sol[origIdx];
       }
-      solutionStr = '1:${rotatedSolution.map((v) => v.toString()).join('')}';
+      solutionStr = '1:${rotatedSolution.map(cellValueToString).join('')}';
     }
 
     final complexityStr = (cachedComplexity ?? 0).toString();
@@ -811,25 +921,26 @@ class Puzzle {
 
     final hasProgress = List.generate(
       n,
-      (i) => !newReadonly[i] && newValues[i] != 0,
+      (i) => !newReadonly[i] && newValues[i] != CellValue.free,
     ).any((x) => x);
     if (hasProgress) {
-      final playStr = newValues.map((v) => v.toString()).join('');
+      final playStr = newValues.map(cellValueToString).join('');
       line = '${line}_p:$playStr';
     }
-
     return Puzzle(line);
   }
 
   /// Export puzzle to the v2 line format.
   /// When [compute] is false, skip complexity and solution computation.
   String lineExport({bool compute = true}) {
-    final domainStr = domain.map((v) => v.toString()).join('');
-    final valuesStr = cellValues.map((v) => v.toString()).join('');
+    final domainStr = domain.map(cellValueToString).join('');
+    final valuesStr = cellValues.map(cellValueToString).join('');
     final constraintsStr = constraints.map((c) => c.serialize()).join(';');
     final complexity = compute ? computeComplexity() : 0;
     final sol = cachedSolution;
-    final solutionStr = sol != null ? '1:${sol.join('')}' : '0:0';
+    final solutionStr = sol != null
+        ? '1:${sol.map(cellValueToString).join('')}'
+        : '0:0';
     return 'v2_${domainStr}_${width}x${height}_${valuesStr}_${constraintsStr}_${solutionStr}_$complexity';
   }
 }

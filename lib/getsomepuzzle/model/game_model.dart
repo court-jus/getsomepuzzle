@@ -90,9 +90,9 @@ class GameModel extends ChangeNotifier {
   int _usefulHintCount = 0;
 
   // --- Drag state ---
-  int? firstDragValue;
+  CellValue? firstDragValue;
   int? lastDragIdx;
-  int? firstRightDragValue;
+  CellValue? firstRightDragValue;
   int? lastRightDragIdx;
 
   /// Cell index of an in-flight right-click whose toggle is **deferred**
@@ -396,7 +396,7 @@ class GameModel extends ChangeNotifier {
       _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
     }
     if (currentPuzzle!.cellValues[idx] != firstDragValue &&
-        currentPuzzle!.cellValues[idx] == 0) {
+        currentPuzzle!.cellValues[idx] == CellValue.free) {
       currentPuzzle!.setValue(idx, firstDragValue!);
       currentMeta?.stats?.recordCellEdit();
       if (history.isEmpty || history.last != idx) history.add(idx);
@@ -421,14 +421,16 @@ class GameModel extends ChangeNotifier {
     if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
     if (lastRightDragIdx != null && idx == lastRightDragIdx) return;
     final currentValue = currentPuzzle!.cellValues[idx];
-    if (firstRightDragValue == null && currentValue == 1) return;
+    if (firstRightDragValue == null && currentValue == CellValue.black) return;
 
     if (firstRightDragValue == null) {
       // First event of a right-button gesture (pointer-down on a cell
       // whose value is not black). Defer the toggle: we don't know
       // yet whether this is a single click (commit on release) or a
       // drag (commit at the moment the user moves to another cell).
-      firstRightDragValue = currentValue == 0 ? 2 : 0;
+      firstRightDragValue = currentValue == CellValue.free
+          ? CellValue.white
+          : CellValue.free;
       _pendingRightClickIdx = idx;
       lastRightDragIdx = idx;
       return;
@@ -444,7 +446,9 @@ class GameModel extends ChangeNotifier {
       _commitRightToggle(_pendingRightClickIdx!, isDrag: false);
       _pendingRightClickIdx = null;
     }
-    final oppositeValue = firstRightDragValue == 0 ? 2 : 0;
+    final oppositeValue = firstRightDragValue == CellValue.free
+        ? CellValue.white
+        : CellValue.free;
     if (currentValue == oppositeValue) {
       _commitRightToggle(idx, isDrag: true);
     }
@@ -452,7 +456,28 @@ class GameModel extends ChangeNotifier {
   }
 
   void _commitRightToggle(int idx, {required bool isDrag}) {
-    final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
+    bool changed;
+    if (firstRightDragValue == CellValue.free) {
+      // Toggling a coloured cell back to free: use `resetCell` so the
+      // cell's options are restored to the full domain. Going through
+      // `setValue(free, ignoreOptions: true)` would leave the cell in
+      // the degenerate `value = free, options = []` state — visible as
+      // a free cell whose option dots have vanished on a 3+ colour
+      // puzzle.
+      if (currentPuzzle!.cells[idx].value == CellValue.free) {
+        changed = false;
+      } else {
+        currentPuzzle!.resetCell(idx);
+        currentPuzzle!.updateConstraintStatus();
+        changed = true;
+      }
+    } else {
+      changed = currentPuzzle!.setValue(
+        idx,
+        firstRightDragValue!,
+        ignoreOptions: true,
+      );
+    }
     if (changed) {
       currentMeta?.stats?.recordCellEdit();
       if (history.isEmpty || history.last != idx) history.add(idx);
@@ -595,7 +620,18 @@ class GameModel extends ChangeNotifier {
   /// modes only differ on what subsequent taps do. The caller pre-resolves
   /// every l10n string into [texts]; this method picks the right one for the
   /// stage being entered.
-  void onHintTap(Settings settings, HintTexts texts) {
+  ///
+  /// [onPuzzleCompleted] is invoked when the player taps the hint button on
+  /// a fully-and-validly-completed puzzle past stage 1. Tap 1 still shows
+  /// the "everything filled so far is correct" message (since no error /
+  /// no wrong cell can be surfaced); the next tap repurposes the hint
+  /// button as a "next puzzle" trigger so the player keeps moving without
+  /// having to find a separate UI control.
+  void onHintTap(
+    Settings settings,
+    HintTexts texts, {
+    void Function()? onPuzzleCompleted,
+  }) {
     if (currentPuzzle == null) return;
     final mode = settings.hintType;
     _log.fine('hint tap: stage=$hintStage mode=$mode');
@@ -605,6 +641,18 @@ class GameModel extends ChangeNotifier {
       _revealErrors(texts);
       hintStage = 1;
       notifyListeners();
+      return;
+    }
+
+    // Past stage 1, on a complete-and-valid puzzle there is nothing left
+    // to deduce — repurpose the next tap as "advance to the next puzzle"
+    // so the player doesn't get stuck pressing a no-op button.
+    if (currentPuzzle!.complete &&
+        currentPuzzle!.check(saveResult: false).isEmpty) {
+      if (onPuzzleCompleted != null) {
+        onPuzzleCompleted();
+        resetHintCycle();
+      }
       return;
     }
 
@@ -678,7 +726,9 @@ class GameModel extends ChangeNotifier {
     if (helpMove == null) return;
     currentPuzzle!.clearHighlights();
     currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-    hintText = texts.hintCellDeducible;
+    hintText = helpMove!.removeOption != null
+        ? texts.hintCellOptionRemovable
+        : texts.hintCellDeducible;
     hintIsError = false;
   }
 
@@ -697,14 +747,17 @@ class GameModel extends ChangeNotifier {
       hintText = texts.hintImpossible;
       hintIsError = true;
     } else {
+      final removeOption = helpMove!.removeOption != null;
       if (helpMove!.isForce) {
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-        hintText = texts.hintForce;
+        hintText = removeOption ? texts.hintForceRemoveOption : texts.hintForce;
       } else {
         final givenBy = helpMove!.givenBy;
         if (givenBy is Constraint) givenBy.isHighlighted = true;
         currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-        hintText = texts.hintDeducedFrom(givenBy);
+        hintText = removeOption
+            ? texts.hintRemoveOptionDeducedFrom(givenBy)
+            : texts.hintDeducedFrom(givenBy);
       }
       hintIsError = false;
     }
@@ -716,11 +769,26 @@ class GameModel extends ChangeNotifier {
 
   /// Tap 4 of `deducibleCell` — apply the move. Triggers `_afterMutation`,
   /// which resets [hintStage] and recomputes the next [helpMove].
+  ///
+  /// Two move shapes are supported: `setValue` (the cell takes a concrete
+  /// colour) and `removeOption` (the cell loses one possible colour but
+  /// stays free, unless it was the last option in which case
+  /// `Cell.removeOption` auto-collapses to a setValue).
   void _applyHelpMove() {
     if (helpMove == null) return;
-    currentPuzzle!.setValue(helpMove!.idx, helpMove!.value);
-    history.add(helpMove!.idx);
-    _afterMutation();
+    if (helpMove!.value != null) {
+      currentPuzzle!.setValue(
+        helpMove!.idx,
+        helpMove!.value!,
+        ignoreOptions: true,
+      );
+      history.add(helpMove!.idx);
+      _afterMutation();
+    } else if (helpMove!.removeOption != null) {
+      currentPuzzle!.removeOption(helpMove!.idx, helpMove!.removeOption!);
+      history.add(helpMove!.idx);
+      _afterMutation();
+    }
   }
 
   /// Tap 2 of `addConstraint` — attach the next useful constraint, or
@@ -949,6 +1017,13 @@ class HintTexts {
   final String hintConstraintAdded;
   final String hintConstraintNone;
 
+  /// Variants used when the help move is a `removeOption` rather than a
+  /// `setValue`. Same shape as their siblings above, but phrased in terms
+  /// of "an option can be removed" rather than "the cell can be deduced".
+  final String hintCellOptionRemovable;
+  final String hintForceRemoveOption;
+  final String Function(CanApply givenBy) hintRemoveOptionDeducedFrom;
+
   const HintTexts({
     required this.someConstraintsInvalid,
     required this.hintCellWrong,
@@ -959,5 +1034,8 @@ class HintTexts {
     required this.hintDeducedFrom,
     required this.hintConstraintAdded,
     required this.hintConstraintNone,
+    required this.hintCellOptionRemovable,
+    required this.hintForceRemoveOption,
+    required this.hintRemoveOptionDeducedFrom,
   });
 }

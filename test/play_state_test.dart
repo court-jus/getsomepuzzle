@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
@@ -12,7 +13,17 @@ void main() {
       // 8th field, and `hasRestoredProgress` must stay false.
       final p = Puzzle(baseLine);
       expect(p.hasRestoredProgress, isFalse);
-      expect(p.cellValues, [1, 0, 0, 0, 0, 0, 0, 0, 0]);
+      expect(p.cellValues, [
+        CellValue.black,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+      ]);
     });
 
     test('p:<values> trailing field restores non-readonly cells', () {
@@ -22,7 +33,17 @@ void main() {
       // the cell is readonly.
       final p = Puzzle('${baseLine}_p:120020002');
       expect(p.hasRestoredProgress, isTrue);
-      expect(p.cellValues, [1, 2, 0, 0, 2, 0, 0, 0, 2]);
+      expect(p.cellValues, [
+        CellValue.black,
+        CellValue.white,
+        CellValue.free,
+        CellValue.free,
+        CellValue.white,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.white,
+      ]);
     });
 
     test('readonly cells are not overwritten by play-state', () {
@@ -30,7 +51,7 @@ void main() {
       // readonly cell wins. Cell 0 stays at 1 even though the play-state
       // requests 2.
       final p = Puzzle('${baseLine}_p:200000000');
-      expect(p.cellValues[0], 1);
+      expect(p.cellValues[0], CellValue.black);
       // Length-mismatch check is independent: this state matches the grid
       // length so the field IS applied (just with cell 0 ignored).
       expect(p.hasRestoredProgress, isTrue);
@@ -42,7 +63,17 @@ void main() {
       // save can't corrupt the puzzle on reload.
       final p = Puzzle('${baseLine}_p:12');
       expect(p.hasRestoredProgress, isFalse);
-      expect(p.cellValues, [1, 0, 0, 0, 0, 0, 0, 0, 0]);
+      expect(p.cellValues, [
+        CellValue.black,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+        CellValue.free,
+      ]);
     });
 
     test('lineWithPlayState round-trips current cell values', () {
@@ -51,8 +82,8 @@ void main() {
       // puzzle's *current* cellValues — including the readonly cell, so
       // length stays consistent with the grid.
       final p = Puzzle(baseLine);
-      p.setValue(1, 2);
-      p.setValue(4, 2);
+      p.setValue(1, CellValue.white);
+      p.setValue(4, CellValue.white);
       final out = p.lineWithPlayState();
       expect(out, '${baseLine}_p:120020000');
     });
@@ -61,7 +92,7 @@ void main() {
       // Saving twice in a row must not stack two `p:` fields. Re-saving
       // after a new move replaces the previous suffix in place.
       final p = Puzzle('${baseLine}_p:120000000');
-      p.setValue(4, 2);
+      p.setValue(4, CellValue.white);
       final out = p.lineWithPlayState();
       // Single `p:` field, latest values.
       expect(out.split('_').where((s) => s.startsWith('p:')).length, 1);
@@ -73,9 +104,9 @@ void main() {
       // the same puzzle state. This is the user-facing guarantee the
       // feature exists for.
       final original = Puzzle(baseLine);
-      original.setValue(1, 2);
-      original.setValue(4, 1);
-      original.setValue(7, 2);
+      original.setValue(1, CellValue.white);
+      original.setValue(4, CellValue.black);
+      original.setValue(7, CellValue.white);
       final savedLine = original.lineWithPlayState();
 
       final reloaded = Puzzle(savedLine);

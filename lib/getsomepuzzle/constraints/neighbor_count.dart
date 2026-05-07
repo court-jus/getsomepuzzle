@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -8,23 +7,26 @@ class NeighborCountConstraint extends CellsCentricConstraint {
   @override
   String get slug => 'NC';
 
-  int color = 0;
+  CellValue color = CellValue.free;
   int count = 0;
 
   NeighborCountConstraint(String strParams) {
     final params = strParams.split(".");
     indices = [int.parse(params[0])];
-    color = int.parse(params[1]);
+    color = cellRepresentationToValue(params[1]);
     count = int.parse(params[2]);
   }
 
   @override
-  String serialize() => '$slug:${indices.first}.$color.$count';
+  String serialize() =>
+      '$slug:${indices.first}.${cellValueToString(color)}.$count';
 
   @override
   Constraint rotated(int origWidth, int origHeight) {
     final newIdx = rotateIdx90CW(indices.first, origWidth, origHeight);
-    return NeighborCountConstraint('$newIdx.$color.$count');
+    return NeighborCountConstraint(
+      '$newIdx.${cellValueToString(color)}.$count',
+    );
   }
 
   @override
@@ -32,12 +34,12 @@ class NeighborCountConstraint extends CellsCentricConstraint {
 
   @override
   String toHuman(Puzzle puzzle) =>
-      '${indices.first + 1} has $count $color neighbors';
+      '${indices.first + 1} has $count ${color.name} neighbors';
 
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final List<String> result = [];
@@ -52,7 +54,7 @@ class NeighborCountConstraint extends CellsCentricConstraint {
             (row < height - 1 ? 1 : 0);
         for (final c in domain) {
           for (int ct = 0; ct < nc; ct++) {
-            result.add('$idx.$c.$ct');
+            result.add('$idx.${cellValueToString(c)}.$ct');
           }
         }
       }
@@ -67,7 +69,7 @@ class NeighborCountConstraint extends CellsCentricConstraint {
         .where((i) => puzzle.cellValues[i] == color)
         .length;
     final freeNeighbors = myNeighbors
-        .where((i) => puzzle.cellValues[i] == 0)
+        .where((i) => puzzle.cellValues[i] == CellValue.free)
         .length;
     if (puzzle.complete) return targetColorNeighbors == count;
     if (targetColorNeighbors > count) return false;
@@ -81,7 +83,9 @@ class NeighborCountConstraint extends CellsCentricConstraint {
     final targetColorNeighbors = myNeighbors.where(
       (i) => puzzle.cellValues[i] == color,
     );
-    final freeNeighbors = myNeighbors.where((i) => puzzle.cellValues[i] == 0);
+    final freeNeighbors = myNeighbors.where(
+      (i) => puzzle.cellValues[i] == CellValue.free,
+    );
 
     if (freeNeighbors.isEmpty) {
       // I already have all my neighbors filled, nothing to deduce.
@@ -90,23 +94,34 @@ class NeighborCountConstraint extends CellsCentricConstraint {
 
     if (targetColorNeighbors.length > count) {
       // There is an error, I have too many colored neighbors
-      return Move(0, 0, this, isImpossible: this);
+      return Move(0, this, isImpossible: this);
     }
 
     if (targetColorNeighbors.length == count) {
-      // I already have all my colored neighbors, the rest must be the opposite color
-      final opposite = puzzle.domain.whereNot((i) => i == color).first;
-      return Move(freeNeighbors.first, opposite, this, complexity: 0);
+      // I already have all my colored neighbors, the rest must be another color
+      // we check all neighbors to see what options they have left
+      for (var neiIdx in freeNeighbors) {
+        final nei = puzzle.cells[neiIdx];
+        if (nei.options.contains(color)) {
+          return Move(neiIdx, removeOption: color, this, complexity: 0);
+        }
+      }
     }
 
     if (targetColorNeighbors.length + freeNeighbors.length < count) {
       // There are not enough cells to satisfy my constraint
-      return Move(0, 0, this, isImpossible: this);
+      return Move(0, value: CellValue.free, this, isImpossible: this);
     }
 
     if (targetColorNeighbors.length + freeNeighbors.length == count) {
-      // All my free neighbors must match my target color
-      return Move(freeNeighbors.first, color, this, complexity: 0);
+      // All my free neighbors must match my target color. If the chosen
+      // one has excluded `color` (3-colour puzzles), the target count is
+      // no longer reachable.
+      final target = freeNeighbors.first;
+      if (!puzzle.cells[target].options.contains(color)) {
+        return Move(0, this, isImpossible: this);
+      }
+      return Move(target, value: color, this, complexity: 0);
     }
 
     // I don't have all my colored neighbors but there are more free cells than
@@ -119,7 +134,7 @@ class NeighborCountConstraint extends CellsCentricConstraint {
     if (!verify(puzzle)) return false;
     final myNeighbors = puzzle.getNeighbors(indices.first);
     final freeNeighbors = myNeighbors
-        .where((i) => puzzle.cellValues[i] == 0)
+        .where((i) => puzzle.cellValues[i] == CellValue.free)
         .length;
     return freeNeighbors == 0;
   }

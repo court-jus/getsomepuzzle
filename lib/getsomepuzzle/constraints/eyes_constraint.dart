@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -56,35 +55,37 @@ class EyesConstraint extends CellsCentricConstraint {
   @override
   String get slug => 'EY';
 
-  int color = 0;
+  CellValue color = CellValue.free;
   int count = 0;
 
   EyesConstraint(String strParams) {
     final params = strParams.split(".");
     indices = [int.parse(params[0])];
-    color = int.parse(params[1]);
+    color = cellRepresentationToValue(params[1]);
     count = int.parse(params[2]);
   }
 
   @override
-  String serialize() => '$slug:${indices.first}.$color.$count';
+  String serialize() =>
+      '$slug:${indices.first}.${cellValueToString(color)}.$count';
 
   @override
   Constraint rotated(int origWidth, int origHeight) {
     final newIdx = rotateIdx90CW(indices.first, origWidth, origHeight);
-    return EyesConstraint('$newIdx.$color.$count');
+    return EyesConstraint('$newIdx.${cellValueToString(color)}.$count');
   }
 
   @override
   String toString() => '$count';
 
   @override
-  String toHuman(Puzzle puzzle) => '${indices.first + 1} sees $count $color';
+  String toHuman(Puzzle puzzle) =>
+      '${indices.first + 1} sees $count ${cellValueToString(color)}';
 
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final List<String> result = [];
@@ -95,7 +96,7 @@ class EyesConstraint extends CellsCentricConstraint {
         final idx = row * width + col;
         for (int count = minCount; count < maxCount; count++) {
           for (final c in domain) {
-            result.add('$idx.$c.$count');
+            result.add('$idx.${cellValueToString(c)}.$count');
           }
         }
       }
@@ -129,9 +130,9 @@ class EyesConstraint extends CellsCentricConstraint {
     int max = 0;
     for (var i = start; inBounds(i); i += step) {
       final v = puzzle.cellValues[i];
-      if (v != color && v != 0) break;
+      if (v != color && v != CellValue.free) break;
       if (v == color && stillSeeing) seen++;
-      if (v == 0) {
+      if (v == CellValue.free) {
         stillSeeing = false;
         empties.add(i);
         emptyPositions.add(max);
@@ -155,15 +156,14 @@ class EyesConstraint extends CellsCentricConstraint {
   @override
   Move? apply(Puzzle puzzle) {
     final view = whatDoIsee(puzzle);
-    final opposite = puzzle.domain.firstWhereOrNull((v) => v != color) ?? 0;
 
     if (view.totalSeen > count) {
       // Already seeing more than required.
-      return Move(0, 0, this, isImpossible: this);
+      return Move(0, this, isImpossible: this);
     }
     if (view.totalMax < count) {
       // Even filling every reachable empty with the target color is not enough.
-      return Move(0, 0, this, isImpossible: this);
+      return Move(0, this, isImpossible: this);
     }
 
     for (final d in view.directions) {
@@ -178,14 +178,21 @@ class EyesConstraint extends CellsCentricConstraint {
       if (minD > d.seen) {
         for (int i = 0; i < d.empties.length; i++) {
           if (d.emptyPositions[i] < minD) {
-            return Move(d.empties[i], color, this, complexity: 2);
+            // The empty must take `color` to reach the lower bound. If
+            // its options no longer include `color` (3-colour puzzles),
+            // the bound is unreachable.
+            final idx = d.empties[i];
+            if (!puzzle.cells[idx].options.contains(color)) {
+              return Move(0, this, isImpossible: this);
+            }
+            return Move(idx, value: color, this, complexity: 2);
           }
         }
       }
 
       // Upper bound: cells 0..maxD cannot all be color, otherwise count_d would
       // exceed maxD. If exactly one empty is at position <= maxD, that empty
-      // must take the opposite color to break line of sight in time.
+      // must take an opposite color to break line of sight in time.
       if (maxD < d.max) {
         int? unique;
         bool multiple = false;
@@ -205,7 +212,12 @@ class EyesConstraint extends CellsCentricConstraint {
           // a trivial close-the-line move. Otherwise the player needs to
           // juggle per-direction budgets across the four directions.
           final int weight = view.totalSeen == count ? 0 : 3;
-          return Move(unique, opposite, this, complexity: weight);
+          if (puzzle.cells[unique].options.contains(color)) {
+            return Move(unique, removeOption: color, this, complexity: weight);
+          } else {
+            // The only "close-the-line" move is impossible
+            return Move(0, this, isImpossible: this);
+          }
         }
       }
     }

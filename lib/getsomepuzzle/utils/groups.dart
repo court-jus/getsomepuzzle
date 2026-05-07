@@ -1,10 +1,11 @@
 import 'dart:collection';
 
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 Set<int> getMyColorGroup(Puzzle puzzle, int idx) {
   final myValue = puzzle.cellValues[idx];
-  if (myValue == 0) return {};
+  if (myValue == CellValue.free) return {};
   final List<int> result = [idx];
   result.addAll(
     puzzle.getNeighbors(idx).where((e) => puzzle.cellValues[e] == myValue),
@@ -54,7 +55,7 @@ List<List<int>> getGroups(Puzzle puzzle) {
   return result;
 }
 
-List<List<int>> getColorGroups(Puzzle puzzle, int color) {
+List<List<int>> getColorGroups(Puzzle puzzle, CellValue color) {
   return getGroups(puzzle).where((grp) {
     if (grp.isEmpty) return false;
     return puzzle.cellValues[grp.first] == color;
@@ -80,7 +81,7 @@ List<List<int>> getColorGroups(Puzzle puzzle, int color) {
 /// group (e.g. a letter group), given the current opposite-color obstacles.
 List<List<int>> toVirtualGroups(Puzzle puzzle) {
   final result = <List<int>>[];
-  final values = <int>{0, ...puzzle.domain};
+  final values = <CellValue>{CellValue.free, ...puzzle.domain};
   for (final v in values) {
     _componentsAnchoredOnValue(puzzle, v, result);
   }
@@ -88,9 +89,13 @@ List<List<int>> toVirtualGroups(Puzzle puzzle) {
 }
 
 /// Append to [out] each connected component of cells whose value is [v] or
-/// 0, where every component is anchored by at least one cell whose value
+/// has the option [v], where every component is anchored by at least one cell whose value
 /// is exactly [v]. Components are discovered via BFS.
-void _componentsAnchoredOnValue(Puzzle puzzle, int v, List<List<int>> out) {
+void _componentsAnchoredOnValue(
+  Puzzle puzzle,
+  CellValue v,
+  List<List<int>> out,
+) {
   final cellValues = puzzle.cellValues;
   final visited = <int>{};
   for (int start = 0; start < cellValues.length; start++) {
@@ -102,7 +107,7 @@ void _componentsAnchoredOnValue(Puzzle puzzle, int v, List<List<int>> out) {
       final cur = queue.removeFirst();
       for (final nei in puzzle.getNeighbors(cur)) {
         final nv = cellValues[nei];
-        if (nv != v && nv != 0) continue;
+        if (nv != v && !puzzle.cells[nei].options.contains(v)) continue;
         if (!component.add(nei)) continue;
         queue.add(nei);
       }
@@ -116,7 +121,7 @@ void _componentsAnchoredOnValue(Puzzle puzzle, int v, List<List<int>> out) {
 /// merge graph) would prevent at least one of [members] from being reachable
 /// from `members.first`.
 ///
-/// The merge graph spans every cell whose value is [color] or 0 (uncoloured).
+/// The merge graph spans every cell whose value is [color] or hasthe option [color]
 /// Used by constraints that require a set of cells to end up in the same
 /// same-colour group (`LT`, future `GC`) to detect articulation points —
 /// cells that lie on every possible merge path between [members] and must
@@ -129,7 +134,7 @@ void _componentsAnchoredOnValue(Puzzle puzzle, int v, List<List<int>> out) {
 bool blockingDisconnectsMembers(
   Puzzle puzzle,
   int blocked,
-  int color,
+  CellValue color,
   List<int> members,
 ) {
   if (members.length < 2) return false;
@@ -143,7 +148,7 @@ bool blockingDisconnectsMembers(
       if (nei == blocked) continue;
       if (visited.contains(nei)) continue;
       final v = puzzle.cellValues[nei];
-      if (v != color && v != 0) continue;
+      if (v != color && !puzzle.cells[nei].options.contains(color)) continue;
       visited.add(nei);
       queue.add(nei);
     }
@@ -152,9 +157,9 @@ bool blockingDisconnectsMembers(
 }
 
 /// Size of the connected component reachable from [seed] through cells of
-/// value [color] or 0. [seed] itself is included even when its own value
+/// value [color] or having option [color]. [seed] itself is included even when its own value
 /// differs from [color] (callers typically pass a member of a [color] group).
-int reachableComponentSize(Puzzle puzzle, int seed, int color) {
+int reachableComponentSize(Puzzle puzzle, int seed, CellValue color) {
   final visited = <int>{seed};
   final queue = Queue<int>()..add(seed);
   while (queue.isNotEmpty) {
@@ -162,7 +167,7 @@ int reachableComponentSize(Puzzle puzzle, int seed, int color) {
     for (final nei in puzzle.getNeighbors(cur)) {
       if (visited.contains(nei)) continue;
       final v = puzzle.cellValues[nei];
-      if (v != color && v != 0) continue;
+      if (v != color && !puzzle.cells[nei].options.contains(color)) continue;
       visited.add(nei);
       queue.add(nei);
     }
@@ -185,7 +190,7 @@ int reachableComponentSize(Puzzle puzzle, int seed, int color) {
 bool blockingShrinksReachableBelow(
   Puzzle puzzle,
   int blocked,
-  int color,
+  CellValue color,
   int seed,
   int minSize,
 ) {
@@ -198,7 +203,7 @@ bool blockingShrinksReachableBelow(
       if (nei == blocked) continue;
       if (visited.contains(nei)) continue;
       final v = puzzle.cellValues[nei];
-      if (v != color && v != 0) continue;
+      if (v != color && !puzzle.cells[nei].options.contains(color)) continue;
       visited.add(nei);
       queue.add(nei);
     }
@@ -207,8 +212,8 @@ bool blockingShrinksReachableBelow(
 }
 
 bool canMergeGroups(Puzzle puzzle, List<int> groupA, List<int> groupB) {
-  // Check if there exists a path of free cells (value 0 or same color) connecting groupA and groupB
-  // Perform flood fill from all cells in groupA, through cells that are either empty (0) or same color
+  // Check if there exists a path of free cells (same color or having that option) connecting groupA and groupB
+  // Perform flood fill from all cells in groupA, through cells that are either same color or have that option
   final targetColor = puzzle.cellValues[groupA.first];
   final otherColor = puzzle.cellValues[groupB.first];
   if (targetColor != otherColor) return false;
@@ -229,7 +234,7 @@ bool canMergeGroups(Puzzle puzzle, List<int> groupA, List<int> groupB) {
       if (visited.contains(neighbor)) continue;
       final neighborValue = puzzle.cellValues[neighbor];
       // Can traverse through empty cells or cells of the same color
-      if (neighborValue == 0 || neighborValue == targetColor) {
+      if (puzzle.cells[neighbor].options.contains(targetColor) || neighborValue == targetColor) {
         visited.add(neighbor);
         queue.add(neighbor);
         // If we reach any cell in groupB, they can merge
@@ -242,7 +247,7 @@ bool canMergeGroups(Puzzle puzzle, List<int> groupA, List<int> groupB) {
   return false;
 }
 
-int calculateMinGroups(Puzzle puzzle, int color) {
+int calculateMinGroups(Puzzle puzzle, CellValue color) {
   // Calculate the minimum possible number of groups of that color
   // that can be made by merging existing groups in puzzle.
   final groups = getColorGroups(puzzle, color);
@@ -279,10 +284,10 @@ int calculateMinGroups(Puzzle puzzle, int color) {
   return roots.length;
 }
 
-List<int> getFreeCellsWithoutNeighborColor(Puzzle puzzle, int color) {
+List<int> getFreeCellsWithoutNeighborColor(Puzzle puzzle, CellValue color) {
   final List<int> result = [];
   for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
-    if (puzzle.cellValues[idx] != 0) continue;
+    if (puzzle.cellValues[idx] != CellValue.free) continue;
     final neighbors = puzzle.getNeighbors(idx);
     if (!neighbors.any((n) => puzzle.cellValues[n] == color)) {
       result.add(idx);
@@ -291,12 +296,12 @@ List<int> getFreeCellsWithoutNeighborColor(Puzzle puzzle, int color) {
   return result;
 }
 
-List<int> getCellsThatMergeColorGroups(Puzzle puzzle, int color) {
+List<int> getCellsThatMergeColorGroups(Puzzle puzzle, CellValue color) {
   final List<int> result = [];
   final groups = getColorGroups(puzzle, color);
 
   for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
-    if (puzzle.cellValues[idx] != 0) continue;
+    if (!puzzle.cells[idx].options.contains(color)) continue;
 
     final neighbors = puzzle.getNeighbors(idx);
     final neighborGroups = <int>{};

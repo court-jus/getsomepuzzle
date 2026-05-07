@@ -55,19 +55,28 @@ class GSGSComplicity extends Complicity {
         if (!puzzle.getNeighbors(ai).contains(aj)) continue;
         final vi = puzzle.cellValues[ai];
         final vj = puzzle.cellValues[aj];
-        if (vi != 0 && vj != 0) {
-          if (vi == vj) return Move(0, 0, this, isImpossible: this);
+        if (vi != CellValue.free && vj != CellValue.free) {
+          if (vi == vj) {
+            return Move(0, value: CellValue.free, this, isImpossible: this);
+          }
           continue; // already on different colours — nothing to do
         }
-        if (vi != 0 && vj == 0) {
-          final opposite = puzzle.domain.firstWhere((c) => c != vi);
+        if (vi != CellValue.free && vj == CellValue.free) {
           // Tier 3: combination — two GSs reasoning jointly about an
-          // adjacency that neither one alone can rule out yet.
-          return Move(aj, opposite, this, complexity: 3);
+          // adjacency that neither one alone can rule out yet. The two
+          // anchors must take different colours, so aj cannot take vi.
+          // If aj already excluded vi (3-colour puzzles), no useful
+          // deduction here — skip to next pair.
+          if (puzzle.cells[aj].options.contains(vi)) {
+            return Move(aj, removeOption: vi, this, complexity: 3);
+          }
+          continue;
         }
-        if (vj != 0 && vi == 0) {
-          final opposite = puzzle.domain.firstWhere((c) => c != vj);
-          return Move(ai, opposite, this, complexity: 3);
+        if (vj != CellValue.free && vi == CellValue.free) {
+          if (puzzle.cells[ai].options.contains(vj)) {
+            return Move(ai, removeOption: vj, this, complexity: 3);
+          }
+          continue;
         }
         // Both empty: we know they must be different colours but we
         // can't pick a value yet. A later step (other constraints

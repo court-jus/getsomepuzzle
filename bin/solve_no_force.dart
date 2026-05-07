@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
@@ -21,7 +22,11 @@ void main(List<String> args) {
     final src = m.givenBy is Complicity
         ? m.givenBy.serialize()
         : m.givenBy.runtimeType.toString();
-    p.setValue(m.idx, m.value);
+    if (m.value != null) {
+      p.setValue(m.idx, m.value!);
+    } else if (m.removeOption != null) {
+      p.removeOption(m.idx, m.removeOption!);
+    }
     final r = m.idx ~/ p.width;
     final c = m.idx % p.width;
     print('Step ${step + 1}: ($r,$c) = ${m.value} [$src]');
@@ -43,7 +48,7 @@ void _printGrid(Puzzle p) {
     final row = <String>[];
     for (int c = 0; c < p.width; c++) {
       final v = p.cellValues[r * p.width + c];
-      row.add(v == 0 ? '.' : v.toString());
+      row.add(v == CellValue.free ? '.' : v.toString());
     }
     print('  ${row.join(' ')}');
   }

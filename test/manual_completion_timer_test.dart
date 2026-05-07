@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
@@ -28,7 +29,7 @@ void main() {
         expect(game.currentMeta!.stats!.timer.isRunning, isTrue);
 
         for (var i = 0; i < 4; i++) {
-          game.currentPuzzle!.setValue(i, 1);
+          game.currentPuzzle!.setValue(i, CellValue.black);
         }
         game.handleCheck(
           settings,
@@ -43,7 +44,10 @@ void main() {
         );
 
         // Breaking completeness must restart the stopwatch on the next check.
-        game.currentPuzzle!.setValue(0, 0);
+        // `resetCell` returns the cell to free + restores its options — going
+        // through `setValue(free)` would throw RangeError because the cell's
+        // options were cleared by the previous setValue(black).
+        game.currentPuzzle!.resetCell(0);
         game.handleCheck(
           settings,
           invalidConstraintsText: _invalidMsg,
@@ -66,7 +70,7 @@ void main() {
       );
       game.openPuzzle(_fixture(), 1);
       for (var i = 0; i < 4; i++) {
-        game.currentPuzzle!.setValue(i, 1);
+        game.currentPuzzle!.setValue(i, CellValue.black);
       }
       game.handleCheck(
         settings,
@@ -95,7 +99,7 @@ void main() {
       );
       game.openPuzzle(_fixture(), 1);
       for (var i = 0; i < 4; i++) {
-        game.currentPuzzle!.setValue(i, 1);
+        game.currentPuzzle!.setValue(i, CellValue.black);
       }
       game.handleCheck(
         settings,
