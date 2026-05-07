@@ -1,4 +1,4 @@
-package com.example.getsomepuzzle
+package cc.leveque.getsomepuzzle
 
 import io.flutter.embedding.android.FlutterActivity
 
