@@ -7,6 +7,11 @@
 # Privacy-policy HTML pages generated from assets/privacy.*.md by
 # bin/build_privacy.dart at web-build time.
 web/privacy.*.html
+
+# Raw screenshots produced by integration_test/screenshots_test.dart via
+# `flutter drive`. The processed/cropped versions kept under
+# marketing/screenshots/<locale>/ stay tracked.
+marketing/screenshots/raw/
 .DS_Store
 .atom/
 .build/
