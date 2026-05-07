@@ -5,8 +5,6 @@ enum ValidateType { manual, intermediate, automatic }
 
 enum ShowRating { yes, no }
 
-enum ShareData { yes, no }
-
 enum LiveCheckType { all, count, complete }
 
 enum HintType { deducibleCell, addConstraint }
@@ -17,7 +15,6 @@ class ChangeableSettings {
   ValidateType? validateType;
   ShowRating? showRating;
   LiveCheckType? liveCheckType;
-  ShareData? shareData;
   HintType? hintType;
   IdleTimeout? idleTimeout;
   int? playerLevel;
@@ -27,7 +24,6 @@ class ChangeableSettings {
     this.validateType,
     this.showRating,
     this.liveCheckType,
-    this.shareData,
     this.hintType,
     this.idleTimeout,
     this.playerLevel,
@@ -36,14 +32,13 @@ class ChangeableSettings {
 
   @override
   String toString() {
-    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Shar: ${shareData?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}";
+    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}";
   }
 }
 
 class Settings {
   ValidateType validateType;
   ShowRating showRating;
-  ShareData shareData;
   LiveCheckType liveCheckType;
   HintType hintType;
   IdleTimeout idleTimeout;
@@ -55,7 +50,6 @@ class Settings {
   Settings({
     this.validateType = ValidateType.intermediate,
     this.showRating = ShowRating.no,
-    this.shareData = ShareData.yes,
     this.liveCheckType = LiveCheckType.complete,
     this.hintType = HintType.deducibleCell,
     this.idleTimeout = IdleTimeout.disabled,
@@ -65,7 +59,7 @@ class Settings {
 
   @override
   String toString() {
-    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Shar: ${shareData.name}; Hint: ${hintType.name}; Idle: ${idleTimeout.name}";
+    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Hint: ${hintType.name}; Idle: ${idleTimeout.name}";
   }
 
   /// Duration corresponding to the current [idleTimeout], or null when the
@@ -117,14 +111,6 @@ class Settings {
       case "no":
         showRating = ShowRating.no;
     }
-    final String settingsShareData =
-        prefs.getString("settingsShareData") ?? "yes";
-    switch (settingsShareData) {
-      case "yes":
-        shareData = ShareData.yes;
-      case "no":
-        shareData = ShareData.no;
-    }
     final String settingsHintType =
         prefs.getString("settingsHintType") ?? "deducibleCell";
     switch (settingsHintType) {
@@ -148,7 +134,6 @@ class Settings {
     prefs.setString("settingsValidateType", validateType.name);
     prefs.setString("settingsLiveCheckType", liveCheckType.name);
     prefs.setString("settingsShowRating", showRating.name);
-    prefs.setString("settingsShareData", shareData.name);
     prefs.setString("settingsHintType", hintType.name);
     prefs.setString("settingsIdleTimeout", idleTimeout.name);
     prefs.setInt("settingsPlayerLevel", playerLevel);
@@ -164,9 +149,6 @@ class Settings {
     }
     if (newValue.showRating != null) {
       showRating = newValue.showRating!;
-    }
-    if (newValue.shareData != null) {
-      shareData = newValue.shareData!;
     }
     if (newValue.hintType != null) {
       hintType = newValue.hintType!;

@@ -1,7 +1,6 @@
 // ignore_for_file: avoid_print
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -38,7 +37,6 @@ import 'package:getsomepuzzle/utils/platform_utils.dart';
 import 'package:getsomepuzzle/utils/share_link_stub.dart'
     if (dart.library.html) 'package:getsomepuzzle/utils/share_link_html.dart'
     if (dart.library.io) 'package:getsomepuzzle/utils/share_link_io.dart';
-import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -518,11 +516,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   void _onPuzzleCompleted() {
-    postMessage(
-      "played",
-      jsonEncode({"puzzle": game.currentMeta!.lineRepresentation}),
-      settings.shareData,
-    );
     // Bump the global usable-plays counter so the recommendation gate
     // clears as the session progresses — without this the gate only
     // sees the stats loaded at app start and stays stuck below the
@@ -704,14 +697,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void like(int liked) {
     if (game.currentMeta == null) return;
     game.like(liked);
-    postMessage(
-      "like",
-      jsonEncode({
-        "puzzle": game.currentMeta!.lineRepresentation,
-        "liked": liked,
-      }),
-      settings.shareData,
-    );
     loadPuzzle();
   }
 
@@ -1184,32 +1169,5 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             )
           : null,
     );
-  }
-}
-
-Future<http.Response?> postMessage(
-  String endpoint,
-  String body,
-  ShareData share,
-) async {
-  if (share == ShareData.no) return null;
-  final log = Logger("Network");
-  // FINE rather than INFO: telemetry payloads can include the full
-  // puzzle line and shouldn't be in the player's normal console feed.
-  log.fine("Posting message $endpoint with data $body");
-  try {
-    return await http.post(
-      Uri.parse("https://getsomepuzzle.court-jus.net:444/$endpoint/"),
-      headers: <String, String>{
-        "Content-type": "application/json; charset=UTF-8",
-      },
-      body: body,
-    );
-  } on http.ClientException catch (err) {
-    log.severe("Client could not connect $err");
-    return null;
-  } catch (err) {
-    log.severe("Unkown exception while connecting $err");
-    return null;
   }
 }

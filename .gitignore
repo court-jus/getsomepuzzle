@@ -3,6 +3,10 @@
 *.log
 *.pyc
 *.swp
+
+# Privacy-policy HTML pages generated from assets/privacy.*.md by
+# bin/build_privacy.dart at web-build time.
+web/privacy.*.html
 .DS_Store
 .atom/
 .build/

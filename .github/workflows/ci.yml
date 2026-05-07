@@ -132,6 +132,8 @@ jobs:
       - run: flutter --version
       - name: Install Dependencies
         run: flutter pub get
+      - name: Generate privacy-policy HTML pages
+        run: dart run bin/build_privacy.dart
       - name: Build
         run: flutter build web --base-href=/getsomepuzzle/
       - name: package

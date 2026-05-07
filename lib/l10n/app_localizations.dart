@@ -106,6 +106,12 @@ abstract class AppLocalizations {
   /// **'Help'**
   String get help;
 
+  /// Label of the link in the help page that opens the privacy-policy page on the web
+  ///
+  /// In en, this message translates to:
+  /// **'View privacy policy'**
+  String get viewPrivacyPolicy;
+
   /// Label of the menu choice that displays game statistics
   ///
   /// In en, this message translates to:
@@ -375,24 +381,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No'**
   String get settingShowRatingNo;
-
-  /// Does the player want to share they played/liked data?
-  ///
-  /// In en, this message translates to:
-  /// **'Share data'**
-  String get settingShareData;
-
-  /// The player wants to share
-  ///
-  /// In en, this message translates to:
-  /// **'Yes'**
-  String get settingShareDataYes;
-
-  /// The player does not want to share
-  ///
-  /// In en, this message translates to:
-  /// **'No'**
-  String get settingShareDataNo;
 
   /// Does the player want a live check for errors?
   ///

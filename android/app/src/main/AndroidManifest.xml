@@ -42,6 +42,4 @@
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
-    <!-- Required to fetch data from the internet -->
-    <uses-permission android:name="android.permission.INTERNET" />
 </manifest>
