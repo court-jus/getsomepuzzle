@@ -1,0 +1,17 @@
+Get Some Puzzle es un juego de lógica en una cuadrícula. Cada celda se vuelve negra o blanca según las reglas — y siempre hay exactamente una solución.
+
+Sin azar, sin prisa. Cada jugada se deduce lógicamente de las restricciones del rompecabezas. Cuando pides una pista, el juego te guía paso a paso en la deducción en lugar de darte la respuesta.
+
+Las reglas se introducen una por una. Empiezas con restricciones simples de paridad y grupos, y poco a poco descubres las reglas de simetría, las restricciones ojo, los conteos de grupos y de vecinos, y una docena más. Cada restricción cambia tu lectura de la cuadrícula; cada combinación abre un nuevo tipo de razonamiento.
+
+Lo que ofrece:
+• Miles de rompecabezas integrados, con dificultad progresiva.
+• Una lista adaptativa que elige rompecabezas a tu nivel.
+• Un generador integrado: ajusta el tamaño y las restricciones, obtén un rompecabezas nuevo cada vez.
+• Un editor integrado: diseña tus propios rompecabezas y compártelos mediante un enlace.
+• Tres idiomas: inglés, francés, español.
+
+Gratis, sin anuncios, sin rastreo, sin cuenta.
+Get Some Puzzle es de código abierto — todo el código está en GitHub. La aplicación no recopila ni transmite ningún dato: tus estadísticas, ajustes y los rompecabezas que creas permanecen en tu dispositivo.
+
+Diviértete.
