@@ -3,6 +3,13 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_md/flutter_md.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+/// Public URL where the privacy-policy HTML pages are hosted (one per
+/// locale). The pages are generated at build-time from
+/// `assets/privacy.{en,fr,es}.md` by `bin/build_privacy.dart`, copied
+/// into `build/web/` by `flutter build web`, and deployed to gh-pages.
+const _privacyBaseUrl = 'https://court-jus.github.io/getsomepuzzle';
 
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key, required this.locale});
@@ -61,6 +68,20 @@ class _HelpPageState extends State<HelpPage> {
                             : (widget.locale == "es" ? helpEs : helpEn)),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    TextButton.icon(
+                      icon: const Icon(Icons.privacy_tip_outlined),
+                      label: Text(
+                        AppLocalizations.of(context)!.viewPrivacyPolicy,
+                      ),
+                      onPressed: () {
+                        final url = Uri.parse(
+                          '$_privacyBaseUrl/privacy.${widget.locale}.html',
+                        );
+                        launchUrl(url, mode: LaunchMode.externalApplication);
+                      },
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),

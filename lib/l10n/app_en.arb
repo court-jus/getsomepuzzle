@@ -4,6 +4,10 @@
     "@help": {
         "description": "Label of the menu choice that opens the help text"
     },
+    "viewPrivacyPolicy": "View privacy policy",
+    "@viewPrivacyPolicy": {
+        "description": "Label of the link in the help page that opens the privacy-policy page on the web"
+    },
     "stats": "Stats",
     "@stats": {
         "description": "Label of the menu choice that displays game statistics"
@@ -183,18 +187,6 @@
     "settingShowRatingNo": "No",
     "@settingShowRatingNo": {
         "description": "The player does not want to rate each puzzle"
-    },
-    "settingShareData": "Share data",
-    "@settingShareData": {
-        "description": "Does the player want to share they played/liked data?"
-    },
-    "settingShareDataYes": "Yes",
-    "@settingShareDataYes": {
-        "description": "The player wants to share"
-    },
-    "settingShareDataNo": "No",
-    "@settingShareDataNo": {
-        "description": "The player does not want to share"
     },
     "settingsLiveCheckType": "Errors check",
     "@settingsLiveCheckType": {

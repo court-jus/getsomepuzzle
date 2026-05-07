@@ -151,20 +151,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         );
                       }),
                     ),
-                    _EnumSettingRow<ShareData>(
-                      label: l10n.settingShareData,
-                      value: widget.settings.shareData,
-                      options: ShareData.values,
-                      labels: {
-                        ShareData.yes: l10n.settingShareDataYes,
-                        ShareData.no: l10n.settingShareDataNo,
-                      },
-                      onChanged: (v) => setState(() {
-                        widget.onSettingsChange(
-                          ChangeableSettings(shareData: v),
-                        );
-                      }),
-                    ),
                     const SizedBox(height: 16),
                     Text(
                       l10n.settingDifficultyLevel,

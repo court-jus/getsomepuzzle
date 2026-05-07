@@ -1,6 +1,7 @@
 {
     "@@locale": "es",
     "help": "Ayuda",
+    "viewPrivacyPolicy": "Ver la política de privacidad",
     "stats": "Stats",
     "open": "Abrir",
     "restart": "Reiniciar",
@@ -46,9 +47,6 @@
     "settingShowRating": "Calificar",
     "settingShowRatingYes": "Sí",
     "settingShowRatingNo": "No",
-    "settingShareData": "Compartir",
-    "settingShareDataYes": "Sí",
-    "settingShareDataNo": "No",
     "settingsLiveCheckType": "Comprobación de errores",
     "settingsLiveCheckTypeAll": "Tiempo real",
     "settingsLiveCheckTypeCount": "Recuento",

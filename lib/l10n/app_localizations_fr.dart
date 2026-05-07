@@ -12,6 +12,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get help => 'Aide';
 
   @override
+  String get viewPrivacyPolicy => 'Voir la politique de confidentialité';
+
+  @override
   String get stats => 'Stats';
 
   @override
@@ -148,15 +151,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingShowRatingNo => 'Non';
-
-  @override
-  String get settingShareData => 'Partager mes données';
-
-  @override
-  String get settingShareDataYes => 'Oui';
-
-  @override
-  String get settingShareDataNo => 'Non';
 
   @override
   String get settingsLiveCheckType => 'Erreurs';
