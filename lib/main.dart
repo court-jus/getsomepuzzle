@@ -41,7 +41,7 @@ import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.6.9";
+const versionText = "Version 1.6.10";
 
 /// Where the GitHub Pages web build lives. Share links target this URL with
 /// a `?puzzle=<line>` query — works as a browser fallback everywhere, and

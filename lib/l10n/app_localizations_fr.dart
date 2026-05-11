@@ -101,6 +101,31 @@ class AppLocalizationsFr extends AppLocalizations {
   String get statsCopiedToClipboard => 'Stats copiées dans le presse-papier';
 
   @override
+  String get statsScopeCurrent => 'Collection courante';
+
+  @override
+  String get statsScopeAll => 'Toutes les collections';
+
+  @override
+  String get btnImportStats => 'Importer';
+
+  @override
+  String statsImportSuccess(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count statistiques importées',
+      one: '1 statistique importée',
+      zero: 'Aucune statistique importée',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsImportNothingValid =>
+      'Aucune statistique valide dans le fichier sélectionné';
+
+  @override
   String get tooltipPause => 'Pause...';
 
   @override

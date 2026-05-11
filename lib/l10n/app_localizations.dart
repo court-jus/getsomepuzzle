@@ -280,6 +280,36 @@ abstract class AppLocalizations {
   /// **'Stats copied to clipboard'**
   String get statsCopiedToClipboard;
 
+  /// Toggle option on the stats page to display only the stats of the currently loaded collection.
+  ///
+  /// In en, this message translates to:
+  /// **'Current collection'**
+  String get statsScopeCurrent;
+
+  /// Toggle option on the stats page to display the complete stats across every collection ever played.
+  ///
+  /// In en, this message translates to:
+  /// **'All collections'**
+  String get statsScopeAll;
+
+  /// Label of the button that lets the user pick a stats text file and merge its entries into the local stats store.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get btnImportStats;
+
+  /// Snackbar message confirming the import operation.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No stat entries imported} =1{1 stat entry imported} other{{count} stat entries imported}}'**
+  String statsImportSuccess(int count);
+
+  /// Snackbar message when the imported file did not contain a single parseable stat line.
+  ///
+  /// In en, this message translates to:
+  /// **'No valid stat entries found in the selected file'**
+  String get statsImportNothingValid;
+
   /// Tooltip displayed while the mouse is over the pause menu
   ///
   /// In en, this message translates to:

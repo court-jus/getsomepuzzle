@@ -126,3 +126,18 @@ next-deepest gap. Reset on successful generation or on warm-up.
 ## UI
 
 * When showing that a cell can be deduced thanks to a constraint and that constraint is DF, the name of the constraint is not shown.
+
+## Stats persistence
+
+- [ ] **Explore Android Auto Backup** to survive APK uninstall/reinstall
+  without manual user action. Required changes:
+  - `android:allowBackup="true"` and a `fullBackupContent` / `dataExtractionRules`
+    XML in `android/app/src/main/AndroidManifest.xml`.
+  - Backup rules to include `path_provider`'s documents directory (where
+    `stats.txt` and `stats_imported_*.txt` live) and the shared preferences
+    XML if we eventually use it for stats.
+  - Caveats to validate before shipping: 24-hour backup cooldown, requires
+    Google Play services + signed-in account, no effect on emulators
+    without GMS, and the user can disable cloud backup system-wide.
+  - Decide whether to opt in for *all* app data (simpler) or whitelist
+    only the stats subtree (safer in case we ever persist secrets).

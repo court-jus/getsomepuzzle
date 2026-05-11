@@ -30,6 +30,18 @@
     "msgCountMatchingPuzzles": "Nombre de puzzles correspondant",
     "btnShareStats": "Partager",
     "statsCopiedToClipboard": "Stats copiées dans le presse-papier",
+    "statsScopeCurrent": "Collection courante",
+    "statsScopeAll": "Toutes les collections",
+    "btnImportStats": "Importer",
+    "statsImportSuccess": "{count, plural, =0{Aucune statistique importée} =1{1 statistique importée} other{{count} statistiques importées}}",
+    "@statsImportSuccess": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
+    "statsImportNothingValid": "Aucune statistique valide dans le fichier sélectionné",
     "tooltipPause": "Pause...",
     "pausedDueToIdle": "Mis en pause pour inactivité",
     "pausedDueToFocusLost": "Mis en pause car l'application a perdu le focus",

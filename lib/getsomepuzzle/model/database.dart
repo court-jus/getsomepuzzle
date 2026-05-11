@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
@@ -707,13 +706,25 @@ class Database {
     load(assetContent.split("\n"));
     await _augmentWithOverfilledIfOnboarding();
     await currentFilters.load();
+    final stats = await _readRawStatsFromStorage();
+    loadStats(stats);
+    preparePlaylist();
+  }
+
+  /// Read every persisted raw stat line from disk (or `SharedPreferences`
+  /// on web) — across **all** collections. Mirrors the lookup pattern used
+  /// at app boot: every `stats*` key on web, every file whose path
+  /// contains `…/getsomepuzzle/stats` on native. Lines are returned in
+  /// whatever order the storage iteration yields them, with duplicates
+  /// across files left intact — caller dedupes if needed.
+  Future<List<String>> _readRawStatsFromStorage() async {
     final List<String> stats = [];
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
       for (final key in prefs.getKeys()) {
         if (key.startsWith("stats")) {
           log.finer("Loading stats from $key");
-          stats.addAll(prefs.getStringList(key) ?? []);
+          stats.addAll(prefs.getStringList(key) ?? const []);
         }
       }
     } else {
@@ -721,34 +732,60 @@ class Database {
       final path = p.join(documentsDirectory.path, "getsomepuzzle");
       final pattern = p.join(path, "stats");
       await Directory(path).create(recursive: true);
-      for (final file in Directory(path).listSync()) {
-        if (file.path.contains(pattern)) {
-          log.finer("Loading stats from ${file.path}");
-          final fileIo = File(file.path);
-          final content = await fileIo.readAsString();
-          stats.addAll(content.split("\n"));
-        }
+      for (final entry in Directory(path).listSync()) {
+        if (entry is! File || !entry.path.contains(pattern)) continue;
+        log.finer("Loading stats from ${entry.path}");
+        final content = await entry.readAsString();
+        stats.addAll(content.split("\n"));
       }
     }
-    loadStats(stats);
-    preparePlaylist();
+    return stats;
   }
 
+  /// Persist the currently-played puzzles of the active collection without
+  /// erasing entries from every other collection.
+  ///
+  /// Why we don't just write `getStats()` verbatim: that returns only the
+  /// *current* collection's played puzzles, and `stats.txt` is the only
+  /// file written here. Switching collections mid-session would therefore
+  /// overwrite the file with whatever the new collection has played (often
+  /// zero entries — see the regression captured in `todo.md`), silently
+  /// wiping every other collection's play history.
+  ///
+  /// Instead we read **every** existing stat line from storage (canonical
+  /// stats files + any imported file), dedupe by canonical puzzle key, and
+  /// overlay the current session's plays on top so they win on conflict.
+  /// The result is written back to the canonical `stats.txt` (or the
+  /// `"stats"` `SharedPreferences` key on web). Legacy / imported stat
+  /// files are left untouched — the canonical-key dedupe at load time
+  /// keeps everything coherent, and the redundancy survives a `clearAllStats`
+  /// because that helper deletes every `stats*` file outright.
   Future<void> writeStats() async {
-    final List<String> stats = getStats();
+    final raw = await _readRawStatsFromStorage();
+    final Map<String, String> byKey = {};
+    for (final line in raw) {
+      final entry = StatEntry.parse(line);
+      if (entry == null) continue;
+      byKey[canonicalPuzzleKey(entry.puzzleLine)] = line;
+    }
+    final fromSession = getStats();
+    for (final line in fromSession) {
+      final entry = StatEntry.parse(line);
+      if (entry == null) continue;
+      byKey[canonicalPuzzleKey(entry.puzzleLine)] = line;
+    }
+    final merged = byKey.values.toList()..sort();
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList("stats", stats);
+      await prefs.setStringList("stats", merged);
       return;
     }
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = p.join(documentsDirectory.path, "getsomepuzzle");
     await Directory(path).create(recursive: true);
     final filePath = p.join(path, "stats.txt");
-    final file = File(filePath);
-
-    file.writeAsStringSync(
-      stats.sorted().join("\n"),
+    File(filePath).writeAsStringSync(
+      merged.join("\n"),
       mode: FileMode.writeOnly,
       flush: true,
     );
@@ -1360,6 +1397,77 @@ class Database {
         .where((puz) => puz.played)
         .map((puz) => puz.getStat())
         .toList();
+  }
+
+  /// Merge raw stat lines from an imported file into persistent storage,
+  /// then reload the in-memory state. Only the lines that successfully
+  /// parse as [StatEntry] are kept (so user-edited or corrupt files don't
+  /// poison the store). Returns the number of valid entries persisted.
+  ///
+  /// We deliberately write to a fresh `stats_imported_<ts>.txt` rather
+  /// than overwriting `stats.txt`: the next [writeStats] call would clobber
+  /// `stats.txt` with only the current collection's plays, throwing away
+  /// the import for every other collection. The dedicated file is picked
+  /// up by [_readRawStatsFromStorage] on subsequent boots like any other
+  /// stats file, and [loadStats] dedupes by canonical key so duplicates
+  /// between the import and the existing store collapse harmlessly.
+  Future<int> importStats(String content) async {
+    final List<String> validLines = [];
+    for (final raw in content.split('\n')) {
+      final line = raw.trim();
+      if (line.isEmpty || line.startsWith('#')) continue;
+      if (StatEntry.parse(line) == null) continue;
+      validLines.add(line);
+    }
+    if (validLines.isEmpty) return 0;
+    final timestamp = DateTime.now().toIso8601String().replaceAll(
+      RegExp(r'[:.]'),
+      '-',
+    );
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      // SharedPreferences keys starting with "stats" are picked up by
+      // _readRawStatsFromStorage — same merge semantics as the native path.
+      await prefs.setStringList('stats_imported_$timestamp', validLines);
+    } else {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final dirPath = p.join(documentsDirectory.path, 'getsomepuzzle');
+      await Directory(dirPath).create(recursive: true);
+      final filePath = p.join(dirPath, 'stats_imported_$timestamp.txt');
+      File(filePath).writeAsStringSync(
+        validLines.join('\n'),
+        mode: FileMode.writeOnly,
+        flush: true,
+      );
+    }
+    final allStats = await _readRawStatsFromStorage();
+    loadStats(allStats);
+    preparePlaylist();
+    return validLines.length;
+  }
+
+  /// Every persisted stat line across **all** collections, deduplicated by
+  /// canonical puzzle key (the same key used by [loadStats] so legacy lines
+  /// embedding a stale `cplx` still collapse with the current line).
+  ///
+  /// In-session plays from the currently-loaded collection are folded in
+  /// last so they take precedence over any older snapshot still on disk —
+  /// otherwise viewing or sharing right after finishing a puzzle would
+  /// surface its previous entry (or nothing) instead of the just-recorded
+  /// timings.
+  Future<List<String>> getAllStats() async {
+    final raw = await _readRawStatsFromStorage();
+    final Map<String, String> byKey = {};
+    for (final line in raw) {
+      final entry = StatEntry.parse(line);
+      if (entry == null) continue;
+      byKey[canonicalPuzzleKey(entry.puzzleLine)] = line;
+    }
+    for (final puz in puzzles.where((p) => p.played)) {
+      byKey[canonicalPuzzleKey(puz.lineRepresentation)] = puz.getStat();
+    }
+    final result = byKey.values.toList()..sort();
+    return result;
   }
 
   String _playlistFileName(String slug) =>

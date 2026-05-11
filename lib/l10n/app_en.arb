@@ -120,6 +120,32 @@
     "@statsCopiedToClipboard": {
         "description": "Snackbar message shown when sharing the stats fell back to copying them into the clipboard."
     },
+    "statsScopeCurrent": "Current collection",
+    "@statsScopeCurrent": {
+        "description": "Toggle option on the stats page to display only the stats of the currently loaded collection."
+    },
+    "statsScopeAll": "All collections",
+    "@statsScopeAll": {
+        "description": "Toggle option on the stats page to display the complete stats across every collection ever played."
+    },
+    "btnImportStats": "Import",
+    "@btnImportStats": {
+        "description": "Label of the button that lets the user pick a stats text file and merge its entries into the local stats store."
+    },
+    "statsImportSuccess": "{count, plural, =0{No stat entries imported} =1{1 stat entry imported} other{{count} stat entries imported}}",
+    "@statsImportSuccess": {
+        "description": "Snackbar message confirming the import operation.",
+        "placeholders": {
+            "count": {
+                "type": "int",
+                "example": "42"
+            }
+        }
+    },
+    "statsImportNothingValid": "No valid stat entries found in the selected file",
+    "@statsImportNothingValid": {
+        "description": "Snackbar message when the imported file did not contain a single parseable stat line."
+    },
     "tooltipPause": "Pause...",
     "@tooltipPause": {
         "description": "Tooltip displayed while the mouse is over the pause menu"
