@@ -1,16 +1,31 @@
 // Capture store screenshots through the integration_test harness.
 //
-// Invocation:
+// Invocation (one command regenerates everything):
 //   xvfb-run -a flutter test integration_test/screenshots_test.dart -d linux
 //
-// Locale defaults to English; override with `LOCALE=fr` (or `es`) on the
-// command line to capture another locale's screens. PNGs land under
-// `marketing/screenshots/raw/<locale>_<NN>_<name>.png`.
+// Coverage: 4 scenarios × 3 locales (en/fr/es) × 5 device profiles =
+// 60 PNGs written under
+//   marketing/screenshots/raw/<locale>/<device>/<NN>_<name>.png
+//
+// Each device profile sets `tester.view.physicalSize` to the store's
+// target dimensions with `dpr=2.0`, so the rasterized PNG is a 2×
+// supersample of the spec — better for visual review and downsamples
+// cleanly to exact store dims via `convert -resize 50%`. Logical canvas
+// (= physicalSize / dpr) stays at 540–1024 dp, matching what real
+// phones/tablets/iPad use, so the layout doesn't break.
+//
+//   device          physicalSize    output PNG    store target
+//   play_phone      1080×1920       2160×3840     1080×1920
+//   play_tablet_7   1200×1920       2400×3840     1200×1920
+//   play_tablet_10  1600×2560       3200×5120     1600×2560
+//   iphone_67       1290×2796       2580×5592     1290×2796
+//   ipad_129        2048×2732       4096×5464     2048×2732
 //
 // We bypass `binding.takeScreenshot()` because that path requires a
 // platform-channel implementation that Flutter desktop doesn't ship —
-// instead we walk the render tree to grab the topmost
-// RenderRepaintBoundary and call `toImage` directly.
+// instead we rasterize the RenderView's root composited OffsetLayer so
+// overlays (drawers, modal dialogs) appear behind the menu the way they
+// do on a real device.
 
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -26,7 +41,22 @@ import 'package:getsomepuzzle/widgets/cell.dart';
 
 import 'helpers/harness.dart';
 
-const _supportedLocales = {'en', 'fr', 'es'};
+const _locales = ['en', 'fr', 'es'];
+
+class _Device {
+  const _Device(this.name, this.physicalSize, this.dpr);
+  final String name;
+  final Size physicalSize;
+  final double dpr;
+}
+
+const _devices = [
+  _Device('play_phone', Size(1080, 1920), 2.0),
+  _Device('play_tablet_7', Size(1200, 1920), 2.0),
+  _Device('play_tablet_10', Size(1600, 2560), 2.0),
+  _Device('iphone_67', Size(1290, 2796), 2.0),
+  _Device('ipad_129', Size(2048, 2732), 2.0),
+];
 
 /// 5×8 fixture loaded from assets/1-easy.txt: CC + DF + GS + PA + SY all
 /// in the same puzzle, partly pre-filled. Visually richer than the
@@ -40,13 +70,9 @@ const _fixture5x8MultiRules =
     'SY:14.5;SY:23.3;SY:23.4;SY:39.3'
     '_1:2121111112211122221221121221122211222221_30';
 
-/// 1080×1920 portrait at dpr=2 → a 2160×3840 PNG, well within Play Store
-/// and App Store ranges and easy to crop down to specific device aspect
-/// ratios in post-processing. The grid is responsive enough that this
-/// resolution renders without overflow.
-void _setPhoneViewport(WidgetTester tester) {
-  tester.view.physicalSize = const Size(1080, 1920);
-  tester.view.devicePixelRatio = 2.0;
+void _setViewport(WidgetTester tester, _Device device) {
+  tester.view.physicalSize = device.physicalSize;
+  tester.view.devicePixelRatio = device.dpr;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 }
@@ -60,7 +86,12 @@ void _setPhoneViewport(WidgetTester tester) {
 /// actually sees on screen. The root layer rasters every child layer in
 /// composition order: home + drawer + dialog stacked the way Flutter
 /// paints them.
-Future<void> _capture(WidgetTester tester, String name) async {
+Future<void> _capture(
+  WidgetTester tester,
+  String locale,
+  _Device device,
+  String name,
+) async {
   final view = tester.binding.renderViews.first;
   final layer = view.debugLayer;
   if (layer is! OffsetLayer) {
@@ -76,7 +107,9 @@ Future<void> _capture(WidgetTester tester, String name) async {
   final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
   final bytes = byteData!.buffer.asUint8List();
 
-  final out = File(p.join('marketing', 'screenshots', 'raw', '$name.png'));
+  final out = File(
+    p.join('marketing', 'screenshots', 'raw', locale, device.name, '$name.png'),
+  );
   out.parent.createSync(recursive: true);
   out.writeAsBytesSync(bytes);
   // ignore: avoid_print
@@ -85,90 +118,95 @@ Future<void> _capture(WidgetTester tester, String name) async {
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  final localeEnv = Platform.environment['LOCALE'] ?? 'en';
-  final locale = _supportedLocales.contains(localeEnv) ? localeEnv : 'en';
 
-  group('Store screenshots ($locale)', () {
-    testWidgets('rich grid', (tester) async {
-      // Multi-constraint 5x8 puzzle: shows that the game is more than
-      // single-rule grids. Renders a near-vertical grid on a phone-shaped
-      // viewport, filling the screen well.
-      await prepareApp(
-        {'locale': locale},
-        customPuzzles: [_fixture5x8MultiRules],
-      );
-      _setPhoneViewport(tester);
-      app.main([]);
-      await tester.pumpAndSettle(const Duration(seconds: 5));
-      await _capture(tester, '${locale}_01_rich_grid');
-    });
+  for (final locale in _locales) {
+    for (final device in _devices) {
+      group('Store screenshots ($locale / ${device.name})', () {
+        testWidgets('rich grid', (tester) async {
+          // Multi-constraint 5×8 puzzle: shows that the game is more
+          // than single-rule grids. Renders a near-vertical grid on a
+          // phone-shaped viewport, filling the screen well.
+          await prepareApp(
+            {'locale': locale},
+            customPuzzles: [_fixture5x8MultiRules],
+          );
+          _setViewport(tester, device);
+          app.main([]);
+          await tester.pumpAndSettle(const Duration(seconds: 5));
+          await _capture(tester, locale, device, '01_rich_grid');
+        });
 
-    testWidgets('main drawer open', (tester) async {
-      await prepareApp({'locale': locale}, customPuzzles: [fixture5x3]);
-      _setPhoneViewport(tester);
-      app.main([]);
-      await tester.pumpAndSettle(const Duration(seconds: 5));
-      await openDrawer(tester);
-      await _capture(tester, '${locale}_02_drawer');
-    });
+        testWidgets('main drawer open', (tester) async {
+          await prepareApp({'locale': locale}, customPuzzles: [fixture5x3]);
+          _setViewport(tester, device);
+          app.main([]);
+          await tester.pumpAndSettle(const Duration(seconds: 5));
+          await openDrawer(tester);
+          await _capture(tester, locale, device, '02_drawer');
+        });
 
-    testWidgets('help page', (tester) async {
-      await prepareApp({'locale': locale}, customPuzzles: [fixture5x3]);
-      _setPhoneViewport(tester);
-      app.main([]);
-      await tester.pumpAndSettle(const Duration(seconds: 5));
-      await openDrawer(tester);
-      await tester.tap(find.byIcon(Icons.help));
-      await tester.pumpAndSettle();
-      await _capture(tester, '${locale}_03_help');
-    });
+        testWidgets('help page', (tester) async {
+          await prepareApp({'locale': locale}, customPuzzles: [fixture5x3]);
+          _setViewport(tester, device);
+          app.main([]);
+          await tester.pumpAndSettle(const Duration(seconds: 5));
+          await openDrawer(tester);
+          await tester.tap(find.byIcon(Icons.help));
+          await tester.pumpAndSettle();
+          await _capture(tester, locale, device, '03_help');
+        });
 
-    testWidgets('editor with constraint-type picker', (tester) async {
-      // Open the in-app editor (CreatePage) with an empty grid, then tap
-      // the first cell — `_onCellTap` calls `showConstraintTypePicker`
-      // for unconstrained cells, which opens the dialog we want to
-      // showcase.
-      await prepareApp({'locale': locale}, customPuzzles: [fixture5x3]);
-      _setPhoneViewport(tester);
-      app.main([]);
-      await tester.pumpAndSettle(const Duration(seconds: 5));
+        testWidgets('editor with constraint-type picker', (tester) async {
+          // Open the in-app editor (CreatePage) with an empty grid,
+          // then tap the first cell — `_onCellTap` calls
+          // `showConstraintTypePicker` for unconstrained cells, which
+          // opens the dialog we want to showcase.
+          await prepareApp({'locale': locale}, customPuzzles: [fixture5x3]);
+          _setViewport(tester, device);
+          app.main([]);
+          await tester.pumpAndSettle(const Duration(seconds: 5));
 
-      await openDrawer(tester);
-      // The drawer's "Library" section (containing the Edit/Create
-      // entry) is collapsed by default — expand it before the icon
-      // tap. Restrict the ExpansionTile finder to the drawer subtree:
-      // with a puzzle loaded, the drawer shows three sections —
-      // Current Puzzle (initiallyExpanded), Library, Progress — and
-      // Library is the second ExpansionTile inside the Drawer.
-      final drawerSections = find.descendant(
-        of: find.byType(Drawer),
-        matching: find.byType(ExpansionTile),
-      );
-      await tester.tap(drawerSections.at(1));
-      await tester.pumpAndSettle();
+          await openDrawer(tester);
+          // The drawer's "Library" section (containing the Edit/Create
+          // entry) is collapsed by default — expand it before the icon
+          // tap. Restrict the ExpansionTile finder to the drawer
+          // subtree: with a puzzle loaded, the drawer shows three
+          // sections — Current Puzzle (initiallyExpanded), Library,
+          // Progress — and Library is the second ExpansionTile inside
+          // the Drawer.
+          final drawerSections = find.descendant(
+            of: find.byType(Drawer),
+            matching: find.byType(ExpansionTile),
+          );
+          await tester.tap(drawerSections.at(1));
+          await tester.pumpAndSettle();
 
-      // Edit icon now visible inside the drawer's Library section. Tap
-      // it; the wrapping ListTile pops the drawer and pushes CreatePage.
-      await tester.tap(
-        find.descendant(
-          of: find.byType(Drawer),
-          matching: find.byIcon(Icons.edit),
-        ),
-      );
-      await tester.pumpAndSettle();
+          // Edit icon now visible inside the drawer's Library section.
+          // Tap it; the wrapping ListTile pops the drawer and pushes
+          // CreatePage.
+          await tester.tap(
+            find.descendant(
+              of: find.byType(Drawer),
+              matching: find.byIcon(Icons.edit),
+            ),
+          );
+          await tester.pumpAndSettle();
 
-      // CreatePage opens on a dimensions form (two sliders + a "Start"
-      // ElevatedButton with Icons.edit). Tap that button to enter the
-      // editor proper, where the empty 4×4 grid materialises.
-      await tester.tap(find.widgetWithIcon(ElevatedButton, Icons.edit));
-      await tester.pumpAndSettle();
+          // CreatePage opens on a dimensions form (two sliders + a
+          // "Start" ElevatedButton with Icons.edit). Tap that button
+          // to enter the editor proper, where the empty 4×4 grid
+          // materialises.
+          await tester.tap(find.widgetWithIcon(ElevatedButton, Icons.edit));
+          await tester.pumpAndSettle();
 
-      // Now tap (0,0) — `_onCellTap` triggers `showConstraintTypePicker`
-      // for an unconstrained cell.
-      await tester.tap(find.byType(CellWidget).first);
-      await tester.pumpAndSettle();
+          // Now tap (0,0) — `_onCellTap` triggers
+          // `showConstraintTypePicker` for an unconstrained cell.
+          await tester.tap(find.byType(CellWidget).first);
+          await tester.pumpAndSettle();
 
-      await _capture(tester, '${locale}_04_editor_rule_picker');
-    });
-  });
+          await _capture(tester, locale, device, '04_editor_rule_picker');
+        });
+      });
+    }
+  }
 }

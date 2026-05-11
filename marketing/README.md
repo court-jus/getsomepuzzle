@@ -86,61 +86,87 @@ Windows.
 
 ## Screenshots
 
-Captured from the integration-test harness on Linux. Each scenario is a
-regular `testWidgets` body that drives the app to the target screen and
-then walks the render tree to grab the topmost
-`RenderRepaintBoundary`, writing a PNG straight to
-`marketing/screenshots/raw/<locale>_<NN>_<name>.png`. The boilerplate
-lives in `integration_test/screenshots_test.dart` (test bodies + capture
-helper) and reuses the existing `integration_test/helpers/harness.dart`
-for puzzle seeding and SharedPreferences mocking — no separate
-`flutter drive` driver is needed.
+Captured from the integration-test harness on Linux. A single command
+regenerates the full matrix: 4 scenarios × 3 locales (en/fr/es) × 5
+device profiles = 60 PNGs. The boilerplate lives in
+`integration_test/screenshots_test.dart` (test bodies + capture helper)
+and reuses `integration_test/helpers/harness.dart` for puzzle seeding
+and SharedPreferences mocking — no separate `flutter drive` driver is
+needed.
 
 ### Why not `binding.takeScreenshot()`
 
 `IntegrationTestWidgetsFlutterBinding.takeScreenshot()` routes through a
 platform channel that isn't implemented on Flutter desktop, so it throws
-`MissingPluginException` on Linux. Walking the render tree to a
-`RenderRepaintBoundary` and calling `toImage` directly avoids the
-channel and works the same on Linux, macOS and Windows hosts.
+`MissingPluginException` on Linux. We rasterize the `RenderView`'s root
+`OffsetLayer` directly via `layer.toImage`, which avoids the channel and
+works the same on Linux, macOS and Windows hosts.
 
 ### Run
 
 ```bash
-# English (default)
 xvfb-run -a flutter test integration_test/screenshots_test.dart -d linux
-
-# French / Spanish — overrides the seeded SharedPreferences locale
-LOCALE=fr xvfb-run -a flutter test integration_test/screenshots_test.dart -d linux
-LOCALE=es xvfb-run -a flutter test integration_test/screenshots_test.dart -d linux
 ```
 
-The viewport is set to 1080×1920 at dpr=2 (→ 2160×3840 PNG), large
-enough to crop down to any phone aspect ratio in post-processing. The
-`marketing/screenshots/raw/` directory is gitignored — once you've
-picked the keepers and cropped them to per-store dimensions, drop the
-final files in `marketing/screenshots/<locale>/` (tracked).
+One command, every locale and device profile. Outputs land under
+`marketing/screenshots/raw/<locale>/<device>/<NN>_<name>.png` — directory
+is gitignored. Final keepers go under `marketing/screenshots/<locale>/`
+(tracked).
 
-### Required output (per store)
+### Device profiles
 
-- **Play Store**: ≥2 phone screenshots; 7" and 10" tablet recommended.
-- **App Store**: 6.7" iPhone (1290×2796) + 6.5" iPhone (1242×2688), and
-  12.9" iPad (2048×2732) if you target tablets.
+Each profile sets `tester.view.physicalSize` to the store's spec with
+`dpr=2.0`, so the rasterized PNG is a clean 2× supersample of the
+target. Logical canvas (= physicalSize / dpr) stays at 540–1024 dp,
+matching what real phones, tablets and iPad use — so layout doesn't
+break.
+
+| device          | physicalSize | output PNG  | store target | use            |
+|-----------------|--------------|-------------|--------------|----------------|
+| `play_phone`    | 1080×1920    | 2160×3840   | 1080×1920    | Play phone     |
+| `play_tablet_7` | 1200×1920    | 2400×3840   | 1200×1920    | Play 7" tablet |
+| `play_tablet_10`| 1600×2560    | 3200×5120   | 1600×2560    | Play 10" tablet|
+| `iphone_67`     | 1290×2796    | 2580×5592   | 1290×2796    | App Store 6.7" |
+| `ipad_129`      | 2048×2732    | 4096×5464   | 2048×2732    | App Store iPad |
+
+To get the exact store dimensions, downsample 2× into the tracked
+tree with the bundled helper:
+
+```bash
+marketing/finalize_screenshots.sh           # all locales / devices
+marketing/finalize_screenshots.sh fr        # one locale
+marketing/finalize_screenshots.sh fr/iphone_67   # one (locale, device)
+```
+
+The script reads from `marketing/screenshots/raw/<locale>/<device>/...`
+and writes 50%-resized PNGs at exact store dimensions to
+`marketing/screenshots/<locale>/<device>/...`. Requires ImageMagick
+(`magick` in PATH). The hi-res raw is kept because it's easier to
+review than a tight, exact-spec PNG.
 
 ### Current scenarios
 
-| File | What it shows |
-|------|---------------|
-| `<locale>_01_rich_grid.png` | A 5×8 fixture (`_fixture5x8MultiRules`) carrying CC + DF + GS + PA + SY constraints — visual proof that the game runs deeper than single-rule grids. |
-| `<locale>_02_drawer.png` | The main drawer open, surfacing browse / generate / create / stats / settings entries. |
-| `<locale>_03_help.png` | The help page, top of the constraint catalogue. |
-| `<locale>_04_editor_rule_picker.png` | The in-app editor with the constraint-type picker dialog open, listing all 12 rule types. |
+| File                                 | What it shows |
+|--------------------------------------|---------------|
+| `<…>/01_rich_grid.png`               | A 5×8 fixture (`_fixture5x8MultiRules`) carrying CC + DF + GS + PA + SY constraints — visual proof that the game runs deeper than single-rule grids. |
+| `<…>/02_drawer.png`                  | The main drawer open, surfacing browse / generate / create / stats / settings entries on top of the live game screen. |
+| `<…>/03_help.png`                    | The help page, top of the constraint catalogue. |
+| `<…>/04_editor_rule_picker.png`      | The in-app editor with the constraint-type picker dialog open, listing all 12 rule types over an in-progress empty grid. |
 
 ### Adding a scenario
 
-Drop another `testWidgets` block in `screenshots_test.dart`, drive the
-UI to the screen, call `_capture(tester, '${locale}_NN_name')`. Re-run
-the command; the new PNG appears alongside the others.
+Drop another `testWidgets` block inside the `for (locale)` × `for
+(device)` loops in `screenshots_test.dart`, drive the UI to the screen,
+call `_capture(tester, locale, device, 'NN_name')`. Re-run the command;
+the new PNG appears under every locale/device subdirectory.
+
+### Adding a device profile
+
+Append an entry to the `_devices` list at the top of
+`screenshots_test.dart` — `(name, physicalSize, dpr)`. Output PNG
+dimensions are `physicalSize × dpr`, and logical canvas (used for
+layout) is `physicalSize / dpr` — keep logical above ~400 dp on the
+short edge so the existing UI lays out without overflow.
 
 ### Capture implementation
 
