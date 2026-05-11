@@ -279,138 +279,139 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintQuantity => 'quantité';
 
   @override
-  String get constraintSymmetry => 'symmetry';
+  String get constraintSymmetry => 'symétrie';
 
   @override
-  String get generate => 'Generate';
+  String get generate => 'Générer';
 
   @override
-  String get generateTitle => 'Generate puzzles';
+  String get generateTitle => 'Générer des puzzles';
 
   @override
-  String get generateWidth => 'Width';
+  String get generateWidth => 'Largeur';
 
   @override
-  String get generateHeight => 'Height';
+  String get generateHeight => 'Hauteur';
 
   @override
-  String get generateRequiredRules => 'Required rules';
+  String get generateRequiredRules => 'Règles requises';
 
   @override
-  String get generateExcludedRules => 'Excluded rules';
+  String get generateExcludedRules => 'Règles exclues';
 
   @override
-  String get generateMaxTime => 'Max time';
+  String get generateMaxTime => 'Temps max';
 
   @override
   String get generateCount => 'Puzzles';
 
   @override
-  String get generateStart => 'Generate';
+  String get generateStart => 'Générer';
 
   @override
-  String get generateStop => 'Stop';
+  String get generateStop => 'Arrêter';
 
   @override
   String generateProgress(int current, int total) {
-    return 'Generated $current / $total puzzles';
+    return '$current / $total puzzles générés';
   }
 
   @override
-  String get generateComplete => 'Generation complete!';
+  String get generateComplete => 'Génération terminée !';
 
   @override
-  String get generateConstraints => 'Constraints';
+  String get generateConstraints => 'Contraintes';
 
   @override
   String get generateFailed =>
-      'No puzzles could be generated with these parameters. Try different settings.';
+      'Aucun puzzle n\'a pu être généré avec ces paramètres. Essaie d\'autres réglages.';
 
   @override
-  String get generatePlay => 'Play';
+  String get generatePlay => 'Jouer';
 
   @override
-  String get generateMore => 'More';
+  String get generateMore => 'Plus';
 
   @override
   String get noCustomPuzzles =>
-      'No custom puzzles yet. Use the Generate page to create some!';
+      'Pas encore de puzzles personnalisés. Utilise la page Générer pour en créer !';
 
   @override
-  String get create => 'Create';
+  String get create => 'Créer';
 
   @override
-  String get createTitle => 'Create a puzzle';
+  String get createTitle => 'Créer un puzzle';
 
   @override
-  String get createStart => 'Start editing';
+  String get createStart => 'Commencer l\'édition';
 
   @override
-  String get createTest => 'Test';
+  String get createTest => 'Tester';
 
   @override
-  String get createValidate => 'Validate';
+  String get createValidate => 'Valider';
 
   @override
-  String get createSave => 'Save';
+  String get createSave => 'Enregistrer';
 
   @override
-  String get createSaved => 'Puzzle saved!';
+  String get createSaved => 'Puzzle enregistré !';
 
   @override
-  String get createSolvable => 'Solvable';
+  String get createSolvable => 'Résoluble';
 
   @override
-  String get createNotSolvable => 'Not solvable';
+  String get createNotSolvable => 'Insoluble';
 
   @override
-  String get createUniqueSolution => 'Unique solution';
+  String get createUniqueSolution => 'Solution unique';
 
   @override
-  String get createMultipleSolutions => 'Multiple solutions';
+  String get createMultipleSolutions => 'Plusieurs solutions';
 
   @override
-  String get createNoSolution => 'No solution';
+  String get createNoSolution => 'Aucune solution';
 
   @override
-  String get createComplexity => 'Complexity';
+  String get createComplexity => 'Complexité';
 
   @override
-  String get createNoConstraints => 'Tap a cell to add a constraint';
+  String get createNoConstraints =>
+      'Touche une case pour ajouter une contrainte';
 
   @override
-  String get createAddConstraint => 'Add a constraint';
+  String get createAddConstraint => 'Ajouter une contrainte';
 
   @override
-  String get createChooseType => 'Constraint type';
+  String get createChooseType => 'Type de contrainte';
 
   @override
-  String get createChooseSide => 'Side';
+  String get createChooseSide => 'Côté';
 
   @override
-  String get createChooseAxis => 'Symmetry axis';
+  String get createChooseAxis => 'Axe de symétrie';
 
   @override
-  String get createChooseSize => 'Group size';
+  String get createChooseSize => 'Taille du groupe';
 
   @override
-  String get createChooseLetter => 'Letter';
+  String get createChooseLetter => 'Lettre';
 
   @override
-  String get createChooseValue => 'Value';
+  String get createChooseValue => 'Valeur';
 
   @override
-  String get createChooseCount => 'Count';
+  String get createChooseCount => 'Nombre';
 
   @override
-  String get createMotifWidth => 'Pattern width';
+  String get createMotifWidth => 'Largeur du motif';
 
   @override
-  String get createMotifHeight => 'Pattern height';
+  String get createMotifHeight => 'Hauteur du motif';
 
   @override
   String createLetterGroupMode(String letter) {
-    return 'Tap cells to add to group $letter, then press Done';
+    return 'Touche les cases pour les ajouter au groupe $letter, puis appuie sur Terminer';
   }
 
   @override
@@ -598,7 +599,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get constraintExplainGC =>
-      'A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.';
+      'Un nombre encadré avec une icône de chaîne indique combien de groupes distincts (composantes connexes) de cette couleur la solution doit contenir.';
 
   @override
   String get constraintExplainNC =>
