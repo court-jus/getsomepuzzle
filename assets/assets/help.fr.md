@@ -107,9 +107,7 @@ Après l'ajout d'une contrainte, le cycle reprend au diagnostic d'erreurs sur l'
 
 ## Stats
 
-Le jeu enregistre le temps passé à résoudre un puzzle ainsi que le nombre d'erreurs. Ces données ne sont pas collectés automatiquement mais j'apprécierai que vous me les envoyiez, j'ai l'intention de m'en servir pour calculer la difficulté des puzzles.
-
-Le jeu envoie automatiquement s'il le peut l'identification des puzzles joués, ainsi que leur appréciation. Ces données sont complètement anonymes mais vous pouvez tout de même refuser leur envoi dans le menu paramètres.
+Le jeu enregistre le temps passé à résoudre un puzzle ainsi que le nombre d'erreurs. Ces données restent sur votre appareil — rien n'est collecté automatiquement. Si vous résolvez beaucoup de puzzles, je serai ravi que vous me les envoyiez : je m'en sers pour calculer la difficulté des puzzles.
 
 Pour m'envoyer les stats, cliquez sur le choix correspondant dans le menu puis sur le bouton "Partager".
 

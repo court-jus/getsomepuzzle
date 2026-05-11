@@ -107,9 +107,7 @@ Tras añadir una restricción, el ciclo vuelve al diagnóstico de errores en el 
 
 ## Estadísticas
 
-El juego registra cuánto tiempo ha pasado antes de que un rompecabezas se resuelva y cuántos fallos se cometieron. Estos datos NO se recopilan automáticamente, pero si resuelves un montón de rompecabezas, espero que me envíes tus estadísticas. Pretendo ordenar los rompecabezas por dificultad y esto ayudaría mucho.
-
-Si la red está disponible, el juego envía automáticamente la identificación de los rompecabezas jugados y su valoración. Estos datos son totalmente anónimos, pero puedes desactivar el envío en el menú de ajustes.
+El juego registra cuánto tiempo ha pasado antes de que un rompecabezas se resuelva y cuántos fallos se cometieron. Estos datos permanecen en tu dispositivo — no se recopila nada automáticamente. Si resuelves muchos rompecabezas, me encantaría que me enviaras tus estadísticas: las uso para ordenar los rompecabezas por dificultad, y eso ayuda mucho.
 
 Para enviar las estadísticas, haz clic en el ícono de "Journal" en la página principal, a la izquierda del ícono de ayuda, copia el contenido y envíamelo.
 

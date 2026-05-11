@@ -107,9 +107,7 @@ After a constraint is added, the next tap restarts the cycle at the error check.
 
 ## Stats
 
-The game records how much time has passed before a puzzle is solved and how many failures were made. This data is NOT collected automatically but if you solve a bunch of puzzles I hope you will send me your stats, I intend to sort the puzzles by difficulty and this would help a lot.
-
-If the network is available, the game automatically sends the identification of played puzzles and their rating. That data is totally anonymous but you opt out via the settings menu.
+The game records how much time has passed before a puzzle is solved and how many failures were made. This data stays on your device — nothing is collected automatically. If you solve a bunch of puzzles I'd love it if you sent your stats over: I use them to sort the puzzles by difficulty, and that helps a lot.
 
 To send the stats, click the "Journal" icon on the main page, to the left of the help icon, copy the content and send it to me.
 
