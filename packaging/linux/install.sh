@@ -13,9 +13,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." &> /dev/null && pwd)"
 DESKTOP_NAME="getsomepuzzle.desktop"
+ICON_NAME="getsomepuzzle"
 SRC_DESKTOP="$SCRIPT_DIR/$DESKTOP_NAME"
+SRC_ICON="$REPO_ROOT/marketing/sample_3x3.svg"
 DEST_DIR="$HOME/.local/share/applications"
 DEST_DESKTOP="$DEST_DIR/$DESKTOP_NAME"
+ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+DEST_ICON="$ICON_DIR/$ICON_NAME.svg"
 DEFAULT_BIN="$REPO_ROOT/build/linux/x64/release/bundle/getsomepuzzle"
 
 usage() {
@@ -29,6 +33,13 @@ uninstall() {
         echo "Removed $DEST_DESKTOP"
     else
         echo "No desktop entry to remove."
+    fi
+    if [[ -f "$DEST_ICON" ]]; then
+        rm -f "$DEST_ICON"
+        echo "Removed $DEST_ICON"
+        if command -v gtk-update-icon-cache &> /dev/null; then
+            gtk-update-icon-cache --force --quiet "$HOME/.local/share/icons/hicolor" || true
+        fi
     fi
     if command -v update-desktop-database &> /dev/null; then
         update-desktop-database "$DEST_DIR" || true
@@ -63,7 +74,20 @@ if [[ ! -x "$bin_path" ]]; then
     exit 1
 fi
 
-mkdir -p "$DEST_DIR"
+mkdir -p "$DEST_DIR" "$ICON_DIR"
+
+# Install the launcher icon at the XDG location matching `Icon=getsomepuzzle`
+# in the .desktop file. Using the scalable SVG avoids shipping a fan-out of
+# raster sizes — every modern desktop environment renders it natively.
+if [[ -f "$SRC_ICON" ]]; then
+    install -m 644 "$SRC_ICON" "$DEST_ICON"
+    echo "Installed $DEST_ICON"
+    if command -v gtk-update-icon-cache &> /dev/null; then
+        gtk-update-icon-cache --force --quiet "$HOME/.local/share/icons/hicolor" || true
+    fi
+else
+    echo "WARNING: source icon not found at $SRC_ICON — desktop entry will fall back to a generic icon." >&2
+fi
 
 # Patch the Exec= line so the desktop entry points at the user's actual
 # binary instead of the /usr/local/bin placeholder shipped in the repo.

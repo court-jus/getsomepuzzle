@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sample puzzle illustration: 3x3_001000200_PA:0.right;EY:4.1.3;SY:6.5
+
+  Doubles as the app's launcher icon source — the viewBox is full-bleed
+  (300x300, no margin) so iOS / Android / web resizers can crop or mask
+  the icon without leaving an empty border around the grid.
+
+  Faithful reproduction of the in-app rendering, derived from:
+    lib/widgets/cell.dart                     (bg/fg colors, border)
+    lib/widgets/eyes.dart                     (eye shape + digit overlay)
+    lib/widgets/symmetry.dart                 (3 concentric circles for axis 5)
+    lib/getsomepuzzle/constraints/to_flutter.dart
+                                              (Parity → arrow_circle_right Material icon)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <defs>
+    <style>
+      .bg-empty   { fill: #c0ebf1; }
+      .bg-black   { fill: #000000; }
+      .bg-white   { fill: #ffffff; }
+      .border     { fill: none; stroke: #448aff; stroke-width: 1; }
+      .border-fixed { fill: none; stroke: #448aff; stroke-width: 6; }
+    </style>
+  </defs>
+
+  <!-- ===================== Cells background ===================== -->
+  <!-- row 0 -->
+  <rect class="bg-empty" x="0"   y="0"   width="100" height="100"/>
+  <rect class="bg-empty" x="100" y="0"   width="100" height="100"/>
+  <rect class="bg-black" x="200" y="0"   width="100" height="100"/>
+  <!-- row 1 -->
+  <rect class="bg-empty" x="0"   y="100" width="100" height="100"/>
+  <rect class="bg-empty" x="100" y="100" width="100" height="100"/>
+  <rect class="bg-empty" x="200" y="100" width="100" height="100"/>
+  <!-- row 2 -->
+  <rect class="bg-white" x="0"   y="200" width="100" height="100"/>
+  <rect class="bg-empty" x="100" y="200" width="100" height="100"/>
+  <rect class="bg-empty" x="200" y="200" width="100" height="100"/>
+
+  <!-- Cell borders. Fixed cells (clues, value != 0) get the thick 6px border
+       the in-app cell uses for readonly cells (lib/widgets/cell.dart line 151). -->
+  <rect class="border"       x="0"   y="0"   width="100" height="100"/>
+  <rect class="border"       x="100" y="0"   width="100" height="100"/>
+  <rect class="border-fixed" x="200" y="0"   width="100" height="100"/>
+  <rect class="border"       x="0"   y="100" width="100" height="100"/>
+  <rect class="border"       x="100" y="100" width="100" height="100"/>
+  <rect class="border"       x="200" y="100" width="100" height="100"/>
+  <rect class="border-fixed" x="0"   y="200" width="100" height="100"/>
+  <rect class="border"       x="100" y="200" width="100" height="100"/>
+  <rect class="border"       x="200" y="200" width="100" height="100"/>
+
+  <!-- ===================== Constraints ===================== -->
+
+  <!-- PA:0.right — Parity arrow (right) in cell 0 (col=0,row=0, center 50,50).
+       Reproduces Material `arrow_circle_right_outlined`: outlined circle + chevron. -->
+  <g transform="translate(50,50)" stroke="#000000" stroke-width="3.5"
+     stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <circle cx="0" cy="0" r="22"/>
+    <line x1="-9" y1="0" x2="9" y2="0"/>
+    <polyline points="3,-7 10,0 3,7"/>
+  </g>
+
+  <!-- EY:4.1.3 — Eye-shaped constraint, color=1 (black eye), count=3.
+       In cell 4 (col=1,row=1, center 150,150).
+       Eye geometry: s = 2/3 * cellSize = 66.67; ovalHeight = 0.55*s ≈ 36.67. -->
+  <path d="M 116.67,150
+           A 33.33,18.33 0 0,1 183.33,150
+           A 33.33,18.33 0 0,1 116.67,150 Z"
+        fill="#000000" stroke="#ffffff" stroke-width="3.3"/>
+
+  <!-- Digit "3" centered on (150,150). Black fill, white outline of width
+       0.04*cellSize=4 to keep it readable inside the dark eye, drawn with
+       paint-order so the white stroke sits behind the black fill. -->
+  <text x="150" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        font-size="68" font-weight="700"
+        text-anchor="middle" dominant-baseline="central"
+        fill="#000000" stroke="#ffffff" stroke-width="4"
+        paint-order="stroke fill">3</text>
+
+  <!-- SY:6.5 — Symmetry constraint, axis=5 (point/origin: 3 concentric
+       circles). In cell 6 (col=0,row=2, center 50,250). Painter size is
+       0.6 × cellSize = 60; radii r1=30, r2=20, r3=7.5; strokeWidth=5. -->
+  <g transform="translate(50,250)" fill="none" stroke="#000000" stroke-width="5">
+    <circle cx="0" cy="0" r="30"/>
+    <circle cx="0" cy="0" r="20"/>
+    <circle cx="0" cy="0" r="7.5"/>
+  </g>
+</svg>
