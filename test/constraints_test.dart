@@ -571,6 +571,60 @@ void main() {
       expect(params.contains('1.down'), isFalse);
       expect(params, contains('2.right'));
     });
+
+    test('domain==2: any readonly cell excludes the pair', () {
+      // Cell 0 is readonly, cells 1, 2, 3 are free. On a 2-colour
+      // domain, a DF between readonly cell 0 and any free neighbour
+      // would collapse the free cell to the other value in one step
+      // — too trivial to be worth offering as a player puzzle. So
+      // every pair touching cell 0 is dropped.
+      final params = DifferentFromConstraint.generateAllParameters(
+        2,
+        2,
+        defaultDomain,
+        {0},
+      );
+      expect(params.contains('0.right'), isFalse); // 0-readonly  → drop
+      expect(params.contains('0.down'), isFalse); //  0-readonly  → drop
+      expect(params, contains('1.down')); // (1, 3) both free
+      expect(params, contains('2.right')); // (2, 3) both free
+    });
+
+    test('domain==3: pair with one readonly cell is kept', () {
+      // Same setup as above on a 3-colour domain. A DF between
+      // readonly cell 0 and a free neighbour now leaves the free
+      // cell with 2 options out of 3 — a real partial deduction —
+      // so the pair stays in the candidate pool. Only pairs where
+      // BOTH cells are readonly get filtered.
+      final params = DifferentFromConstraint.generateAllParameters(
+        2,
+        2,
+        fullDomain,
+        {0},
+      );
+      expect(params, contains('0.right')); // (0-readonly, 1-free) → keep
+      expect(params, contains('0.down')); //  (0-readonly, 2-free) → keep
+      expect(params, contains('1.down')); //  (1-free, 3-free)     → keep
+      expect(params, contains('2.right')); // (2-free, 3-free)     → keep
+      expect(params.length, 4);
+    });
+
+    test('domain==3: pair with BOTH readonly is still excluded', () {
+      // Cells 0 and 1 both readonly. The DF between them either
+      // violates verify(solved) or is trivially satisfied — no
+      // useful deduction either way — so we drop it even on 3-colour.
+      // The DF between cells 0 and 2 (readonly, free) survives.
+      final params = DifferentFromConstraint.generateAllParameters(
+        2,
+        2,
+        fullDomain,
+        {0, 1},
+      );
+      expect(params.contains('0.right'), isFalse); // both readonly → drop
+      expect(params, contains('0.down')); // (0-readonly, 2-free)  → keep
+      expect(params, contains('1.down')); // (1-readonly, 3-free)  → keep
+      expect(params, contains('2.right')); // (2-free, 3-free)     → keep
+    });
   });
 
   group('DifferentFromConstraint.toHuman', () {

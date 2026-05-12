@@ -71,7 +71,10 @@ void _enumerateSolutions(
     }
     final idx = freeIdx[k];
     for (final v in puzzle.domain) {
-      puzzle.setValue(idx, v);
+      // Use ignoreOptions: setValue empties `options` on transition and we
+      // backtrack the cell to free between trials — without the bypass, the
+      // next domain value would trip the options check on an empty list.
+      puzzle.cells[idx].setValue(v, ignoreOptions: true);
       // Light pruning: if any constraint already fails (state itself broken
       // or unreachable), abort this branch.
       if (puzzle.check(saveResult: false).isEmpty) {
@@ -79,7 +82,7 @@ void _enumerateSolutions(
       }
       if (out.length >= limit) return;
     }
-    puzzle.setValue(idx, CellValue.free);
+    puzzle.cells[idx].setValue(CellValue.free, ignoreOptions: true);
   }
 
   rec(0);

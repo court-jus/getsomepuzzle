@@ -115,6 +115,14 @@ class _GeneratePageState extends State<GeneratePage> {
           });
         case GeneratorTargetMessage():
           break;
+        case GeneratorRejectMessage():
+          // In-app generator UI doesn't surface a rejection breakdown
+          // (the CLI dashboard does). Counts are still implicit in the
+          // attempt counter vs. generated count.
+          break;
+        case GeneratorTimingsMessage():
+          // Stage timings are CLI-only diagnostics.
+          break;
       }
     });
   }

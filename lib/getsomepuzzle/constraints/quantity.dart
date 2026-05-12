@@ -70,8 +70,11 @@ class QuantityConstraint extends Constraint {
           return Move(freeCell.$1, removeOption: color, this, complexity: 0);
         }
       }
-      // No freecell has the option to remove, that's impossible
-      return Move(0, this, isImpossible: this);
+      // No free cell still has `color` in options — every remaining cell
+      // already can't take this colour, so the count stays at target. The
+      // constraint is satisfied; return null instead of reporting an
+      // impossibility. (Same domain-3 trap as SH Level 2.)
+      return null;
     } else if (count - myValues.length == freeCells.length) {
       // The number of free cells matches what I need: they all become color.
       // If the chosen cell has already excluded `color` (3-colour puzzles),

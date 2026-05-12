@@ -68,19 +68,39 @@ class DifferentFromConstraint extends CellsCentricConstraint {
   ) {
     final List<String> result = [];
     final excluded = excludedIndices ?? {};
+    // Domain-dependent filter (`excludedIndices` is the set of
+    // readonly/prefilled cells when the generator calls us):
+    //
+    // * 2-colour: a DF where ONE side is readonly collapses the other
+    //   side instantly (`removeOption: readonly.value` leaves a single
+    //   option). The deduction is trivial — no "fun" for the player —
+    //   so we keep only DF pairs with both sides FREE.
+    // * 3+ colours: that same DF now leaves the free cell with 2
+    //   options, which is a proper partial deduction and a real bit of
+    //   gameplay. We keep those pairs. We still drop pairs where BOTH
+    //   cells are readonly: those either violate `verify(solved)` (same
+    //   values) or are trivially satisfied (different values, no
+    //   propagation possible).
+    final keepOnlyFreePairs = domain.length == 2;
+    bool shouldKeep(int a, int b) {
+      if (keepOnlyFreePairs) {
+        return !excluded.contains(a) && !excluded.contains(b);
+      }
+      return !(excluded.contains(a) && excluded.contains(b));
+    }
+
     for (int idx = 0; idx < width * height; idx++) {
-      if (excluded.contains(idx)) continue;
       final ridx = idx ~/ width;
       final cidx = idx % width;
       if (cidx < width - 1) {
         final neighbor = idx + 1;
-        if (!excluded.contains(neighbor)) {
+        if (shouldKeep(idx, neighbor)) {
           result.add('$idx.right');
         }
       }
       if (ridx < height - 1) {
         final neighbor = idx + width;
-        if (!excluded.contains(neighbor)) {
+        if (shouldKeep(idx, neighbor)) {
           result.add('$idx.down');
         }
       }

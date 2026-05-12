@@ -214,10 +214,9 @@ class EyesConstraint extends CellsCentricConstraint {
           final int weight = view.totalSeen == count ? 0 : 3;
           if (puzzle.cells[unique].options.contains(color)) {
             return Move(unique, removeOption: color, this, complexity: weight);
-          } else {
-            // The only "close-the-line" move is impossible
-            return Move(0, this, isImpossible: this);
           }
+          // Option already pruned: the line of sight is already closed.
+          // Nothing to deduce here, keep scanning the other directions.
         }
       }
     }

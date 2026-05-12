@@ -21,6 +21,7 @@ assets/liked
 assets/disliked
 assets/played
 /stats/
+stats_*/
 
 # IntelliJ related
 *.iml
@@ -53,3 +54,4 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+scripts

@@ -313,8 +313,11 @@ class Puzzle {
   void restart() {
     for (var cell in cells) {
       if (!cell.readonly) {
-        cell.value = CellValue.free;
-        cell.options = cell.domain;
+        // `cell.reset()` copies `domain` into a fresh list; assigning
+        // `cell.domain` directly would alias every cell's options to the
+        // single shared `domain` list, so the first removeOption would
+        // wipe that colour from every cell at once.
+        cell.reset();
       }
     }
     _invalidateCaches();

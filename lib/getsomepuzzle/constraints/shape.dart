@@ -284,8 +284,14 @@ class ShapeConstraint extends Motif {
             return Move(freeNeighbor, removeOption: color, this, complexity: 0);
           }
         }
-        // No freeneighbor has the option to remove
-        return Move(0, this, isImpossible: this);
+        // No free neighbor still has `color` as an option — borders are
+        // already closed. The constraint is satisfied for this group; move on
+        // to the next group instead of reporting an impossibility. (In domain
+        // 2, removeOption auto-sets the only remaining value so the neighbor
+        // stops being "free" — this branch was unreachable. In domain 3+,
+        // removing one colour leaves two options, so the cell stays free and
+        // we loop back here without anything to do.)
+        continue;
       }
 
       // --- Level 3: open group can't fit in any variant → impossible ---

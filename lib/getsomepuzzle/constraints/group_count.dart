@@ -73,9 +73,10 @@ class GroupCountConstraint extends Constraint {
       // be free *and* have `color` no longer in its options (pruned by
       // another constraint via `removeOption`); such a cell can never
       // become `color`, so it must not count as a candidate here.
-      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color)
-          .where((idx) => puzzle.cells[idx].options.contains(color))
-          .length;
+      final candidates = getFreeCellsWithoutNeighborColor(
+        puzzle,
+        color,
+      ).where((idx) => puzzle.cells[idx].options.contains(color)).length;
       if (candidates + currentCount < count) {
         return false;
       }
@@ -123,9 +124,10 @@ class GroupCountConstraint extends Constraint {
       // options still contain `color`. On a 3+ colour domain, candidates
       // pruned of `color` could otherwise inflate the count and mask a
       // real impossibility.
-      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color)
-          .where((idx) => puzzle.cells[idx].options.contains(color))
-          .toList();
+      final candidates = getFreeCellsWithoutNeighborColor(
+        puzzle,
+        color,
+      ).where((idx) => puzzle.cells[idx].options.contains(color)).toList();
       if (candidates.length + currentCount < count) {
         return Move(0, this, isImpossible: this);
       }
@@ -155,8 +157,11 @@ class GroupCountConstraint extends Constraint {
               return Move(forcedCell, removeOption: color, this, complexity: 3);
             }
           }
-          // No forced cell can remove option
-          return Move(0, this, isImpossible: this);
+          // No forced cell still has `color` in options — every merge-cell
+          // already can't take this colour, so the count is locked at target.
+          // Constraint satisfied, nothing more to do. (Same domain-3 trap as
+          // SH Level 2 and the base_line_constraint == count branch.)
+          return null;
         }
       } else {
         // Simulation-based probe: for each candidate, simulate colouring

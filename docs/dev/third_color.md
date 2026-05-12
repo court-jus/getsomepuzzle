@@ -114,16 +114,345 @@ make rejections cheap rather than expensive):
   candidate sweep so a long sweep (hundreds of `solve()` calls on a
   hard 3-colour grid) honours the deadline within seconds, not at the
   next outer-iteration boundary.
-
+* After accepting a `ColumnCountConstraint` the iterative loop drops
+  every other CC candidate targeting the same column from
+  `allConstraints`; same for `RowCountConstraint` and rows. At most
+  one CC per column / one RC per row keeps the puzzle clean (two
+  would be redundant on a 2-colour domain and at best partially
+  redundant on 3-colour) and saves the inner loop from re-evaluating
+  doomed candidates every cycle.
 Possible next steps (not done):
 
-* Skip force in the iterative loop's per-candidate `cloned.solve()`
-  — we only need a propagation-power signal there. Force can stay in
-  the final validity check.
 * Raise the `currentRatio > 0.25` threshold for 3-colour puzzles, or
   derive it from `domain.length`.
 * Smarter pre-fill: choose colours that maximise constraint
   satisfiability instead of uniform random.
+
+Experiments tried and reverted:
+
+* **Propagation-only signal in the iterative loop.** The idea was to
+  swap the per-candidate `cloned.solve()` for `propagateToFixpoint()`:
+  the inner loop only needs a propagation-power signal, and skipping
+  `_forceOneCell` (the dominant cost on 3-colour grids — one clone +
+  full propagation per `(cell, value)` pair, on every stall, twice per
+  candidate) would speed each candidate measurement up. The final
+  validity check would still use `solve()` with force.
+  Initial verdict (12s run, 19 attempts on `size 4-5 × 4-7 | domain 3`):
+  1 puzzle, **100% of rejects classified as `ratioTooHigh`**, reverted.
+  **Re-bench with rigorous methodology (5min × 4 workers on
+  `4-6 × 4-8 | domain 3`) overturned the verdict**: 121 puzzles in
+  one run (median per-success 629ms, max complexity 100), throughput
+  24.2 puzzles/min versus 14.8-17.1 for the other strategies, and
+  per-worker variance σ≈2.8 (3× tighter than the alternatives). The
+  diagnosis "force-enablers get rejected" is still structurally
+  correct — prop-only does refuse them and the puzzles produced
+  lean heavily on propagation-friendly slugs (NC ~4.5/puzzle, EY
+  ~2.75/puzzle, vs ~0.3 for force-leaning FM/PA/GS/LT/DF). But the
+  PRACTICAL impact is much smaller than the original 12s sample
+  suggested: ~14% success rate is fine when each rejection costs
+  ~141ms.
+  Shipped as the `propOnly` strategy (CLI: `--strategy prop-only`),
+  available for benchmarking or as a fast-throughput batch-generation
+  mode that emits a restricted constraint mix. Not the default —
+  for a balanced corpus the other strategies still earn their place
+  by surfacing force-enabler slugs.
+* **Hybrid: propagation-only candidates + occasional force on `pu`.**
+  Inner sweep used `propagateToFixpoint()` (cheap); rejected
+  candidates were parked in a `secondChance` queue; when no candidate
+  improved propagation, one `findAMove(tryForce: true)` step was
+  applied directly on `pu`, then the parked candidates were retried
+  against the advanced state. `pu.restart()` reverted the
+  force-placed cells before the final validity check so they wouldn't
+  leak into the exported prefill.
+  Measured outcome on `size 4-5 × 4-7 | domain 3`: ~2% success rate
+  (worse than the ~6% force-aware baseline), still dominated by
+  `ratioTooHigh`. Even with `--allow NC,EY,RC,CC` (constraints with
+  little force-enabler character), the rejection rate stayed at
+  ~97%. Diagnosis: constraints accepted during the loop were
+  validated against `pu` states reached via a *specific sequence* of
+  force decisions made with a *partial* constraint set. After
+  `pu.restart()`, the final `solve()` sees the full final constraint
+  set, and its `_forceOneCell` may pick a different cell — the
+  loop's trajectory isn't reproducible from the clean state, so the
+  accepted constraints don't actually drive `solve()` to completion.
+  Reverted. The force-aware signal stays in the loop; only a
+  cached-before-ratio optimisation survives.
+
+### Targeted constraint generation to lower `ratioTooHigh` — IMPLEMENTED
+
+Status: steps 1 and 3 of the plan below shipped. Step 2 was folded
+into step 3 (the undetermined-cells list is cached alongside the
+`ratioBefore` probe and consumed directly by the targeted sort, so it
+never needed a separate phase).
+
+What landed in `generator.dart`:
+
+* The `!isUnique` post-loop check is gone. Validity now follows from
+  `currentRatio == 0` after the optional fill-from-solution; the
+  redundant `solveExplained` + replay was removed along with the
+  `GenerationRejectReason.notUnique` enum value.
+* The fill step reuses the already-solved `solvedPu` rather than
+  running a third `solve()` on a fresh clone.
+* The iterative loop now requeues rejected candidates into a
+  `secondChance` list and re-pools them after every accept — a
+  candidate that didn't propagate against the old state may now
+  propagate against the new one (peer-constraint synergy).
+* After each accept, the loop runs one probe `solve()` to refresh
+  both the cached ratio AND the cached list of undetermined cells.
+  `_generateTargetedKeys` then computes the serialise-keys of DF /
+  NC / CC / RC candidates that touch those cells, and the sort
+  comparator promotes those candidates to the front of
+  `allConstraints`. Other slugs fall back to usage-based ordering.
+
+Measured outcome on `size 4-5 × 4-5 | domain 3 | allow all`,
+4 workers: 26 successes / 34 attempts ≈ 76% success rate, only 4
+`ratioTooHigh` rejects across the run (no `notUnique` category by
+construction). Compares with ~5-6% in the pre-change baseline on a
+similar configuration.
+
+### Two-tier candidate acceptance + post-loop cleanup
+
+Profiling after the above optimisations showed `loop_candidate` (the
+per-candidate `cloned.solve()` test inside the iterative loop) at
+**91.9% of total CPU**, averaging 55 ms × 234 calls per attempt. The
+full-solve cost is dominated by `_forceOneCell`, which sweeps every
+free × domain combination — overkill when the candidate's
+contribution is a single propagation step.
+
+A first attempt swapped the single-tier `cloned.solve()` check with
+a **two-tier** test (every candidate runs propagation first, then
+falls back to full solve if propagation didn't advance). On
+domain 3 the cheap path's hit rate measured at **~0.4 %** — almost
+no candidate propagates anything new from a 3-colour state. The
+5 ms cheap probe became pure overhead on every test, and a logic
+bug compounded the regression: cheap-accept set `currentRatio =
+cloned.computeRatio()` (the prop-fixpoint ratio, ≥ true full-solve
+ratio). The outer loop's `currentRatio == 0` exit condition then
+fired only on full-accepts, so cheap-accepts in a sequence made
+the loop visibly *increase* `currentRatio` (worker logs showed
+e.g. 0.13 → 0.37 → 0.63) and keep running past the natural close
+point. Effect: candidate count blew up from ~234 to ~660-1300 per
+attempt, success rate dropped from ~76 % to ~25 %. Reverted.
+
+The current shipped design is **phase-gated**:
+
+* **Phase 1 (cheap-only)** — `cloned.propagateToFixpoint()` and
+  accept iff prop-fixpoint free-cells of cloned drop below `pu`'s.
+  No full-solve fallback in phase 1: candidates that don't propagate
+  go to `secondChance`. `currentRatio` is NOT updated by phase-1
+  accepts (it would lie); phase 1's own exit signal is
+  `cachedPropFreeCells == 0` (prop alone closed the puzzle).
+  Phase 1 uses **single-accept-per-outer-iter**: the inner sweep
+  breaks at the first accept, the outer loop re-pools `secondChance`
+  with the targeted re-sort, and the next sweep starts from the
+  reprioritised queue. A "multi-accept" variant (drain the whole
+  queue per outer iter, accept everything that fires) was tried and
+  reverted: on 3-colour grids cheap accepts are sparse, so each
+  outer iter only accepted 1-2 candidates anyway, and draining the
+  full queue cost ~10× more cheap probes than the early-stop sweep
+  (12 successes vs 27 in matched benches). Single-accept's re-sort
+  between accepts surfaces the highest-targeted candidate next,
+  pushing the average accept toward the front of each sweep.
+* **Phase 2 (strict full-solve)** — triggered exactly when phase 1
+  plateaus (inner sweep exhausts without acceptance) and
+  `secondChance` is non-empty. Phase 2 runs the pre-two-tier
+  single-tier criterion: `cloned.solve()` and accept iff
+  `fullRatio < cachedRatioBefore`. No cheap probe in phase 2,
+  same per-call cost as the original baseline (~55 ms). Picks up
+  the force-enablers phase 1 dropped.
+
+Easy puzzles close fast via phase 1 propagation cascade (the
+revert-investigation logs showed phase-1-only successes in 569 ms
+and 671 ms with only 4-10 candidates tested). Hard puzzles
+transition to phase 2, which behaves like the pre-two-tier baseline
+and accepts force-enablers. Crucially, the cheap probe is paid only
+on phase 1 candidates — on a 3-colour grid phase 1 plateaus quickly,
+so the cheap-probe overhead stays bounded.
+
+`removeUselessRules` (`puzzle.dart:859`) still runs post-loop on
+every successful attempt. Phase 1's lax cheap accept may pick
+constraints later subsumed by phase 2 or by fill-from-solution
+hints; the cleanup walks the constraint list last-to-first and
+drops any whose removal preserves deductive uniqueness.
+
+Three stage timers in the dashboard:
+* `loop_candidate_prop` — phase-1 candidate tests.
+* `loop_candidate_full` — phase-2 candidate tests.
+* `cleanup` — `removeUselessRules`, one call per successful attempt.
+
+The dashboard also prints a derived "Two-tier breakdown" line:
+`prop_calls candidates tested → (prop_calls - full_calls) phase-1
+accepts, full_calls fell to phase 2`. Reading off the phase 1
+hit rate directly is the quickest way to judge whether phase 1 is
+paying off on a given configuration.
+
+Original problem (kept for context):
+
+The iterative loop samples constraint candidates at random
+and accepts whatever happens to lower the post-`solve()` ratio. When
+3 or 4 cells remain undetermined, this random sampling rarely lands a
+candidate that targets exactly those cells — and we exhaust
+`allConstraints` without closing the puzzle → `ratioTooHigh`.
+
+User's proposal: at any point in the loop, we already know via
+`solvedPu.solve()` which cells are still undetermined. We can use
+that information to drive constraint generation *toward* those cells
+rather than at random.
+
+Also: the post-loop `!isUnique` check is redundant with the
+`currentRatio == 0` invariant (after fill-from-solution). Both use
+the same `findAMove` engine. The `notUnique` rejects we still see
+come from small asymmetries between `solve()` and `solveExplained()`
+halt conditions (excluded-option `setValue` bail at puzzle.dart:797,
+no-op `removeOption` bail at puzzle.dart:802), not from a genuine
+non-uniqueness — by construction a puzzle whose `solve()` reaches
+ratio 0 from its readonly cells is unique under the project
+convention.
+
+**Which constraints are easy to target?**
+
+| Slug | Targetable per-cell? | How |
+|------|---------------------|-----|
+| `DF`   | Yes        | Link X to a readonly singleton holding `solved[X]` |
+| `NC`   | Yes        | `NC:X.C.count` where count = neighbours of `solved[X]` with colour C |
+| `CC`/`RC` | Per axis | Compute each colour's count on X's column/row in `solved` |
+| `EY`   | Partial    | Cell-centric but requires anchor + group analysis |
+| `GS, LT, SH, FM, PA, SY, QA, GC` | Hard | Non-local combinatorics; current random sampling stays |
+
+**Three-step plan, each step shippable on its own:**
+
+1. **Drop the `!isUnique` check.** Replace with `currentRatio == 0`
+   after the optional fill-from-solution. Align `solveExplained`'s
+   halt conditions with `solve()`'s, or just remove the redundant
+   re-solve. Cuts ~33% of post-loop work; removes one rejection
+   category. Low risk.
+2. **Maintain a `determinedMask`** during the loop (cells where
+   `solvedPu.solve()` aboutit). Pure instrumentation — exposes the
+   "where are the gaps" signal that step 3 needs.
+3. **`generateTargetedParameters(slug, cellIdx, solved)`** — a
+   variant of `generateAllParameters` returning parameters whose
+   propagation effect lands on `cellIdx`. Wire it into the loop's
+   plateau path: when `allConstraints` is exhausted and there's
+   still an undetermined cell, ask the targeted generator for
+   constraints that could close it. Implement DF and NC first
+   (smallest combinatorial cost, highest hit rate), then CC/RC.
+
+Prioritise step 1 (low-risk perf + correctness cleanup), then
+step 3 (the real lever on `ratioTooHigh`).
+
+### Equilibrium-mode bench with preseed corpus (2026-05-13)
+
+All numbers in the previous sections were measured on **warmup mode**
+(empty initial corpus, the equilibrium picker waiting for ≥100 puzzles
+before activating). A warmup target is a random `(N slugs, ≤4×5
+grid)` pick — much easier than an equilibrium target. We discovered
+this only after several rounds of strategy comparison gave
+suspiciously close success rates (19-25% for all four strategies).
+
+To bench equilibrium mode properly, we preseed the output file with
+the existing 1141-puzzle corpus (`domain3puzzles/raw_corpus.txt`) so
+the picker enters equilibrium immediately. The `bench_strategies.sh`
+script exposes this via the `PRESEED` env var. Methodologically this
+is what matters for production decisions: in actual use the corpus
+is never empty, so warmup-mode performance is a transient.
+
+Numbers (5 min × 4 workers per strategy, 4-6 × 4-8 grids, domain 3,
+watchdog at 15 s):
+
+| Strategy        | Attempts | Successes | Success rate | Per-worker σ |
+|-----------------|----------|-----------|--------------|-------------|
+| single-tier     | 44       | 12        | 27.3 %       | ~0.7        |
+| phase-gate      | 83       | 40        | **48.2 %**   | ~5.0        |
+| phase-1-oneshot | 44       | 25        | **56.8 %**   | ~1.5        |
+| prop-only       | 94       | 50        | 53.2 %       | ~2.9        |
+
+Reject breakdowns (last `Rejects (N): …` line captured in the
+dashboard):
+
+```
+single-tier      ratioTooHigh=2,  attemptStalled=26    (93 % stalls)
+phase-gate       ratioTooHigh=11, attemptStalled=28
+phase-1-oneshot  ratioTooHigh=2,  attemptStalled=13
+prop-only        ratioTooHigh=30, attemptStalled=11    (inverse profile)
+```
+
+The picker drove 100 % of new puzzles to include the four slugs
+under-represented in the preseed (NC, CC, RC, QA — QA was at 4.7 %
+in the corpus). Other slug counts on the 12-50 new puzzles per
+strategy:
+
+```
+                  EY  PA  DF  SY  LT  FM  GS  GC  SH
+single-tier (12):  -   6   6   4   -   2   -   -   -
+phase-gate (40):  10   6   -   8   9   -   -   -   -
+phase-1-oneshot:   -   -  14   8   6   5   -   -   -
+prop-only (50):    9   8   -   7   5   0*  -   -   -
+```
+*prop-only produced **zero FM** — the expected failure mode of a
+prop-only acceptance signal on a force-needing slug.
+
+#### Before / after summary
+
+The whole generator overhaul, end-to-end, on 3-colour grids:
+
+| Generator state                         | Date       | Config         | Bench mode | Rate         |
+|-----------------------------------------|------------|----------------|------------|--------------|
+| Pre-3-colour (2-colour baseline)        | early 2026 | 2-colour       | -          | ~75-80 %     |
+| Post-3-colour migration, `solveExplained` bug | mid 2026   | 4-5×4-5        | warmup     | < 1 %        |
+| `solveExplained` removeOption fix       | mid 2026   | 4-5×4-7        | warmup     | ~5-6 %       |
+| Targeted-sort + `removeUselessRules`    | 2026-05-12 | 4-5×4-5        | warmup     | ~76 %        |
+| Phase-gate + watchdog (4 strategies)    | 2026-05-13 | 4-6×4-8        | warmup     | 14-27 %      |
+| Phase-gate + watchdog + preseed         | 2026-05-13 | 4-6×4-8        | **equilibrium** | **27-57 %** |
+
+The 4-6×4-8 / equilibrium-mode line is the closest to production
+behaviour. Phase-gate at 48 % and phase-1-oneshot at 57 % are both
+nearly **10× the post-migration baseline** (~5-6 %).
+
+#### Production decision
+
+* **Drop `singleTier`** as a live strategy. Equilibrium-mode results
+  show 12 puzzles vs 25-50 for the other three strategies on the
+  same budget — single-tier's per-candidate full solve cost makes the
+  watchdog fire on most of its attempts (93 % `attemptStalled`).
+  Keep the enum value for benchmarking only.
+
+* **Multi-strategy worker pool**: instead of running all 4 workers
+  on the same strategy, split them across `phaseGate`,
+  `phase1Oneshot` and `propOnly` (e.g. 2/1/1 or 1/1/2 depending on
+  desired slug mix). Rationale:
+  * `prop-only` is the throughput champion on propagation-friendly
+    targets (NC, EY, CC, RC, QA) — give it the bulk of those.
+  * `phase-gate` / `phase-1-oneshot` catch the force-needing slugs
+    (FM, GS, LT, DF, SY, GC, SH) that `prop-only` rejects with
+    `ratioTooHigh`.
+  * The equilibrium picker arbitrates between workers via the
+    shared corpus stats: as `prop-only` workers pile up NC/EY
+    puzzles, the picker shifts its targets toward force-needing
+    slugs, and the `phase-gate` workers naturally pick those up.
+  * The slug-mix imbalance we saw on the single-strategy preseed
+    bench (zero FM from prop-only) gets self-corrected this way.
+
+* **Default in `GeneratorConfig.strategy`**: still `phaseGate` for
+  callers that don't override (in-app generator, tests). The
+  multi-strategy split is a CLI / worker-pool concern, not a default
+  change.
+
+#### Caveats and follow-ups
+
+* The watchdog threshold (15 s) penalises strategies with expensive
+  per-candidate tests. Re-bench with 30 s or 60 s to see whether
+  `singleTier` recovers — useful to confirm it's structurally weak,
+  not just unlucky with the watchdog window.
+* prop-only's FM rate of 0 is worth investigating: under what
+  conditions could pure propagation accept a force-needing
+  constraint? Likely never, but the picker keeps targeting FM
+  because the corpus is under-represented. Resolving this requires
+  either a smarter picker that gives up on impossible targets per
+  strategy, or accepting that `prop-only` workers skip FM and let
+  other workers handle it (which is what the multi-strategy pool
+  proposed above does).
+* All measurements are on a single hardware setup; absolute timings
+  will vary. The relative rankings should be robust.
 
 ### `FMFMComplicity` and `PAFMComplicity` inert on 3-colour
 

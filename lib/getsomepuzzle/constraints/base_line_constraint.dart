@@ -45,8 +45,13 @@ base class LineCentricConstraint extends Constraint {
           return Move(freeCell.idx, removeOption: color, this, complexity: 0);
         }
       }
-      // No free cell has the option to remove
-      return Move(0, this, isImpossible: this);
+      // No free cell still has `color` in options — the line is already
+      // closed. The constraint is satisfied; nothing more to do. (Reporting
+      // `isImpossible` here was the same domain-3 trap as in SH Level 2:
+      // domain-2 auto-sets when only one option remains, so free cells
+      // disappear after one round of removeOption; domain-3+ leaves the
+      // cell free with two options and we loop back here with nothing to do.)
+      return null;
     }
     if (count - colorCount == freeCells.length) {
       // Exactly as many free cells as needed — they must all be color.
