@@ -20,12 +20,7 @@ void main() {
       final sw = Stopwatch()..start();
       while (sw.elapsedMilliseconds < 15000 && lines.length < 5) {
         final result = PuzzleGenerator.generateOne(
-          GeneratorConfig(
-            width: 3,
-            height: 3,
-            count: 1,
-            domain: fullDomain,
-          ),
+          GeneratorConfig(width: 3, height: 3, count: 1, domain: fullDomain),
           shouldStop: () => sw.elapsedMilliseconds > 15000,
         );
         if (result != null) lines.add(result.line);
@@ -41,10 +36,9 @@ void main() {
 
       for (final line in lines) {
         final p = Puzzle(line);
-        final solutionLine = line.split('_').firstWhere(
-          (f) => f.startsWith('1:'),
-          orElse: () => '',
-        );
+        final solutionLine = line
+            .split('_')
+            .firstWhere((f) => f.startsWith('1:'), orElse: () => '');
         final solution = solutionLine.isEmpty
             ? <CellValue>[]
             : solutionLine

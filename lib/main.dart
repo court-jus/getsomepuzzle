@@ -23,6 +23,7 @@ import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
 import 'package:getsomepuzzle/widgets/learning_page.dart';
 import 'package:getsomepuzzle/widgets/main_drawer.dart';
 import 'package:getsomepuzzle/widgets/new_constraint_dialog.dart';
+import 'package:getsomepuzzle/widgets/third_color_suggestion_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/create_page.dart';
 import 'package:getsomepuzzle/widgets/generate_page.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
@@ -159,6 +160,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   bool initialized = false;
   bool shouldChooseLocale = true;
   bool _testingFromEditor = false;
+  // True when taps on free cells should prune one option from the
+  // current option set instead of painting the cell. Only togglable on
+  // 3+ colour puzzles: on a 2-colour domain the cycle collapses to a
+  // setValue and the button stays hidden.
+  bool _removeOptionMode = false;
   Timer? _saveTimer;
   final log = Logger("HomePage");
 
@@ -361,7 +367,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         if (slug.isNotEmpty && slug != 'TX' && progress.isFirstTimeFor(slug))
           slug,
     };
-    if (newSlugs.isEmpty) return;
+    if (newSlugs.isEmpty) {
+      // No new rule to surface — but the 3-colour suggestion has its
+      // own independent trigger, so we still give it a chance to fire.
+      _maybeSuggestThirdColor();
+      return;
+    }
     if (_modalInFlight) return;
     _modalInFlight = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -412,6 +423,68 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       await progress.save();
       _modalInFlight = false;
       if (skipped && mounted) setState(() {});
+      // Chain the 3-colour suggestion check once the new-rule flow is
+      // fully resolved. It self-guards on `shouldSuggestThirdColor` so
+      // the common case (modal already shown, or threshold not met)
+      // returns immediately without any UI side effect.
+      _maybeSuggestThirdColor();
+    });
+  }
+
+  /// Show the 3-colour suggestion modal if all four gating conditions
+  /// hold (cf. [Database.shouldSuggestThirdColor]). The modal is
+  /// scheduled on the next frame so it stacks cleanly on top of any
+  /// modal that just finished, and the result is acted on: tapping
+  /// "Try it" removes the `d3` ban from the player's domain filter
+  /// and rebuilds the playlist immediately, so the next puzzle draws
+  /// from the wider pool. Either way the suggestion is marked as
+  /// shown so it never fires again.
+  Future<void> _maybeSuggestThirdColor() async {
+    if (!mounted || database == null) {
+      log.fine(
+        '_maybeSuggestThirdColor: skipped (mounted=$mounted, '
+        'db=${database != null})',
+      );
+      return;
+    }
+    if (_modalInFlight) {
+      log.fine('_maybeSuggestThirdColor: skipped (modalInFlight)');
+      return;
+    }
+    if (!database!.shouldSuggestThirdColor()) return;
+    log.info('_maybeSuggestThirdColor: showing modal');
+    _modalInFlight = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _modalInFlight = false;
+        return;
+      }
+      final wantsIt = await ThirdColorSuggestionDialog.show(context);
+      await database!.noteThirdColorSuggestionShown();
+      _modalInFlight = false;
+      if (wantsIt && mounted) {
+        // Opt-in path: swap the domain ban so the next playlist
+        // surfaces 3-colour puzzles exclusively. Just removing d3
+        // would mix 2- and 3-colour puzzles and the player would
+        // routinely land back on a black-and-white grid — defeating
+        // the point of "Try it". Forcing d3 only is also discoverable
+        // from the Open page filters, where the player can flip back
+        // to mixed (or 2-only) any time.
+        final filters = database!.currentFilters;
+        final newBanned = Set<String>.from(filters.bannedDomains)
+          ..remove('d3')
+          ..add('d2');
+        filters.bannedDomains = newBanned;
+        await filters.save();
+        database!.preparePlaylist();
+        // Drop the in-progress 2-colour puzzle and pull a fresh one
+        // from the just-rebuilt playlist — otherwise the player keeps
+        // staring at the same black-and-white grid after asking to
+        // try 3 colours. We don't pass `skipped: true`: the player
+        // didn't reject the puzzle, the app moved them on. Recording
+        // it as skipped would pollute the stats.
+        loadPuzzle();
+      }
     });
   }
 
@@ -478,7 +551,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   void handlePuzzleTap(int idx) {
-    if (game.handleTap(idx)) {
+    if (game.handleTap(idx, removeOptionMode: _removeOptionMode)) {
       _handleCheck();
     }
   }
@@ -499,6 +572,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void handlePuzzleRightDragEnd() {
     game.handleRightDragEnd();
     _handleCheck();
+  }
+
+  void handlePuzzleLongPress(int idx) {
+    if (game.handleLongPress(idx, removeOptionMode: _removeOptionMode)) {
+      _handleCheck();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -832,6 +911,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 ),
               ),
             ),
+          if (game.currentPuzzle != null &&
+              !shouldChooseLocale &&
+              game.currentPuzzle!.domain.length > 2)
+            IconButton(
+              icon: Icon(
+                _removeOptionMode
+                    ? Icons.do_not_disturb_alt
+                    : Icons.format_paint,
+              ),
+              tooltip: _removeOptionMode
+                  ? AppLocalizations.of(context)!.tooltipTapModeRemoveOption
+                  : AppLocalizations.of(context)!.tooltipTapModeIncrValue,
+              onPressed: () {
+                setState(() => _removeOptionMode = !_removeOptionMode);
+              },
+            ),
           if (game.currentPuzzle != null && !shouldChooseLocale)
             IconButton(
               icon: Icon(Icons.lightbulb),
@@ -1074,6 +1169,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                           onCellRightDragEnd: isDesktopOrWeb
                                               ? handlePuzzleRightDragEnd
                                               : null,
+                                          onCellLongPress:
+                                              handlePuzzleLongPress,
                                           cellSize: cellSize,
                                           hintText: game.hintText,
                                           hintIsError: game.hintIsError,

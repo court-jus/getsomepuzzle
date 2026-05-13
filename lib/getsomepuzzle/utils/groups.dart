@@ -234,7 +234,8 @@ bool canMergeGroups(Puzzle puzzle, List<int> groupA, List<int> groupB) {
       if (visited.contains(neighbor)) continue;
       final neighborValue = puzzle.cellValues[neighbor];
       // Can traverse through empty cells or cells of the same color
-      if (puzzle.cells[neighbor].options.contains(targetColor) || neighborValue == targetColor) {
+      if (puzzle.cells[neighbor].options.contains(targetColor) ||
+          neighborValue == targetColor) {
         visited.add(neighbor);
         queue.add(neighbor);
         // If we reach any cell in groupB, they can merge

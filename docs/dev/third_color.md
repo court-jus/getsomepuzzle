@@ -3,7 +3,7 @@
 Currently, the game only works with two colors (black and white) but it could be interesting
 to have some puzzles with more than two colors.
 
-## Current state (as of 2026-05-12)
+## Current state (as of 2026-05-13)
 
 The "purple" third color is wired through the model (`CellValue.purple`),
 the cell/options machinery (`Cell.options` + `Cell.removeOption`), the UI
@@ -28,10 +28,30 @@ What works:
 * `Puzzle.incrValue` cycles the tap through the puzzle's declared
   domain (`free → domain[0] → … → domain[last] → free`), so a 2-colour
   puzzle never surfaces purple. Wrapping back to free goes through
-  `resetCell` so options are restored.
-* Right-click toggling a coloured cell back to free also goes through
-  `resetCell` (not `setValue(free, ignoreOptions: true)`), so the
-  option dots reappear correctly on a 3-colour puzzle.
+  `resetCell` so options are restored. `Puzzle.decrValue` is the exact
+  mirror (`free → domain[last] → … → domain[0] → free`) and powers the
+  right-click cycle and the mobile long-press: a single right-click
+  (or long-press) on a free cell jumps straight to the last domain
+  colour, so purple is reachable in one gesture on 3-colour puzzles
+  instead of three taps via `incrValue`.
+* Right-click and right-drag are uniform across domain sizes. The
+  initial cell of a right gesture goes through `decrValue` (deferred
+  to `pointer-up`, like the left-click deferred-tap dance, so a click
+  is committed at release and a drag is committed at the first move).
+  Subsequent free cells of a right-drag are painted with
+  `_prevCycle(initialCellValue)` — i.e. the same colour the
+  `decrValue` produced on the first cell. The 2-colour regression
+  cost: erasing a white cell now takes two right-clicks
+  (`white → black → free`) instead of one toggle — accepted as the
+  price of uniformity.
+* Left-drag uses `_nextCycle(initialCellValue)` as the paint colour
+  (was `domain.whereNot(== initialCellValue).first`, which never
+  produced purple on a 3-colour puzzle). Drag-painting a row in
+  purple is now possible by starting the drag on a white cell.
+* Long-press (mobile fallback for right-click) is wired through
+  `GameModel.handleLongPress` to `Puzzle.decrValue`, mode-agnostic
+  with respect to the paint / remove-option toggle (the long-press
+  always means "previous colour", regardless of the left-tap mode).
 * `CellWidget` renders one coloured dot per remaining option at the
   bottom of a free cell when `puzzle.domain.length > 2` (~10 % of the
   cell, with a thin grey outline so the white dot stays visible
@@ -68,6 +88,73 @@ What works:
   `getFreeCellsWithoutNeighborColor` candidates by
   `options.contains(color)` so cells pruned of `color` no longer
   inflate the "could still form a new group" count.
+* Solver soundness fixes (see "Solver soundness audit (2026-05-13)"
+  below): five constraints had the same domain-3 `isImpossible` trap
+  that let multi-solution puzzles slip past `isDeductivelyUnique()`.
+* `_overrepresentedSlugs` in `worker_io.dart` hard-bans slugs whose
+  observed share exceeds 3× the uniform target (k=3), stopping
+  propagation-friendly slugs (NC, EY) from flooding every attempt.
+* `NTypesTarget` keeps the picker's N chosen slugs as a *soft*
+  preference (`preferredSlugs`) instead of hard-restricting
+  `allowedSlugs`. Trades exact ntypes guarantee for ~10× generator
+  productivity in equilibrium mode.
+* CLI `--strategy` accepts a comma-separated list; workers are
+  assigned round-robin so a heterogeneous pool (e.g.
+  `--strategy phase-gate,phase-1-oneshot,prop-only`) covers each
+  strategy's strengths in a single run.
+
+## Solver soundness audit (2026-05-13)
+
+An end-to-end audit uncovered a recurring soundness bug in five
+constraints' `apply()` methods on domain 3+. Pattern: the constraint
+correctly closes its borders by removing `color` from free
+neighbours via `removeOption`, then on the next propagation pass —
+finding no remaining neighbour with `color` in options — wrongly
+returns `Move(0, this, isImpossible: this)`.
+
+* In domain 2, the auto-set on single-option-remaining
+  (`cell.dart:60`) ran the neighbour to non-free after one
+  `removeOption`, so the buggy branch was unreachable.
+* In domain 3+, `removeOption` leaves the cell free with two
+  options, so the constraint loops back here with nothing to do and
+  trips the false impossibility. `applyWithForce` then uses that
+  spurious `isImpossible` to eliminate valid branches, making
+  `isDeductivelyUnique()` return true on puzzles that brute-force
+  enumeration shows to have multiple completions.
+
+Five constraints fixed (each returns `null` / `continue` instead of
+the spurious `isImpossible`):
+
+| Constraint                     | File                            | Branch                                   |
+|--------------------------------|---------------------------------|------------------------------------------|
+| `ShapeConstraint`              | `constraints/shape.dart`        | Level 2 (group matches variant, borders closed) |
+| `LineCentricConstraint` (RC/CC) | `constraints/base_line_constraint.dart` | `colorCount == count` post-close |
+| `GroupCountConstraint`         | `constraints/group_count.dart`  | `currentCount == count` with no merge-cell still colourable |
+| `QuantityConstraint`           | `constraints/quantity.dart`     | `myValues.length == count` post-close   |
+| `EyesConstraint`               | `constraints/eyes_constraint.dart` | Upper-bound unique candidate already pruned |
+
+Other audited constraints (`NC`, `PA`, `FM`, `SY`, `LT`, `GS`, `DF`)
+either don't have the pattern or already fall through correctly.
+
+A separate fix in `Puzzle.restart()` (`puzzle.dart`): the old code
+assigned `cell.options = cell.domain` — every cell aliased the same
+shared list, so the first post-restart `removeOption` wiped that
+colour from every cell at once. Now uses `cell.reset()` which copies
+the domain into a fresh per-cell list.
+
+Regression test in `test/unique_solution_test.dart` brute-force-counts
+solutions for two reported multi-solution puzzles; both correctly
+fail `isDeductivelyUnique()` post-fix. After the audit, brute-force
+flagged 47 / 174 of the dev `assets/domain3.txt` puzzles as
+previously-undetected multi-solution; we dropped them. Production
+assets (`1-easy`, `overfilled-easy`) were unaffected; `6-mad`'s
+domain-3 entries were entirely regenerated.
+
+The user's stats file confirmed the player-visible cost of the bug:
+on 147 recently-played domain-3 puzzles, the 18 that turned out to
+be multi-solution under the post-fix solver took **4.3× longer to
+solve** (119.7 s vs 28.0 s on valid puzzles) and incurred **1.9×
+more errors** (7.4 vs 4.0).
 
 ## Open issues
 
@@ -340,99 +427,77 @@ convention.
 Prioritise step 1 (low-risk perf + correctness cleanup), then
 step 3 (the real lever on `ratioTooHigh`).
 
-### Equilibrium-mode bench with preseed corpus (2026-05-13)
+### Equilibrium-mode bench (2026-05-13, post-audit)
 
-All numbers in the previous sections were measured on **warmup mode**
-(empty initial corpus, the equilibrium picker waiting for ≥100 puzzles
-before activating). A warmup target is a random `(N slugs, ≤4×5
-grid)` pick — much easier than an equilibrium target. We discovered
-this only after several rounds of strategy comparison gave
-suspiciously close success rates (19-25% for all four strategies).
+Two methodology issues invalidated the earlier benches: the picker
+runs a much easier *warmup target* until the corpus reaches ≥ 100
+puzzles, and the solver had a soundness bug (see "Solver soundness
+audit" above) that let multi-solution puzzles slip past the validity
+gate, inflating apparent success rates. Both were addressed before
+the numbers below:
 
-To bench equilibrium mode properly, we preseed the output file with
-the existing 1141-puzzle corpus (`domain3puzzles/raw_corpus.txt`) so
-the picker enters equilibrium immediately. The `bench_strategies.sh`
-script exposes this via the `PRESEED` env var. Methodologically this
-is what matters for production decisions: in actual use the corpus
-is never empty, so warmup-mode performance is a transient.
+* Preseed the output file with an existing corpus to enter
+  equilibrium mode immediately (`PRESEED` env var in
+  `bench_strategies.sh`).
+* All five `apply()` soundness bugs fixed.
 
-Numbers (5 min × 4 workers per strategy, 4-6 × 4-8 grids, domain 3,
-watchdog at 15 s):
+Bench (10 min × 4 workers per strategy, 4-6 × 4-8 grids, domain 3,
+watchdog 15 s, preseed = 117-puzzle bootstrap):
 
-| Strategy        | Attempts | Successes | Success rate | Per-worker σ |
-|-----------------|----------|-----------|--------------|-------------|
-| single-tier     | 44       | 12        | 27.3 %       | ~0.7        |
-| phase-gate      | 83       | 40        | **48.2 %**   | ~5.0        |
-| phase-1-oneshot | 44       | 25        | **56.8 %**   | ~1.5        |
-| prop-only       | 94       | 50        | 53.2 %       | ~2.9        |
+| Strategy            | Puzzles | Rejects                                  | Success rate |
+|---------------------|---------|------------------------------------------|--------------|
+| phase-gate          | 9       | ratioTooHigh=30, attemptStalled=51       | 10 %         |
+| prop-only           | 26      | ratioTooHigh=77, attemptStalled=26       | 20 %         |
+| **multi-strat pool** | **19** | ratioTooHigh=51, attemptStalled=41       | 17 %         |
 
-Reject breakdowns (last `Rejects (N): …` line captured in the
-dashboard):
+The multi-strategy pool runs one strategy per worker via round-robin
+(`--strategy phase-gate,phase-1-oneshot,prop-only`); its worker breakdown
+shows phase-gate and prop-only each contributing ~8 successes,
+phase-1-oneshot ~1-2 — confirming the strategies cover complementary
+slug regions.
 
-```
-single-tier      ratioTooHigh=2,  attemptStalled=26    (93 % stalls)
-phase-gate       ratioTooHigh=11, attemptStalled=28
-phase-1-oneshot  ratioTooHigh=2,  attemptStalled=13
-prop-only        ratioTooHigh=30, attemptStalled=11    (inverse profile)
-```
-
-The picker drove 100 % of new puzzles to include the four slugs
-under-represented in the preseed (NC, CC, RC, QA — QA was at 4.7 %
-in the corpus). Other slug counts on the 12-50 new puzzles per
-strategy:
-
-```
-                  EY  PA  DF  SY  LT  FM  GS  GC  SH
-single-tier (12):  -   6   6   4   -   2   -   -   -
-phase-gate (40):  10   6   -   8   9   -   -   -   -
-phase-1-oneshot:   -   -  14   8   6   5   -   -   -
-prop-only (50):    9   8   -   7   5   0*  -   -   -
-```
-*prop-only produced **zero FM** — the expected failure mode of a
-prop-only acceptance signal on a force-needing slug.
+Slug coverage is now uniform across 11 of 13 slugs. NC and EY remain
+hard-banned by the equilibrium picker (they were over-represented at
+32 % / 31 % in the bootstrap); the other 11 slugs all show up in
+every strategy's output. **prop-only now produces FM** — the 22 FM
+occurrences in this run invalidate the previous claim that
+prop-only's acceptance signal could never accept a force-needing
+slug. The structural argument still holds for *purely* force-only
+candidates, but in practice FM constraints often piggyback on cells
+where propagation alone advances after they're added.
 
 #### Before / after summary
 
 The whole generator overhaul, end-to-end, on 3-colour grids:
 
-| Generator state                         | Date       | Config         | Bench mode | Rate         |
-|-----------------------------------------|------------|----------------|------------|--------------|
-| Pre-3-colour (2-colour baseline)        | early 2026 | 2-colour       | -          | ~75-80 %     |
-| Post-3-colour migration, `solveExplained` bug | mid 2026   | 4-5×4-5        | warmup     | < 1 %        |
-| `solveExplained` removeOption fix       | mid 2026   | 4-5×4-7        | warmup     | ~5-6 %       |
-| Targeted-sort + `removeUselessRules`    | 2026-05-12 | 4-5×4-5        | warmup     | ~76 %        |
-| Phase-gate + watchdog (4 strategies)    | 2026-05-13 | 4-6×4-8        | warmup     | 14-27 %      |
-| Phase-gate + watchdog + preseed         | 2026-05-13 | 4-6×4-8        | **equilibrium** | **27-57 %** |
+| Generator state                         | Date       | Config         | Mode        | Rate          |
+|-----------------------------------------|------------|----------------|-------------|---------------|
+| Pre-3-colour (2-colour baseline)        | early 2026 | 2-colour       | -           | ~75-80 %      |
+| Post-3-colour migration                 | mid 2026   | 4-5×4-5        | warmup      | < 1 %         |
+| `solveExplained` removeOption fix       | mid 2026   | 4-5×4-7        | warmup      | ~5-6 %        |
+| Targeted-sort + `removeUselessRules`    | 2026-05-12 | 4-5×4-5        | warmup      | ~76 %         |
+| Phase-gate + watchdog (4 strategies)    | 2026-05-13 | 4-6×4-8        | warmup      | 14-27 %       |
+| Phase-gate + watchdog + preseed (pre-audit) | 2026-05-13 | 4-6×4-8        | equilibrium | 27-57 % (inflated by solver bug) |
+| Hard-ban k=3 + ntypes-soft + solver audit | 2026-05-13 | 4-6×4-8        | **equilibrium** | **10-20 %**   |
 
-The 4-6×4-8 / equilibrium-mode line is the closest to production
-behaviour. Phase-gate at 48 % and phase-1-oneshot at 57 % are both
-nearly **10× the post-migration baseline** (~5-6 %).
+The pre-audit equilibrium row reported 27-57 % only because false
+`isImpossible` paths let the solver "succeed" on multi-solution
+puzzles. The post-audit row is what the production generator
+actually delivers.
 
 #### Production decision
 
-* **Drop `singleTier`** as a live strategy. Equilibrium-mode results
-  show 12 puzzles vs 25-50 for the other three strategies on the
-  same budget — single-tier's per-candidate full solve cost makes the
-  watchdog fire on most of its attempts (93 % `attemptStalled`).
-  Keep the enum value for benchmarking only.
-
-* **Multi-strategy worker pool**: instead of running all 4 workers
-  on the same strategy, split them across `phaseGate`,
-  `phase1Oneshot` and `propOnly` (e.g. 2/1/1 or 1/1/2 depending on
-  desired slug mix). Rationale:
-  * `prop-only` is the throughput champion on propagation-friendly
-    targets (NC, EY, CC, RC, QA) — give it the bulk of those.
-  * `phase-gate` / `phase-1-oneshot` catch the force-needing slugs
-    (FM, GS, LT, DF, SY, GC, SH) that `prop-only` rejects with
-    `ratioTooHigh`.
-  * The equilibrium picker arbitrates between workers via the
-    shared corpus stats: as `prop-only` workers pile up NC/EY
-    puzzles, the picker shifts its targets toward force-needing
-    slugs, and the `phase-gate` workers naturally pick those up.
-  * The slug-mix imbalance we saw on the single-strategy preseed
-    bench (zero FM from prop-only) gets self-corrected this way.
-
-* **Default in `GeneratorConfig.strategy`**: still `phaseGate` for
+* **Multi-strategy worker pool** is the recommended default for
+  batch CLI generation:
+  `--strategy phase-gate,phase-1-oneshot,prop-only` (round-robin
+  assignment across the worker pool). The pool combines prop-only's
+  throughput on propagation-friendly targets with phase-gate's
+  force-enabler coverage in a single run; no need to pick a strategy
+  per workload.
+* **Drop `singleTier`** as a live strategy. Pre-audit benches
+  already showed it watchdog-limited (93 % `attemptStalled`); the
+  enum value is retained for benchmarking only.
+* **`GeneratorConfig.strategy`** default stays `phaseGate` for
   callers that don't override (in-app generator, tests). The
   multi-strategy split is a CLI / worker-pool concern, not a default
   change.
@@ -440,17 +505,13 @@ nearly **10× the post-migration baseline** (~5-6 %).
 #### Caveats and follow-ups
 
 * The watchdog threshold (15 s) penalises strategies with expensive
-  per-candidate tests. Re-bench with 30 s or 60 s to see whether
-  `singleTier` recovers — useful to confirm it's structurally weak,
-  not just unlucky with the watchdog window.
-* prop-only's FM rate of 0 is worth investigating: under what
-  conditions could pure propagation accept a force-needing
-  constraint? Likely never, but the picker keeps targeting FM
-  because the corpus is under-represented. Resolving this requires
-  either a smarter picker that gives up on impossible targets per
-  strategy, or accepting that `prop-only` workers skip FM and let
-  other workers handle it (which is what the multi-strategy pool
-  proposed above does).
+  per-candidate tests. Re-bench with 30 s or 60 s to confirm
+  `singleTier` is structurally weak rather than watchdog-unlucky.
+* Productivity in equilibrium mode drops sharply once the corpus is
+  balanced — the picker keeps pushing into harder ntypes / less
+  represented slug combinations. The 10-20 % rate is for a freshly
+  preseeded corpus; long-running benches plateau lower as the easy
+  targets exhaust.
 * All measurements are on a single hardware setup; absolute timings
   will vary. The relative rankings should be robust.
 
@@ -477,12 +538,6 @@ nearly **10× the post-migration baseline** (~5-6 %).
 * **UI: opt-in/opt-out switch for domain3 puzzles** in the player
   settings — once the corpus has both, the player needs to be able
   to filter them.
-* **UI: right-click / drag semantics on 3-colour puzzles.** Right-
-  click currently still does the 2-colour toggle (free ↔ white) and
-  drag still paints "set to the first-tap value". Both work, but
-  neither uses the third colour — on a 3-colour puzzle the player
-  has to use the regular tap cycle to reach purple. Probably fine
-  as a first iteration, but worth a UX review.
 * **Re-tune complexity scoring** for 3-colour puzzles. The scoring
   was tuned for 2-colour traces; 3-colour traces tend to produce
   more `removeOption` steps that each carry a tier-0..5 complexity.

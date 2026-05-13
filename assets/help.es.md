@@ -4,7 +4,9 @@ En este juego, tu objetivo es colorear las celdas de la cuadrícula en blanco o 
 
 Para saber qué celda debe ir en qué color, debes seguir algunas restricciones (las reglas se explican a continuación).
 
-Haz clic (o toca en móvil) en una celda para cambiar su color.
+Haz clic (o toca en móvil) en una celda para cambiar su color. Un clic recorre los colores: libre → negro → blanco → libre. En escritorio, el clic derecho recorre en sentido inverso (libre → blanco → negro → libre); en móvil, una pulsación larga hace lo mismo. Arrastrar pinta varias celdas seguidas con el color del ciclo.
+
+Algunos rompecabezas usan un tercer color, el púrpura, con pequeños puntos de colores debajo de las celdas libres que indican qué colores siguen siendo posibles. En esos rompecabezas, el ciclo incluye el púrpura: un clic es libre → negro → blanco → púrpura → libre, y un clic derecho (o pulsación larga) es libre → púrpura → blanco → negro → libre — basta un solo clic derecho para alcanzar el púrpura.
 
 Algunas celdas ya pueden estar rellenas y no podrás cambiarlas, están indicadas por un borde interno más grueso.
 
@@ -59,6 +61,10 @@ Un número en un círculo encima de una columna indica cuántas celdas de ese co
 ### Número de grupos
 
 Un número en un cuadro con un icono de enlace indica cuántos grupos (componentes conectados) de ese color deben estar en la solución.
+
+### Número de vecinos
+
+Una celda que contiene un dígito dentro de una **cruz** (signo +) indica cuántos vecinos ortogonales de ese color debe tener la celda. La cruz está rellena con el color objetivo y delineada con el color opuesto para que siga siendo legible sobre cualquier fondo. Por ejemplo, una cruz negra con el dígito 2 significa que la celda debe tener exactamente 2 vecinos negros entre sus celdas arriba/abajo/izquierda/derecha.
 
 ### Ojos
 

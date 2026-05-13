@@ -4,7 +4,9 @@ In this game, your aim is to color the cells of the grid in black or white.
 
 To know which cell has to be which color, you have to follow some constraints (rules are explained below).
 
-Click (or touch on mobile) a cell to change its color.
+Click (or touch on mobile) a cell to change its color. A click cycles through colours: free → black → white → free. On desktop, right-click cycles in the opposite direction (free → white → black → free); on mobile, a long press does the same. Dragging paints several cells in a row with the cycle's colour.
+
+Some puzzles use a third colour, purple, with small coloured dots underneath the free cells showing which colours are still possible. On those puzzles the cycle includes purple: a click is free → black → white → purple → free, and a right-click (or long press) is free → purple → white → black → free — so a single right-click is enough to reach purple.
 
 Some cells can be already filled and you won't be able to change them, they are indicated by a thicker inside border.
 
@@ -59,6 +61,10 @@ A number in a circle above a column indicates how many cells of that color must 
 ### Group count
 
 A number in a box with a link icon indicates how many groups (connected components) of that color must be in the solution.
+
+### Neighbor count
+
+A cell containing a digit inside a **plus-shaped cross** indicates how many orthogonal neighbours of that colour the cell must have. The cross is filled with the target colour and outlined in the opposite colour so it stays readable on any background. For instance, a black cross holding the digit 2 means the cell must have exactly 2 black neighbours among its top/bottom/left/right cells.
 
 ### Eyes
 

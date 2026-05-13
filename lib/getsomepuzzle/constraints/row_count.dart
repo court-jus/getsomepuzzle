@@ -24,7 +24,8 @@ final class RowCountConstraint extends LineCentricConstraint {
   List<Cell> getLine(Puzzle puzzle) => puzzle.getRows()[getIdx()];
 
   @override
-  String toHuman(Puzzle puzzle) => 'Row ${getIdx() + 1}: $count ${cellValueToString(color)}';
+  String toHuman(Puzzle puzzle) =>
+      'Row ${getIdx() + 1}: $count ${cellValueToString(color)}';
 
   @override
   Constraint rotated(int origWidth, int origHeight) {

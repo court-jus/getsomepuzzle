@@ -262,6 +262,24 @@ abstract class AppLocalizations {
   /// **'Banned rules'**
   String get labelWidgetBannedrules;
 
+  /// Label of the open-page filter that picks the puzzle domain size (2- vs 3-color puzzles)
+  ///
+  /// In en, this message translates to:
+  /// **'Number of colors'**
+  String get labelWidgetDomain;
+
+  /// Chip label for two-color puzzles in the domain filter
+  ///
+  /// In en, this message translates to:
+  /// **'2 colors'**
+  String get labelDomainTwoColors;
+
+  /// Chip label for three-color puzzles in the domain filter
+  ///
+  /// In en, this message translates to:
+  /// **'3 colors'**
+  String get labelDomainThreeColors;
+
   /// Message displayed before the number of puzzles
   ///
   /// In en, this message translates to:
@@ -339,6 +357,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clue'**
   String get tooltipClue;
+
+  /// Tooltip on the tap-mode toggle button shown on 3+ colour puzzles when the current mode is 'paint': a tap on a free cell will set the next colour.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap cycles colour'**
+  String get tooltipTapModeIncrValue;
+
+  /// Tooltip on the tap-mode toggle button shown on 3+ colour puzzles when the current mode is 'remove option': a tap on a free cell will rule out one of its remaining colour options.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap removes an option'**
+  String get tooltipTapModeRemoveOption;
 
   /// Tooltip displayed while the mouse is over the undo button
   ///
@@ -1131,6 +1161,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skip learning'**
   String get newConstraintModalSkip;
+
+  /// Title of the modal suggesting the player try 3-color puzzles. Shown once after onboarding plus 50 plays, only if the player has never played a 3-color puzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for 3 colors?'**
+  String get thirdColorSuggestionTitle;
+
+  /// Body of the 3-color suggestion modal. Reassures the player by linking 3-color puzzles to the rules they already master.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. It\'s a fresh kind of challenge built on what you already know.'**
+  String get thirdColorSuggestionBody;
+
+  /// Button on the 3-color suggestion modal that opts the player into 3-color puzzles by enabling the d3 domain in their filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it'**
+  String get thirdColorSuggestionTryLabel;
+
+  /// Button on the 3-color suggestion modal that dismisses the suggestion without changing filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Maybe later'**
+  String get thirdColorSuggestionLaterLabel;
+
+  /// Secondary paragraph on the 3-color suggestion modal, shown between the main body and the action buttons. Reassures the player that the opt-in is reversible via the Open page filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember that you can always choose the type of puzzles you want from the advanced filters in the library.'**
+  String get thirdColorSuggestionFiltersReminder;
 
   /// Title of the intro modal shown once before the first rule explanation, on a brand-new player or right after a 'Replay onboarding' reset.
   ///

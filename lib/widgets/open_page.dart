@@ -48,6 +48,8 @@ class _OpenPageState extends State<OpenPage> {
     List<String>? newBRules,
     List<String>? newWFlags,
     List<String>? newBFlags,
+    List<String>? newWDomains,
+    List<String>? newBDomains,
   }) {
     setState(() {
       bool changed = false;
@@ -98,6 +100,23 @@ class _OpenPageState extends State<OpenPage> {
             .currentFilters
             .wantedFlags
             .where((flag) => !newBFlags.contains(flag))
+            .toSet();
+        changed = true;
+      }
+      if (newWDomains != null) {
+        widget.database.currentFilters.wantedDomains = newWDomains.toSet();
+        widget.database.currentFilters.bannedDomains.removeAll(
+          widget.database.currentFilters.wantedDomains,
+        );
+        changed = true;
+      }
+      if (newBDomains != null) {
+        widget.database.currentFilters.bannedDomains = newBDomains.toSet();
+        widget.database.currentFilters.wantedDomains = widget
+            .database
+            .currentFilters
+            .wantedDomains
+            .where((d) => !newBDomains.contains(d))
             .toSet();
         changed = true;
       }
@@ -517,6 +536,42 @@ class _OpenPageState extends State<OpenPage> {
                                     applyFilter(
                                       newWFlags: value.$1.toList(),
                                       newBFlags: value.$2.toList(),
+                                    ),
+                                  },
+                                ),
+                                const Divider(),
+                                Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  )!.labelWidgetDomain,
+                                ),
+                                FlagsSelector(
+                                  choices: [
+                                    (
+                                      "d2",
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.labelDomainTwoColors,
+                                    ),
+                                    (
+                                      "d3",
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.labelDomainThreeColors,
+                                    ),
+                                  ],
+                                  wanted: widget
+                                      .database
+                                      .currentFilters
+                                      .wantedDomains,
+                                  banned: widget
+                                      .database
+                                      .currentFilters
+                                      .bannedDomains,
+                                  apply: (value) => {
+                                    applyFilter(
+                                      newWDomains: value.$1.toList(),
+                                      newBDomains: value.$2.toList(),
                                     ),
                                   },
                                 ),

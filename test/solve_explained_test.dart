@@ -81,14 +81,12 @@ void main() {
     expect(
       replay.complete,
       isTrue,
-      reason: 'replaying every SolveStep should drive the puzzle to '
+      reason:
+          'replaying every SolveStep should drive the puzzle to '
           'completion when the trace originally completed; if this '
           'fails, the trace probably dropped a removeOption.',
     );
-    expect(
-      replay.cellValues.where((v) => v == CellValue.free).length,
-      0,
-    );
+    expect(replay.cellValues.where((v) => v == CellValue.free).length, 0);
     // sanity: every free cell was eventually touched.
     final touched = steps.map((s) => s.cellIdx).toSet();
     expect(touched.length, freeCount);

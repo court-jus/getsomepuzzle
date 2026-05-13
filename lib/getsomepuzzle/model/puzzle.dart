@@ -430,6 +430,78 @@ class Puzzle {
     setValue(idx, domain[currentDomainIdx + 1], ignoreOptions: true);
   }
 
+  /// Mirror of [incrValue] that walks the domain backward. Steps through:
+  ///   `free → domain[last] → domain[last-1] → … → domain[0] → free → …`
+  ///
+  /// Wired to right-click (desktop) and long-press (mobile) so the player
+  /// can reach the last colour of the domain in one click instead of N.
+  /// Same `resetCell` + `updateConstraintStatus` dance as [incrValue] on
+  /// the wrap-back-to-free step. `ignoreOptions: true` matches [incrValue]
+  /// — manual cycling can always override constraint-driven pruning.
+  void decrValue(int idx) {
+    if (domain.isEmpty) return;
+    if (cells[idx].readonly) return;
+    final currentValue = cellValues[idx];
+    if (currentValue == CellValue.free) {
+      setValue(idx, domain.last, ignoreOptions: true);
+      return;
+    }
+    final currentDomainIdx = domain.indexOf(currentValue);
+    if (currentDomainIdx <= 0) {
+      // Either the current colour isn't part of this puzzle's domain
+      // (legacy data) or it is the first domain entry — wrap back to
+      // free with full options restored.
+      resetCell(idx);
+      updateConstraintStatus();
+      return;
+    }
+    setValue(idx, domain[currentDomainIdx - 1], ignoreOptions: true);
+  }
+
+  /// Manual option-pruning cycle triggered by a tap on a *free* cell in
+  /// "remove-option" mode. Walks through:
+  ///   all options → drop domain[0] → drop domain[1] → … → drop
+  ///   domain[last] → all options → …
+  /// Each step restores the previously dropped option (if any) and
+  /// removes the next one in domain order. A 2-colour domain has no
+  /// useful intermediate state (any single removal collapses to a
+  /// `setValue`), so this method is only meaningful on 3+ colour
+  /// puzzles — the caller gates on `domain.length`.
+  ///
+  /// If the cell already has a value, falls back to [incrValue] so the
+  /// tap still has the regular cycling effect.
+  ///
+  /// A non-canonical option state (more than one option missing, e.g.
+  /// from a prior right-click prune) is treated as "start fresh": the
+  /// cell is reset and the first domain colour is removed.
+  void cycleRemoveOption(int idx) {
+    if (domain.isEmpty) return;
+    final cell = cells[idx];
+    if (cell.readonly) return;
+    if (cell.value != CellValue.free) {
+      incrValue(idx);
+      return;
+    }
+    final missing = domain.where((v) => !cell.options.contains(v)).toList();
+    if (missing.isEmpty) {
+      removeOption(idx, domain.first);
+      return;
+    }
+    if (missing.length == 1) {
+      final m = domain.indexOf(missing.first);
+      if (m == domain.length - 1) {
+        resetCell(idx);
+        updateConstraintStatus();
+        return;
+      }
+      resetCell(idx);
+      removeOption(idx, domain[m + 1]);
+      return;
+    }
+    resetCell(idx);
+    removeOption(idx, domain.first);
+  }
+
   bool get complete {
     return !cellValues.any((val) => val == CellValue.free);
   }

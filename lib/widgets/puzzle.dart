@@ -33,6 +33,7 @@ class PuzzleWidget extends StatefulWidget {
     this.hintIsError = false,
     this.onCellRightDrag,
     this.onCellRightDragEnd,
+    this.onCellLongPress,
   });
 
   final Puzzle currentPuzzle;
@@ -44,6 +45,10 @@ class PuzzleWidget extends StatefulWidget {
   final bool hintIsError;
   final ValueChanged<int>? onCellRightDrag;
   final VoidCallback? onCellRightDragEnd;
+
+  /// Long-press = cycle backward. Mobile equivalent of the right-click
+  /// on desktop — the host wires both to the same `GameModel` entry.
+  final ValueChanged<int>? onCellLongPress;
 
   @override
   State<PuzzleWidget> createState() => _PuzzleWidgetState();
@@ -447,6 +452,9 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       onTap: () => _handleCellTap(idx),
       onSecondaryTap: isDesktopOrWeb
           ? () => _handleCellTap(idx, secondary: true)
+          : null,
+      onLongPress: widget.onCellLongPress != null
+          ? () => widget.onCellLongPress!(idx)
           : null,
       onDrag: (Offset offset) {
         final int targetRow = (rowidx + offset.dy).floor();

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
@@ -366,11 +365,21 @@ class GameModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// Returns true if the tap was handled (cell was toggled).
-  bool handleTap(int idx) {
+  ///
+  /// [removeOptionMode] switches a free cell's tap from the regular
+  /// `incrValue` cycle to the option-pruning cycle (only meaningful on
+  /// 3+ colour puzzles — collapses to `incrValue` everywhere else).
+  /// When the cell already has a value, both modes share the same
+  /// behaviour so the player never gets "stuck" on a coloured cell.
+  bool handleTap(int idx, {bool removeOptionMode = false}) {
     if (currentPuzzle == null) return false;
     if (currentPuzzle!.cells[idx].readonly) return false;
     _beforeMutation();
-    currentPuzzle!.incrValue(idx);
+    if (removeOptionMode && currentPuzzle!.domain.length > 2) {
+      currentPuzzle!.cycleRemoveOption(idx);
+    } else {
+      currentPuzzle!.incrValue(idx);
+    }
     currentMeta?.stats?.recordCellEdit();
     currentPuzzle!.clearConstraintsValidity();
     if (history.isEmpty || history.last != idx) history.add(idx);
@@ -386,23 +395,38 @@ class GameModel extends ChangeNotifier {
     _beforeMutation();
     lastDragIdx = idx;
     if (firstDragValue == null) {
-      final myOpposite = currentPuzzle!.domain
-          .whereNot((e) => e == currentPuzzle!.cellValues[idx])
-          .first;
-      firstDragValue = myOpposite;
-      currentPuzzle!.setValue(idx, firstDragValue!);
-      currentMeta?.stats?.recordCellEdit();
-      if (history.isEmpty || history.last != idx) history.add(idx);
-      _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
-    }
-    if (currentPuzzle!.cellValues[idx] != firstDragValue &&
+      // First cell of the drag: pick the *next* colour in the cycle
+      // (so the drag mirrors what a tap would do). Paint the initial
+      // cell unconditionally, then lock that value for the rest of
+      // the drag.
+      firstDragValue = _nextCycle(currentPuzzle!.cellValues[idx]);
+      _applyLeftDragPaint(idx);
+    } else if (firstDragValue != CellValue.free &&
         currentPuzzle!.cellValues[idx] == CellValue.free) {
-      currentPuzzle!.setValue(idx, firstDragValue!);
-      currentMeta?.stats?.recordCellEdit();
-      if (history.isEmpty || history.last != idx) history.add(idx);
-      _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
+      // Subsequent cells: only repaint *free* cells, never overwrite
+      // an already-coloured cell. When the cycle's "next" value is
+      // free (drag starting on the domain's last colour), there's no
+      // useful repaint to do — the initial cell was reset, the rest
+      // is left alone.
+      _applyLeftDragPaint(idx);
     }
     notifyListeners();
+  }
+
+  /// Apply [firstDragValue] to cell [idx]. Free target uses [resetCell]
+  /// so the cell's options are restored to the full domain (otherwise it
+  /// would land in the degenerate `value = free, options = []` state).
+  void _applyLeftDragPaint(int idx) {
+    if (firstDragValue == CellValue.free) {
+      if (currentPuzzle!.cells[idx].value == CellValue.free) return;
+      currentPuzzle!.resetCell(idx);
+      currentPuzzle!.updateConstraintStatus();
+    } else {
+      currentPuzzle!.setValue(idx, firstDragValue!);
+    }
+    currentMeta?.stats?.recordCellEdit();
+    if (history.isEmpty || history.last != idx) history.add(idx);
+    _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
   }
 
   void handleDragEnd() {
@@ -421,70 +445,69 @@ class GameModel extends ChangeNotifier {
     if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
     if (lastRightDragIdx != null && idx == lastRightDragIdx) return;
     final currentValue = currentPuzzle!.cellValues[idx];
-    if (firstRightDragValue == null && currentValue == CellValue.black) return;
 
     if (firstRightDragValue == null) {
-      // First event of a right-button gesture (pointer-down on a cell
-      // whose value is not black). Defer the toggle: we don't know
-      // yet whether this is a single click (commit on release) or a
-      // drag (commit at the moment the user moves to another cell).
-      firstRightDragValue = currentValue == CellValue.free
-          ? CellValue.white
-          : CellValue.free;
+      // First event of a right-button gesture. The deferred-commit
+      // dance with [_pendingRightClickIdx] is kept: a lone press-and-
+      // release acts as a right-click (committed at pointer-up), while
+      // a move to another cell flushes the initial cell and starts
+      // painting. The cached value is the *paint target* used on the
+      // subsequent cells of a right-drag — derived from the initial
+      // cell's colour through the cycle's previous step so the right
+      // gesture mirrors the right-click cycle (free → domain.last,
+      // domain[i] → domain[i-1], domain[0] → free).
+      firstRightDragValue = _prevCycle(currentValue);
       _pendingRightClickIdx = idx;
       lastRightDragIdx = idx;
       return;
     }
 
     // Subsequent event on a *different* cell: a drag is happening.
-    // Flush the deferred initial click first (logged as a click,
-    // since at the time it was committed the user hadn't moved yet),
-    // then paint the new cell if it sits at the opposite value.
+    // Flush the deferred initial cell (which applies a [decrValue],
+    // i.e. one step backward in the cycle), then paint the new cell
+    // if it is free. We never overwrite an already-coloured cell on
+    // a right-drag — symmetric with the left-drag.
     _beforeMutation();
     lastRightDragIdx = idx;
     if (_pendingRightClickIdx != null) {
-      _commitRightToggle(_pendingRightClickIdx!, isDrag: false);
+      _commitRightDecr(_pendingRightClickIdx!, isDrag: false);
       _pendingRightClickIdx = null;
     }
-    final oppositeValue = firstRightDragValue == CellValue.free
-        ? CellValue.white
-        : CellValue.free;
-    if (currentValue == oppositeValue) {
-      _commitRightToggle(idx, isDrag: true);
+    if (firstRightDragValue != CellValue.free &&
+        currentValue == CellValue.free) {
+      _commitRightPaint(idx);
     }
     notifyListeners();
   }
 
-  void _commitRightToggle(int idx, {required bool isDrag}) {
-    bool changed;
-    if (firstRightDragValue == CellValue.free) {
-      // Toggling a coloured cell back to free: use `resetCell` so the
-      // cell's options are restored to the full domain. Going through
-      // `setValue(free, ignoreOptions: true)` would leave the cell in
-      // the degenerate `value = free, options = []` state — visible as
-      // a free cell whose option dots have vanished on a 3+ colour
-      // puzzle.
-      if (currentPuzzle!.cells[idx].value == CellValue.free) {
-        changed = false;
-      } else {
-        currentPuzzle!.resetCell(idx);
-        currentPuzzle!.updateConstraintStatus();
-        changed = true;
-      }
-    } else {
-      changed = currentPuzzle!.setValue(
-        idx,
-        firstRightDragValue!,
-        ignoreOptions: true,
-      );
+  /// Apply [Puzzle.decrValue] to the initial cell of a right gesture.
+  /// Used both for a pure right-click (release without move) and as
+  /// the deferred commit when a right-drag starts moving away from
+  /// the initial cell.
+  void _commitRightDecr(int idx, {required bool isDrag}) {
+    final before = currentPuzzle!.cellValues[idx];
+    currentPuzzle!.decrValue(idx);
+    final after = currentPuzzle!.cellValues[idx];
+    if (before != after) {
+      currentMeta?.stats?.recordCellEdit();
+      if (history.isEmpty || history.last != idx) history.add(idx);
+      _log.fine('${isDrag ? "right-drag" : "right-click"} cell $idx → $after');
     }
+  }
+
+  /// Paint the [firstRightDragValue] colour on a free cell traversed
+  /// during a right-drag. Caller must have already checked the target
+  /// is not free and the cell currently holds [CellValue.free].
+  void _commitRightPaint(int idx) {
+    final changed = currentPuzzle!.setValue(
+      idx,
+      firstRightDragValue!,
+      ignoreOptions: true,
+    );
     if (changed) {
       currentMeta?.stats?.recordCellEdit();
       if (history.isEmpty || history.last != idx) history.add(idx);
-      _log.fine(
-        '${isDrag ? "right-drag" : "right-click"} cell $idx '
-        '→ ${currentPuzzle!.cellValues[idx]}',
-      );
+      _log.fine('right-drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
     }
   }
 
@@ -501,13 +524,62 @@ class GameModel extends ChangeNotifier {
     // left button live.
     if (_pendingRightClickIdx != null) {
       _beforeMutation();
-      _commitRightToggle(_pendingRightClickIdx!, isDrag: false);
+      _commitRightDecr(_pendingRightClickIdx!, isDrag: false);
       _pendingRightClickIdx = null;
     }
     _log.fine('right-drag end');
     firstRightDragValue = null;
     lastRightDragIdx = null;
     _afterMutation();
+  }
+
+  /// Long-press on a cell — mobile fallback for the right-click cycle.
+  /// On desktop the right-click reaches the same goal, but mobile has
+  /// no secondary mouse button so the player needs another way to step
+  /// backward through the cycle (most importantly: reach `domain.last`
+  /// in one tap instead of N). Mode-agnostic: it stays a "go to the
+  /// previous colour" shortcut even when [removeOptionMode] is on.
+  bool handleLongPress(int idx, {bool removeOptionMode = false}) {
+    if (currentPuzzle == null) return false;
+    if (currentPuzzle!.cells[idx].readonly) return false;
+    _beforeMutation();
+    final before = currentPuzzle!.cellValues[idx];
+    currentPuzzle!.decrValue(idx);
+    final after = currentPuzzle!.cellValues[idx];
+    if (before == after) {
+      // No change (degenerate domain or already-blocked cell) — skip
+      // the recordCellEdit / history bookkeeping but still flush state.
+      _afterMutation();
+      return false;
+    }
+    currentMeta?.stats?.recordCellEdit();
+    currentPuzzle!.clearConstraintsValidity();
+    if (history.isEmpty || history.last != idx) history.add(idx);
+    _log.fine('long-press cell $idx → $after');
+    _afterMutation();
+    return true;
+  }
+
+  /// One step forward in the puzzle's colour cycle. Used to derive a
+  /// left-drag's paint target from the first touched cell's colour, so
+  /// the drag stays in sync with a regular tap.
+  CellValue _nextCycle(CellValue v) {
+    final domain = currentPuzzle!.domain;
+    if (domain.isEmpty) return CellValue.free;
+    if (v == CellValue.free) return domain.first;
+    final i = domain.indexOf(v);
+    if (i < 0 || i == domain.length - 1) return CellValue.free;
+    return domain[i + 1];
+  }
+
+  /// Mirror of [_nextCycle] used by right-drag and long-press handlers.
+  CellValue _prevCycle(CellValue v) {
+    final domain = currentPuzzle!.domain;
+    if (domain.isEmpty) return CellValue.free;
+    if (v == CellValue.free) return domain.last;
+    final i = domain.indexOf(v);
+    if (i <= 0) return CellValue.free;
+    return domain[i - 1];
   }
 
   // ---------------------------------------------------------------------------

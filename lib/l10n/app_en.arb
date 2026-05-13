@@ -108,6 +108,18 @@
     "@labelWidgetBannedrules": {
         "description": "Label of the widget"
     },
+    "labelWidgetDomain": "Number of colors",
+    "@labelWidgetDomain": {
+        "description": "Label of the open-page filter that picks the puzzle domain size (2- vs 3-color puzzles)"
+    },
+    "labelDomainTwoColors": "2 colors",
+    "@labelDomainTwoColors": {
+        "description": "Chip label for two-color puzzles in the domain filter"
+    },
+    "labelDomainThreeColors": "3 colors",
+    "@labelDomainThreeColors": {
+        "description": "Chip label for three-color puzzles in the domain filter"
+    },
     "msgCountMatchingPuzzles": "Puzzles matching filters",
     "@msgCountMatchingPuzzles": {
         "description": "Message displayed before the number of puzzles"
@@ -165,6 +177,14 @@
     "tooltipClue": "Clue",
     "@tooltipClue": {
         "description": "Tooltip displayed while the mouse is over the 'give me a clue' button"
+    },
+    "tooltipTapModeIncrValue": "Tap cycles colour",
+    "@tooltipTapModeIncrValue": {
+        "description": "Tooltip on the tap-mode toggle button shown on 3+ colour puzzles when the current mode is 'paint': a tap on a free cell will set the next colour."
+    },
+    "tooltipTapModeRemoveOption": "Tap removes an option",
+    "@tooltipTapModeRemoveOption": {
+        "description": "Tooltip on the tap-mode toggle button shown on 3+ colour puzzles when the current mode is 'remove option': a tap on a free cell will rule out one of its remaining colour options."
     },
     "tooltipUndo": "Undo",
     "@tooltipUndo": {
@@ -628,6 +648,26 @@
     "newConstraintModalSkip": "Skip learning",
     "@newConstraintModalSkip": {
         "description": "Button on the new-rule dialog that lets the player skip onboarding entirely: every rule is marked as seen and the phase counter jumps past all defined phases."
+    },
+    "thirdColorSuggestionTitle": "Ready for 3 colors?",
+    "@thirdColorSuggestionTitle": {
+        "description": "Title of the modal suggesting the player try 3-color puzzles. Shown once after onboarding plus 50 plays, only if the player has never played a 3-color puzzle."
+    },
+    "thirdColorSuggestionBody": "You've solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. It's a fresh kind of challenge built on what you already know.",
+    "@thirdColorSuggestionBody": {
+        "description": "Body of the 3-color suggestion modal. Reassures the player by linking 3-color puzzles to the rules they already master."
+    },
+    "thirdColorSuggestionTryLabel": "Try it",
+    "@thirdColorSuggestionTryLabel": {
+        "description": "Button on the 3-color suggestion modal that opts the player into 3-color puzzles by enabling the d3 domain in their filters."
+    },
+    "thirdColorSuggestionLaterLabel": "Maybe later",
+    "@thirdColorSuggestionLaterLabel": {
+        "description": "Button on the 3-color suggestion modal that dismisses the suggestion without changing filters."
+    },
+    "thirdColorSuggestionFiltersReminder": "Remember that you can always choose the type of puzzles you want from the advanced filters in the library.",
+    "@thirdColorSuggestionFiltersReminder": {
+        "description": "Secondary paragraph on the 3-color suggestion modal, shown between the main body and the action buttons. Reassures the player that the opt-in is reversible via the Open page filters."
     },
     "welcomeModalTitle": "Welcome",
     "@welcomeModalTitle": {

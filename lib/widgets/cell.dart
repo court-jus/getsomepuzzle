@@ -35,6 +35,7 @@ class CellWidget extends StatelessWidget {
     required this.onDrag,
     required this.onDragEnd,
     this.onSecondaryTap,
+    this.onLongPress,
     this.constraints,
     this.borderColor,
     this.borderWidth,
@@ -53,6 +54,13 @@ class CellWidget extends StatelessWidget {
   final List<Constraint>? constraints;
   final VoidCallback onTap;
   final VoidCallback? onSecondaryTap;
+
+  /// Long-press fallback for mobile (where there is no right-click).
+  /// Wired to the puzzle's "cycle backward" action so the player can
+  /// reach the last colour of the domain in one gesture instead of N
+  /// taps. Null = no long-press handling (e.g. 2-colour puzzles where
+  /// the right-click toggle already reaches every colour in one step).
+  final VoidCallback? onLongPress;
   final ValueChanged<Offset> onDrag;
   final VoidCallback onDragEnd;
   final double cellSize;
@@ -151,6 +159,7 @@ class CellWidget extends StatelessWidget {
           : null,
       child: GestureDetector(
         onTap: onTap,
+        onLongPress: onLongPress,
         onVerticalDragUpdate: (details) {
           final localPos = details.localPosition;
           final offsetX = localPos.dx / cellSize;

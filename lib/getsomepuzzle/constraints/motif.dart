@@ -155,7 +155,8 @@ class ForbiddenMotif extends Motif {
           final targetIdx = (posRow + row) * puzzle.width + (posCol + col);
           if (puzzle.cellValues[targetIdx] == car) {
             return Move(0, this, isImpossible: this);
-          } else if (puzzle.cellValues[targetIdx] == CellValue.free && puzzle.cells[targetIdx].options.contains(car)) {
+          } else if (puzzle.cellValues[targetIdx] == CellValue.free &&
+              puzzle.cells[targetIdx].options.contains(car)) {
             return Move(targetIdx, removeOption: car, this, complexity: weight);
           }
         }

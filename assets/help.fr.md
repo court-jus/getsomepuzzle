@@ -4,7 +4,9 @@ Dans ce jeu, votre but est de colorer les cases d'une grille en noir ou blanc.
 
 Pour savoir de quelle couleur chaque case doit être coloriée, vous devez suivre certaines contraintes (leurs règles sont expliquées plus bas).
 
-Pour colorer les cases, cliquez dessus (ou touchez les sur mobile). Une fois pour noir, une deuxième fois pour blanc.
+Pour colorer les cases, cliquez dessus (ou touchez-les sur mobile). Le clic fait défiler la couleur : libre → noir → blanc → libre. Sur ordinateur, le clic droit fait défiler dans l'autre sens (libre → blanc → noir → libre) ; sur mobile, l'appui long fait la même chose. Le glisser-déplacer remplit plusieurs cases d'un coup avec la couleur du cycle.
+
+Certains puzzles utilisent une troisième couleur, le violet, et des pastilles colorées sous les cases libres montrent quelles couleurs sont encore possibles. Sur ces puzzles, le cycle inclut le violet : clic = libre → noir → blanc → violet → libre, et clic droit (ou appui long) = libre → violet → blanc → noir → libre — un seul clic droit suffit donc pour atteindre le violet.
 
 Certaines cases sont déjà remplies et vous ne pouvez pas les modifier. Elles sont indiquées par une bordure plus épaisse.
 
@@ -59,6 +61,10 @@ Un nombre dans un cercle au dessus d'une colonne indique combien de cellules de 
 ### Nombre de groupes
 
 Un nombre dans un cadre avec une icône de lien indique combien de groupes (composantes connectées) de cette couleur doivent être dans la solution.
+
+### Nombre de voisins
+
+Une case contenant un chiffre à l'intérieur d'une **croix** (signe +) indique combien de voisins orthogonaux de cette couleur la case doit avoir. La croix est de la couleur cible et son contour est de la couleur opposée pour rester lisible quel que soit le fond. Par exemple, une croix noire avec le chiffre 2 demande que la case ait exactement 2 voisins noirs parmi ses voisins haut/bas/gauche/droite.
 
 ### Yeux
 

@@ -92,6 +92,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get labelWidgetBannedrules => 'Reglas prohibidas';
 
   @override
+  String get labelWidgetDomain => 'Número de colores';
+
+  @override
+  String get labelDomainTwoColors => '2 colores';
+
+  @override
+  String get labelDomainThreeColors => '3 colores';
+
+  @override
   String get msgCountMatchingPuzzles => 'Puzzles que coinciden con filtros';
 
   @override
@@ -140,6 +149,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get tooltipClue => 'Pista';
+
+  @override
+  String get tooltipTapModeIncrValue => 'Tocar cambia el color';
+
+  @override
+  String get tooltipTapModeRemoveOption => 'Tocar elimina una opción';
 
   @override
   String get tooltipUndo => 'Deshacer';
@@ -568,6 +583,23 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get newConstraintModalSkip => 'Saltar aprendizaje';
+
+  @override
+  String get thirdColorSuggestionTitle => '¿Listo para 3 colores?';
+
+  @override
+  String get thirdColorSuggestionBody =>
+      'Has resuelto un buen número de puzles en blanco y negro. ¿Quieres probar el modo 3 colores? Un nuevo color — el púrpura — se une al negro y al blanco, y las reglas se aplican a cada color de forma independiente. Es un nuevo tipo de desafío basado en lo que ya conoces.';
+
+  @override
+  String get thirdColorSuggestionTryLabel => 'Probar';
+
+  @override
+  String get thirdColorSuggestionLaterLabel => 'Más tarde';
+
+  @override
+  String get thirdColorSuggestionFiltersReminder =>
+      'No olvides que siempre puedes elegir el tipo de puzles que quieres en los filtros avanzados de la biblioteca.';
 
   @override
   String get welcomeModalTitle => 'Bienvenido';
