@@ -1,0 +1,137 @@
+name: Build Branch (Manual)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    name: Prepare version suffix
+    outputs:
+      slug: ${{ steps.slug.outputs.slug }}
+    steps:
+      - name: Compute branch slug
+        id: slug
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          SLUG=$(echo "$BRANCH" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9]+/-/g' \
+            | sed -E 's/^-+|-+$//g' \
+            | cut -c1-30)
+          if [ -z "$SLUG" ]; then
+            echo "Empty slug derived from branch '$BRANCH'" >&2
+            exit 1
+          fi
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+          echo "Slug: $SLUG"
+
+  check:
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    name: Check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Run tests
+        run: flutter test
+
+  build-apk:
+    needs: [prepare, check]
+    runs-on: ubuntu-latest
+    name: Build APK
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - name: Patch version with branch slug
+        env:
+          SLUG: ${{ needs.prepare.outputs.slug }}
+        run: |
+          sed -i -E "s/^version: ([0-9]+\.[0-9]+\.[0-9]+)(.*)$/version: \1-${SLUG}\2/" pubspec.yaml
+          sed -i -E "s/const versionText = \"Version ([0-9]+\.[0-9]+\.[0-9]+)\";/const versionText = \"Version \1-${SLUG}\";/" lib/main.dart
+          grep '^version: ' pubspec.yaml
+          grep 'const versionText' lib/main.dart
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ApkReleases-${{ needs.prepare.outputs.slug }}
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  build-windows:
+    needs: [prepare, check]
+    runs-on: windows-latest
+    name: Build Windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - name: Patch version with branch slug
+        shell: bash
+        env:
+          SLUG: ${{ needs.prepare.outputs.slug }}
+        run: |
+          sed -i -E "s/^version: ([0-9]+\.[0-9]+\.[0-9]+)(.*)$/version: \1-${SLUG}\2/" pubspec.yaml
+          sed -i -E "s/const versionText = \"Version ([0-9]+\.[0-9]+\.[0-9]+)\";/const versionText = \"Version \1-${SLUG}\";/" lib/main.dart
+          grep '^version: ' pubspec.yaml
+          grep 'const versionText' lib/main.dart
+      - run: flutter pub get
+      - run: flutter build windows
+      - name: package
+        run: |
+          cd build
+          tar -czvf windows-build.tgz windows/x64/runner/Release
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WindowsRelease-${{ needs.prepare.outputs.slug }}
+          path: build/windows-build.tgz
+
+  build-web:
+    needs: [prepare, check]
+    runs-on: ubuntu-latest
+    name: Build Web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - name: Patch version with branch slug
+        env:
+          SLUG: ${{ needs.prepare.outputs.slug }}
+        run: |
+          sed -i -E "s/^version: ([0-9]+\.[0-9]+\.[0-9]+)(.*)$/version: \1-${SLUG}\2/" pubspec.yaml
+          sed -i -E "s/const versionText = \"Version ([0-9]+\.[0-9]+\.[0-9]+)\";/const versionText = \"Version \1-${SLUG}\";/" lib/main.dart
+          grep '^version: ' pubspec.yaml
+          grep 'const versionText' lib/main.dart
+      - run: flutter pub get
+      - name: Generate privacy-policy HTML pages
+        run: dart run bin/build_privacy.dart
+      - run: flutter build web --base-href=/getsomepuzzle/
+      - name: package
+        run: |
+          cd build
+          tar -czvf web-build.tgz web
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebRelease-${{ needs.prepare.outputs.slug }}
+          path: build/web-build.tgz
