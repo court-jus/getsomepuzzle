@@ -450,11 +450,6 @@ void main() {
           '2026-01-0${(i % 9) + 1}T12:00:00 30s 0f v2_12_4x4_0000000000000000_FM:1_0:0_$i',
     );
 
-    // The gate is tied to `playlistBatchSize` with a floor of 3. We
-    // pick test sizes well below (1) and well above (≥40, past the
-    // last strict onboarding phase so the recommendation is no longer
-    // suppressed by `currentPhase != null`) so the tests remain
-    // robust to the constants being tweaked.
     const enough = 40;
 
     test('null below the onboarding noise floor (1 play)', () {
@@ -477,7 +472,14 @@ void main() {
       // playerLevel 80 → mad ('6-mad'). Player is in '2-player'.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
-      db.onboardingCompletions = enough; // past strict phases
+      db.onboardingCompletions = {
+        "FM": 5,
+        "NC": 5,
+        "PA": 5,
+        "CC": 5,
+        "RC": 5,
+        "GS": 5,
+      }; // past strict phases
       db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, '6-mad');
     });
@@ -490,7 +492,14 @@ void main() {
       // fresh plays in the current bucket.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
-      db.onboardingCompletions = enough; // past strict phases
+      db.onboardingCompletions = {
+        "FM": 5,
+        "NC": 5,
+        "PA": 5,
+        "CC": 5,
+        "RC": 5,
+        "GS": 5,
+      }; // past strict phases
       db.puzzles = []; // nothing loaded in memory
       db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, '6-mad');
@@ -508,12 +517,23 @@ void main() {
       db.collection = '2-player';
       db.loadStats(const []); // fresh stats, 0 plays
       expect(db.recommendedCollectionKey, isNull);
-      // Synthesize a played puzzle just to satisfy the signature; the
-      // counter increment doesn't depend on the puzzle's content.
-      final puz = PuzzleData('v2_12_3x3_000020000_FM:11_1:212121212_6');
-      for (int i = 0; i < enough; i++) {
+      db.onboardingCompletions = {
+        "FM": 5,
+        "NC": 5,
+        "PA": 5,
+        "CC": 5,
+        "RC": 5,
+        "GS": 4,
+      };
+      expect(db.recommendedCollectionKey, null);
+      expect(db.currentPhase?.index, 5);
+      // Synthesize a played puzzle that contains the last constraint that has not been fully onboarded yet.
+      // We play it enough times so the recommendation thinks we played enough puzzles
+      final puz = PuzzleData('v2_12_3x3_000020000_GS:0.1__');
+      for (var i = 0; i < enough; i++) {
         db.notePuzzleCompleted(puz);
       }
+      expect(db.currentPhase, null);
       expect(db.recommendedCollectionKey, '6-mad');
     });
 
@@ -525,11 +545,25 @@ void main() {
       final db = Database(playerLevel: 80);
       db.collection = '1-easy';
       db.loadStats(nFinishedStatLines(enough));
-      // Within strict (39 < 40), even though player level says 6-mad.
-      db.onboardingCompletions = 39;
+      // When the onboarding is not done, even though player level says 6-mad.
+      db.onboardingCompletions = {
+        "FM": 5,
+        "NC": 5,
+        "PA": 5,
+        "CC": 5,
+        "RC": 4,
+        "GS": 2,
+      };
       expect(db.recommendedCollectionKey, isNull);
       // Once across the strict boundary, recommendation resumes.
-      db.onboardingCompletions = 40;
+      db.onboardingCompletions = {
+        "FM": 5,
+        "NC": 5,
+        "PA": 5,
+        "CC": 5,
+        "RC": 5,
+        "GS": 5,
+      };
       expect(db.recommendedCollectionKey, '6-mad');
     });
   });

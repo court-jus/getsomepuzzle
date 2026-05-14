@@ -6,29 +6,22 @@ void main() {
     test('returns phase 0 for a brand-new player (zero completions)', () {
       // The first phase is "FM only" — what a fresh-install player
       // sees on their very first batch.
-      final phase = phaseForCompletions(0);
+      final phase = phaseForCompletions({});
       expect(phase, isNotNull);
       expect(phase!.index, 0);
       expect(phase.introducing, 'FM');
       expect(phase.allowed, {'FM'});
     });
 
-    test('rolls into the next phase exactly at every multiple of 10', () {
-      // The phase boundary is at the 10th completion: completions == 10
-      // moves into phase 1. Completions 9 is the last play of phase 0.
-      expect(phaseForCompletions(9)!.index, 0);
-      expect(phaseForCompletions(10)!.index, 1);
-      expect(phaseForCompletions(19)!.index, 1);
-      expect(phaseForCompletions(20)!.index, 2);
+    test('rolls into the next phase when enough puzzles are completed', () {
+      expect(phaseForCompletions({"FM": 3})!.index, 0);
+      expect(phaseForCompletions({"FM": 5})!.index, 1);
+      expect(phaseForCompletions({"FM": 5, "NC": 2})!.index, 1);
+      expect(phaseForCompletions({"FM": 5, "NC": 5})!.index, 2);
     });
 
     test('returns null once the player has graduated past the last phase', () {
-      // The strict phases cover [0, 40). Beyond that the player drops
-      // into the soft-filter mode (any collection, ≤1 unseen slug per
-      // puzzle).
-      expect(phaseForCompletions(39)!.index, 3);
-      expect(phaseForCompletions(40), isNull);
-      expect(phaseForCompletions(999), isNull);
+      expect(phaseForCompletions({"FM": 5, "NC": 5, "PA": 5, "CC": 5, "RC": 5, "GS": 5}), isNull);
     });
   });
 
@@ -93,30 +86,6 @@ void main() {
       // The eligibility check tolerates it.
       final phase = OnboardingPhase.phases[0];
       expect(puzzleEligibleForPhase(['FM', 'TX', ''], phase), isTrue);
-    });
-  });
-
-  group('phaseWeight', () {
-    test('returns 0 for ineligible puzzles', () {
-      // Out-of-phase puzzles must drop out of sampling entirely.
-      final phase = OnboardingPhase.phases[0];
-      expect(phaseWeight(['FM', 'GS'], phase), 0.0);
-    });
-
-    test('boosts puzzles containing the introducing slug', () {
-      // 4:1 ratio gives ≈ 80 % expected share when refresh and
-      // introduction puzzles are present in roughly equal numbers.
-      final phase = OnboardingPhase.phases[1]; // introducing NC
-      expect(phaseWeight(['NC'], phase), 4.0);
-      expect(phaseWeight(['FM', 'NC'], phase), 4.0);
-    });
-
-    test('keeps eligible refresh puzzles at the baseline weight', () {
-      // A puzzle that is in-phase but doesn't contain the
-      // introducing slug stays in the pool at baseline weight, giving
-      // the player a refresher of an already-mastered slug.
-      final phase = OnboardingPhase.phases[1]; // introducing NC
-      expect(phaseWeight(['FM'], phase), 1.0);
     });
   });
 }

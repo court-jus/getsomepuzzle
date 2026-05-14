@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -435,8 +436,8 @@ class Database {
   /// persisted to `SharedPreferences`. Drives [currentPhase] — every
   /// 10th completion advances the player to the next onboarding phase
   /// until they graduate past the last defined phase. Reset to 0 by
-  /// the future "Rejouer l'onboarding" button.
-  int onboardingCompletions = 0;
+  /// the "Replay onboarding" button.
+  Map<String, int> onboardingCompletions = {};
 
   static const _onboardingCompletionsKey = 'onboardingCompletions';
 
@@ -461,8 +462,13 @@ class Database {
       if (slug.isEmpty || slug == 'TX') continue;
       _playCountBySlug.update(slug, (v) => v + 1, ifAbsent: () => 1);
     }
-    if (currentPhase != null) {
-      onboardingCompletions++;
+    final wasOnboarding = currentPhase != null;
+    if (wasOnboarding) {
+      for (var slug in puz.rules) {
+        onboardingCompletions[slug] = onboardingCompletions[slug] == null
+            ? 1
+            : onboardingCompletions[slug]! + 1;
+      }
       // Fire-and-forget: persistence failures only mean the counter
       // resets on next launch, which the player will perceive as a
       // benign delay (one extra puzzle in the same phase).
@@ -480,7 +486,10 @@ class Database {
     // the same phase.
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_onboardingCompletionsKey, onboardingCompletions);
+      await prefs.setString(
+        _onboardingCompletionsKey,
+        json.encode(onboardingCompletions),
+      );
     } catch (e) {
       log.fine('Failed to persist onboardingCompletions: $e');
     }
@@ -490,8 +499,7 @@ class Database {
   /// Pairs with `ConstraintProgress.clear()` for the full
   /// "Rejouer l'onboarding" workflow.
   Future<void> resetOnboardingProgress() async {
-    onboardingCompletions = 0;
-    await _persistOnboardingCompletions();
+    onboardingCompletions = {};
   }
 
   /// Push the onboarding counter past every defined phase so
@@ -500,9 +508,10 @@ class Database {
   /// (cf. [_softFilterActive]) — together they fully exit the
   /// onboarding journey, while play stats stay intact.
   Future<void> skipOnboarding() async {
-    onboardingCompletions =
-        OnboardingPhase.phases.length * OnboardingPhase.phaseLength;
-    await _persistOnboardingCompletions();
+    onboardingCompletions = {};
+    for (var phase in OnboardingPhase.phases) {
+      onboardingCompletions[phase.introducing] = OnboardingPhase.phaseLength;
+    }
   }
 
   /// Mix in puzzles from `assets/overfilled-easy.txt` into the catalog
@@ -688,7 +697,17 @@ class Database {
     }
     collection = collectionToLoad;
     prefs.setString("collectionToLoad", collection);
-    onboardingCompletions = prefs.getInt(_onboardingCompletionsKey) ?? 0;
+    try {
+      final onboardingCompletionsJson =
+          prefs.getString(_onboardingCompletionsKey) ?? "{}";
+      final decoded =
+          json.decode(onboardingCompletionsJson) as Map<String, dynamic>;
+      onboardingCompletions = decoded.map((k, v) => MapEntry(k, v as int));
+    } catch (error) {
+      log.severe(error);
+      // The user probably had this saved in the previous version
+      onboardingCompletions = {};
+    }
     await loadUserPlaylists();
     String assetContent;
     if (collection == 'custom' || collection.startsWith('user_')) {
@@ -800,10 +819,10 @@ class Database {
 
   /// Number of puzzles surfaced per playlist batch on the 6 built-in
   /// level collections. End-of-batch is the natural moment to surface
-  /// a level-rotation suggestion — capping at 20 avoids the player going
+  /// a level-rotation suggestion — capping at 5 avoids the player going
   /// months without seeing it on collections that hold ~1k+ puzzles.
-  /// Tutorial, custom, and user playlists are not capped.
-  static const int playlistBatchSize = 10;
+  /// Custom, and user playlists are not capped.
+  static const int playlistBatchSize = 5;
 
   bool _isPlayableLevel(String key) =>
       playableCollectionKeyToLevel.containsKey(key);
@@ -921,7 +940,11 @@ class Database {
       final wCplx = math.exp(-math.min(d * d / twoSigmaSq, 700));
       final gap = _varietyGapForPuzzle(p, varietyStats);
       final wVariety = 1 + selectionVarietyAlpha * gap;
-      final wPhase = phaseWeight(p.rules, phase);
+      final wPhase =
+          (puzzleEligibleForPhase(p.rules, phase) &&
+              p.rules.contains(phase.introducing)
+          ? 1
+          : 0);
       final w = wCplx * wVariety * wPhase;
       final u = _samplingRandom.nextDouble() + 1e-300;
       final key = -math.log(u) / w;
