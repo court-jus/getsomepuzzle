@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'dart:io' as java_io;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
@@ -267,6 +268,14 @@ class _OpenPageState extends State<OpenPage> {
 
   @override
   Widget build(BuildContext context) {
+    final Set<String> defaultWFlags = {};
+    final Set<String> defaultBFlags = {"played", "skipped", "disliked"};
+    final bool flagsAreDefault =
+        setEquals(widget.database.currentFilters.wantedFlags, defaultWFlags) &&
+        setEquals(widget.database.currentFilters.bannedFlags, defaultBFlags);
+    final bool rulesAreDefault =
+        widget.database.currentFilters.wantedRules.isEmpty &&
+        widget.database.currentFilters.bannedRules.isEmpty;
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.titleOpenPuzzlePage),
@@ -495,30 +504,60 @@ class _OpenPageState extends State<OpenPage> {
                                   ],
                                 ),
                                 const Divider(),
-                                Text(
-                                  AppLocalizations.of(context)!.labelChooseOnly,
-                                ),
-                                FlagsSelector(
-                                  choices: [
-                                    ("played", "PL"),
-                                    ("skipped", "SK"),
-                                    ("liked", "LI"),
-                                    ("disliked", "DI"),
-                                  ],
-                                  wanted: widget
-                                      .database
-                                      .currentFilters
-                                      .wantedFlags,
-                                  banned: widget
-                                      .database
-                                      .currentFilters
-                                      .bannedFlags,
-                                  apply: (value) => {
-                                    applyFilter(
-                                      newWFlags: value.$1.toList(),
-                                      newBFlags: value.$2.toList(),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.labelChooseOnly,
                                     ),
-                                  },
+                                    FlagsSelector(
+                                      choices: [
+                                        ("played", "PL"),
+                                        ("skipped", "SK"),
+                                        ("liked", "LI"),
+                                        ("disliked", "DI"),
+                                      ],
+                                      wanted: widget
+                                          .database
+                                          .currentFilters
+                                          .wantedFlags,
+                                      banned: widget
+                                          .database
+                                          .currentFilters
+                                          .bannedFlags,
+                                      apply: (value) => {
+                                        applyFilter(
+                                          newWFlags: value.$1.toList(),
+                                          newBFlags: value.$2.toList(),
+                                        ),
+                                      },
+                                    ),
+                                    Focus(
+                                      descendantsAreFocusable: false,
+                                      canRequestFocus: false,
+                                      child: IconButton(
+                                        icon: Icon(
+                                          Icons.restart_alt,
+                                          color: flagsAreDefault
+                                              ? Colors.grey
+                                              : Colors.blue,
+                                        ),
+                                        onPressed: flagsAreDefault
+                                            ? null
+                                            : () {
+                                                applyFilter(
+                                                  newWFlags: defaultWFlags
+                                                      .toList(),
+                                                  newBFlags: defaultBFlags
+                                                      .toList(),
+                                                );
+                                              },
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const Divider(),
                                 Row(
@@ -554,29 +593,55 @@ class _OpenPageState extends State<OpenPage> {
                                   ],
                                 ),
                                 const Divider(),
-                                Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  )!.labelWidgetWantedrules,
-                                ),
-                                FlagsSelector(
-                                  choices: existingRules
-                                      .map((e) => (e, e))
-                                      .toList(),
-                                  wanted: widget
-                                      .database
-                                      .currentFilters
-                                      .wantedRules,
-                                  banned: widget
-                                      .database
-                                      .currentFilters
-                                      .bannedRules,
-                                  apply: (value) => {
-                                    applyFilter(
-                                      newWRules: value.$1.toList(),
-                                      newBRules: value.$2.toList(),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.labelWidgetWantedrules,
                                     ),
-                                  },
+                                    FlagsSelector(
+                                      choices: existingRules
+                                          .map((e) => (e, e))
+                                          .toList(),
+                                      wanted: widget
+                                          .database
+                                          .currentFilters
+                                          .wantedRules,
+                                      banned: widget
+                                          .database
+                                          .currentFilters
+                                          .bannedRules,
+                                      apply: (value) => {
+                                        applyFilter(
+                                          newWRules: value.$1.toList(),
+                                          newBRules: value.$2.toList(),
+                                        ),
+                                      },
+                                    ),
+                                    Focus(
+                                      descendantsAreFocusable: false,
+                                      canRequestFocus: false,
+                                      child: IconButton(
+                                        icon: Icon(
+                                          Icons.restart_alt,
+                                          color: rulesAreDefault
+                                              ? Colors.grey
+                                              : Colors.blue,
+                                        ),
+                                        onPressed: rulesAreDefault
+                                            ? null
+                                            : () {
+                                                applyFilter(
+                                                  newWRules: [],
+                                                  newBRules: [],
+                                                );
+                                              },
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const Divider(),
                                 TextField(
