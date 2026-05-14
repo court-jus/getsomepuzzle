@@ -359,6 +359,10 @@
     "@hintConstraintAdded": {
         "description": "Hint message shown when a constraint is added as a hint"
     },
+    "hintConstraintInprogress": "A new constraint is being computed",
+    "@hintConstraintInprogress": {
+        "description": "Hint message shown when a constraint computation is in progress"
+    },
     "hintConstraintNone": "No more constraints available",
     "@hintConstraintNone": {
         "description": "Hint message shown when all constraints have been exhausted"

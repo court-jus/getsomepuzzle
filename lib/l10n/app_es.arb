@@ -110,6 +110,7 @@
     "hintForce": "Esta celda se puede deducir combinando múltiples restricciones",
     "hintImpossible": "Una restricción está violada — se ha cometido un error",
     "hintConstraintAdded": "Se ha añadido una nueva restricción",
+    "hintConstraintInprogress": "Se está calculando una nueva restricción",
     "hintConstraintNone": "No hay más restricciones disponibles",
     "hintCellWrong": "Esta celda está mal",
     "hintAllCorrectSoFar": "Todo lo rellenado hasta ahora es correcto",

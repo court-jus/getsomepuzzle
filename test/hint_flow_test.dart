@@ -25,6 +25,7 @@ const HintTexts _texts = HintTexts(
   hintForce: 'force',
   hintDeducedFrom: _hintDeducedFrom,
   hintConstraintAdded: 'constraint added',
+  hintConstraintInprogress: 'in progress',
   hintConstraintNone: 'no more constraints',
 );
 
@@ -158,7 +159,7 @@ void main() {
         // candidate landed in the non-useful tail (usefulCount stays 0).
         // We bypass the Isolate path by writing the public fields directly.
         game.availableHintConstraints = ['FM:11', 'FM:22'];
-        game.hintConstraintsReady = true;
+        game.hintConstraintsReady = HintConstraintStatus.ready;
 
         expect(
           game.canAddHintConstraint,

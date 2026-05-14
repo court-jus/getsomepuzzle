@@ -8,28 +8,13 @@ class HintWorker {
   Isolate? _isolate;
   ReceivePort? _receivePort;
 
-  Future<List<String>> compute({
-    required int width,
-    required int height,
-    required List<int> domain,
-    required List<int> solution,
-    required Set<String> existingConstraints,
-    required Set<int> readonlyIndices,
-  }) async {
+  Future<List<String>> compute({required Puzzle puzzle}) async {
     final port = ReceivePort();
     _receivePort = port;
 
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
-      _HintParams(
-        sendPort: port.sendPort,
-        width: width,
-        height: height,
-        domain: domain,
-        solution: solution,
-        existingConstraints: existingConstraints.toList(),
-        readonlyIndices: readonlyIndices.toList(),
-      ),
+      _HintParams(sendPort: port.sendPort, puzzle: puzzle),
     );
 
     try {
@@ -56,41 +41,38 @@ class HintWorker {
 
 class _HintParams {
   final SendPort sendPort;
-  final int width;
-  final int height;
-  final List<int> domain;
-  final List<int> solution;
-  final List<String> existingConstraints;
-  final List<int> readonlyIndices;
+  final Puzzle puzzle;
 
-  _HintParams({
-    required this.sendPort,
-    required this.width,
-    required this.height,
-    required this.domain,
-    required this.solution,
-    required this.existingConstraints,
-    required this.readonlyIndices,
-  });
+  _HintParams({required this.sendPort, required this.puzzle});
 }
 
 void _isolateEntryPoint(_HintParams params) {
-  final existing = params.existingConstraints.toSet();
-  final readonlySet = params.readonlyIndices.toSet();
+  final puzzle = params.puzzle;
+
+  final existingConstraints = puzzle.constraints
+      .map((c) => c.serialize())
+      .toSet();
+  final readonlyIndices = <int>{};
+  for (int i = 0; i < puzzle.cells.length; i++) {
+    if (puzzle.cells[i].readonly) readonlyIndices.add(i);
+  }
+
+  final existing = existingConstraints.toSet();
+  final readonlySet = readonlyIndices.toSet();
 
   // Build a solved puzzle for verification
-  final solved = Puzzle.empty(params.width, params.height, params.domain);
-  for (int i = 0; i < params.solution.length; i++) {
-    solved.cells[i].setForSolver(params.solution[i]);
+  final solved = Puzzle.empty(puzzle.width, puzzle.height, puzzle.domain);
+  for (int i = 0; i < puzzle.cachedSolution!.length; i++) {
+    solved.cells[i].setForSolver(puzzle.cachedSolution![i]);
   }
 
   final List<String> validConstraints = [];
 
   for (final entry in constraintRegistry) {
     final allParameters = entry.generateAllParameters(
-      params.width,
-      params.height,
-      params.domain,
+      puzzle.width,
+      puzzle.height,
+      puzzle.domain,
       readonlySet,
     );
     for (final param in allParameters) {
@@ -99,7 +81,18 @@ void _isolateEntryPoint(_HintParams params) {
       final serialized = constraint.serialize();
       if (existing.contains(serialized)) continue;
       if (constraint.verify(solved)) {
-        validConstraints.add(serialized);
+        final clone = params.puzzle.clone();
+        if (constraint.isCompleteFor(clone)) {
+          // This constraint is useless and won't help the player
+          continue;
+        }
+        clone.addConstraint(constraint);
+        // Now we check if the puzzle can be solved with the new constraint
+        if (clone.solve()) {
+          if (constraint.verify(clone)) {
+            validConstraints.add(serialized);
+          }
+        }
       }
     }
   }

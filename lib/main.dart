@@ -664,6 +664,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return l10n.hintDeducedFrom(_constraintName(c));
       },
       hintConstraintAdded: l10n.hintConstraintAdded,
+      hintConstraintInprogress: l10n.hintConstraintInprogress,
       hintConstraintNone: l10n.hintConstraintNone,
     );
   }
@@ -735,7 +736,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             // may have already settled the orientation. `identical` ensures
             // we don't re-rotate the rotation we just produced.
             if (!identical(game.currentPuzzle, p)) return;
+            game.cancelHintConstraintComputation();
+            game.availableHintConstraints = [];
             game.rotateCurrentPuzzle();
+            game.startHintConstraintComputation();
           });
         }
       }

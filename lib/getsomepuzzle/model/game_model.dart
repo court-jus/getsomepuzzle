@@ -17,6 +17,9 @@ import 'package:logging/logging.dart';
 /// manually (no subtitle needed) or the game is running.
 enum AutoPauseReason { idle, focusLost }
 
+/// Differentiate between "no hint ready" and "hint is being computed"
+enum HintConstraintStatus { ready, inprogress, nohint, canceled }
+
 class GameModel extends ChangeNotifier {
   // --- Puzzle state ---
   PuzzleData? currentMeta;
@@ -86,7 +89,7 @@ class GameModel extends ChangeNotifier {
   HintRankWorker? _hintRankWorker;
   Timer? _hintRankDebounce;
   List<String> availableHintConstraints = [];
-  bool hintConstraintsReady = false;
+  HintConstraintStatus hintConstraintsReady = HintConstraintStatus.inprogress;
   int _usefulHintCount = 0;
 
   // --- Drag state ---
@@ -144,6 +147,7 @@ class GameModel extends ChangeNotifier {
   /// long drag or multi-step interaction is not mistaken for inactivity.
   void _beforeMutation() {
     _cancelCheckDebounce();
+    cancelHintConstraintComputation();
     rearmIdleTimer();
   }
 
@@ -155,6 +159,7 @@ class GameModel extends ChangeNotifier {
     _clearHint();
     _scheduleHelpMe();
     _scheduleHintRanking();
+    startHintConstraintComputation();
     notifyListeners();
     rearmIdleTimer();
   }
@@ -728,9 +733,13 @@ class GameModel extends ChangeNotifier {
   /// empty (still leaves the button useful: tap 1 worked, this is just the
   /// terminal feedback). Stage advancement is handled by the caller.
   void _revealAddedConstraint(HintTexts texts) {
-    if (addHintConstraint()) {
+    if (hintConstraintsReady == HintConstraintStatus.inprogress) {
+      hintText = texts.hintConstraintInprogress;
+      hintIsError = false;
+    } else if (addHintConstraint()) {
       hintText = texts.hintConstraintAdded;
       hintIsError = false;
+      startHintConstraintComputation();
     } else {
       currentPuzzle?.clearHighlights();
       hintText = texts.hintConstraintNone;
@@ -763,36 +772,23 @@ class GameModel extends ChangeNotifier {
     final puzzle = currentPuzzle;
     if (puzzle == null || puzzle.cachedSolution == null) return;
 
-    hintConstraintsReady = false;
+    hintConstraintsReady = HintConstraintStatus.inprogress;
     availableHintConstraints = [];
     _usefulHintCount = 0;
-
-    final existingConstraints = puzzle.constraints
-        .map((c) => c.serialize())
-        .toSet();
-    final readonlyIndices = <int>{};
-    for (int i = 0; i < puzzle.cells.length; i++) {
-      if (puzzle.cells[i].readonly) readonlyIndices.add(i);
-    }
 
     final worker = HintWorker();
     _hintWorker = worker;
     worker
-        .compute(
-          width: puzzle.width,
-          height: puzzle.height,
-          domain: puzzle.domain,
-          solution: puzzle.cachedSolution!,
-          existingConstraints: existingConstraints,
-          readonlyIndices: readonlyIndices,
-        )
+        .compute(puzzle: puzzle)
         .then((result) {
           // Drop stale results: the worker we awaited is no longer the
           // active one (cancelled or replaced by a newer call).
           if (!identical(worker, _hintWorker)) return;
           result.shuffle();
           availableHintConstraints = result;
-          hintConstraintsReady = true;
+          hintConstraintsReady = availableHintConstraints.isEmpty
+              ? HintConstraintStatus.nohint
+              : HintConstraintStatus.ready;
           _hintWorker = null;
           _computeHintRanking();
         })
@@ -806,7 +802,7 @@ class GameModel extends ChangeNotifier {
     _cancelHintRanking();
     _hintWorker?.dispose();
     _hintWorker = null;
-    hintConstraintsReady = false;
+    hintConstraintsReady = HintConstraintStatus.canceled;
     availableHintConstraints = [];
     _usefulHintCount = 0;
   }
@@ -816,7 +812,9 @@ class GameModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   void _scheduleHintRanking() {
-    if (!hintConstraintsReady || availableHintConstraints.isEmpty) return;
+    if (hintConstraintsReady != HintConstraintStatus.ready ||
+        availableHintConstraints.isEmpty)
+      return;
     _hintRankDebounce?.cancel();
     _hintRankDebounce = Timer(
       const Duration(milliseconds: 300),
@@ -905,7 +903,8 @@ class GameModel extends ChangeNotifier {
   /// True as long as any candidate remains, regardless of whether it's
   /// "useful" — the player can opt to add a redundant constraint anyway.
   bool get canAddHintConstraint =>
-      hintConstraintsReady && availableHintConstraints.isNotEmpty;
+      hintConstraintsReady == HintConstraintStatus.ready &&
+      availableHintConstraints.isNotEmpty;
 
   // ---------------------------------------------------------------------------
   // Help computation (debounced)
@@ -947,6 +946,7 @@ class HintTexts {
   final String hintForce;
   final String Function(CanApply givenBy) hintDeducedFrom;
   final String hintConstraintAdded;
+  final String hintConstraintInprogress;
   final String hintConstraintNone;
 
   const HintTexts({
@@ -958,6 +958,7 @@ class HintTexts {
     required this.hintForce,
     required this.hintDeducedFrom,
     required this.hintConstraintAdded,
+    required this.hintConstraintInprogress,
     required this.hintConstraintNone,
   });
 }

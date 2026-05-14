@@ -277,6 +277,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get hintConstraintAdded => 'Se ha añadido una nueva restricción';
 
   @override
+  String get hintConstraintInprogress =>
+      'Se está calculando una nueva restricción';
+
+  @override
   String get hintConstraintNone => 'No hay más restricciones disponibles';
 
   @override

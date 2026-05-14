@@ -277,6 +277,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get hintConstraintAdded => 'Une nouvelle contrainte a été ajoutée';
 
   @override
+  String get hintConstraintInprogress =>
+      'Une nouvelle contrainte est en cours de calcul...';
+
+  @override
   String get hintConstraintNone => 'Plus de contraintes disponibles';
 
   @override

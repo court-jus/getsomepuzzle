@@ -21,7 +21,17 @@ void main() {
     });
 
     test('returns null once the player has graduated past the last phase', () {
-      expect(phaseForCompletions({"FM": 5, "NC": 5, "PA": 5, "CC": 5, "RC": 5, "GS": 5}), isNull);
+      expect(
+        phaseForCompletions({
+          "FM": 5,
+          "NC": 5,
+          "PA": 5,
+          "CC": 5,
+          "RC": 5,
+          "GS": 5,
+        }),
+        isNull,
+      );
     });
   });
 

@@ -580,6 +580,12 @@ abstract class AppLocalizations {
   /// **'A new constraint has been added'**
   String get hintConstraintAdded;
 
+  /// Hint message shown when a constraint computation is in progress
+  ///
+  /// In en, this message translates to:
+  /// **'A new constraint is being computed'**
+  String get hintConstraintInprogress;
+
   /// Hint message shown when all constraints have been exhausted
   ///
   /// In en, this message translates to:

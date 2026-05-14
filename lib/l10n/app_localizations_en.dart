@@ -275,6 +275,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hintConstraintAdded => 'A new constraint has been added';
 
   @override
+  String get hintConstraintInprogress => 'A new constraint is being computed';
+
+  @override
   String get hintConstraintNone => 'No more constraints available';
 
   @override
