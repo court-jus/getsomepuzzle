@@ -419,6 +419,11 @@ class Puzzle {
       return a.serialize().compareTo(b.serialize());
     });
     _complicitiesCache = null;
+    // Sorting changes the trace `apply()` produces, which can shift
+    // every cell's per-move complexity → the cached aggregate score
+    // is stale. Drop it so the next `computeComplexity` call sees the
+    // reordered list.
+    cachedComplexity = null;
   }
 
   /// Sentinel used by [sortConstraintsByDifficulty] for constraints
