@@ -68,16 +68,23 @@ void _processFile(String path, String? outputPath) {
       continue;
     }
     try {
-      // Sort + dedup constraints in place before re-solving, so the
-      // output line carries the canonical constraint order and Puzzle
-      // does not waste deduction effort on duplicate constraints.
+      // Dedup the constraints string (TX strip + exact duplicates),
+      // parse, then reorder by real-trace cplx before emitting. The
+      // intermediate lex order from `dedupAndSortConstraints` is
+      // harmless: it gets overwritten by the in-memory sort below.
       final fields = line.split('_');
       fields[4] = dedupAndSortConstraints(fields[4]);
       final puzzle = Puzzle(fields.join('_'));
+      // Single trace fed to the sort; `computeComplexity` does its
+      // own internal solve, so the total cost here is two solves
+      // per puzzle — acceptable for a one-shot maintenance tool.
+      final sortSteps = puzzle.solveExplained();
+      puzzle.sortConstraintsByDifficulty(sortSteps);
       puzzle.computeComplexity();
       final sol = puzzle.cachedSolution;
-      // Replace solution (field 5) and complexity (field 6) with the
-      // freshly computed values; everything else stays intact.
+      // Re-emit field 4 from the in-memory sorted constraint list;
+      // replace fields 5/6 from the fresh complexity computation.
+      fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
       fields[5] = sol != null ? '1:${sol.join('')}' : '0:0';
       fields[6] = '${puzzle.cachedComplexity}';
       output.add(fields.join('_'));

@@ -108,9 +108,17 @@ void main(List<String> args) {
       final pf = puzzleLine.split('_');
       // v2 grammar: v2_<domain>_<wxh>_<prefill>_<constraints>_<solution>_<cplx>[_p:...]
       if (pf.length >= 7) {
+        // Dedup the constraint string then parse; the lex sort
+        // `dedupAndSortConstraints` does is overwritten right after
+        // by the in-memory trace-based sort.
         pf[4] = dedupAndSortConstraints(pf[4]);
         final puzzle = Puzzle(pf.join('_'));
+        // Single trace for sort; `computeComplexity` re-solves
+        // internally afterwards.
+        final sortSteps = puzzle.solveExplained();
+        puzzle.sortConstraintsByDifficulty(sortSteps);
         puzzle.computeComplexity();
+        pf[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
         pf[6] = '${puzzle.cachedComplexity}';
         if (puzzle.cachedSolution != null) {
           pf[5] = '1:${puzzle.cachedSolution!.join('')}';

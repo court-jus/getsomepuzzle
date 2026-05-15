@@ -12,7 +12,10 @@ import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
 /// Outcome of [Puzzle.simplify]. Mirrors the `(success, level, count)`
-/// trio the easing loop needs to decide whether to emit or drop.
+/// trio the easing loop needs to decide whether to emit or drop, plus
+/// the puzzle's solve trace **at the final state** so the caller can
+/// reuse it (e.g. for `sortConstraintsByDifficulty`) instead of paying
+/// for an extra `solveExplained` round.
 class SimplifyResult {
   /// Number of constraints accepted by the surgical loop.
   final int additionsCount;
@@ -24,10 +27,16 @@ class SimplifyResult {
   /// True iff [finalLevel] is at or below the requested target.
   final bool reachedTarget;
 
+  /// Solve trace for the puzzle in its final state — populated even
+  /// when [additionsCount] is 0, so callers don't need to branch on
+  /// "did simplify actually run something?".
+  final List<SolveStep> finalSteps;
+
   const SimplifyResult({
     required this.additionsCount,
     required this.finalLevel,
     required this.reachedTarget,
+    required this.finalSteps,
   });
 }
 
@@ -304,6 +313,40 @@ class Puzzle {
     }
   }
 
+  /// Add a constraint at the **front** of the list so `apply` consults
+  /// it before any pre-existing constraint. Used by `simplify` to let
+  /// a low-cplx candidate override the cell moves of a dominant
+  /// high-cplx constraint already in the puzzle (e.g. a required SH).
+  ///
+  /// Honours the same LetterGroup aggregation contract as
+  /// [addConstraint]: prepending a `LetterGroup` whose letter already
+  /// has a constraint in the list merges their indices and moves the
+  /// (now combined) entry to the front. This keeps the
+  /// "one LT per letter" invariant the constraint construction logic
+  /// expects, even under the front-insertion path.
+  void prependConstraint(Constraint c) {
+    if (c is LetterGroup) {
+      final existingIdx = _constraints.indexWhere(
+        (other) => other is LetterGroup && other.letter == c.letter,
+      );
+      if (existingIdx >= 0) {
+        final existing = _constraints[existingIdx] as LetterGroup;
+        for (final idx in c.indices) {
+          if (!existing.indices.contains(idx)) existing.indices.add(idx);
+        }
+        // Move the merged entry to position 0. `removeAt` shifts the
+        // remaining entries left so the subsequent `insert(0, …)`
+        // lands in the same slot regardless of `existingIdx`.
+        _constraints.removeAt(existingIdx);
+        _constraints.insert(0, existing);
+        _complicitiesCache = null;
+        return;
+      }
+    }
+    _constraints.insert(0, c);
+    _complicitiesCache = null;
+  }
+
   void removeConstraint(Constraint c) {
     if (_constraints.remove(c)) {
       _complicitiesCache = null;
@@ -323,6 +366,66 @@ class Puzzle {
     _constraints.insert(index, c);
     _complicitiesCache = null;
   }
+
+  /// Reorder the in-memory constraint list by the **minimum** move
+  /// complexity each constraint contributed in [steps] (ascending —
+  /// easiest first). Ties broken lexicographically on `serialize()`
+  /// for stability.
+  ///
+  /// Rationale for **min** rather than max: a constraint useful as
+  /// a starting hint (one cplx=0 move on the initial state) belongs
+  /// at the front even if its other moves later in the trace are
+  /// expensive. The player gauges difficulty from the most accessible
+  /// deduction, not the average.
+  ///
+  /// Steps with `constraint == ''` (force) and steps from
+  /// `Complicity` instances credit no specific constraint, so they
+  /// don't influence ranking. Constraints with **zero** contributing
+  /// prop steps in [steps] (claimed elsewhere or just inert here) are
+  /// pushed to the end via an `intMaxValue` sentinel rank.
+  ///
+  /// **Does not solve** — [steps] must be supplied by the caller,
+  /// typically the `solveExplained` trace it already computed for
+  /// classification. Side effects:
+  ///   - `Puzzle.apply()` iterates `constraints` in order, so simpler
+  ///     deductions surface first in the hint system and in the
+  ///     `solveExplained` trace of subsequent calls.
+  ///   - `lineExport` serialises constraints in list order, so the
+  ///     persisted line carries the easier-first order on disk too.
+  ///
+  /// Used by the generator post-loop and by maintenance tools. Never
+  /// call from the player runtime — the line on disk is already
+  /// sorted from the production-side rewrite.
+  void sortConstraintsByDifficulty(List<SolveStep> steps) {
+    // Accumulate the smallest contributed cplx per serialized
+    // constraint. Force steps carry an empty `constraint` field, so
+    // they are naturally skipped. Complicity steps carry the
+    // complicity's own serialize(); since no entry in
+    // `_constraints` matches that, those are also harmless to scan
+    // through.
+    final minCplx = <String, int>{};
+    for (final s in steps) {
+      if (s.constraint.isEmpty) continue;
+      final prev = minCplx[s.constraint];
+      if (prev == null || s.complexity < prev) {
+        minCplx[s.constraint] = s.complexity;
+      }
+    }
+
+    _constraints.sort((a, b) {
+      final ra = minCplx[a.serialize()] ?? _noContribRank;
+      final rb = minCplx[b.serialize()] ?? _noContribRank;
+      if (ra != rb) return ra.compareTo(rb);
+      return a.serialize().compareTo(b.serialize());
+    });
+    _complicitiesCache = null;
+  }
+
+  /// Sentinel used by [sortConstraintsByDifficulty] for constraints
+  /// that contributed no step to the input trace. Picked above any
+  /// realistic per-move `complexity` (0..5 in practice) so contributors
+  /// always sort before non-contributors.
+  static const int _noContribRank = 1 << 30;
 
   void replaceConstraints(Iterable<Constraint> cs) {
     _constraints.clear();
@@ -883,6 +986,7 @@ class Puzzle {
         additionsCount: 0,
         finalLevel: PuzzleLevel.undetermined,
         reachedTarget: false,
+        finalSteps: const [],
       );
     }
 
@@ -948,7 +1052,14 @@ class Puzzle {
       for (int i = 0; i < explorePool.length; i++) {
         if (timedOut()) break;
         final c = explorePool[i];
-        exploreClone.addConstraint(c);
+        // Prepend (not append) so `Puzzle.apply()` consults `c` before
+        // any pre-existing constraint. Required when the puzzle is
+        // dominated by a high-cplx constraint that fires first on
+        // every cell it touches (e.g. `--require SH`): appended
+        // candidates would be tried last and never override the
+        // dominant constraint's moves. `prependConstraint` also
+        // preserves the LetterGroup aggregation contract.
+        exploreClone.prependConstraint(c);
         final exploreSteps = exploreClone.solveExplained();
         final newLevel = _classifyFromSteps(exploreSteps, prefillRatio);
         if (newLevel.index < exploreLevel.index) {
@@ -966,11 +1077,12 @@ class Puzzle {
         break;
       }
 
-      // Graft only the indispensable onto the original. Re-classify;
-      // if the level didn't move on `this`, the indispensable depends
-      // on clone-context and the next pass will find another
-      // indispensable to combine with it.
-      addConstraint(indispensable);
+      // Graft only the indispensable onto the original, same
+      // front-insertion semantic as the exploration: the indispensable
+      // must be consulted by `apply` before the pre-existing
+      // constraints, otherwise its cheaper deduction won't surface
+      // when the original constraint can also fire on the same cell.
+      prependConstraint(indispensable);
       candidates.removeAt(indispensableIdx);
       currentSteps = solveExplained();
       currentLevel = _classifyFromSteps(currentSteps, prefillRatio);
@@ -982,6 +1094,7 @@ class Puzzle {
       additionsCount: additions,
       finalLevel: currentLevel,
       reachedTarget: currentLevel.index <= targetLevel.index,
+      finalSteps: currentSteps,
     );
   }
 

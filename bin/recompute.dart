@@ -36,14 +36,17 @@ void _processFile(String path) {
     }
 
     try {
-      // Drop exact-duplicate constraints (same slug + same params) and
-      // sort them before recomputing. Some legacy lines have constraints
-      // repeated verbatim (e.g. `SH:111.001.001;SH:111.001.001;...`);
-      // keeping them inflates the constraint count and skews the
-      // duration / complexity model downstream without changing the
-      // puzzle's logic. Sorting matches the canonical ordering used by
-      // the in-app stats matching, so two recompute outputs of
-      // structurally equal puzzles share the same constraint section.
+      // Drop exact-duplicate constraints (same slug + same params).
+      // Some legacy lines have constraints repeated verbatim (e.g.
+      // `SH:111.001.001;SH:111.001.001;...`); keeping them inflates the
+      // constraint count and skews the duration / complexity model
+      // downstream without changing the puzzle's logic.
+      //
+      // After parsing, reorder constraints by their real-trace min
+      // complexity so the output line carries an easier-first order.
+      // The lex sort that `dedupAndSortConstraints` does as a side
+      // effect is harmless intermediate state — overwritten by the
+      // in-memory sort below.
       final fields = line.split('_');
       final dedupedConstraintsField = dedupAndSortConstraints(fields[4]);
       final removed =
@@ -57,10 +60,16 @@ void _processFile(String path) {
       final dedupedLine = fields.join('_');
 
       final puzzle = Puzzle(dedupedLine);
+      // Single trace reused for sort; `computeComplexity` does its
+      // own internal solve afterwards.
+      final sortSteps = puzzle.solveExplained();
+      puzzle.sortConstraintsByDifficulty(sortSteps);
       puzzle.computeComplexity();
 
-      // Replace solution (field 5) and complexity (field 6) in the deduped
-      // line, preserving everything else (including TX constraints).
+      // Re-emit field 4 from the in-memory sorted list; replace
+      // fields 5/6 from the fresh complexity computation. Everything
+      // else (including TX entries the parser kept verbatim) stays.
+      fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
       final sol = puzzle.cachedSolution;
       fields[5] = sol != null ? '1:${sol.join('')}' : '0:0';
       fields[6] = '${puzzle.cachedComplexity}';

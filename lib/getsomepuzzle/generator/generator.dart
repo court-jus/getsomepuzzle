@@ -60,6 +60,55 @@ class GeneratorConfig {
   });
 }
 
+/// Why a `generateOne` attempt was abandoned. Surfaced via the
+/// `onReject` callback so callers (the worker logger, the dashboard)
+/// can attribute failure modes precisely instead of staring at a
+/// generic "FAILURE in 4856ms".
+enum GenerationRejectReason {
+  /// No candidate constraint was even valid for the chosen
+  /// solution — the constraint pool started empty. Very rare; only
+  /// happens with extreme `--allow`/`--ban` filters.
+  noCandidates,
+
+  /// Iterative loop finished but `solve()` still leaves more than 25 %
+  /// of cells free → too many would have to be filled "for free", so
+  /// we reject. This is the most common failure mode on tight
+  /// `--require` configs where the required slug doesn't push hard
+  /// enough.
+  ratioTooHigh,
+
+  /// One of the user-required (`--require RULES`) slugs never made
+  /// it into the iterative-loop-accepted constraint set.
+  requiredMissing,
+
+  /// `solveExplained`/replay didn't reach a clean completion — the
+  /// puzzle isn't deductively solvable as-is. Defensive: should be
+  /// unreachable after the ratio check passes, but kept as a separate
+  /// reason so the rare false-negative is visible in logs.
+  notUnique,
+
+  /// `--target-collection` set and the puzzle classified into an
+  /// out-of-cascade bucket (`overfilled`, `overfilledEasy`,
+  /// `undetermined`). Prefill ratio is structural, so we can't ease
+  /// it away.
+  targetOutOfCascade,
+
+  /// `--target-collection` set and the puzzle classified strictly
+  /// easier than the target. Lower-level puzzles can't be made
+  /// harder by adding constraints, so we drop.
+  targetTooEasy,
+
+  /// `--target-collection` set and `Puzzle.simplify` couldn't reach
+  /// the target within its budget (`--easing-budget`). The puzzle
+  /// was too hard and easing plateaued or timed out.
+  targetEasingFailed,
+
+  /// `shouldStop` callback returned true (worker wide max-time
+  /// reached, SIGINT, etc.). Distinct from the other reasons because
+  /// it's not a property of the candidate puzzle.
+  cancelled,
+}
+
 class GeneratorProgress {
   final int puzzlesGenerated;
   final int totalRequested;
@@ -110,6 +159,7 @@ class PuzzleGenerator {
     GeneratorConfig config, {
     void Function(GeneratorProgress)? onProgress,
     bool Function()? shouldStop,
+    void Function(GenerationRejectReason, Puzzle)? onReject,
     Map<String, int>? usageStats,
   }) {
     final width = config.width;
@@ -201,7 +251,10 @@ class PuzzleGenerator {
       return (usage[sa] ?? 0).compareTo(usage[sb] ?? 0);
     });
 
-    if (allConstraints.isEmpty) return null;
+    if (allConstraints.isEmpty) {
+      onReject?.call(GenerationRejectReason.noCandidates, pu);
+      return null;
+    }
     pu.addConstraint(allConstraints.removeAt(0));
 
     // 4. Iteratively add constraints that improve the puzzle
@@ -209,7 +262,10 @@ class PuzzleGenerator {
     int tried = 0;
 
     while (currentRatio > 0 && allConstraints.isNotEmpty) {
-      if (shouldStop?.call() == true) return null;
+      if (shouldStop?.call() == true) {
+        onReject?.call(GenerationRejectReason.cancelled, pu);
+        return null;
+      }
 
       bool found = false;
       while (allConstraints.isNotEmpty) {
@@ -265,6 +321,7 @@ class PuzzleGenerator {
     if (config.requiredRules.isNotEmpty) {
       final presentSlugs = pu.constraints.map((c) => c.slug).toSet();
       if (!config.requiredRules.every((r) => presentSlugs.contains(r))) {
+        onReject?.call(GenerationRejectReason.requiredMissing, pu);
         return null;
       }
     }
@@ -273,7 +330,10 @@ class PuzzleGenerator {
     final solvedPu = pu.clone();
     solvedPu.solve();
     currentRatio = solvedPu.computeRatio();
-    if (currentRatio > 0.25) return null;
+    if (currentRatio > 0.25) {
+      onReject?.call(GenerationRejectReason.ratioTooHigh, pu);
+      return null;
+    }
 
     if (currentRatio > 0) {
       // Fill remaining cells from solution
@@ -299,7 +359,10 @@ class PuzzleGenerator {
       replay.setValue(s.cellIdx, s.value);
     }
     final isUnique = replay.complete && replay.check(saveResult: false).isEmpty;
-    if (!isUnique) return null;
+    if (!isUnique) {
+      onReject?.call(GenerationRejectReason.notUnique, pu);
+      return null;
+    }
 
     final prefill = pu.cells.where((c) => c.readonly).length / pu.cells.length;
     var level = classifyTrace(
@@ -325,20 +388,46 @@ class PuzzleGenerator {
       if (level == PuzzleLevel.overfilled ||
           level == PuzzleLevel.overfilledEasy ||
           level == PuzzleLevel.undetermined) {
+        onReject?.call(GenerationRejectReason.targetOutOfCascade, pu);
         return null;
       }
-      if (level.index < target.index) return null;
+      if (level.index < target.index) {
+        onReject?.call(GenerationRejectReason.targetTooEasy, pu);
+        return null;
+      }
+      SimplifyResult? simplifyResult;
       if (level.index > target.index) {
-        final result = pu.simplify(
+        simplifyResult = pu.simplify(
           targetLevel: target,
           maxTime: config.easingBudget,
           allowedSlugs: config.allowedSlugs,
           shouldStop: shouldStop,
         );
-        if (!result.reachedTarget) return null;
-        level = result.finalLevel;
+        if (!simplifyResult.reachedTarget) {
+          onReject?.call(GenerationRejectReason.targetEasingFailed, pu);
+          return null;
+        }
+        level = simplifyResult.finalLevel;
+      }
+      // Reuse simplify's final trace for sort if it ran — it's a
+      // fresher signal than `steps` (which predates any graft).
+      if (simplifyResult != null) {
+        pu.sortConstraintsByDifficulty(simplifyResult.finalSteps);
+        return (line: pu.lineExport(), level: level);
       }
     }
+
+    // Final pass: enforce the project-wide "easier-first" constraint
+    // order on the persisted line, reusing the trace `steps` we
+    // already computed for the classification above. No extra solve.
+    //
+    // Skipping the post-sort re-classification is deliberate: sorting
+    // can only lower `maxPropCx` (never raise anything in the
+    // cascade), so `level` remains an honest upper bound of what a
+    // fresh parse would see. The asset-routing may sit one tier high
+    // for borderline puzzles — acceptable trade-off vs paying a full
+    // re-solve here.
+    pu.sortConstraintsByDifficulty(steps);
 
     return (line: pu.lineExport(), level: level);
   }

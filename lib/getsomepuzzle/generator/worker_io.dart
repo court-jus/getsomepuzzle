@@ -328,6 +328,11 @@ void _isolateEntryPoint(_IsolateParams params) {
     int lastTried = 0;
     int lastTotalConstraints = 0;
     double lastRatio = 1.0;
+    // Captured by `onReject` inside the generator. Only the *last*
+    // reason matters: generateOne exits at the first `return null`,
+    // so the callback fires at most once per attempt. Reset every
+    // iteration so a previous attempt's reason doesn't leak forward.
+    GenerationRejectReason? lastReject;
 
     ({String line, PuzzleLevel level})? result;
     try {
@@ -357,6 +362,34 @@ void _isolateEntryPoint(_IsolateParams params) {
           }
         },
         shouldStop: () => stopwatch.elapsed > maxTime,
+        onReject: (r, rejectedPu) {
+          lastReject = r;
+          // Persist every rejected puzzle to `assets/<reason>.txt` so
+          // post-run analysis can inspect each failure mode (why did
+          // the easing plateau? what did the ratio-too-high puzzles
+          // look like?). One file per reason; appended. Append is
+          // ~atomic on Linux for short lines so simultaneous worker
+          // isolates writing to the same file shouldn't interleave
+          // bytes within a single puzzle.
+          //
+          // `compute: false` skips the complexity solve we don't need
+          // here — the line is for human inspection or for replay via
+          // `bin/solve.dart`, not for the production corpus.
+          try {
+            final assetsDir = Directory('assets');
+            if (!assetsDir.existsSync()) {
+              assetsDir.createSync(recursive: true);
+            }
+            final line = rejectedPu.lineExport(compute: false);
+            File(
+              'assets/${r.name}.txt',
+            ).writeAsStringSync('$line\n', mode: FileMode.append, flush: true);
+          } catch (e) {
+            // Persistence failures shouldn't kill the worker — log and
+            // move on. Common cause: assets/ unwritable in CI.
+            log('  failed to persist reject (${r.name}): $e');
+          }
+        },
       );
     } catch (e, st) {
       log('  exception during generateOne: $e\n$st');
@@ -370,10 +403,16 @@ void _isolateEntryPoint(_IsolateParams params) {
         '(tried=$lastTried/$lastTotalConstraints)',
       );
     } else {
+      // `reason=unknown` covers the rare "exception during generateOne"
+      // path (the catch above sets result=null without firing
+      // onReject). Anything else points at a specific reject site —
+      // see `GenerationRejectReason` for the inventory.
+      final reason = lastReject?.name ?? 'unknown';
       log(
         '  result: FAILURE in ${attemptDurationMs}ms '
         '(tried=$lastTried/$lastTotalConstraints, '
-        'lastRatio=${lastRatio.toStringAsFixed(3)})',
+        'lastRatio=${lastRatio.toStringAsFixed(3)}, '
+        'reason=$reason)',
       );
     }
 
