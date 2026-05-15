@@ -497,21 +497,28 @@ class Database {
 
   /// Reset the onboarding counter so the player re-enters phase 0.
   /// Pairs with `ConstraintProgress.clear()` for the full
-  /// "Rejouer l'onboarding" workflow.
+  /// "Rejouer l'onboarding" workflow. Persists immediately because
+  /// `loadPuzzlesFile` (typically called right after) re-reads the
+  /// counter from prefs and would otherwise silently undo the reset.
   Future<void> resetOnboardingProgress() async {
     onboardingCompletions = {};
+    await _persistOnboardingCompletions();
   }
 
   /// Push the onboarding counter past every defined phase so
   /// [currentPhase] is null on the spot. Pairs with marking every slug
   /// as seen in `ConstraintProgress` to also disable the soft-filter
   /// (cf. [_softFilterActive]) — together they fully exit the
-  /// onboarding journey, while play stats stay intact.
+  /// onboarding journey, while play stats stay intact. Persists the
+  /// counter so a subsequent app launch (which rebuilds
+  /// `onboardingCompletions` from prefs in [loadPuzzlesFile]) doesn't
+  /// silently drag the player back to phase 0.
   Future<void> skipOnboarding() async {
     onboardingCompletions = {};
     for (var phase in OnboardingPhase.phases) {
       onboardingCompletions[phase.introducing] = OnboardingPhase.phaseLength;
     }
+    await _persistOnboardingCompletions();
   }
 
   /// Mix in puzzles from `assets/overfilled-easy.txt` into the catalog

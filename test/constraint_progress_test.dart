@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
@@ -179,6 +181,62 @@ void main() {
         stat('v2_12_3x3_000020000_FM:11_1:212121212_6', '2026-03-15T10:00:00'),
       ]);
       // Nothing to assert — the test is that we didn't crash.
+    });
+  });
+
+  group('Database.skipOnboarding persistence', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('writes a phase-cleared counter to SharedPreferences', () async {
+      // Regression: skipOnboarding used to only update the in-memory
+      // map. The next launch re-read `onboardingCompletions = {}` from
+      // prefs and silently snapped `currentPhase` back to phase 0,
+      // making `isInOnboarding` true again — the end-of-batch screen
+      // then showed "you haven't met every rule yet" right after the
+      // player tapped "Skip learning". Persist immediately so a
+      // freshly-loaded Database reflects the skipped state.
+      final db = Database(playerLevel: 50);
+      await db.skipOnboarding();
+
+      final loaded = Database(playerLevel: 50);
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('onboardingCompletions');
+      expect(raw, isNotNull, reason: 'skipOnboarding must persist');
+      // Simulate the loader path: the same JSON decode that
+      // loadPuzzlesFile runs at app start.
+      loaded.onboardingCompletions = (jsonDecode(raw!) as Map<String, dynamic>)
+          .map((k, v) => MapEntry(k, v as int));
+      expect(
+        loaded.currentPhase,
+        isNull,
+        reason: 'reloaded Database must consider onboarding complete',
+      );
+    });
+  });
+
+  group('Database.resetOnboardingProgress persistence', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('writes an empty counter to SharedPreferences', () async {
+      // Regression: resetOnboardingProgress only updated memory, but
+      // the "Rejouer l'onboarding" flow calls loadPuzzlesFile right
+      // after — and that re-reads `onboardingCompletions` from prefs.
+      // Without an immediate persist, the reset was silently undone in
+      // the same session.
+      // Pre-seed prefs with a "completed onboarding" state to verify
+      // the reset writes the empty map back.
+      SharedPreferences.setMockInitialValues({
+        'onboardingCompletions': '{"FM":5,"NC":5,"PA":5,"CC":5,"RC":5,"GS":5}',
+      });
+      final db = Database(playerLevel: 50);
+      await db.resetOnboardingProgress();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('onboardingCompletions'), '{}');
     });
   });
 
