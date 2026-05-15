@@ -72,6 +72,8 @@ class GeneratorWorker {
         allowedSlugs: config.allowedSlugs?.toList(),
         maxTimeMs: config.maxTime.inMilliseconds,
         count: config.count,
+        targetLevelIndex: config.targetLevel?.index,
+        easingBudgetMs: config.easingBudget.inMilliseconds,
         usageStats: usageStats,
         puzzleLines: puzzleLines,
         equilibriumRequested: equilibriumRequested,
@@ -124,6 +126,8 @@ class _IsolateParams {
   final List<String>? allowedSlugs;
   final int maxTimeMs;
   final int count;
+  final int? targetLevelIndex;
+  final int easingBudgetMs;
   final Map<String, int>? usageStats;
   final List<String>? puzzleLines;
   final bool equilibriumRequested;
@@ -143,6 +147,8 @@ class _IsolateParams {
     this.allowedSlugs,
     required this.maxTimeMs,
     required this.count,
+    this.targetLevelIndex,
+    required this.easingBudgetMs,
     this.usageStats,
     this.puzzleLines,
     this.equilibriumRequested = false,
@@ -301,6 +307,10 @@ void _isolateEntryPoint(_IsolateParams params) {
       preferredSlugs: preferredSlugs,
       maxTime: maxTime,
       count: 1,
+      targetLevel: params.targetLevelIndex != null
+          ? PuzzleLevel.values[params.targetLevelIndex!]
+          : null,
+      easingBudget: Duration(milliseconds: params.easingBudgetMs),
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;

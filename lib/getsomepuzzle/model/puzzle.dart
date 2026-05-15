@@ -8,7 +8,61 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.da
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
+
+/// Outcome of [Puzzle.simplify]. Mirrors the `(success, level, count)`
+/// trio the easing loop needs to decide whether to emit or drop.
+class SimplifyResult {
+  /// Number of constraints accepted by the surgical loop.
+  final int additionsCount;
+
+  /// Level the puzzle classifies at after all accepted additions
+  /// (== input level if nothing was accepted).
+  final PuzzleLevel finalLevel;
+
+  /// True iff [finalLevel] is at or below the requested target.
+  final bool reachedTarget;
+
+  const SimplifyResult({
+    required this.additionsCount,
+    required this.finalLevel,
+    required this.reachedTarget,
+  });
+}
+
+/// A solve step is "too hard" for [target] iff its presence forces the
+/// classifier cascade above [target]. Used by [Puzzle.simplify] to pick
+/// the cell the next surgical addition should focus on.
+bool _isStepTooHardFor(SolveStep step, PuzzleLevel target) {
+  switch (target) {
+    case PuzzleLevel.beginner:
+      // beginner: forceMoves == 0, maxComplCx == 0, maxPropCx < 3.
+      if (step.method == SolveMethod.force) return true;
+      if (step.isComplicity) return true;
+      return step.complexity >= 3;
+    case PuzzleLevel.player:
+      // player: forceMoves == 0, maxComplCx == 0; propCx unbounded.
+      if (step.method == SolveMethod.force) return true;
+      return step.isComplicity;
+    case PuzzleLevel.advanced:
+      // advanced: forceMoves == 0, 0 < maxComplCx < 4.
+      if (step.method == SolveMethod.force) return true;
+      return step.isComplicity && step.complexity >= 4;
+    case PuzzleLevel.strong:
+      // strong: forceMoves == 0. Complicities allowed regardless of cplx.
+      return step.method == SolveMethod.force;
+    case PuzzleLevel.expert:
+      // expert: 1 force step allowed with depth <= 5. Per-step we only
+      // flag depth > 5; the count side of the rule isn't per-step.
+      return step.method == SolveMethod.force && step.forceDepth > 5;
+    case PuzzleLevel.mad:
+    case PuzzleLevel.overfilledEasy:
+    case PuzzleLevel.overfilled:
+    case PuzzleLevel.undetermined:
+      return false;
+  }
+}
 
 /// Method used to determine a cell value during solving.
 enum SolveMethod { propagation, force }
@@ -760,6 +814,192 @@ class Puzzle {
         insertConstraintAt(i, removed);
       }
     }
+  }
+
+  /// Attempt to lower this puzzle's classified difficulty toward
+  /// [targetLevel] by adding constraints. The strategy is
+  /// "indispensable-by-exploration":
+  ///
+  ///   1. Trace this puzzle via `solveExplained` and classify. If the
+  ///      level is already at or below [targetLevel], stop.
+  ///   2. On a **clone**, naively expand: add candidates one by one
+  ///      until the clone's classified level drops by at least one
+  ///      tier. The candidate that triggered the drop is marked
+  ///      **indispensable** — every candidate added before it served
+  ///      as context (a "potential unblocker") but is discarded.
+  ///   3. Graft only the indispensable onto the original (`this`).
+  ///   4. Reclassify the original. Whether or not its level actually
+  ///      dropped (the indispensable may have needed clone-context to
+  ///      fire alone), loop back to step 1. The next pass starts from
+  ///      the slightly-improved original — additional indispensables
+  ///      accumulate until the target is reached or progress stalls.
+  ///
+  /// Rationale: the previous full-naive algorithm reached the target
+  /// but kept every transitional candidate, padding the constraint
+  /// list. By extracting one transition-trigger per pass, the final
+  /// set is closer to minimal — the puzzle gains only the constraints
+  /// that actually moved the cascade needle, not the context
+  /// scaffolding that happened to come along.
+  ///
+  /// Candidates are drawn from `generateAllParameters` over
+  /// [allowedSlugs] (default: every registered slug), filtered to
+  /// those compatible with this puzzle's unique solution and not
+  /// already present. Stable serialize-order so the same puzzle yields
+  /// the same simplification trace.
+  ///
+  /// Mutates `this` by appending each accepted indispensable. Cell
+  /// values (including readonly) are never modified.
+  /// `removeUselessRules` is **not** invoked — calling it would strip
+  /// the very constraints we just added.
+  ///
+  /// [onStep] is called after each grafted indispensable with the
+  /// constraint, the new classified level on the original, and the
+  /// cell of the first too-hard step that motivated this pass.
+  SimplifyResult simplify({
+    required PuzzleLevel targetLevel,
+    int maxSteps = 50,
+    Duration? maxTime,
+    Set<String>? allowedSlugs,
+    bool Function()? shouldStop,
+    void Function(Constraint added, PuzzleLevel newLevel, int targetCell)?
+    onStep,
+  }) {
+    // Watchdogs: per-call wall-clock budget plus the worker-level
+    // cancellation signal. Checked between candidate tests and between
+    // outer passes so the call can be aborted mid-exploration without
+    // burning the rest of the budget on a doomed pass.
+    final sw = maxTime != null ? (Stopwatch()..start()) : null;
+    bool timedOut() {
+      if (shouldStop?.call() == true) return true;
+      if (sw != null && maxTime != null && sw.elapsed > maxTime) return true;
+      return false;
+    }
+
+    // Compute the unique solution. Candidates that don't verify against
+    // it would make the puzzle unsolvable, so we filter them out.
+    final solved = clone();
+    if (!solved.solve()) {
+      return SimplifyResult(
+        additionsCount: 0,
+        finalLevel: PuzzleLevel.undetermined,
+        reachedTarget: false,
+      );
+    }
+
+    final slugs = allowedSlugs ?? constraintSlugs.toSet();
+    final existing = constraints.map((c) => c.serialize()).toSet();
+    final readonlyIndices = <int>{
+      for (final (i, c) in cells.indexed)
+        if (c.readonly) i,
+    };
+    final candidates = <Constraint>[];
+    for (final slug in slugs) {
+      final params = generateAllParameters(
+        slug,
+        width,
+        height,
+        domain,
+        slug == 'DF' ? readonlyIndices : null,
+      );
+      if (params == null) continue;
+      for (final p in params) {
+        final c = createConstraint(slug, p);
+        if (c == null) continue;
+        if (existing.contains(c.serialize())) continue;
+        if (!c.verify(solved)) continue;
+        candidates.add(c);
+      }
+    }
+    candidates.sort((a, b) => a.serialize().compareTo(b.serialize()));
+
+    final prefillRatio = cells.where((c) => c.readonly).length / cells.length;
+    var currentSteps = solveExplained();
+    var currentLevel = _classifyFromSteps(currentSteps, prefillRatio);
+    var additions = 0;
+
+    while (additions < maxSteps && candidates.isNotEmpty) {
+      if (currentLevel.index <= targetLevel.index) break;
+      if (timedOut()) break;
+
+      // Diagnostic anchor for the [onStep] callback: the cell of the
+      // first too-hard step in the current trace. Not used for
+      // filtering — exploration adds candidates unconditionally and
+      // detects the trigger via the level cascade. `-1` means the
+      // current level is above target but no individual step is
+      // flagged (e.g. target=expert aggregate force count).
+      int focusCell = -1;
+      for (final s in currentSteps) {
+        if (_isStepTooHardFor(s, targetLevel)) {
+          focusCell = s.cellIdx;
+          break;
+        }
+      }
+
+      // Exploration phase. Naively expand a clone — add candidates in
+      // order without any acceptance criterion — until the clone's
+      // classified level strictly drops. The trigger is the
+      // indispensable; the preceding additions ride along but are
+      // **not** grafted onto the original.
+      final exploreClone = clone();
+      final explorePool = List<Constraint>.from(candidates);
+      Constraint? indispensable;
+      int indispensableIdx = -1;
+      var exploreLevel = currentLevel;
+      for (int i = 0; i < explorePool.length; i++) {
+        if (timedOut()) break;
+        final c = explorePool[i];
+        exploreClone.addConstraint(c);
+        final exploreSteps = exploreClone.solveExplained();
+        final newLevel = _classifyFromSteps(exploreSteps, prefillRatio);
+        if (newLevel.index < exploreLevel.index) {
+          // Cascade transition triggered. Even if `newLevel` is still
+          // above `targetLevel`, the next outer-loop pass will pick
+          // up where this one leaves off.
+          indispensable = c;
+          indispensableIdx = i;
+          break;
+        }
+      }
+      if (indispensable == null) {
+        // Even adding every remaining candidate fails to move the
+        // cascade — true plateau, no point trying further iterations.
+        break;
+      }
+
+      // Graft only the indispensable onto the original. Re-classify;
+      // if the level didn't move on `this`, the indispensable depends
+      // on clone-context and the next pass will find another
+      // indispensable to combine with it.
+      addConstraint(indispensable);
+      candidates.removeAt(indispensableIdx);
+      currentSteps = solveExplained();
+      currentLevel = _classifyFromSteps(currentSteps, prefillRatio);
+      additions++;
+      onStep?.call(indispensable, currentLevel, focusCell);
+    }
+
+    return SimplifyResult(
+      additionsCount: additions,
+      finalLevel: currentLevel,
+      reachedTarget: currentLevel.index <= targetLevel.index,
+    );
+  }
+
+  /// Re-classify a trace against a known prefill ratio. Replays the
+  /// trace on a clone to confirm completeness — incomplete traces are
+  /// `undetermined`, matching the contract of `classifyTrace`.
+  PuzzleLevel _classifyFromSteps(List<SolveStep> steps, double prefillRatio) {
+    final replay = clone();
+    for (final s in steps) {
+      replay.setValue(s.cellIdx, s.value);
+    }
+    final completed =
+        replay.complete && replay.check(saveResult: false).isEmpty;
+    return classifyTrace(
+      steps: steps,
+      prefillRatio: prefillRatio,
+      solved: completed,
+    );
   }
 
   /// Return a fresh puzzle equivalent to a 90° clockwise rotation of this

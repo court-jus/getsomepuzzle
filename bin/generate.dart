@@ -34,11 +34,14 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final maxTime = parsed['maxTime'] as int;
   final output = parsed['output'] as String?;
   final bannedRules = (parsed['banned'] as String?)?.split(',').toSet() ?? {};
+  final allowedSlugsArg = (parsed['allowed'] as String?)?.split(',').toSet();
   final requiredRules =
       (parsed['required'] as String?)?.split(',').toSet() ?? {};
   final equilibriumRequested = parsed['equilibrium'] as bool;
   final jobs = (parsed['jobs'] as int).clamp(1, count);
   final logDir = parsed['logDir'] as String?;
+  final targetLevel = parsed['targetLevel'] as PuzzleLevel?;
+  final easingBudget = parsed['easingBudget'] as int;
   if (logDir != null) {
     final dir = Directory(logDir);
     if (!dir.existsSync()) dir.createSync(recursive: true);
@@ -141,12 +144,17 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   var cachedStats = _CollectionStats.fromLines(currentLines);
 
   // Universe of slugs the equilibrium picker considers — same logic as the
-  // worker (registry minus user --ban). Used by the dashboard to compute
-  // per-axis targets that match what `pickTarget` actually optimizes, and
-  // re-used below to drive worker config.
-  final allowedSlugs = bannedRules.isEmpty
-      ? null
-      : constraintSlugs.toSet().difference(bannedRules);
+  // worker (registry filtered by `--allow` whitelist if any, then minus
+  // `--ban`). Used by the dashboard to compute per-axis targets that
+  // match what `pickTarget` actually optimizes, and re-used below to
+  // drive worker config. `null` means "all registered slugs" — kept as
+  // the sentinel so downstream code can short-circuit when no filter is
+  // active.
+  Set<String>? allowedSlugs;
+  if (allowedSlugsArg != null || bannedRules.isNotEmpty) {
+    allowedSlugs = allowedSlugsArg ?? constraintSlugs.toSet();
+    allowedSlugs = allowedSlugs.difference(bannedRules);
+  }
   final universeSlugs = allowedSlugs ?? constraintSlugs.toSet();
 
   void render() {
@@ -222,6 +230,8 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       requiredRules: requiredRules,
       allowedSlugs: allowedSlugs,
       count: workerCount,
+      targetLevel: targetLevel,
+      easingBudget: Duration(seconds: easingBudget),
     );
     final worker = GeneratorWorker();
     workers.add(worker);
@@ -824,7 +834,10 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'maxTime': 60,
     'output': null,
     'banned': null,
+    'allowed': null,
     'required': null,
+    'targetLevel': null,
+    'easingBudget': 30,
     'checkFile': null,
     'statsDir': null,
     'equilibrium': true,
@@ -861,8 +874,23 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['output'] = args[++i];
       case '--ban':
         result['banned'] = args[++i];
+      case '--allow':
+        result['allowed'] = args[++i];
       case '--require':
         result['required'] = args[++i];
+      case '--target-collection':
+        final name = args[++i];
+        final level = playableCollectionKeyToLevel[name];
+        if (level == null) {
+          final valid = playableCollectionKeyToLevel.keys.join(', ');
+          stderr.writeln(
+            '--target-collection must be one of: $valid (got "$name")',
+          );
+          exit(1);
+        }
+        result['targetLevel'] = level;
+      case '--easing-budget':
+        result['easingBudget'] = int.parse(args[++i]);
       case '--no-equilibrium':
         result['equilibrium'] = false;
       case '-j':
@@ -913,7 +941,25 @@ Generation options:
   -T, --max-time S        Maximum generation time (in seconds, default: 60)
   -o, --output FILE       Output file (default: stdout)
       --ban RULES         Comma-separated rule slugs to exclude (e.g. FM,LT)
+      --allow RULES       Comma-separated whitelist — when set, only these
+                          slugs are eligible (e.g. NC,EY,CC for a small
+                          subset). Combines with --ban: the effective set
+                          is (allow minus ban). Useful for bisecting which
+                          constraint is making generation slow.
       --require RULES     Comma-separated rule slugs to require (e.g. PA,GS)
+      --target-collection NAME
+                          Only emit puzzles classified in NAME. NAME is
+                          one of: 1-easy, 2-player, 3-advanced, 4-strong,
+                          5-expert, 6-mad. Puzzles below this difficulty
+                          are dropped; puzzles above enter an "easing"
+                          loop (add more constraints until the trace
+                          simplifies into the target). Overfilled and
+                          undetermined puzzles are always dropped under
+                          this filter. removeUselessRules is not called.
+      --easing-budget S   Per-puzzle wall-clock budget (in seconds) for
+                          the easing loop (default: 30). When exceeded,
+                          the candidate is dropped and the worker moves
+                          on. No effect without --target-collection.
       --no-equilibrium    Disable the multi-axis equilibrium bias.
                           Default: ON. When OFF, only the legacy slug-usage
                           bias is applied (matches pre-equilibrium behavior).

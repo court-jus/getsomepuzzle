@@ -32,6 +32,17 @@ class GeneratorConfig {
   final Duration maxTime;
   final int count;
 
+  /// When set, only puzzles classified at this exact level are emitted.
+  /// Easier puzzles are dropped; harder puzzles enter an "easing" loop
+  /// (add more constraints to reduce trace complexity) bounded by
+  /// [easingBudget]. `null` = no target filter (default behavior).
+  final PuzzleLevel? targetLevel;
+
+  /// Per-puzzle wall-clock budget for the easing loop. Once exceeded,
+  /// the candidate is dropped and the worker moves on. Ignored when
+  /// [targetLevel] is `null`.
+  final Duration easingBudget;
+
   const GeneratorConfig({
     required this.width,
     required this.height,
@@ -44,6 +55,8 @@ class GeneratorConfig {
     this.preferredSlugs = const {},
     this.maxTime = const Duration(seconds: 60),
     this.count = 1,
+    this.targetLevel,
+    this.easingBudget = const Duration(seconds: 30),
   });
 }
 
@@ -289,11 +302,43 @@ class PuzzleGenerator {
     if (!isUnique) return null;
 
     final prefill = pu.cells.where((c) => c.readonly).length / pu.cells.length;
-    final level = classifyTrace(
+    var level = classifyTrace(
       steps: steps,
       prefillRatio: prefill,
       solved: true,
     );
+
+    // Target-collection filter. When set, classify-and-route the puzzle:
+    //   - exact match → emit;
+    //   - too easy (lower index) → drop, caller will retry;
+    //   - too hard (higher index) → delegate to `Puzzle.simplify`,
+    //     which runs the indispensable-by-exploration pass under the
+    //     `easingBudget` wall-clock cap.
+    //   - out-of-cascade buckets (overfilled / undetermined) → drop:
+    //     prefill ratio doesn't change with more constraints, so they
+    //     cannot be eased into a playable collection.
+    // Important: `simplify` never invokes `removeUselessRules` — its
+    // job is to strip redundant constraints, which is exactly the
+    // opposite of what easing builds up.
+    if (config.targetLevel != null) {
+      final target = config.targetLevel!;
+      if (level == PuzzleLevel.overfilled ||
+          level == PuzzleLevel.overfilledEasy ||
+          level == PuzzleLevel.undetermined) {
+        return null;
+      }
+      if (level.index < target.index) return null;
+      if (level.index > target.index) {
+        final result = pu.simplify(
+          targetLevel: target,
+          maxTime: config.easingBudget,
+          allowedSlugs: config.allowedSlugs,
+          shouldStop: shouldStop,
+        );
+        if (!result.reachedTarget) return null;
+        level = result.finalLevel;
+      }
+    }
 
     return (line: pu.lineExport(), level: level);
   }
