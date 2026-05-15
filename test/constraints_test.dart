@@ -710,6 +710,28 @@ void main() {
         }
       },
     );
+
+    test('new isolated groups + merge can reach target → not impossible', () {
+      // Regression: extracted from the multi-solution bad puzzle
+      // v2_12_4x4_0120000000001000_FM:22.20;GC:2.2;GS:14.1;LT:A.3.7;
+      // NC:11.1.0;NC:4.2.0;SY:13.5 — after the in-game solver propagates 6
+      // steps, the grid below is reached. There are 3 white groups
+      // ({2,3,7}, {10}, {15}) and GC:2.2 wants 2. The only direct merge-cell
+      // is 11 (adjacent to all 3 groups), so `_reachableCountsByMerges`
+      // returns {3, 1} — target 2 is absent. But the state has 5 free cells
+      // (0, 4, 5, 8, 13) with no white neighbour: any one of them can become
+      // a 4th isolated white group, then colouring cell 11 collapses the
+      // original 3 into 1, leaving 2 groups. So target 2 IS reachable and
+      // apply()/verify() must not report isImpossible. The reachable-by-
+      // merges enumeration is an under-approximation whenever
+      // getFreeCellsWithoutNeighborColor is non-empty.
+      final p = makePuzzle('0122\n0012\n0020\n1012');
+      final gc = GroupCountConstraint('2.2');
+      p.addConstraint(gc);
+      expect(gc.verify(p), isTrue);
+      final move = gc.apply(p);
+      if (move != null) expect(move.isImpossible, isNull);
+    });
   });
 
   group('GroupCountConstraint.apply - not enough groups', () {
