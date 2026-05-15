@@ -21,6 +21,20 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unicons/unicons.dart';
 
+/// Why [Database.playlist] is empty after [Database.preparePlaylist].
+/// Surfaced under the disabled Play button in `open_page` so the user
+/// knows whether to import puzzles, relax filters, finish onboarding
+/// puzzles already in flight, etc.
+enum EmptyPlaylistReason {
+  customEmpty,
+  userAllPlayed,
+  noPuzzlesLoaded,
+  filtersTooStrict,
+  onboardingPhase,
+  softFilter,
+  generic,
+}
+
 class PuzzleData {
   String lineRepresentation = "";
   List<int> domain = [];
@@ -896,6 +910,33 @@ class Database {
   /// the UI to surface "you haven't met every rule yet" messaging at
   /// end-of-batch and to keep the Apprentissage page actionable.
   bool get isInOnboarding => currentPhase != null || _softFilterActive;
+
+  /// Classifies *why* the current [playlist] is empty, or null if it
+  /// isn't. The UI uses this to explain a disabled Play button instead
+  /// of just graying it out. Probes are ordered from most specific to
+  /// most generic; the first matching case wins.
+  EmptyPlaylistReason? get emptyPlaylistReason {
+    if (playlist.isNotEmpty) return null;
+    if (collection == 'custom' && puzzles.isEmpty) {
+      return EmptyPlaylistReason.customEmpty;
+    }
+    if (collection.startsWith('user_')) {
+      return EmptyPlaylistReason.userAllPlayed;
+    }
+    if (puzzles.isEmpty) {
+      return EmptyPlaylistReason.noPuzzlesLoaded;
+    }
+    if (filter().isEmpty) {
+      return EmptyPlaylistReason.filtersTooStrict;
+    }
+    if (currentPhase != null && _isPlayableLevel(collection)) {
+      return EmptyPlaylistReason.onboardingPhase;
+    }
+    if (_softFilterActive) {
+      return EmptyPlaylistReason.softFilter;
+    }
+    return EmptyPlaylistReason.generic;
+  }
 
   /// Drop puzzles that would force the player to meet two or more new
   /// constraints in a single grid. Pure pass-through when the soft

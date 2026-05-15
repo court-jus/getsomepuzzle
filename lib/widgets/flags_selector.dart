@@ -19,7 +19,7 @@ class FlagsSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        for (final rulesRow in choices.slices(5))
+        for (final rulesRow in choices.slices(4))
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: rulesRow

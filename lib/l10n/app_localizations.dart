@@ -1408,6 +1408,42 @@ abstract class AppLocalizations {
   /// **'Next puzzle'**
   String get nextPuzzle;
 
+  /// Reason shown under the disabled Play button when the current user_ playlist has no unplayed puzzles left
+  ///
+  /// In en, this message translates to:
+  /// **'All puzzles in this playlist have been played. Pick another collection or create a new playlist.'**
+  String get emptyPlaylistUserAllPlayed;
+
+  /// Reason shown under the disabled Play button when the puzzle list failed to load or is empty
+  ///
+  /// In en, this message translates to:
+  /// **'No puzzles loaded for this collection.'**
+  String get emptyPlaylistNoPuzzlesLoaded;
+
+  /// Reason shown under the disabled Play button when filter() returns 0 puzzles
+  ///
+  /// In en, this message translates to:
+  /// **'Your filters exclude every puzzle in this collection. Try relaxing the dimensions, rules or flags.'**
+  String get emptyPlaylistFiltersTooStrict;
+
+  /// Reason shown under the disabled Play button when the onboarding phase eligibility excludes every filtered puzzle
+  ///
+  /// In en, this message translates to:
+  /// **'No puzzle in this collection fits the current onboarding step. Finish the introductory puzzles or switch collection.'**
+  String get emptyPlaylistOnboardingPhase;
+
+  /// Reason shown under the disabled Play button when the post-strict onboarding soft filter rejects every candidate
+  ///
+  /// In en, this message translates to:
+  /// **'Every remaining puzzle would introduce more than one new rule at once. Play a few more puzzles from earlier collections first.'**
+  String get emptyPlaylistSoftFilter;
+
+  /// Generic fallback reason shown under the disabled Play button
+  ///
+  /// In en, this message translates to:
+  /// **'No puzzle is currently available.'**
+  String get emptyPlaylistGeneric;
+
   /// Drawer entry that opens the puzzle selection page (filters, collections)
   ///
   /// In en, this message translates to:

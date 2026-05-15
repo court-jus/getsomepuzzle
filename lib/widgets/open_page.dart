@@ -136,6 +136,32 @@ class _OpenPageState extends State<OpenPage> {
     matchingCount = widget.database.filter().length;
   }
 
+  /// Localized hint shown under the Play button when it is disabled.
+  /// Returns null when the button is enabled, or when the empty-state
+  /// is already explained by the dedicated `noCustomPuzzles` block
+  /// above the button (custom collection with no puzzles imported).
+  String? _disabledPlayMessage(BuildContext context) {
+    final reason = widget.database.emptyPlaylistReason;
+    if (reason == null) return null;
+    final loc = AppLocalizations.of(context)!;
+    switch (reason) {
+      case EmptyPlaylistReason.customEmpty:
+        return null;
+      case EmptyPlaylistReason.userAllPlayed:
+        return loc.emptyPlaylistUserAllPlayed;
+      case EmptyPlaylistReason.noPuzzlesLoaded:
+        return loc.emptyPlaylistNoPuzzlesLoaded;
+      case EmptyPlaylistReason.filtersTooStrict:
+        return loc.emptyPlaylistFiltersTooStrict;
+      case EmptyPlaylistReason.onboardingPhase:
+        return loc.emptyPlaylistOnboardingPhase;
+      case EmptyPlaylistReason.softFilter:
+        return loc.emptyPlaylistSoftFilter;
+      case EmptyPlaylistReason.generic:
+        return loc.emptyPlaylistGeneric;
+    }
+  }
+
   void selectPuzzle(
     PuzzleData puz,
     BuildContext context, [
@@ -427,6 +453,19 @@ class _OpenPageState extends State<OpenPage> {
                         ),
                       ),
                     ),
+                    if (_disabledPlayMessage(context) != null)
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          _disabledPlayMessage(context)!,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.grey,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     ExpansionPanelList(
                       expansionCallback: (panelIndex, isExpanded) {
                         setState(() {
@@ -504,36 +543,35 @@ class _OpenPageState extends State<OpenPage> {
                                   ],
                                 ),
                                 const Divider(),
+                                Text(
+                                  AppLocalizations.of(context)!.labelChooseOnly,
+                                ),
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.labelChooseOnly,
-                                    ),
-                                    FlagsSelector(
-                                      choices: [
-                                        ("played", "PL"),
-                                        ("skipped", "SK"),
-                                        ("liked", "LI"),
-                                        ("disliked", "DI"),
-                                      ],
-                                      wanted: widget
-                                          .database
-                                          .currentFilters
-                                          .wantedFlags,
-                                      banned: widget
-                                          .database
-                                          .currentFilters
-                                          .bannedFlags,
-                                      apply: (value) => {
-                                        applyFilter(
-                                          newWFlags: value.$1.toList(),
-                                          newBFlags: value.$2.toList(),
-                                        ),
-                                      },
+                                    const SizedBox(width: 48),
+                                    Expanded(
+                                      child: FlagsSelector(
+                                        choices: [
+                                          ("played", "PL"),
+                                          ("skipped", "SK"),
+                                          ("liked", "LI"),
+                                          ("disliked", "DI"),
+                                        ],
+                                        wanted: widget
+                                            .database
+                                            .currentFilters
+                                            .wantedFlags,
+                                        banned: widget
+                                            .database
+                                            .currentFilters
+                                            .bannedFlags,
+                                        apply: (value) => {
+                                          applyFilter(
+                                            newWFlags: value.$1.toList(),
+                                            newBFlags: value.$2.toList(),
+                                          ),
+                                        },
+                                      ),
                                     ),
                                     Focus(
                                       descendantsAreFocusable: false,
@@ -560,66 +598,34 @@ class _OpenPageState extends State<OpenPage> {
                                   ],
                                 ),
                                 const Divider(),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.labelWidgetFillRatio,
-                                    ),
-                                    PlusMinusField(
-                                      onChanged: (minValue, maxValue) {
-                                        final value = RangeValues(
-                                          minValue.toDouble(),
-                                          maxValue.toDouble(),
-                                        );
-                                        applyFilter(newPrefilled: value);
-                                      },
-                                      initialMin: widget
-                                          .database
-                                          .currentFilters
-                                          .minFilled,
-                                      initialMax: widget
-                                          .database
-                                          .currentFilters
-                                          .maxFilled,
-                                      minimum: 0,
-                                      maximum: 100,
-                                      increment: 5,
-                                      showReset: true,
-                                    ),
-                                  ],
+                                Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  )!.labelWidgetWantedrules,
                                 ),
-                                const Divider(),
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.labelWidgetWantedrules,
-                                    ),
-                                    FlagsSelector(
-                                      choices: existingRules
-                                          .map((e) => (e, e))
-                                          .toList(),
-                                      wanted: widget
-                                          .database
-                                          .currentFilters
-                                          .wantedRules,
-                                      banned: widget
-                                          .database
-                                          .currentFilters
-                                          .bannedRules,
-                                      apply: (value) => {
-                                        applyFilter(
-                                          newWRules: value.$1.toList(),
-                                          newBRules: value.$2.toList(),
-                                        ),
-                                      },
+                                    const SizedBox(width: 48),
+                                    Expanded(
+                                      child: FlagsSelector(
+                                        choices: existingRules
+                                            .map((e) => (e, e))
+                                            .toList(),
+                                        wanted: widget
+                                            .database
+                                            .currentFilters
+                                            .wantedRules,
+                                        banned: widget
+                                            .database
+                                            .currentFilters
+                                            .bannedRules,
+                                        apply: (value) => {
+                                          applyFilter(
+                                            newWRules: value.$1.toList(),
+                                            newBRules: value.$2.toList(),
+                                          ),
+                                        },
+                                      ),
                                     ),
                                     Focus(
                                       descendantsAreFocusable: false,
@@ -640,6 +646,38 @@ class _OpenPageState extends State<OpenPage> {
                                                 );
                                               },
                                       ),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(),
+                                Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  )!.labelWidgetFillRatio,
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    PlusMinusField(
+                                      onChanged: (minValue, maxValue) {
+                                        final value = RangeValues(
+                                          minValue.toDouble(),
+                                          maxValue.toDouble(),
+                                        );
+                                        applyFilter(newPrefilled: value);
+                                      },
+                                      initialMin: widget
+                                          .database
+                                          .currentFilters
+                                          .minFilled,
+                                      initialMax: widget
+                                          .database
+                                          .currentFilters
+                                          .maxFilled,
+                                      minimum: 0,
+                                      maximum: 100,
+                                      increment: 5,
+                                      showReset: true,
                                     ),
                                   ],
                                 ),

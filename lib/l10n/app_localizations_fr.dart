@@ -738,5 +738,29 @@ class AppLocalizationsFr extends AppLocalizations {
   String get nextPuzzle => 'Puzzle suivant';
 
   @override
+  String get emptyPlaylistUserAllPlayed =>
+      'Tous les puzzles de cette playlist ont été joués. Choisis une autre collection ou crée une nouvelle playlist.';
+
+  @override
+  String get emptyPlaylistNoPuzzlesLoaded =>
+      'Aucun puzzle chargé pour cette collection.';
+
+  @override
+  String get emptyPlaylistFiltersTooStrict =>
+      'Tes filtres excluent tous les puzzles de cette collection. Essaie d\'élargir les dimensions, les règles ou les marqueurs.';
+
+  @override
+  String get emptyPlaylistOnboardingPhase =>
+      'Aucun puzzle de cette collection ne correspond à l\'étape d\'apprentissage en cours. Termine les puzzles d\'introduction ou change de collection.';
+
+  @override
+  String get emptyPlaylistSoftFilter =>
+      'Tous les puzzles restants introduiraient plus d\'une nouvelle règle à la fois. Joue encore quelques puzzles des collections précédentes.';
+
+  @override
+  String get emptyPlaylistGeneric =>
+      'Aucun puzzle n\'est actuellement disponible.';
+
+  @override
   String get browse => 'Parcourir';
 }

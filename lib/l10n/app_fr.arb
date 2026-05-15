@@ -297,5 +297,11 @@
     "generateFailed": "Aucun puzzle n'a pu être généré avec ces paramètres. Essaie d'autres réglages.",
     "generatePlay": "Jouer",
     "generateMore": "Plus",
-    "noCustomPuzzles": "Pas encore de puzzles personnalisés. Utilise la page Générer pour en créer !"
+    "noCustomPuzzles": "Pas encore de puzzles personnalisés. Utilise la page Générer pour en créer !",
+    "emptyPlaylistUserAllPlayed": "Tous les puzzles de cette playlist ont été joués. Choisis une autre collection ou crée une nouvelle playlist.",
+    "emptyPlaylistNoPuzzlesLoaded": "Aucun puzzle chargé pour cette collection.",
+    "emptyPlaylistFiltersTooStrict": "Tes filtres excluent tous les puzzles de cette collection. Essaie d'élargir les dimensions, les règles ou les marqueurs.",
+    "emptyPlaylistOnboardingPhase": "Aucun puzzle de cette collection ne correspond à l'étape d'apprentissage en cours. Termine les puzzles d'introduction ou change de collection.",
+    "emptyPlaylistSoftFilter": "Tous les puzzles restants introduiraient plus d'une nouvelle règle à la fois. Joue encore quelques puzzles des collections précédentes.",
+    "emptyPlaylistGeneric": "Aucun puzzle n'est actuellement disponible."
 }

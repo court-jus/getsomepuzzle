@@ -297,5 +297,11 @@
     "generateFailed": "No se pudo generar ningún puzzle con estos parámetros. Prueba otros ajustes.",
     "generatePlay": "Jugar",
     "generateMore": "Más",
-    "noCustomPuzzles": "Aún no hay puzzles personalizados. Usa la página Generar para crear algunos."
+    "noCustomPuzzles": "Aún no hay puzzles personalizados. Usa la página Generar para crear algunos.",
+    "emptyPlaylistUserAllPlayed": "Ya jugaste todos los puzzles de esta lista. Elige otra colección o crea una nueva lista.",
+    "emptyPlaylistNoPuzzlesLoaded": "No hay puzzles cargados para esta colección.",
+    "emptyPlaylistFiltersTooStrict": "Tus filtros excluyen todos los puzzles de esta colección. Prueba a relajar dimensiones, reglas o marcadores.",
+    "emptyPlaylistOnboardingPhase": "Ningún puzzle de esta colección encaja con el paso de aprendizaje actual. Termina los puzzles introductorios o cambia de colección.",
+    "emptyPlaylistSoftFilter": "Los puzzles restantes introducirían más de una regla nueva a la vez. Juega algunos puzzles más de las colecciones anteriores.",
+    "emptyPlaylistGeneric": "No hay ningún puzzle disponible por ahora."
 }
