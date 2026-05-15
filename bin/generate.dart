@@ -17,7 +17,10 @@ Future<void> main(List<String> args) async {
     case 'generate':
       await _runGenerate(parsed);
     case 'check':
-      await _runCheck(parsed['checkFile'] as String);
+      await _runCheck(
+        parsed['checkFile'] as String,
+        detailed: parsed['detailed'] as bool,
+      );
     case 'read-stats':
       _runReadStats(parsed['statsDir'] as String);
   }
@@ -601,7 +604,66 @@ void _writeHistogram(
 
 // --- Check mode ---
 
-Future<void> _runCheck(String filePath) async {
+/// Categories used by `--check-detailed` to explain each rejection.
+///   * `unsolvable`     — 0 valid completions exist (puzzle is broken).
+///   * `nonUnique`      — ≥2 valid completions (ambiguous).
+///   * `needsBacktrack` — exactly 1 valid completion exists but the
+///                        deductive solver couldn't reach it without
+///                        backtracking (in-game hint system would fail).
+///   * `cachedMismatch` — deductively unique, but the `_1:xxx` cached
+///                        solution on the line doesn't match the deduced
+///                        completion. Treated as invalid.
+enum _DetailedCategory {
+  unsolvable,
+  nonUnique,
+  needsBacktrack,
+  cachedMismatch;
+
+  String get label => switch (this) {
+    _DetailedCategory.unsolvable => 'UNSOLVABLE',
+    _DetailedCategory.nonUnique => 'NON-UNIQUE',
+    _DetailedCategory.needsBacktrack => 'NEEDS-BACKTRACK',
+    _DetailedCategory.cachedMismatch => 'CACHED MISMATCH',
+  };
+}
+
+/// Enumerate at most [limit] valid completions of [puzzle] by exhaustive
+/// backtracking over free cells. Cell values are plain ints in the current
+/// API (`0` = free, the puzzle's `domain` holds the legal non-free values).
+/// Lifted from the former `bin/check_uniqueness_batch.dart`.
+List<List<int>> _enumerateSolutions(Puzzle puzzle, {int limit = 2}) {
+  final out = <List<int>>[];
+  final freeIdx = <int>[];
+  for (int i = 0; i < puzzle.cells.length; i++) {
+    if (puzzle.cells[i].value == 0) freeIdx.add(i);
+  }
+
+  void rec(int k) {
+    if (out.length >= limit) return;
+    if (k == freeIdx.length) {
+      if (puzzle.check(saveResult: false).isEmpty) {
+        out.add(List<int>.from(puzzle.cellValues));
+      }
+      return;
+    }
+    final idx = freeIdx[k];
+    for (final v in puzzle.domain) {
+      puzzle.cells[idx].setValue(v);
+      if (puzzle.check(saveResult: false).isEmpty) {
+        rec(k + 1);
+      }
+      if (out.length >= limit) return;
+    }
+    // Untry: cell back to free so the parent frame can pick a different
+    // candidate without leaking state into sibling branches.
+    puzzle.cells[idx].setValue(0);
+  }
+
+  rec(0);
+  return out;
+}
+
+Future<void> _runCheck(String filePath, {bool detailed = false}) async {
   final file = File(filePath);
   if (!file.existsSync()) {
     stderr.writeln('File not found: $filePath');
@@ -621,6 +683,11 @@ Future<void> _runCheck(String filePath) async {
   int valid = 0;
   int invalid = 0;
   int errored = 0;
+  // Per-category counters used only in detailed mode. Populated as
+  // rejections are classified; rendered in the dashboard breakdown.
+  final categoryCounts = <_DetailedCategory, int>{
+    for (final c in _DetailedCategory.values) c: 0,
+  };
   final sw = Stopwatch()..start();
   final goodLines = <String>[];
   var stats = _CollectionStats.fromLines(goodLines);
@@ -637,6 +704,8 @@ Future<void> _runCheck(String filePath) async {
       errored: errored,
       elapsed: sw.elapsed,
       stats: stats,
+      detailed: detailed,
+      categoryCounts: categoryCounts,
     );
   }
 
@@ -646,13 +715,75 @@ Future<void> _runCheck(String filePath) async {
     final line = lines[i].trim();
     try {
       final p = Puzzle(line);
+      // Capture the on-line cached solution BEFORE any solving. `solve()`
+      // itself doesn't overwrite `cachedSolution` (only computeComplexity
+      // does), and `isDeductivelyUnique()` operates on a clone — but we
+      // still snapshot the value here to make the dependency explicit and
+      // protect against future changes to the solver.
+      final lineCachedSolution = p.cachedSolution;
       if (p.isDeductivelyUnique()) {
+        if (detailed && lineCachedSolution != null) {
+          // Re-solve on a fresh clone to obtain the deduced completion,
+          // then compare against the cached solution parsed from the line.
+          final solved = p.clone();
+          solved.solve();
+          final deduced = solved.cellValues;
+          bool match = deduced.length == lineCachedSolution.length;
+          if (match) {
+            for (int j = 0; j < deduced.length; j++) {
+              if (deduced[j] != lineCachedSolution[j]) {
+                match = false;
+                break;
+              }
+            }
+          }
+          if (!match) {
+            invalid++;
+            categoryCounts[_DetailedCategory.cachedMismatch] =
+                (categoryCounts[_DetailedCategory.cachedMismatch] ?? 0) + 1;
+            badSink.writeln(
+              '# INVALID (${_DetailedCategory.cachedMismatch.label} — '
+              'cached _1: differs from deduced solution)',
+            );
+            badSink.writeln(line);
+            if ((i + 1) % 10 == 0 || i + 1 == lines.length) {
+              stats = _CollectionStats.fromLines(goodLines);
+              render();
+            }
+            continue;
+          }
+        }
         valid++;
         goodSink.writeln(line);
         goodLines.add(line);
       } else {
         invalid++;
-        badSink.writeln('# INVALID (not deductively unique)');
+        if (detailed) {
+          // Classify the rejection by enumerating up to 2 valid
+          // completions. 0 → UNSOLVABLE, ≥2 → NON-UNIQUE, exactly 1 →
+          // NEEDS-BACKTRACK (the puzzle has a unique mathematical
+          // solution but the deductive solver can't reach it).
+          final solutions = _enumerateSolutions(p.clone(), limit: 2);
+          final _DetailedCategory cat;
+          if (solutions.isEmpty) {
+            cat = _DetailedCategory.unsolvable;
+          } else if (solutions.length >= 2) {
+            cat = _DetailedCategory.nonUnique;
+          } else {
+            cat = _DetailedCategory.needsBacktrack;
+          }
+          categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+          final detail = switch (cat) {
+            _DetailedCategory.unsolvable => '0 solutions found',
+            _DetailedCategory.nonUnique => '≥2 solutions found',
+            _DetailedCategory.needsBacktrack =>
+              '1 solution found but solver can\'t deduce it',
+            _DetailedCategory.cachedMismatch => '',
+          };
+          badSink.writeln('# INVALID (${cat.label} — $detail)');
+        } else {
+          badSink.writeln('# INVALID (not deductively unique)');
+        }
         badSink.writeln(line);
       }
     } catch (e) {
@@ -678,6 +809,12 @@ Future<void> _runCheck(String filePath) async {
     'Done in ${_fmt(sw.elapsed)}: $valid valid, $invalid invalid'
     '${errored > 0 ? ', $errored errored' : ''} out of ${lines.length}',
   );
+  if (detailed && invalid > 0) {
+    for (final c in _DetailedCategory.values) {
+      final n = categoryCounts[c] ?? 0;
+      if (n > 0) stderr.writeln('    ${c.label.padRight(16)} $n');
+    }
+  }
   stderr.writeln('  good → $goodPath');
   stderr.writeln('  bad  → $badPath');
   if (invalid + errored > 0) exit(1);
@@ -694,6 +831,9 @@ String _suffixedPath(String filePath, String suffix) {
 
 /// Same shape as [_renderDashboard] but tailored for check mode: progress on
 /// top, then count-only histograms of the puzzles kept in the .good file.
+/// When [detailed] is true, [categoryCounts] is used to render an extra
+/// breakdown of the four invalid categories (UNSOLVABLE / NON-UNIQUE /
+/// NEEDS-BACKTRACK / CACHED MISMATCH).
 void _renderCheckDashboard({
   required String filePath,
   required String goodPath,
@@ -705,9 +845,11 @@ void _renderCheckDashboard({
   required int errored,
   required Duration elapsed,
   required _CollectionStats stats,
+  bool detailed = false,
+  Map<_DetailedCategory, int> categoryCounts = const {},
 }) {
   stderr.write('\x1B[2J\x1B[H');
-  stderr.writeln('Checking $filePath');
+  stderr.writeln('Checking $filePath${detailed ? ' (detailed)' : ''}');
   stderr.writeln('  good → $goodPath');
   stderr.writeln('  bad  → $badPath');
   stderr.writeln('');
@@ -717,6 +859,15 @@ void _renderCheckDashboard({
     'valid $valid | invalid $invalid'
     '${errored > 0 ? ' | errors $errored' : ''}',
   );
+
+  if (detailed) {
+    final breakdown = <String, int>{
+      for (final c in _DetailedCategory.values) c.label: categoryCounts[c] ?? 0,
+    };
+    stderr.writeln('');
+    stderr.writeln('Invalid breakdown:');
+    _writeCountHistogram(breakdown, sortByValue: false);
+  }
 
   final orderedTypes = <String, int>{
     for (final k in ['1', '2', '3', '4', '5', '6+']) k: stats.nTypes[k] ?? 0,
@@ -839,6 +990,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'targetLevel': null,
     'easingBudget': 30,
     'checkFile': null,
+    'detailed': false,
     'statsDir': null,
     'equilibrium': true,
     'jobs': Platform.numberOfProcessors,
@@ -849,6 +1001,10 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     switch (args[i]) {
       case '--check':
         result['mode'] = 'check';
+        result['checkFile'] = args[++i];
+      case '--check-detailed':
+        result['mode'] = 'check';
+        result['detailed'] = true;
         result['checkFile'] = args[++i];
       case '--read-stats':
         result['mode'] = 'read-stats';
@@ -928,8 +1084,18 @@ Usage: dart run bin/generate.dart [options]
 
 Modes:
   (default)               Generate puzzles
-  --check FILE            Validate puzzles. Writes valid puzzles to
-                          FILE.good.txt and invalid ones to FILE.bad.txt.
+  --check FILE            Validate puzzles via fast deductive solve. Writes
+                          valid puzzles to FILE.good.txt and invalid ones to
+                          FILE.bad.txt.
+  --check-detailed FILE   Same outputs as --check, but rejected puzzles are
+                          further classified via exhaustive backtracking
+                          into UNSOLVABLE (0 completions), NON-UNIQUE
+                          (≥2 completions) or NEEDS-BACKTRACK (1 completion
+                          the deductive solver can't reach). Accepted
+                          puzzles also have their cached _1: solution
+                          cross-checked against the deduced one;
+                          mismatches are reclassified as CACHED MISMATCH
+                          and treated as invalid. Slower than --check.
   --read-stats DIR        Aggregate play stats, output puzzles sorted by difficulty
 
 Generation options:
@@ -982,6 +1148,7 @@ Rule slugs: $rules
 Examples:
   dart run bin/generate.dart -n 100 -o puzzles.txt
   dart run bin/generate.dart --check assets/try_me.txt
+  dart run bin/generate.dart --check-detailed assets/try_me.txt
   dart run bin/generate.dart --read-stats ~/Documents/getsomepuzzle/
 ''');
 }

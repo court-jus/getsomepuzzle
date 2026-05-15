@@ -80,7 +80,10 @@ void _processFile(String path, String? outputPath) {
       // per puzzle — acceptable for a one-shot maintenance tool.
       final sortSteps = puzzle.solveExplained();
       puzzle.sortConstraintsByDifficulty(sortSteps);
-      puzzle.computeComplexity();
+      // `force: true` ignores the value the Puzzle constructor loaded
+      // from the v2 line — we just sorted the constraints, so the
+      // stored cplx is stale.
+      puzzle.computeComplexity(force: true);
       final sol = puzzle.cachedSolution;
       // Re-emit field 4 from the in-memory sorted constraint list;
       // replace fields 5/6 from the fresh complexity computation.

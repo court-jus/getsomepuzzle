@@ -391,7 +391,9 @@ void main(List<String> args) {
       final p = all[i];
       try {
         final puz = Puzzle(p.puzzleLine);
-        puz.computeComplexity();
+        // Force fresh recomputation: stats lines can carry stale cplx
+        // values written by older versions of the scoring formula.
+        puz.computeComplexity(force: true);
         final c = puz.cachedComplexity;
         if (c != null) {
           out.add(

@@ -117,7 +117,9 @@ void main(List<String> args) {
         // internally afterwards.
         final sortSteps = puzzle.solveExplained();
         puzzle.sortConstraintsByDifficulty(sortSteps);
-        puzzle.computeComplexity();
+        // Force fresh compute — we just sorted the constraints and the
+        // cached value loaded from the line is now stale.
+        puzzle.computeComplexity(force: true);
         pf[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
         pf[6] = '${puzzle.cachedComplexity}';
         if (puzzle.cachedSolution != null) {

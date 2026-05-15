@@ -7,7 +7,10 @@ void main() {
     final p = Puzzle(
       'v2_12_3x3_000000001_PA:1.bottom;FM:11;LT:A.6.7;PA:8.top;GS:0.1_0:0_0',
     );
-    final cplx = p.computeComplexity();
+    // `force: true` — the v2 lines below carry stored cplx values
+    // (field [6]) which the constructor now loads into the cache.
+    // We want the actual computation under test, not the stored read.
+    final cplx = p.computeComplexity(force: true);
     print('cplx=0 puzzle → computed=$cplx');
     expect(cplx, lessThan(20)); // Should be low
   });
@@ -28,7 +31,10 @@ void main() {
     int? prev;
     for (final (line, label) in samples) {
       final p = Puzzle(line);
-      final cplx = p.computeComplexity();
+      // `force: true` — the v2 lines below carry stored cplx values
+      // (field [6]) which the constructor now loads into the cache.
+      // We want the actual computation under test, not the stored read.
+      final cplx = p.computeComplexity(force: true);
       print('$label → cplx=$cplx');
       if (prev != null) {
         expect(
@@ -46,7 +52,10 @@ void main() {
     final p = Puzzle(
       'v2_12_3x3_000000000_LT:A.8.2;LT:B.4.6;FM:1.2.2;FM:122;GS:0.1_0:0_100',
     );
-    final cplx = p.computeComplexity();
+    // `force: true` — the v2 lines below carry stored cplx values
+    // (field [6]) which the constructor now loads into the cache.
+    // We want the actual computation under test, not the stored read.
+    final cplx = p.computeComplexity(force: true);
     print('cplx=100 puzzle → computed=$cplx');
     expect(cplx, greaterThan(20));
   });
@@ -59,7 +68,10 @@ void main() {
     ];
     for (final line in lines) {
       final p = Puzzle(line);
-      final cplx = p.computeComplexity();
+      // `force: true` — the v2 lines below carry stored cplx values
+      // (field [6]) which the constructor now loads into the cache.
+      // We want the actual computation under test, not the stored read.
+      final cplx = p.computeComplexity(force: true);
       final expected = int.parse(line.split('_').last);
       print('expected=$expected → computed=$cplx');
       expect(cplx, greaterThanOrEqualTo(0));

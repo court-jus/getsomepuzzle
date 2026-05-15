@@ -1,0 +1,476 @@
+// Extract a diverse "onboarding bank" of puzzles from 1-easy.txt: N
+// puzzles per OnboardingPhase, picked to be maximally spread in the
+// trace-vector space so the new player sees varied examples of each
+// freshly-introduced constraint.
+//
+// Phases:
+//   - Strict (6) come from `OnboardingPhase.phases` — FM, NC, PA, CC,
+//     RC, GS, each with its own `allowed` envelope.
+//   - Synthetic (7) are derived for every constraint slug that is
+//     *not* introduced by a strict phase (LT, QA, SY, DF, SH, GC, EY).
+//     For each, `allowed = baseline ∪ {newSlug}` where baseline is the
+//     last strict phase's allowed set.
+//
+// Selection per phase:
+//   1. Filter pool: `slugs ⊆ allowed AND introducing ∈ slugs`.
+//      Uses `puzzleEligibleForPhase` from the model.
+//   2. Farthest-point sampling: greedy max-min on z-scored Euclidean
+//      distance, seeded with the puzzle farthest from the pool
+//      centroid (deterministic, no RNG).
+//
+// Distance vector: same family as `bin/cluster_puzzles.dart` —
+// 78 trace shares (`share_<slug>_t<tier>`) + complexity, force_rounds,
+// max_force_depth, avg_move_complexity, distinct_constraints_used,
+// n_constraints, cells. Z-score on the 1-easy subset, clipped ±5.
+//
+// Usage:
+//   dart run bin/extract_onboarding.dart [--input PATH]
+//                                         [--source PATH]
+//                                         [--output PATH]
+//                                         [--per-phase N]
+//                                         [--verbose]
+
+import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
+
+const _slugs = [
+  'CC',
+  'CX',
+  'DF',
+  'EY',
+  'FM',
+  'GC',
+  'GS',
+  'LT',
+  'NC',
+  'PA',
+  'QA',
+  'SH',
+  'SY',
+];
+const _tiers = [0, 1, 2, 3, 4, 5];
+
+// Difficulty & structural features pulled from the CSV in addition to
+// the 78 trace-share columns. Mirrors the default selection of
+// `bin/cluster_puzzles.dart` so the two scripts speak the same
+// similarity language.
+const _extraFeatures = [
+  'complexity',
+  'n_force_rounds',
+  'max_force_depth',
+  'avg_move_complexity',
+  'distinct_constraints_used',
+  'n_constraints',
+  'cells',
+  // prefill_ratio carries the *starting impression* (25 % filled vs 5 %
+  // feels very different) so two puzzles with the same trace shape
+  // but very different prefills shouldn't end up next to each other.
+  'prefill_ratio',
+];
+
+void main(List<String> args) {
+  String csvPath = 'puzzle_vectors.csv';
+  String sourcePath = 'assets/1-easy.txt';
+  String outputPath = 'assets/1-easy_onboarding.txt';
+  int perPhase = 300;
+  bool verbose = false;
+
+  for (int i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case '--input':
+        csvPath = args[++i];
+      case '--source':
+        sourcePath = args[++i];
+      case '--output':
+        outputPath = args[++i];
+      case '--per-phase':
+        perPhase = int.parse(args[++i]);
+      case '-v':
+      case '--verbose':
+        verbose = true;
+      case '-h':
+      case '--help':
+        _printUsage();
+        exit(0);
+      default:
+        stderr.writeln('Unknown argument: ${args[i]}');
+        _printUsage();
+        exit(1);
+    }
+  }
+
+  // --- 1. Build the phase list (strict + synthetic) ---
+  final phases = _buildPhaseList();
+  stderr.writeln(
+    'Phases: ${phases.length} total '
+    '(${OnboardingPhase.phases.length} strict + '
+    '${phases.length - OnboardingPhase.phases.length} synthetic)',
+  );
+
+  // --- 2. Load CSV vectors keyed by canonical_key ---
+  stderr.writeln('Reading $csvPath...');
+  final csv = _loadCsvVectors(csvPath);
+  stderr.writeln(
+    '  ${csv.vectors.length} rows, ${csv.featureNames.length} features',
+  );
+
+  // --- 3. Walk source file, build entries with vectors + slug sets ---
+  stderr.writeln('Reading $sourcePath...');
+  final entries = <_Entry>[];
+  int sourceLines = 0;
+  int missingVector = 0;
+  for (final line in File(sourcePath).readAsLinesSync()) {
+    if (line.trim().isEmpty || line.startsWith('#')) continue;
+    sourceLines++;
+    String key;
+    try {
+      key = canonicalPuzzleKey(line);
+    } catch (_) {
+      continue;
+    }
+    final vec = csv.vectors[key];
+    if (vec == null) {
+      missingVector++;
+      continue;
+    }
+    entries.add(_Entry(line, key, _slugsFromCanonicalKey(key), vec));
+  }
+  stderr.writeln(
+    '  $sourceLines lines, ${entries.length} with vectors, '
+    '$missingVector missing in CSV',
+  );
+
+  // --- 4. Z-score over the 1-easy subset, clip outliers ---
+  _zScoreInPlace(entries, csv.featureNames.length);
+
+  // --- 5. For each phase: filter pool, farthest-point sample, emit ---
+  final out = StringBuffer();
+  out.writeln('# Onboarding bank extracted from $sourcePath');
+  out.writeln('# $perPhase puzzles per phase, farthest-point sampled');
+  out.writeln('# Generated by bin/extract_onboarding.dart');
+  out.writeln('');
+
+  int totalEmitted = 0;
+  for (final phase in phases) {
+    final pool = entries.where((e) => _eligible(e, phase)).toList();
+    final picked = _farthestPointSample(pool, perPhase);
+    final allowedStr = (phase.allowed.toList()..sort()).join(', ');
+    out.writeln(
+      '# === Phase ${phase.index}: introducing ${phase.introducing} '
+      '(allowed: $allowedStr) — ${picked.length}/${pool.length} puzzles ===',
+    );
+    if (verbose) {
+      stderr.writeln(
+        '  phase ${phase.index} ${phase.introducing}: '
+        'pool=${pool.length}, picked=${picked.length}',
+      );
+    }
+    for (final p in picked) {
+      out.writeln(p.line);
+    }
+    out.writeln('');
+    totalEmitted += picked.length;
+  }
+
+  File(outputPath).writeAsStringSync(out.toString());
+  stderr.writeln('');
+  stderr.writeln('Wrote $outputPath ($totalEmitted puzzles total)');
+}
+
+void _printUsage() {
+  stderr.writeln('''
+Usage: dart run bin/extract_onboarding.dart [options]
+
+Options:
+  --input PATH       Vector CSV from vectorize_puzzles.dart
+                     (default: puzzle_vectors.csv)
+  --source PATH      Source puzzle file
+                     (default: assets/1-easy.txt)
+  --output PATH      Output bank
+                     (default: assets/1-easy_onboarding.txt)
+  --per-phase N      Puzzles to pick per phase (default: 300)
+  -v, --verbose      Per-phase pool/pick counts
+  -h, --help         Show this help
+''');
+}
+
+/// Concatenate `OnboardingPhase.phases` (strict envelopes) with one
+/// synthetic phase per remaining slug. Synthetic order is
+/// alphabetical so the output is reproducible.
+List<OnboardingPhase> _buildPhaseList() {
+  final phases = List<OnboardingPhase>.from(OnboardingPhase.phases);
+  final introducedByStrict = phases.map((p) => p.introducing).toSet();
+  // Baseline = last strict phase's allowed set. New synthetic phases
+  // each add exactly one slug on top of this baseline.
+  final baseline = phases.last.allowed;
+  final remaining =
+      OnboardingPhase.allKnownSlugs
+          .where((s) => !introducedByStrict.contains(s))
+          .toList()
+        ..sort();
+  for (int i = 0; i < remaining.length; i++) {
+    phases.add(
+      OnboardingPhase(
+        index: phases.length,
+        introducing: remaining[i],
+        allowed: {...baseline, remaining[i]},
+      ),
+    );
+  }
+  return phases;
+}
+
+/// True when the puzzle is eligible for [phase]: every declared slug
+/// is allowed and the phase's introduced slug is present.
+bool _eligible(_Entry e, OnboardingPhase phase) {
+  if (!e.slugs.contains(phase.introducing)) return false;
+  return puzzleEligibleForPhase(e.slugs, phase);
+}
+
+/// Extract slugs declared in a canonical key. Canonical key format is
+/// `domain_dimensions_prefill_constraints` (no version prefix); the
+/// fourth `_`-separated segment is a `;`-separated list of
+/// `SLUG:params` tokens. `TX` and empty entries are dropped to mirror
+/// `puzzleEligibleForPhase`'s own filter.
+Set<String> _slugsFromCanonicalKey(String key) {
+  final parts = key.split('_');
+  if (parts.length < 4) return const {};
+  final out = <String>{};
+  for (final c in parts[3].split(';')) {
+    final i = c.indexOf(':');
+    final slug = i > 0 ? c.substring(0, i) : c;
+    if (slug.isEmpty || slug == 'TX') continue;
+    out.add(slug);
+  }
+  return out;
+}
+
+/// In-place z-score on every entry's `normVec` (which initially holds
+/// the raw values). Empty std → column zeroed. Z capped at ±5.
+void _zScoreInPlace(List<_Entry> entries, int dim) {
+  if (entries.isEmpty) return;
+  final mean = Float64List(dim);
+  final std = Float64List(dim);
+  for (final e in entries) {
+    for (int k = 0; k < dim; k++) {
+      mean[k] += e.normVec[k];
+    }
+  }
+  for (int k = 0; k < dim; k++) {
+    mean[k] /= entries.length;
+  }
+  for (final e in entries) {
+    for (int k = 0; k < dim; k++) {
+      final d = e.normVec[k] - mean[k];
+      std[k] += d * d;
+    }
+  }
+  for (int k = 0; k < dim; k++) {
+    final v = std[k] / entries.length;
+    std[k] = v <= 0 ? 0 : sqrt(v);
+  }
+  const zClip = 5.0;
+  for (final e in entries) {
+    for (int k = 0; k < dim; k++) {
+      if (std[k] < 1e-12) {
+        e.normVec[k] = 0;
+      } else {
+        var z = (e.normVec[k] - mean[k]) / std[k];
+        if (z > zClip) z = zClip;
+        if (z < -zClip) z = -zClip;
+        e.normVec[k] = z;
+      }
+    }
+  }
+}
+
+/// Greedy max-min sampling. Seeds with the puzzle farthest from the
+/// pool centroid, then iteratively picks the entry whose minimum
+/// distance to the current selection is maximal.
+List<_Entry> _farthestPointSample(List<_Entry> pool, int n) {
+  if (pool.isEmpty) return const [];
+  if (pool.length <= n) return List<_Entry>.from(pool);
+
+  final dim = pool.first.normVec.length;
+
+  // Centroid of the pool — deterministic seed point.
+  final centroid = Float64List(dim);
+  for (final e in pool) {
+    for (int k = 0; k < dim; k++) {
+      centroid[k] += e.normVec[k];
+    }
+  }
+  for (int k = 0; k < dim; k++) {
+    centroid[k] /= pool.length;
+  }
+
+  int firstIdx = 0;
+  double firstDist = -1;
+  for (int i = 0; i < pool.length; i++) {
+    final d = _sqDistFloat(pool[i].normVec, centroid);
+    if (d > firstDist) {
+      firstDist = d;
+      firstIdx = i;
+    }
+  }
+
+  // Per-pool min-distance-to-selected. Negative = already selected.
+  final minDist = List<double>.filled(pool.length, double.infinity);
+  for (int i = 0; i < pool.length; i++) {
+    if (i == firstIdx) continue;
+    minDist[i] = _sqDistFloat(pool[i].normVec, pool[firstIdx].normVec);
+  }
+  minDist[firstIdx] = -1;
+
+  final selected = <_Entry>[pool[firstIdx]];
+
+  while (selected.length < n) {
+    int nextIdx = -1;
+    double bestMin = -1;
+    for (int i = 0; i < pool.length; i++) {
+      if (minDist[i] < 0) continue;
+      if (minDist[i] > bestMin) {
+        bestMin = minDist[i];
+        nextIdx = i;
+      }
+    }
+    if (nextIdx < 0) break;
+    selected.add(pool[nextIdx]);
+    final newVec = pool[nextIdx].normVec;
+    minDist[nextIdx] = -1;
+    for (int i = 0; i < pool.length; i++) {
+      if (minDist[i] < 0) continue;
+      final d = _sqDistFloat(pool[i].normVec, newVec);
+      if (d < minDist[i]) minDist[i] = d;
+    }
+  }
+
+  return selected;
+}
+
+double _sqDistFloat(Float64List a, Float64List b) {
+  double s = 0;
+  for (int k = 0; k < a.length; k++) {
+    final d = a[k] - b[k];
+    s += d * d;
+  }
+  return s;
+}
+
+class _Entry {
+  final String line;
+  final String canonicalKey;
+  final Set<String> slugs;
+
+  /// Raw values on construction, replaced in-place by z-scores during
+  /// the normalization pass.
+  final Float64List normVec;
+  _Entry(this.line, this.canonicalKey, this.slugs, this.normVec);
+}
+
+class _CsvData {
+  final List<String> featureNames;
+  final Map<String, Float64List> vectors;
+  _CsvData(this.featureNames, this.vectors);
+}
+
+/// Parse the CSV header to find the feature columns we care about
+/// (78 share columns + a handful of structural features), then stream
+/// every row into a `canonical_key → Float64List` map.
+_CsvData _loadCsvVectors(String path) {
+  final file = File(path);
+  if (!file.existsSync()) {
+    stderr.writeln('CSV not found: $path');
+    exit(1);
+  }
+  final lines = file.readAsLinesSync();
+  if (lines.isEmpty) {
+    stderr.writeln('CSV is empty: $path');
+    exit(1);
+  }
+
+  final header = _parseCsvLine(lines.first);
+  final colIdx = <String, int>{};
+  for (int i = 0; i < header.length; i++) {
+    colIdx[header[i]] = i;
+  }
+  final keyIdx = colIdx['canonical_key'];
+  if (keyIdx == null) {
+    stderr.writeln('CSV missing required column: canonical_key');
+    exit(1);
+  }
+
+  final featureCols = <int>[];
+  final featureNames = <String>[];
+  void want(String name) {
+    final idx = colIdx[name];
+    if (idx == null) {
+      stderr.writeln('CSV missing required column: $name');
+      exit(1);
+    }
+    featureCols.add(idx);
+    featureNames.add(name);
+  }
+
+  for (final s in _slugs) {
+    for (final t in _tiers) {
+      want('share_${s}_t$t');
+    }
+  }
+  for (final f in _extraFeatures) {
+    want(f);
+  }
+
+  final vectors = <String, Float64List>{};
+  for (int li = 1; li < lines.length; li++) {
+    final raw = lines[li];
+    if (raw.trim().isEmpty) continue;
+    final fields = _parseCsvLine(raw);
+    if (fields.length < header.length) continue;
+    final key = fields[keyIdx];
+    final vec = Float64List(featureCols.length);
+    for (int k = 0; k < featureCols.length; k++) {
+      vec[k] = double.tryParse(fields[featureCols[k]]) ?? 0.0;
+    }
+    vectors[key] = vec;
+  }
+  return _CsvData(featureNames, vectors);
+}
+
+/// Minimal CSV parser identical to the one in `cluster_puzzles.dart` —
+/// double-quoted fields with `""` escapes.
+List<String> _parseCsvLine(String line) {
+  final out = <String>[];
+  final buf = StringBuffer();
+  bool inQuotes = false;
+  for (int i = 0; i < line.length; i++) {
+    final ch = line[i];
+    if (inQuotes) {
+      if (ch == '"') {
+        if (i + 1 < line.length && line[i + 1] == '"') {
+          buf.write('"');
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        buf.write(ch);
+      }
+    } else {
+      if (ch == ',') {
+        out.add(buf.toString());
+        buf.clear();
+      } else if (ch == '"' && buf.isEmpty) {
+        inQuotes = true;
+      } else {
+        buf.write(ch);
+      }
+    }
+  }
+  out.add(buf.toString());
+  return out;
+}

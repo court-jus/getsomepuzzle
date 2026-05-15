@@ -261,6 +261,15 @@ class Puzzle {
             .toList();
       }
     }
+    // Optional cached complexity at field [6]. `recompute.dart` and the
+    // generator both serialise it here so subsequent reads (vectorizer,
+    // dashboards, sorters) can skip the solve+score loop. Skip when the
+    // slot looks like a playstate field (legacy lines without complexity
+    // but with `p:`) or is unparseable — in those cases the cache stays
+    // null and `computeComplexity()` triggers a fresh compute on demand.
+    if (attributesStr.length > 6 && !attributesStr[6].startsWith('p:')) {
+      cachedComplexity = int.tryParse(attributesStr[6]);
+    }
     // Optional trailing play-state field "p:<cellvalues>" (length must
     // match the grid). Values for readonly cells are ignored — those
     // already carry the puzzle's initial state. Non-zero values for the
@@ -783,8 +792,8 @@ class Puzzle {
   ///   1 type=0, 2=1, 3=2, 4-5=3, 6+=4.
   /// - **Emptiness** (0-6): proportion of free cells.
   ///   Fully empty=6, 50% filled=3, fully filled=0.
-  int computeComplexity() {
-    if (cachedComplexity != null) return cachedComplexity!;
+  int computeComplexity({bool force = false}) {
+    if (!force && cachedComplexity != null) return cachedComplexity!;
 
     final size = width * height;
     final totalFree = freeCells().length;

@@ -82,8 +82,14 @@ Options:
                 files (assets/1-easy.txt … assets/6-mad.txt) into the
                 file matching its post-sort classification. Out-of-
                 cascade puzzles (overfilled, undetermined) go to their
-                dedicated files. Overwrites all destination files.
-                Positional args are ignored in this mode.
+                dedicated files. Writes to `<dest>.tmp` (append mode);
+                **never modifies the source `.txt` files**. The user
+                migrates manually with `mv <dest>.tmp <dest>` when
+                satisfied. Re-runs are idempotent: puzzles already
+                emitted to a `.tmp` (by `canonicalPuzzleKey`) are
+                skipped, so an interrupted `--route` can be resumed
+                by simply re-launching the command. Positional args
+                are ignored in this mode.
   -v, --verbose Emit a per-puzzle diff line whenever the stored cplx,
                 the pre-sort level, or the post-sort level changes.
   -h, --help    Show this help.
@@ -188,7 +194,10 @@ void _processFile(
       );
 
       // Step 4 — recompute the cplx score. Single internal solve.
-      puzzle.computeComplexity();
+      // `force: true` bypasses the cached value the Puzzle constructor
+      // loaded from the line's field [6] — recompute's entire purpose
+      // is to re-derive that value from scratch.
+      puzzle.computeComplexity(force: true);
       final newCplx = puzzle.cachedComplexity ?? -1;
 
       processed++;
@@ -317,16 +326,52 @@ String _fmtHistogram(Map<PuzzleLevel, int> hist) {
 void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
   final sw = Stopwatch()..start();
 
-  // Per-destination append handle. Each file is opened **once** as a
-  // `.tmp` (truncate mode) and stays open until the end of the run
-  // — keeping the FD around is cheaper than open/close per line.
-  // Renamed (or deleted in dry-run) at the end. Sources are read
-  // before any rename happens, so even when `srcPath == destPath`
-  // the source content is fully consumed by the time it would be
-  // overwritten.
+  // ─── Pre-load: read all existing `.tmp` to build idempotence sets ──
   //
-  // In dry-run we still create `.tmp` files (so destStats are
-  // populated exactly as in a real run) but delete them on exit.
+  // We treat the `.tmp` files as the single source of truth for
+  // "already done". A puzzle whose `canonicalPuzzleKey` is already in
+  // the loaded set is skipped — its sort + classify + recompute
+  // happened on a previous run. Non-puzzle lines (blanks, comments,
+  // parse-failures) are deduped by exact string content so we don't
+  // re-append them on every rerun.
+  //
+  // Sources are NEVER read or modified here; only the `.tmp` files
+  // are inspected.
+  final existingCanonical = <String>{};
+  final existingVerbatim = <String>{};
+  int preloadedPuzzles = 0;
+  int preloadedVerbatim = 0;
+  for (final tmpPath in _allPossibleTmpPaths()) {
+    final f = File(tmpPath);
+    if (!f.existsSync()) continue;
+    for (final line in f.readAsLinesSync()) {
+      if (line.trim().isEmpty || line.startsWith('#')) {
+        if (existingVerbatim.add(line)) preloadedVerbatim++;
+        continue;
+      }
+      try {
+        if (existingCanonical.add(canonicalPuzzleKey(line))) {
+          preloadedPuzzles++;
+        }
+      } catch (_) {
+        // Couldn't compute the key (malformed line). Treat as
+        // verbatim so we don't re-add it next time.
+        if (existingVerbatim.add(line)) preloadedVerbatim++;
+      }
+    }
+  }
+  if (preloadedPuzzles + preloadedVerbatim > 0) {
+    stderr.writeln(
+      'Loaded $preloadedPuzzles puzzles + $preloadedVerbatim verbatim '
+      'lines from existing .tmp files. Resume mode active.',
+    );
+  }
+
+  // ─── Sinks (append mode) ────────────────────────────────────────────
+  //
+  // Append so multiple runs accumulate without truncating prior work.
+  // No commit / rename / cleanup at the end — the `.tmp` files stay
+  // in place for the user to verify and migrate manually.
   final destFiles = <String, RandomAccessFile>{};
   final destStats = <String, _DestStats>{};
   final perFileStats = <String, _RouteStats>{};
@@ -334,21 +379,21 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
   RandomAccessFile sinkFor(String destPath) {
     return destFiles.putIfAbsent(destPath, () {
       final tmp = File('$destPath.tmp');
-      // Ensure parent dir exists (overfilled / undetermined paths
-      // might land in assets/ which always does, but be defensive).
       final dir = tmp.parent;
       if (!dir.existsSync()) dir.createSync(recursive: true);
       destStats[destPath] = _DestStats();
-      return tmp.openSync(mode: FileMode.write);
+      return tmp.openSync(mode: FileMode.append);
     });
   }
 
-  // Streaming write helper. Each emit goes straight to disk, no
-  // accumulation. Increment `destStats` so the end-of-run summary
-  // can break down counts.
   void emit(String destPath, String line, _DestStatsKind kind) {
-    final raf = sinkFor(destPath);
-    raf.writeStringSync('$line\n');
+    if (dryRun) {
+      // Track stats but never touch disk in dry-run.
+      destStats.putIfAbsent(destPath, _DestStats.new);
+    } else {
+      final raf = sinkFor(destPath);
+      raf.writeStringSync('$line\n');
+    }
     final s = destStats[destPath]!;
     switch (kind) {
       case _DestStatsKind.verbatim:
@@ -360,6 +405,9 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
     }
   }
 
+  int alreadyProcessed = 0;
+  int newlyProcessed = 0;
+
   for (final srcPath in _playableLevelPaths) {
     final srcFile = File(srcPath);
     if (!srcFile.existsSync()) {
@@ -369,33 +417,49 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
     final fileSw = Stopwatch()..start();
     final stats = perFileStats.putIfAbsent(srcPath, _RouteStats.new);
     int processedThisFile = 0;
-    // Force the `.tmp` to exist even if everything in this source
-    // routes elsewhere (so the final rename has something to swap in).
-    sinkFor(srcPath);
 
     for (final line in srcFile.readAsLinesSync()) {
       if (line.trim().isEmpty || line.startsWith('#')) {
-        emit(srcPath, line, _DestStatsKind.verbatim);
+        if (existingVerbatim.add(line)) {
+          emit(srcPath, line, _DestStatsKind.verbatim);
+        }
         continue;
       }
       if (sample != null && processedThisFile >= sample) {
-        // Sample-bypass: keep the line verbatim in its source so the
-        // dry-run preview keeps the file shape coherent.
-        emit(srcPath, line, _DestStatsKind.verbatim);
+        // Sample-bypass: skip entirely. We don't treat these as
+        // "verbatim" (they're real puzzles we chose not to process);
+        // they'll be picked up by a subsequent non-sample run via the
+        // canonical-key idempotence check.
+        continue;
+      }
+
+      // Idempotence check before any heavy work: compute the
+      // canonical key on the *source* line and skip if already
+      // present in a `.tmp`.
+      String sourceKey;
+      try {
+        sourceKey = canonicalPuzzleKey(line);
+      } catch (_) {
+        sourceKey = '';
+      }
+      if (sourceKey.isNotEmpty && existingCanonical.contains(sourceKey)) {
+        alreadyProcessed++;
+        processedThisFile++;
         continue;
       }
 
       try {
         final fields = line.split('_');
         if (fields.length < 7) {
-          emit(srcPath, line, _DestStatsKind.verbatim);
+          if (existingVerbatim.add(line)) {
+            emit(srcPath, line, _DestStatsKind.verbatim);
+          }
           continue;
         }
 
         fields[4] = dedupAndSortConstraints(fields[4]);
         final puzzle = Puzzle(fields.join('_'));
 
-        // One trace, reused for the sort signal.
         final preSortSteps = puzzle.solveExplained();
         final prefillRatio =
             puzzle.cells.where((c) => c.readonly).length / puzzle.cells.length;
@@ -413,10 +477,8 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
           solved: true,
         );
 
-        puzzle.computeComplexity();
+        puzzle.computeComplexity(force: true);
 
-        // Re-emit field 4 from the in-memory sorted list; refresh
-        // 5/6 from the post-sort computation.
         fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
         final sol = puzzle.cachedSolution;
         fields[5] = sol != null ? '1:${sol.join('')}' : '0:0';
@@ -427,6 +489,17 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
         final destPath = destFilename != null
             ? 'assets/$destFilename'
             : srcPath;
+
+        // Second check: in case sort + recompute produced a line
+        // whose canonical key is now in the set (extremely rare but
+        // safer than emitting a duplicate). We add the OUT key
+        // unconditionally so any subsequent run sees this puzzle as
+        // processed.
+        try {
+          existingCanonical.add(canonicalPuzzleKey(outLine));
+        } catch (_) {}
+        if (sourceKey.isNotEmpty) existingCanonical.add(sourceKey);
+
         if (destPath == srcPath) {
           emit(destPath, outLine, _DestStatsKind.stayed);
           stats.kept++;
@@ -445,46 +518,38 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
 
         processedThisFile++;
         stats.processed++;
+        newlyProcessed++;
         if (stats.processed % 100 == 0) {
-          stderr.write('\r$srcPath: ${stats.processed} processed...');
+          stderr.write('\r$srcPath: ${stats.processed} new processed...');
         }
       } catch (e) {
-        // Parse / sort / classify blew up: keep the source line
-        // verbatim so we don't lose data.
-        emit(srcPath, line, _DestStatsKind.verbatim);
+        if (existingVerbatim.add(line)) {
+          emit(srcPath, line, _DestStatsKind.verbatim);
+        }
       }
     }
 
     stderr.writeln(
-      '\r$srcPath: ${stats.processed} processed in '
+      '\r$srcPath: ${stats.processed} new in '
       '${fileSw.elapsed.inSeconds}s '
       '(${stats.kept} stayed, ${stats.moved} moved out)',
     );
   }
 
-  // Close all handles before renaming.
+  // Close handles. No rename, no delete — the `.tmp` files remain
+  // on disk for the user to inspect.
   for (final raf in destFiles.values) {
     raf.closeSync();
   }
 
-  // Commit / rollback the .tmp files.
-  for (final destPath in destFiles.keys) {
-    final tmp = File('$destPath.tmp');
-    if (dryRun) {
-      tmp.deleteSync();
-    } else {
-      // renameSync overwrites the existing file on POSIX. The source
-      // file is no longer being read at this point.
-      tmp.renameSync(destPath);
-    }
-  }
-
   stderr.writeln('');
-  final action = dryRun ? '(dry-run, no files written)' : 'written';
-  for (final destPath in destFiles.keys.toList()..sort()) {
+  final action = dryRun ? '(dry-run, no files written)' : 'appended';
+  for (final destPath in destStats.keys.toList()..sort()) {
     final s = destStats[destPath]!;
+    final total = s.verbatim + s.stayed + s.newcomers;
+    if (total == 0) continue;
     stderr.writeln(
-      '$destPath: ${s.verbatim + s.stayed + s.newcomers} lines $action — '
+      '$destPath.tmp: $total lines $action — '
       '${s.verbatim} verbatim, '
       '${s.stayed} recomputed-and-stayed, '
       '${s.newcomers} recomputed-and-arrived',
@@ -493,12 +558,29 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
 
   stderr.writeln('');
   stderr.writeln('--route summary in ${sw.elapsed.inSeconds}s:');
+  stderr.writeln(
+    '  Already processed (matched in prior .tmp): $alreadyProcessed',
+  );
+  stderr.writeln(
+    '  Newly processed this run:                  $newlyProcessed',
+  );
+  if (newlyProcessed == 0 && alreadyProcessed > 0) {
+    stderr.writeln('');
+    stderr.writeln(
+      'All source puzzles are present in the .tmp files. '
+      'You can review them, then migrate with:',
+    );
+    for (final p in _playableLevelPaths) {
+      stderr.writeln('  mv $p.tmp $p');
+    }
+  }
+  stderr.writeln('');
   for (final srcPath in _playableLevelPaths) {
     final s = perFileStats[srcPath];
     if (s == null) continue;
     stderr.writeln(
-      '  $srcPath: ${s.processed} puzzles, ${s.kept} kept here, '
-      '${s.moved} moved out',
+      '  $srcPath: ${s.processed} newly processed, '
+      '${s.kept} kept here, ${s.moved} moved out',
     );
     final moveEntries =
         (s.moves.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
@@ -507,6 +589,25 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
       stderr.writeln('    ${m.value}× ${m.key}');
     }
   }
+}
+
+/// Enumerate the candidate `.tmp` paths the pre-load step should
+/// scan. Includes the 6 playable destinations + the 3 off-cascade
+/// (`overfilledEasy`, `overfilled`, `undetermined`). Returning the
+/// candidate set (even files that don't exist) keeps the caller
+/// simple — it just `existsSync()`-checks each.
+List<String> _allPossibleTmpPaths() {
+  final paths = <String>[..._playableLevelPaths];
+  // Off-cascade destinations from `levelFilenames`.
+  for (final lvl in [
+    PuzzleLevel.overfilledEasy,
+    PuzzleLevel.overfilled,
+    PuzzleLevel.undetermined,
+  ]) {
+    final name = levelFilenames[lvl];
+    if (name != null) paths.add('assets/$name');
+  }
+  return paths.map((p) => '$p.tmp').toList();
 }
 
 class _RouteStats {
