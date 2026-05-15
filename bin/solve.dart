@@ -6,21 +6,33 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
   if (args.isEmpty) {
-    stderr.writeln('Usage: dart run bin/solve.dart <puzzle_file>');
+    stderr.writeln('Usage: dart run bin/solve.dart <puzzle_file_or_line>');
     exit(1);
   }
 
-  final file = File(args[0]);
-  if (!file.existsSync()) {
-    stderr.writeln('File not found: ${args[0]}');
-    exit(1);
+  final arg = args[0];
+  final List<String> lines;
+  final file = File(arg);
+  if (file.existsSync()) {
+    lines = file
+        .readAsLinesSync()
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+  } else {
+    // Not a file — try to interpret the argument as a single puzzle line.
+    // Puzzle(...) throws on a malformed representation.
+    try {
+      Puzzle(arg);
+    } catch (e) {
+      stderr.writeln(
+        'Argument is neither an existing file nor a valid puzzle line: $arg',
+      );
+      stderr.writeln('Parse error: $e');
+      exit(1);
+    }
+    lines = [arg];
   }
-
-  final lines = file
-      .readAsLinesSync()
-      .map((l) => l.trim())
-      .where((l) => l.isNotEmpty)
-      .toList();
 
   for (int i = 0; i < lines.length; i++) {
     if (lines.length > 1) {
@@ -76,10 +88,19 @@ void _solvePuzzle(String line) {
 
   print('');
   if (p.complete) {
-    final allValid = p.constraints.every((constraint) => constraint.verify(p));
+    final violations = p.constraints
+        .where((c) => !c.verify(p))
+        .toList(growable: false);
     print('Solution:');
     _printGrid(p);
-    print(allValid ? 'VALID' : 'INVALID');
+    if (violations.isEmpty) {
+      print('VALID');
+    } else {
+      print('INVALID — violated constraints:');
+      for (final c in violations) {
+        print('  ${c.serialize()} — ${c.toHuman(p)}');
+      }
+    }
   } else {
     print('Final state (incomplete):');
     _printGrid(p);
