@@ -32,10 +32,12 @@ grid, then collects the constraints that characterise it best.
    as hints.
 
 3. **Enumerate every valid constraint.** For each registered slug
-   (`FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC`), `generateAllParameters`
-   yields every parametric instance for the grid dimensions; the generator
-   keeps only the ones that **verify against the solution grid**. This is
-   the "true" constraint set for that solution.
+   (`FM, PA, RC, GS, LT, QA, SY, DF, SH, CC, GC, NC, EY` — see
+   `constraintRegistry` in `lib/getsomepuzzle/constraints/registry.dart`
+   for the authoritative list), `generateAllParameters` yields every
+   parametric instance for the grid dimensions; the generator keeps only
+   the ones that **verify against the solution grid**. This is the "true"
+   constraint set for that solution.
 
 4. **Sort the candidates.** Random shuffle, then a stable sort that pushes
    `prioritySlugs` (= `requiredRules ∪ preferredSlugs`) to the front and
@@ -103,6 +105,61 @@ grid, then collects the constraints that characterise it best.
 - **Bias toward "soft" solutions.** Random 50/50 grids rarely have
   notable structure, which under-uses structural constraints
   (`GS`, `SY`, `SH`, `GC`).
+
+### 1.4. Boss mode
+
+For very large grids (target: 30×20, ~600 cells), the standard pipeline
+above becomes intractable. A few targeted changes are activated when
+`GeneratorConfig.useBossPrefill = true` (CLI flag `--boss`):
+
+- **Seed-and-grow prefill** (step 1). Replaces the random `{1,2}` grid
+  with a deterministic "plant seeds, grow each one to ~15–25 cells"
+  algorithm. Yields coherent blobs instead of white-noise. GS
+  constraints are posted on the resulting components, capped at 3 per
+  component to avoid redundancy. See [`boss.md`](boss.md) for details.
+
+- **Candidate cap per slug** (step 3). On a 30×20 grid, GS alone
+  produces ~8 400 candidates. The generator now shuffles each slug's
+  parameter list and keeps only the first `maxConstraintParameters`
+  (default 1 000) that verify against the solution; the rest goes into
+  a per-slug **reserve** consumed on demand (`refillFromReserve`) when
+  the iterative loop runs out of candidates.
+
+- **Batch addition in the greedy loop** (step 5). Instead of
+  testing one candidate at a time (2 solves per candidate), boss mode
+  groups candidates by batches of `addConstraintsInBatch` (default 30).
+  Trade-off: the final puzzle may carry "passenger" constraints (kept
+  because the batch as a whole helped, not because each member was
+  strictly required). Acceptable because boss puzzles are not asked to
+  be minimal. An anti-infinite-loop guard rejects after
+  `maxConsecutiveFailedBatches` (default 20) rejected batches in a row,
+  triggering a reserve refill or stopping.
+
+- **Incremental `bossSolvedState`** (step 5). Standard mode re-clones
+  `pu` and re-solves from scratch on every test (`solve(pre) → ratioBefore`,
+  `solve(pre + candidate) → ratioAfter`). Deductive propagation is
+  monotone — once a cell is deduced from constraint set C₁, it stays
+  valid under any superset C₁∪C₂. Boss mode exploits this: a persistent
+  `bossSolvedState` holds the cumulative post-propagation state, each
+  batch is tested on `bossSolvedState.clone() + batch`, and on accept
+  the just-solved clone is promoted to the new state. **One solve per
+  batch instead of two.**
+
+- **Propagation-only solves** (step 5 and step 6). `_forceOneCell()`
+  clones the puzzle once per `(free cell, value)` pair — on a 600-cell
+  grid that's >1 000 clones per `findAMove` call. Boss mode passes
+  `tryForce: false` to every `solve()` in the iterative loop and to the
+  final ratio check. Propagation may plateau higher than full-solve
+  would, but the batch loop compensates by adding more constraints.
+
+- **No constraint-set cleanup**. `sortConstraintsByDifficulty` (the
+  final easier-first reorder) is skipped in boss mode — sort cost is
+  non-trivial on big grids, and the easier-first invariant isn't
+  required of boss puzzles.
+
+The instrumentation hooks (`onLog` on `generateOne`, `onIter` /
+`onForceProgress` on `Puzzle.solve` / `findAMove`) were added to make
+the boss flow debuggable on these long generations.
 
 ## 2. Equilibrium
 

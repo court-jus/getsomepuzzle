@@ -1,76 +1,74 @@
-# Niveaux de difficulté des puzzles
+# Puzzle difficulty levels
 
-Un classement à 6 paliers (Débutant → Fou furieux) qui regroupe les
-puzzles selon le **type de raisonnement** que leur résolution exige.
-La cible : pouvoir composer une playlist progressive où chaque palier
-introduit une nouvelle compétence cognitive — propagation simple,
-puis difficile, puis complicités, puis force.
+A 6-tier ranking (Beginner → Mad) that groups puzzles by the **kind of
+reasoning** their resolution requires. Goal: compose a progressive
+playlist where each tier introduces a new cognitive skill — simple
+propagation, then hard propagation, then complicities, then force.
 
-Le script de classification batch est `bin/classify_difficulty.dart`,
-qui consomme la trace `solveExplained()` enrichie (`SolveStep` porte
-`complexity` et `isComplicity` depuis le commit `7c3020b`).
+The batch classification script is `bin/classify_difficulty.dart`,
+which consumes the enriched `solveExplained()` trace (`SolveStep`
+carries `complexity` and `isComplicity` since commit `7c3020b`).
 
-## Critères structurels
+## Structural criteria
 
-Cascade descendante, mutuellement exclusifs (un puzzle est rangé dans
-la catégorie la plus haute qu'il satisfait) :
+Descending cascade, mutually exclusive (a puzzle lands in the highest
+tier it satisfies):
 
-| Catégorie       | Critères                                                                |
-|-----------------|-------------------------------------------------------------------------|
-| **Débutant**    | 0 force, 0 complicité, max propagation ≤ 2                              |
-| **Joueur**      | 0 force, 0 complicité, max propagation ≥ 3                              |
-| **Avancé**      | 0 force, ≥ 1 complicité, complexité max des complicités ≤ 3             |
-| **Balaise**     | 0 force, ≥ 1 complicité de complexité ≥ 4                               |
-| **Expert**      | 1 move FORCE, `forceDepth ≤ 5`                                          |
-| **Fou furieux** | ≥ 2 moves FORCE, ou 1 move FORCE de `forceDepth > 5`                    |
-| Indéterminé     | trace incomplète (timeout / contradiction)                              |
+| Tier         | Criteria                                                                |
+|--------------|-------------------------------------------------------------------------|
+| **Beginner** | 0 force, 0 complicity, max propagation ≤ 2                              |
+| **Player**   | 0 force, 0 complicity, max propagation ≥ 3                              |
+| **Advanced** | 0 force, ≥ 1 complicity, max complicity complexity ≤ 3                  |
+| **Strong**   | 0 force, ≥ 1 complicity of complexity ≥ 4                               |
+| **Expert**   | 1 FORCE move, `forceDepth ≤ 5`                                          |
+| **Mad**      | ≥ 2 FORCE moves, or 1 FORCE move with `forceDepth > 5`                  |
+| Undetermined | incomplete trace (timeout / contradiction)                              |
 
-Échelle `Move.complexity` ∈ 0..5, voir `lib/getsomepuzzle/model/cell.dart:74`
-et `docs/dev/complexity.md`. Détection complicité = `Move.givenBy is
-Complicity`.
+`Move.complexity` scale ∈ 0..5, see
+`lib/getsomepuzzle/model/cell.dart:74` and `docs/dev/complexity.md`.
+Complicity detection = `Move.givenBy is Complicity`.
 
-L'intention derrière le palier Expert : **"il a fallu poser une
-hypothèse pour voir qu'elle est fausse"**. Cette déduction par
-contradiction (la "force") est qualitativement différente d'une chaîne
-de propagation difficile mais directe ; les deux paliers (Joueur et
-Expert) sont donc séparés.
+Intent behind the Expert tier: **"you had to posit a hypothesis to
+discover it was wrong"**. Deduction by contradiction ("force") is
+qualitatively different from a hard but direct propagation chain;
+Player and Expert are therefore kept distinct.
 
-### Décisions de design
+### Design decisions
 
-- **La durée de résolution n'est pas un critère de palier.** Un
-  débutant peut très bien aimer une grande grille à sa portée, un
-  expert peut buter sur une petite grille complexe. La taille de
-  grille module le ressenti mais ne change pas le palier cognitif.
-- **Pas de filtre "emptiness" intégré aux catégories.** À la place :
-  expurger du corpus les puzzles trop pré-remplis (qui ne sont pas
-  intéressants à jouer indépendamment du palier), puis classifier ce
-  qui reste. Voir section suivante.
+- **Solve duration is not a tier criterion.** A beginner may very
+  well enjoy a large grid within their reach; an expert may struggle
+  on a small complex one. Grid size modulates the feel but does not
+  change the cognitive tier.
+- **No built-in "emptiness" filter in the tiers.** Instead: strip
+  overly pre-filled puzzles out of the corpus first (they aren't
+  interesting to play regardless of tier), then classify what's
+  left. See next section.
 
-## Seuil de pré-remplissage
+## Prefill threshold
 
-Le générateur (`lib/getsomepuzzle/generator/generator.dart:103`)
-choisit `ratio` aléatoirement dans `[0.75, 1.0]` — `ratio` étant la
-fraction de cellules **laissée vide** au joueur. Donc le
-pré-remplissage initial est borné à **25 %**.
+The generator (`lib/getsomepuzzle/generator/generator.dart:103`)
+picks `ratio` randomly in `[0.75, 1.0]` — `ratio` being the fraction
+of cells **left empty** for the player. So initial prefill is bounded
+to **25 %**.
 
-> Note : le `0.25` qu'on retrouve ligne 257 (`if (currentRatio > 0.25)
-> return null;`) est un autre concept — le ratio résiduel après solve
-> avec contraintes, utilisé pour rejeter les puzzles "trop ouverts" en
-> sortie de génération. Sans rapport avec le pré-remplissage initial.
+> Note: the `0.25` you find at line 257 (`if (currentRatio > 0.25)
+> return null;`) is a different concept — the *residual* ratio after
+> solving with constraints, used to reject "too open" puzzles at
+> generation time. Unrelated to initial prefill.
 
-Le script `bin/classify_difficulty.dart` accepte `--max-prefill F`
-(défaut `0.30`) ; les puzzles dont `readonly/total > F` tombent dans
-la catégorie supplémentaire `Pre-rempli` (et sont écrits dans
-`overfilled.txt` quand `--split-out` est utilisé).
+`bin/classify_difficulty.dart` accepts `--max-prefill F` (default
+`0.30`); puzzles with `readonly/total > F` go into the extra
+`Overfilled` bucket (and into `overfilled.txt` when `--split-out` is
+used).
 
-**Seuil retenu : 0.30** — légèrement plus permissif que le contrat
-du générateur (0.25), pour conserver davantage de puzzles legacy
-sans intégrer la queue pathologique. La distribution observée
-justifie ce choix (cf. histogramme ci-dessous).
+**Chosen threshold: 0.30** — slightly more permissive than the
+generator contract (0.25) so we keep more legacy puzzles without
+pulling in the pathological tail. The observed distribution justifies
+the choice (histogram below).
 
-### Histogramme du pré-remplissage
+### Prefill histogram
 
-Distribution sur les 12 210 puzzles du corpus (bins de 5 %) :
+Distribution over the 12 210 corpus puzzles (5 % bins):
 
 ```
 [0.00-0.05)    459   3.76%  █████████
@@ -88,149 +86,149 @@ Distribution sur les 12 210 puzzles du corpus (bins de 5 %) :
 [0.60-0.65)    266   2.18%  █████
 [0.65-0.70)    186   1.52%  ███
 [0.70-0.75)    103   0.84%  ██
-[0.75+]        252   2.07%  (queue jusqu'à 0.96)
+[0.75+]        252   2.07%  (tail up to 0.96)
 ```
 
-Cumulatif aux seuils ronds :
+Cumulative at round thresholds:
 
-| Seuil ≤ | Conservés | %       |
-|---------|----------:|--------:|
-| 0.20    |     5 516 |  45.2 % |
-| 0.25    |     7 367 |  60.3 % |
-| 0.30    |     8 502 |  69.6 % |
-| 0.40    |     9 888 |  81.0 % |
-| 0.50    |    10 814 |  88.6 % |
+| Threshold ≤ | Kept   | %       |
+|-------------|-------:|--------:|
+| 0.20        |  5 516 |  45.2 % |
+| 0.25        |  7 367 |  60.3 % |
+| 0.30        |  8 502 |  69.6 % |
+| 0.40        |  9 888 |  81.0 % |
+| 0.50        | 10 814 |  88.6 % |
 
-**Distribution unimodale**, mode à `[0.15-0.20)`. La distribution est
-continue ; ni 0.20 ni 0.25 ne sont des points de rupture naturels.
-Pour conserver davantage de puzzles legacy on retient **0.30** comme
-seuil pratique : 8 502 puzzles passent (69.6 %) contre 7 367 à 0.25
-(60.3 %). Au-delà de 0.50 la queue (~11 %, 1 396 puzzles) regroupe
-les cas pathologiques type `LT:A.8.23` à 88 % de pré-remplissage —
-clairement à expurger.
+**Unimodal distribution**, mode at `[0.15-0.20)`. The distribution is
+continuous; neither 0.20 nor 0.25 is a natural break point. To keep
+more legacy puzzles we settle on **0.30** as the practical threshold:
+8 502 puzzles pass (69.6 %) versus 7 367 at 0.25 (60.3 %). Beyond
+0.50 the tail (~11 %, 1 396 puzzles) is dominated by pathological
+cases like `LT:A.8.23` at 88 % prefill — clearly to strip out.
 
-### Cas d'école
+### Reference case
 
-`v2_12_5x5_1222121202211112210121202_LT:A.8.23_..._11` a 22 cellules
-readonly sur 25 = **88 %** de pré-remplissage. Pas un puzzle généré
-récemment ; à sortir du corpus.
+`v2_12_5x5_1222121202211112210121202_LT:A.8.23_..._11` has 22 readonly
+cells out of 25 = **88 %** prefill. Not a recently generated puzzle;
+should be removed from the corpus.
 
 ### Tutorial
 
-Sur 23 puzzles de `tutorial.txt`, 8 (35 %) dépassent le seuil 0.25.
-C'est **attendu et voulu** : les puzzles d'apprentissage sont
-volontairement très pré-remplis pour guider le joueur sur la règle
-qu'on lui apprend. Ils ne participeront pas à la classification de
-difficulté mais restent dans la collection.
+Out of 23 puzzles in `tutorial.txt`, 8 (35 %) cross the 0.25
+threshold. **Expected and intentional**: tutorial puzzles are
+deliberately heavily pre-filled to guide the player towards the rule
+being taught. They don't participate in difficulty classification but
+stay in the collection.
 
-## Distribution sur 100 % du corpus
+## Distribution over the full corpus
 
-Run sur les 12 187 puzzles de `assets/default.txt` (collection2 et
-collection3 mergées dedans), filtre `--max-prefill 0.30` :
+Run over the 12 187 puzzles of `assets/default.txt` (collection2 and
+collection3 merged in), filter `--max-prefill 0.30`:
 
-| Catégorie         | Fichier généré      | Total  | % global | % filtré |
-|-------------------|---------------------|-------:|---------:|---------:|
-| Débutant          | `1-easy.txt`        |  1 750 |   14.4 % |   20.3 % |
-| Joueur            | `2-player.txt`      |  1 147 |    9.4 % |   13.3 % |
-| Avancé            | `3-advanced.txt`    |  1 749 |   14.4 % |   20.2 % |
-| Balaise           | `4-strong.txt`      |  2 291 |   18.8 % |   26.5 % |
-| Expert            | `5-expert.txt`      |    728 |    6.0 % |    8.4 % |
-| Fou furieux       | `6-mad.txt`         |    975 |    8.0 % |   11.3 % |
-| Pré-rempli > 30 % | `overfilled.txt`    |  3 542 |   29.1 % |        — |
-| Indéterminé       | `undetermined.txt`  |      5 |    0.0 % |   0.06 % |
-| **Total**         |                     | 12 187 |    100 % |    100 % |
+| Tier              | Generated file      | Total  | % global | % filtered |
+|-------------------|---------------------|-------:|---------:|-----------:|
+| Beginner          | `1-easy.txt`        |  1 750 |   14.4 % |     20.3 % |
+| Player            | `2-player.txt`      |  1 147 |    9.4 % |     13.3 % |
+| Advanced          | `3-advanced.txt`    |  1 749 |   14.4 % |     20.2 % |
+| Strong            | `4-strong.txt`      |  2 291 |   18.8 % |     26.5 % |
+| Expert            | `5-expert.txt`      |    728 |    6.0 % |      8.4 % |
+| Mad               | `6-mad.txt`         |    975 |    8.0 % |     11.3 % |
+| Prefill > 30 %    | `overfilled.txt`    |  3 542 |   29.1 % |          — |
+| Undetermined      | `undetermined.txt`  |      5 |    0.0 % |     0.06 % |
+| **Total**         |                     | 12 187 |    100 % |      100 % |
 
 ```
-Débutant     ████████████████          20.3 %
-Joueur       ██████████                13.3 %
-Avancé       ████████████████          20.2 %
-Balaise      █████████████████████     26.5 %
-Expert       ██████                     8.4 %
-Fou furieux  █████████                 11.3 %
+Beginner   ████████████████          20.3 %
+Player     ██████████                13.3 %
+Advanced   ████████████████          20.2 %
+Strong     █████████████████████     26.5 %
+Expert     ██████                     8.4 %
+Mad        █████████                 11.3 %
 ```
 
-## Bilan
+## Summary
 
-La distribution reflète **une progression cognitive monotonique** :
+The distribution reflects a **monotonic cognitive progression**:
 
-| Palier         | Compétence requise                                     | % filtré |
-|----------------|--------------------------------------------------------|---------:|
-| Débutant       | propagation simple (saturation, comptage local)        |   20.3 % |
-| Joueur         | propagation difficile (articulation, énumération)      |   13.3 % |
-| Avancé         | complicités simples (interactions à 2 contraintes)     |   20.2 % |
-| Balaise        | complicités difficiles (énumération multi-contraintes) |   26.5 % |
-| Expert         | hypothèse + contradiction (force, depth ≤ 5)           |    8.4 % |
-| Fou furieux    | force lourde (chaînes longues ou multiples hypothèses) |   11.3 % |
+| Tier        | Required skill                                          | % filtered |
+|-------------|---------------------------------------------------------|-----------:|
+| Beginner    | simple propagation (saturation, local counting)         |     20.3 % |
+| Player      | hard propagation (articulation, enumeration)            |     13.3 % |
+| Advanced    | simple complicities (interactions across 2 constraints) |     20.2 % |
+| Strong      | hard complicities (multi-constraint enumeration)        |     26.5 % |
+| Expert      | hypothesis + contradiction (force, depth ≤ 5)           |      8.4 % |
+| Mad         | heavy force (long chains or multiple hypotheses)        |     11.3 % |
 
-Le palier Expert est volontairement plus étroit que les autres car il
-correspond à un saut qualitatif majeur dans le raisonnement (hypothèse
-vs. déduction). Sa rareté est attendue, pas une anomalie.
+The Expert tier is deliberately narrower than the others because it
+matches a major qualitative jump in reasoning (hypothesis vs.
+deduction). Its rarity is expected, not an anomaly.
 
-29 % du corpus est pré-rempli > 30 % et donc isolé dans
-`overfilled.txt`. Ces puzzles ne respectent pas le contrat du
-générateur (`ratio` ∈ [0.75, 1.0], donc max 25 % de pré-remplissage)
-et sont candidats à un cleanup ultérieur.
+29 % of the corpus is pre-filled > 30 % and therefore isolated in
+`overfilled.txt`. Those puzzles don't honour the generator contract
+(`ratio` ∈ [0.75, 1.0], i.e. max 25 % prefill) and are candidates for
+a later cleanup pass.
 
-## Intégration dans le générateur
+## Integration into the generator
 
-Le calcul du niveau est intégré directement dans
-`PuzzleGenerator.generateOne` (`lib/getsomepuzzle/generator/generator.dart`)
-qui retourne désormais `(line, level)` au lieu de `String?`. Aucun
-solve supplémentaire n'est requis : le `solveExplained()` qui valide
-la déductibilité du puzzle est aussi celui qui sert à classifier.
+Level computation is integrated directly inside
+`PuzzleGenerator.generateOne`
+(`lib/getsomepuzzle/generator/generator.dart`), which now returns
+`(line, level)` instead of `String?`. No extra solve is required: the
+`solveExplained()` that validates deductive uniqueness is also the
+one used to classify.
 
-Le palier voyage jusqu'à `bin/generate.dart` via le champ `level` de
-`GeneratorPuzzleMessage`. Le CLI a deux modes :
+The tier travels all the way to `bin/generate.dart` via the `level`
+field of `GeneratorPuzzleMessage`. The CLI has two modes:
 
-- `--output FILE` : tous les puzzles ajoutés au fichier (legacy).
-- *sans `--output`* : routage automatique par palier vers
-  `assets/<level>.txt` (`1-easy.txt` … `6-mad.txt`). Les paliers
-  out-of-cascade `Pre-rempli` et `Indeterminé` ne sont jamais émis
-  par le générateur en live, donc pas de fichier ouvert pour eux
-  dans ce mode.
+- `--output FILE`: every puzzle appended to that file (legacy).
+- *no `--output`*: automatic per-tier routing into
+  `assets/<level>.txt` (`1-easy.txt` … `6-mad.txt`). The
+  out-of-cascade tiers `Overfilled` and `Undetermined` are never
+  emitted live by the generator, so no sink is opened for them in
+  this mode.
 
-## Intégration UI
+## UI integration
 
-Côté joueur, les six fichiers de palier remplacent les anciennes
-collections `default` / `collection2` / `collection3` (mergées puis
-re-splittées en début 2026-05). Les changements :
+Player-side, the six tier files replace the legacy `default` /
+`collection2` / `collection3` collections (merged then re-split early
+2026-05). The changes:
 
-- **`pubspec.yaml`** : les six `assets/<level>.txt` + `tutorial.txt`
-  + `overfilled.txt` (gardé pour audits futurs) sont déclarés.
-- **`Database._builtInCollectionKeys`** (`lib/getsomepuzzle/model/database.dart`)
-  liste les nouvelles clés : `tutorial`, `1-easy`, `2-player`,
-  `3-advanced`, `4-strong`, `5-expert`, `6-mad`, `custom`.
-- **`Database.entryCollectionKey = '1-easy'`** est utilisée comme
-  cible par défaut dans `open_page.dart` (fin de tutoriel) et
-  `main.dart` (bouton primaire "Start playing").
-- **Migration legacy** : si `SharedPreferences` contient encore
-  `collectionToLoad = "default"` (ou `collection2`/`collection3`),
-  `loadPuzzlesFile` redirige automatiquement vers `1-easy` plutôt
-  que de retomber sur `tutorial`.
-- **Labels traduits** dans `lib/l10n/app_{en,fr,es}.arb` :
+- **`pubspec.yaml`**: the six `assets/<level>.txt` + `tutorial.txt`
+  + `overfilled.txt` (kept for future audits) are declared.
+- **`Database._builtInCollectionKeys`**
+  (`lib/getsomepuzzle/model/database.dart`) lists the new keys:
+  `tutorial`, `1-easy`, `2-player`, `3-advanced`, `4-strong`,
+  `5-expert`, `6-mad`, `custom`.
+- **`Database.entryCollectionKey = '1-easy'`** is used as the default
+  target in `open_page.dart` (end-of-tutorial) and in `main.dart` (the
+  primary "Start playing" button).
+- **Legacy migration**: if `SharedPreferences` still holds
+  `collectionToLoad = "default"` (or `collection2` / `collection3`),
+  `loadPuzzlesFile` automatically redirects to `1-easy` instead of
+  falling back to `tutorial`.
+- **Translated labels** in `lib/l10n/app_{en,fr,es}.arb`:
   `collectionTutorial`, `collectionEasy`, `collectionPlayer`,
   `collectionAdvanced`, `collectionStrong`, `collectionExpert`,
-  `collectionMad`. Bundle exposé via la classe `CollectionLabels`
-  pour ne pas coupler `Database` au l10n.
-- **Icônes** (`UniconsLine`) suivent une progression cognitive :
-  `smile` → `brain` → `graduation_cap` → `medal` → `trophy` →
-  `fire`. Tutorial garde `baby_carriage` et `custom` garde
-  `Icons.build`.
+  `collectionMad`. Bundle exposed via the `CollectionLabels` class
+  so `Database` doesn't need to depend on l10n.
+- **Icons** (`UniconsLine`) follow a cognitive progression: `smile`
+  → `brain` → `graduation_cap` → `medal` → `trophy` → `fire`.
+  Tutorial keeps `baby_carriage` and `custom` keeps `Icons.build`.
 
-### Adaptation au joueur
+### Player adaptation
 
-Les six paliers sont reliés au système d'adaptation décrit dans
-`docs/dev/adapt_to_player.md` :
+The six tiers tie into the adaptation system described in
+`docs/dev/adapt_to_player.md`:
 
-- **Cap de batch** : `preparePlaylist()` tronque chaque playlist de
-  palier à 20 puzzles (`Database.playlistBatchSize`). `tutorial`,
-  `custom` et les playlists utilisateurs ne sont pas capés.
-- **Recommandation** : `Database.recommendedCollectionKey` mappe
-  `playerLevel` (0..100, anchored à 50) vers un palier via des seuils
-  fixes (`recommendedLevelFor` dans `level.dart`). Surfacée comme une
-  étoile dans le dropdown de `open_page` et comme bouton "Essayer X"
-  dans `EndOfPlaylist`.
-- **Continuer / Changer** : à chaque fin de batch, `EndOfPlaylist`
-  propose au joueur de continuer dans la collection courante (nouveau
-  batch de 20) ou de basculer vers la collection recommandée. Le
-  joueur garde la main, l'app ne change jamais de palier toute seule.
+- **Batch cap**: `preparePlaylist()` truncates each tier's playlist
+  to 20 puzzles (`Database.playlistBatchSize`). `tutorial`, `custom`
+  and user-defined playlists are not capped.
+- **Recommendation**: `Database.recommendedCollectionKey` maps
+  `playerLevel` (0..100, anchored at 50) to a tier via fixed
+  thresholds (`recommendedLevelFor` in `level.dart`). Surfaced as a
+  star in the `open_page` dropdown and as a "Try X" button in
+  `EndOfPlaylist`.
+- **Continue / switch**: at every end of batch, `EndOfPlaylist`
+  offers the player either to continue in the current collection
+  (fresh batch of 20) or to switch to the recommended one. The
+  player keeps control; the app never changes tier on its own.

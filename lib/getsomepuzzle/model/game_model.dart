@@ -92,6 +92,15 @@ class GameModel extends ChangeNotifier {
   HintConstraintStatus hintConstraintsReady = HintConstraintStatus.inprogress;
   int _usefulHintCount = 0;
 
+  /// Mirrors `Settings.hintsEnabled`. When `false`, all three post-mutation
+  /// hint pre-computes (`_scheduleHelpMe`, `startHintConstraintComputation`,
+  /// `_scheduleHintRanking`) early-return — none of those results would be
+  /// surfaced anyway (the hint button is disabled in the UI). Avoids
+  /// running `findAMove(tryForce=true)` or the background `HintWorker`
+  /// on every tap on very large boards. Synced from main.dart whenever
+  /// the setting changes and on each puzzle open.
+  bool hintsEnabled = true;
+
   // --- Drag state ---
   int? firstDragValue;
   int? lastDragIdx;
@@ -526,16 +535,24 @@ class GameModel extends ChangeNotifier {
     required String Function(int count) errorsCountText,
     required void Function() onPuzzleCompleted,
   }) {
-    // In `complete` (« Attendre ») mode the player asked us to hold
-    // off any validation feedback until the grid is fully filled. The
-    // only useful check before that is "is the puzzle complete?"
-    // (a O(N) "no zero cells" scan) — we skip the full constraint
-    // check entirely in that case. Manual validate-button clicks
-    // bypass the gate so the player can still force a check.
-    if (!manualCheck &&
-        settings.liveCheckType == LiveCheckType.complete &&
-        !currentPuzzle!.complete) {
-      return;
+    // Two independent early-returns when no manual button was pressed:
+    //
+    //   - `validateType == manual` means the player asked for zero
+    //     auto-validation. Even on a fully-filled grid we must stay
+    //     silent until they click the "Valider" button (`manualCheck`).
+    //     Without this gate, every mutation that happens to fill the
+    //     last cell triggers a full constraint scan and surfaces errors
+    //     uninvited.
+    //
+    //   - `liveCheckType == complete` (« Attendre ») holds off any
+    //     validation feedback until the grid is fully filled. Cheap
+    //     `currentPuzzle.complete` check covers it.
+    if (!manualCheck) {
+      if (settings.validateType == ValidateType.manual) return;
+      if (settings.liveCheckType == LiveCheckType.complete &&
+          !currentPuzzle!.complete) {
+        return;
+      }
     }
     final shouldShowErrors =
         settings.liveCheckType == LiveCheckType.all || currentPuzzle!.complete;
@@ -768,6 +785,7 @@ class GameModel extends ChangeNotifier {
   /// Start computing valid hint constraints in a background Isolate.
   /// Only works if the current puzzle has a cached solution.
   void startHintConstraintComputation() {
+    if (!hintsEnabled) return;
     cancelHintConstraintComputation();
     final puzzle = currentPuzzle;
     if (puzzle == null || puzzle.cachedSolution == null) return;
@@ -812,6 +830,7 @@ class GameModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   void _scheduleHintRanking() {
+    if (!hintsEnabled) return;
     if (hintConstraintsReady != HintConstraintStatus.ready ||
         availableHintConstraints.isEmpty)
       return;
@@ -911,6 +930,7 @@ class GameModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   void _scheduleHelpMe() {
+    if (!hintsEnabled) return;
     _helpDebounce?.cancel();
     _helpDebounce = Timer(const Duration(milliseconds: 300), _computeHelp);
   }

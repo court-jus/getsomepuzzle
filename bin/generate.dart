@@ -35,12 +35,19 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final minHeight = parsed['minHeight'] as int;
   final maxHeight = parsed['maxHeight'] as int;
   final maxTime = parsed['maxTime'] as int;
-  final output = parsed['output'] as String?;
+  final bossMode = parsed['boss'] as bool;
+  // --boss without -o defaults to assets/boss.txt so Boss puzzles don't
+  // accidentally land in the difficulty-routed default sinks.
+  final output =
+      (parsed['output'] as String?) ?? (bossMode ? 'assets/boss.txt' : null);
   final bannedRules = (parsed['banned'] as String?)?.split(',').toSet() ?? {};
   final allowedSlugsArg = (parsed['allowed'] as String?)?.split(',').toSet();
   final requiredRules =
       (parsed['required'] as String?)?.split(',').toSet() ?? {};
-  final equilibriumRequested = parsed['equilibrium'] as bool;
+  // --boss forces equilibrium off: the warmup phase locks us into a 2-slug
+  // configuration that's far too thin to resolve a 30×20 grid, and the
+  // equilibrium picker has no calibration for grids that size.
+  final equilibriumRequested = (parsed['equilibrium'] as bool) && !bossMode;
   final jobs = (parsed['jobs'] as int).clamp(1, count);
   final logDir = parsed['logDir'] as String?;
   final targetLevel = parsed['targetLevel'] as PuzzleLevel?;
@@ -235,6 +242,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       count: workerCount,
       targetLevel: targetLevel,
       easingBudget: Duration(seconds: easingBudget),
+      useBossPrefill: bossMode,
     );
     final worker = GeneratorWorker();
     workers.add(worker);
@@ -995,6 +1003,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'equilibrium': true,
     'jobs': Platform.numberOfProcessors,
     'logDir': null,
+    'boss': false,
   };
 
   for (int i = 0; i < args.length; i++) {
@@ -1054,6 +1063,8 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['jobs'] = int.parse(args[++i]);
       case '--log-dir':
         result['logDir'] = args[++i];
+      case '--boss':
+        result['boss'] = true;
       case '-h':
       case '--help':
         _printUsage();
@@ -1139,6 +1150,14 @@ Generation options:
                           worker, append mode). Useful to investigate
                           why a worker is stuck without producing
                           puzzles. Default: no logging.
+      --boss              Use the experimental seed-and-grow prefill
+                          (for large "Boss" grids like 30x20). Plants
+                          seeds weighted toward the centre, grows them
+                          into groups of 15-25 cells, posts one GS
+                          constraint per seed, then random-fills the
+                          rest. Without -o, output goes to
+                          assets/boss.txt. Dumps the prefill state to
+                          /tmp/boss_prefill_<ts>.txt for inspection.
 
 General:
   -h, --help              Show this help

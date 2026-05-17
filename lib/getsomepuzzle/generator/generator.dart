@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
@@ -43,6 +44,13 @@ class GeneratorConfig {
   /// [targetLevel] is `null`.
   final Duration easingBudget;
 
+  /// Use the experimental "seed-and-grow" prefill instead of the default
+  /// random/SH prefill. Targets large grids ("Boss" levels): plants seed
+  /// cells weighted toward the grid centre, grows each one into a group
+  /// of 15–25 cells, then random-fills the remaining ~30% and posts a
+  /// GS constraint per seeded group with its final size.
+  final bool useBossPrefill;
+
   const GeneratorConfig({
     required this.width,
     required this.height,
@@ -57,6 +65,7 @@ class GeneratorConfig {
     this.count = 1,
     this.targetLevel,
     this.easingBudget = const Duration(seconds: 30),
+    this.useBossPrefill = false,
   });
 }
 
@@ -161,7 +170,17 @@ class PuzzleGenerator {
     bool Function()? shouldStop,
     void Function(GenerationRejectReason, Puzzle)? onReject,
     Map<String, int>? usageStats,
+    void Function(String message)? onLog,
   }) {
+    final phaseSw = Stopwatch()..start();
+    int lastPhaseMs = 0;
+    int phaseDelta() {
+      final now = phaseSw.elapsedMilliseconds;
+      final d = now - lastPhaseMs;
+      lastPhaseMs = now;
+      return d;
+    }
+
     final width = config.width;
     final height = config.height;
     final size = width * height;
@@ -186,11 +205,27 @@ class PuzzleGenerator {
 
     // 1. Create a random solved grid. Whenever SH should be tried (required
     // by user or pushed by an equilibrium / warm-up target), the pre-fill
-    // paints a valid Shape motif so the SH constraint is satisfiable.
+    // paints a valid Shape motif so the SH constraint is satisfiable. The
+    // experimental "Boss" prefill (seed-and-grow) takes precedence when the
+    // caller requested it via `useBossPrefill` — it produces large coherent
+    // blobs instead of white-noise random fill, which matters at 30×20+
+    // grid sizes.
     final hasSH = prioritySlugs.contains("SH");
-    final solved = hasSH
-        ? _preFillSh(width, height)
-        : _preFillRegular(width, height);
+    final Puzzle solved;
+    final String prefillKind;
+    if (config.useBossPrefill) {
+      prefillKind = 'boss';
+      solved = _preFillBoss(width, height);
+    } else if (hasSH) {
+      prefillKind = 'sh';
+      solved = _preFillSh(width, height);
+    } else {
+      prefillKind = 'regular';
+      solved = _preFillRegular(width, height);
+    }
+    onLog?.call(
+      'phase1 prefill=$prefillKind ${width}x$height done in ${phaseDelta()}ms',
+    );
     final solvedValues = solved.cellValues;
 
     // 2. Create puzzle with some pre-filled cells
@@ -213,27 +248,119 @@ class PuzzleGenerator {
         readonlyIndices.add(i);
       }
     }
+    onLog?.call(
+      'phase2 prefilled=$prefilled readonly=${readonlyIndices.length} '
+      'done in ${phaseDelta()}ms',
+    );
 
-    // 3. Generate all valid constraints for the solved grid
+    // 3. Generate all valid constraints for the solved grid.
+    //
+    // On big grids (30×20+), some slugs produce huge candidate lists
+    // (GS alone yields ~8400). Verifying them all up front is what
+    // makes phase 3 dominate the wall-clock. So we cap the *kept*
+    // candidates per slug at [maxConstraintParameters], stash the
+    // un-tried tail of each slug's shuffled params list as a
+    // per-slug "reserve", and only consume the reserve later (see
+    // `refillFromReserve` below) if phase 4 burns through the
+    // initial batch without solving the puzzle.
+    const maxConstraintParameters = 1000;
+    onLog?.call('phase3 start: ${allowedSlugs.length} slug(s)');
     final List<Constraint> allConstraints = [];
+    // Per-slug reserve: shuffled params list + cursor into it (next
+    // index to try). Entry is removed when the cursor hits the end.
+    final reserveParams = <String, ({List<String> params, int next})>{};
+    final slugSw = Stopwatch();
     for (final slug in allowedSlugs) {
+      slugSw
+        ..reset()
+        ..start();
       final params =
-          generateAllParameters(
-            slug,
-            width,
-            height,
-            _defaultDomain,
-            slug == 'DF' ? readonlyIndices : null,
-          ) ??
-          [];
-      for (final param in params) {
-        final constraint = createConstraint(slug, param);
-        if (constraint == null) continue;
-        // Check that the constraint is satisfied by the solved grid
-        if (constraint.verify(solved)) {
-          allConstraints.add(constraint);
+          (generateAllParameters(
+                  slug,
+                  width,
+                  height,
+                  _defaultDomain,
+                  slug == 'DF' ? readonlyIndices : null,
+                ) ??
+                [])
+            ..shuffle(_rng);
+      final paramCount = params.length;
+      onLog?.call(
+        '  [$slug] generateAllParameters → $paramCount params (shuffled) '
+        '(${slugSw.elapsedMilliseconds}ms)',
+      );
+      int kept = 0;
+      final logEvery = paramCount < 20 ? paramCount : (paramCount / 10).ceil();
+      int nextLogAt = logEvery;
+      int i = 0;
+      while (i < paramCount && kept < maxConstraintParameters) {
+        if (i >= nextLogAt) {
+          final pct = (i * 100 / paramCount).toStringAsFixed(0);
+          onLog?.call(
+            '  [$slug] verify $pct% ($i/$paramCount kept=$kept '
+            'elapsed=${slugSw.elapsedMilliseconds}ms)',
+          );
+          nextLogAt += logEvery;
         }
+        final constraint = createConstraint(slug, params[i]);
+        if (constraint != null && constraint.verify(solved)) {
+          allConstraints.add(constraint);
+          kept++;
+        }
+        i++;
       }
+      if (i < paramCount) {
+        reserveParams[slug] = (params: params, next: i);
+        onLog?.call(
+          '  [$slug] capped: kept=$kept reserve=${paramCount - i} '
+          '(scanned $i/$paramCount in ${slugSw.elapsedMilliseconds}ms)',
+        );
+      } else {
+        onLog?.call(
+          '  [$slug] exhausted: kept=$kept/$paramCount '
+          'in ${slugSw.elapsedMilliseconds}ms',
+        );
+      }
+    }
+    onLog?.call(
+      'phase3 done: ${allConstraints.length} initial candidates, '
+      'reserves=${reserveParams.length} slug(s) in ${phaseDelta()}ms',
+    );
+
+    // Helper: when phase 4 empties allConstraints with the puzzle still
+    // unsolved, pull another batch from each remaining reserve. Returns
+    // `true` iff at least one new candidate was added. Mutates
+    // `allConstraints` and `reserveParams` in place; the caller is
+    // responsible for re-shuffling / re-sorting after the call.
+    bool refillFromReserve() {
+      if (reserveParams.isEmpty) return false;
+      bool added = false;
+      final emptied = <String>[];
+      for (final entry in reserveParams.entries) {
+        final slug = entry.key;
+        final list = entry.value.params;
+        int i = entry.value.next;
+        int kept = 0;
+        while (i < list.length && kept < maxConstraintParameters) {
+          final c = createConstraint(slug, list[i]);
+          if (c != null && c.verify(solved)) {
+            allConstraints.add(c);
+            kept++;
+            added = true;
+          }
+          i++;
+        }
+        if (i >= list.length) {
+          emptied.add(slug);
+        } else {
+          reserveParams[slug] = (params: list, next: i);
+        }
+        onLog?.call('  [$slug] refill: kept=$kept cursor=$i/${list.length}');
+      }
+      for (final slug in emptied) {
+        reserveParams.remove(slug);
+      }
+      return added;
     }
 
     final total = allConstraints.length;
@@ -257,16 +384,218 @@ class PuzzleGenerator {
     }
     pu.addConstraint(allConstraints.removeAt(0));
 
-    // 4. Iteratively add constraints that improve the puzzle
+    // 4. Iteratively add constraints that improve the puzzle.
+    //
+    // `currentRatio` here is the *pre-solve* ratio — it counts only
+    // the cells that already have a value (readonly prefill cells),
+    // not what propagation could deduce. It's expected to start
+    // close to 1.0 on big grids; the first batch's solveBefore will
+    // give the post-propagation baseline.
     var currentRatio = pu.computeRatio();
     int tried = 0;
+    onLog?.call(
+      'phase4 start: ${allConstraints.length} candidates, '
+      'pre-solve ratio=${currentRatio.toStringAsFixed(3)} '
+      '(=${(currentRatio * size).round()}/$size cells still free)',
+    );
+    int lastLoggedTried = 0;
 
-    while (currentRatio > 0 && allConstraints.isNotEmpty) {
+    // Tries to refill `allConstraints` from per-slug reserves, then
+    // re-shuffles and re-sorts using the current puzzle's slug usage.
+    // Returns `true` iff at least one candidate is now available.
+    bool tryRefillAndResort() {
+      if (!refillFromReserve()) return false;
+      allConstraints.shuffle(_rng);
+      final Map<String, int> localUsage = {};
+      for (final c in pu.constraints) {
+        final s = c.slug;
+        localUsage[s] = (localUsage[s] ?? 0) + 1;
+      }
+      allConstraints.sort((a, b) {
+        final sa = a.slug;
+        final sb = b.slug;
+        return (localUsage[sa] ?? 0).compareTo(localUsage[sb] ?? 0);
+      });
+      onLog?.call(
+        '  phase4 refilled: ${allConstraints.length} candidates available',
+      );
+      return true;
+    }
+
+    // Boss-only: batch addition + incremental `bossSolvedState`.
+    //
+    // Standard mode tests candidates one by one (2 solves per
+    // candidate: baseline then with-candidate). On 30×20+ each solve
+    // is expensive, so for boss puzzles we group candidates by
+    // batches of `addConstraintsInBatch`. The trade-off is verbosity
+    // (the final puzzle may carry some "passenger" constraints that
+    // weren't strictly needed for the gain). Acceptable for boss
+    // because the project's cleanup pass
+    // (`sortConstraintsByDifficulty`) is also skipped in this mode —
+    // boss puzzles are not asked to be minimal.
+    //
+    // Additional optimisation: deductive propagation is monotone — a
+    // cell value deduced from constraint set C₁ remains valid for any
+    // superset C₁∪C₂. So instead of re-cloning `pu` (back to readonly-
+    // only cells) and re-solving from scratch on every batch, we keep
+    // a `bossSolvedState` that holds the cumulative post-propagation
+    // state. Each batch is tested on a clone of that state; on accept
+    // the clone (already post-propagation) is promoted to the new
+    // state. Saves one full `solve()` per batch.
+    //
+    // `maxConsecutiveFailedBatches` is the anti-infinite-loop guard:
+    // after that many rejected batches in a row (no improvement at
+    // all), we try to refill from the per-slug reserves; if reserves
+    // are empty too, we give up.
+    const addConstraintsInBatch = 30;
+    const maxConsecutiveFailedBatches = 20;
+    int consecutiveFailures = 0;
+
+    // Initialise `bossSolvedState` once, with the single constraint
+    // added before the loop. From now on it tracks `pu.constraints`
+    // exactly, plus its own propagated cell values.
+    Puzzle? bossSolvedState;
+    if (config.useBossPrefill) {
+      bossSolvedState = pu.clone();
+      final initSw = Stopwatch()..start();
+      bossSolvedState.solve(tryForce: false);
+      currentRatio = bossSolvedState.computeRatio();
+      onLog?.call(
+        'phase4 boss: initial solvedState '
+        'ratio=${currentRatio.toStringAsFixed(3)} '
+        'filled=${bossSolvedState.cells.where((c) => c.value != 0).length}/$size '
+        'in ${initSw.elapsedMilliseconds}ms',
+      );
+    }
+
+    while (currentRatio > 0) {
       if (shouldStop?.call() == true) {
         onReject?.call(GenerationRejectReason.cancelled, pu);
         return null;
       }
 
+      if (allConstraints.isEmpty) {
+        if (!tryRefillAndResort()) break;
+      }
+
+      if (config.useBossPrefill) {
+        // ─── Batch path (boss) ──────────────────────────────────────
+        final batchSize = min(addConstraintsInBatch, allConstraints.length);
+        final batch = allConstraints.sublist(0, batchSize);
+        allConstraints.removeRange(0, batchSize);
+        // `scanned` counts candidates *queued for testing* so far, not
+        // candidates we've already proven useful — the solves below
+        // haven't run yet at this point.
+        tried += batchSize;
+        onProgress?.call(
+          GeneratorProgress(
+            puzzlesGenerated: 0,
+            totalRequested: config.count,
+            constraintsTried: tried,
+            constraintsTotal: total,
+            currentRatio: currentRatio,
+          ),
+        );
+
+        final batchSw = Stopwatch()..start();
+        // Clone the cumulative solved state (not `pu`!) so the new
+        // batch starts from cells already deduced by previously
+        // accepted constraints. Saves one full re-propagation per
+        // batch. Monotonicity guarantees this is sound: adding
+        // constraints never invalidates a deduction.
+        final cloned = bossSolvedState!.clone();
+        final cloneMs = batchSw.elapsedMilliseconds;
+
+        // Live solve instrumentation. Throttled so we don't get one
+        // log line per iter (200 max per solve). Logs at most every
+        // 10 iters AND every 500ms. Also always logs the final iter
+        // (break point) so we can see why the solve stopped.
+        int lastLogIter = -1;
+        int lastLogMs = 0;
+        void Function(int, int, bool) iterLogger(Stopwatch sw) {
+          int cumFindMs = 0;
+          return (int iter, int findMs, bool moveTaken) {
+            cumFindMs += findMs;
+            final now = sw.elapsedMilliseconds;
+            final shouldLog =
+                !moveTaken ||
+                (iter - lastLogIter >= 10 && now - lastLogMs >= 500);
+            if (shouldLog) {
+              final filled = cloned.cells.where((c) => c.value != 0).length;
+              onLog?.call(
+                '    [solve] iter=$iter findAMove=${findMs}ms '
+                'cumFind=${cumFindMs}ms elapsed=${now}ms '
+                'filled=$filled/$size moveTaken=$moveTaken',
+              );
+              lastLogIter = iter;
+              lastLogMs = now;
+            }
+          };
+        }
+
+        // Boss mode = propagation-only. The force fallback
+        // (`_forceOneCell`) is O(freeCells × |domain|) clones-per-call
+        // — wall-clock explodes immediately on big grids.
+        //
+        // We compare ratio against `currentRatio` (= the cumulative
+        // post-propagation ratio after previously accepted batches),
+        // not a freshly computed baseline. One solve per batch instead
+        // of two.
+        for (final c in batch) {
+          cloned.addConstraint(c);
+        }
+        batchSw.reset();
+        batchSw.start();
+        lastLogIter = -1;
+        lastLogMs = 0;
+        cloned.solve(tryForce: false, onIter: iterLogger(batchSw));
+        final solveMs = batchSw.elapsedMilliseconds;
+        final ratioAfter = cloned.computeRatio();
+
+        final decision = ratioAfter < currentRatio ? 'ACCEPT' : 'reject';
+        onLog?.call(
+          '  phase4 batch=$batchSize scanned=$tried '
+          'pu_constraints=${pu.constraints.length} '
+          'clone=${cloneMs}ms solve=${solveMs}ms '
+          'r:${currentRatio.toStringAsFixed(3)}→${ratioAfter.toStringAsFixed(3)} '
+          '→ $decision '
+          'remaining=${allConstraints.length} '
+          'reserves=${reserveParams.length}',
+        );
+        lastLoggedTried = tried;
+
+        if (ratioAfter < currentRatio) {
+          for (final c in batch) {
+            pu.addConstraint(c);
+          }
+          // Promote the just-solved clone as the new cumulative state
+          // — no additional solve needed.
+          bossSolvedState = cloned;
+          currentRatio = ratioAfter;
+          consecutiveFailures = 0;
+          // Re-shuffle remaining so the next batch is a fresh draw.
+          allConstraints.shuffle(_rng);
+        } else {
+          // Batch didn't help — return its constraints to the pool
+          // and reshuffle so the next batch is a different draw.
+          // `bossSolvedState` stays untouched: rejected constraints
+          // had no effect on it.
+          allConstraints.addAll(batch);
+          allConstraints.shuffle(_rng);
+          consecutiveFailures++;
+          if (consecutiveFailures >= maxConsecutiveFailedBatches) {
+            onLog?.call(
+              '  phase4 stuck after $consecutiveFailures rejected batches, '
+              'attempting refill...',
+            );
+            if (!tryRefillAndResort()) break;
+            consecutiveFailures = 0;
+          }
+        }
+        continue;
+      }
+
+      // ─── Single-candidate path (standard, unchanged) ──────────────
       bool found = false;
       while (allConstraints.isNotEmpty) {
         tried++;
@@ -279,6 +608,17 @@ class PuzzleGenerator {
             currentRatio: currentRatio,
           ),
         );
+        // Throttle phase-4 progress logs to one per 50 tried candidates,
+        // so heavy attempts where many candidates fail to improve the
+        // ratio still emit liveness signal.
+        if (tried - lastLoggedTried >= 50) {
+          onLog?.call(
+            '  phase4 tried=$tried accepted=${pu.constraints.length} '
+            'ratio=${currentRatio.toStringAsFixed(3)} '
+            'remaining=${allConstraints.length}',
+          );
+          lastLoggedTried = tried;
+        }
 
         final constraint = allConstraints.removeAt(0);
         final cloned = pu.clone();
@@ -294,11 +634,23 @@ class PuzzleGenerator {
           pu.addConstraint(constraint);
           currentRatio = ratioAfter;
           found = true;
+          onLog?.call(
+            '  phase4 ACCEPT slug=${constraint.slug} '
+            'tried=$tried accepted=${pu.constraints.length} '
+            'ratio=${currentRatio.toStringAsFixed(3)} '
+            'remaining=${allConstraints.length}',
+          );
+          lastLoggedTried = tried;
           break;
         }
       }
 
-      if (!found) break;
+      if (!found) {
+        // Burned through the current batch without improvement. Try
+        // pulling another batch from reserves; if none, we're done.
+        if (!tryRefillAndResort()) break;
+        continue;
+      }
 
       // Reshuffle and resort remaining constraints
       allConstraints.shuffle(_rng);
@@ -314,6 +666,12 @@ class PuzzleGenerator {
       });
     }
 
+    onLog?.call(
+      'phase4 done: tried=$tried accepted=${pu.constraints.length} '
+      'final ratio=${currentRatio.toStringAsFixed(3)} '
+      'in ${phaseDelta()}ms',
+    );
+
     // Strictly enforce the user-facing required rules (CLI `--require`).
     // Target-pushed `preferredSlugs` are NOT enforced here — if the iterative
     // loop never picked them, the puzzle is still credited to whatever bin it
@@ -326,20 +684,50 @@ class PuzzleGenerator {
       }
     }
 
-    // Compute the solved ratio (not the raw pre-filled ratio)
-    final solvedPu = pu.clone();
-    solvedPu.solve();
-    currentRatio = solvedPu.computeRatio();
+    // Compute the solved ratio (not the raw pre-filled ratio).
+    //
+    // In boss mode this whole pass is redundant: `bossSolvedState` is
+    // already the post-propagation state for `pu.constraints` and we
+    // already know `currentRatio` matches it. We just reuse it instead
+    // of cloning + re-solving 600 cells.
+    final Puzzle solvedPu;
+    if (config.useBossPrefill && bossSolvedState != null) {
+      solvedPu = bossSolvedState;
+      currentRatio = bossSolvedState.computeRatio();
+      onLog?.call(
+        'phase6 (boss): reusing bossSolvedState '
+        'ratio=${currentRatio.toStringAsFixed(3)} '
+        'pu_constraints=${pu.constraints.length} '
+        'phaseTotal=${phaseDelta()}ms',
+      );
+    } else {
+      solvedPu = pu.clone();
+      final phase6Sw = Stopwatch()..start();
+      solvedPu.solve(tryForce: !config.useBossPrefill);
+      final phase6SolveMs = phase6Sw.elapsedMilliseconds;
+      currentRatio = solvedPu.computeRatio();
+      onLog?.call(
+        'phase6 deductive solve: ratio=${currentRatio.toStringAsFixed(3)} '
+        'solve=${phase6SolveMs}ms pu_constraints=${pu.constraints.length} '
+        'phaseTotal=${phaseDelta()}ms',
+      );
+    }
     if (currentRatio > 0.25) {
       onReject?.call(GenerationRejectReason.ratioTooHigh, pu);
       return null;
     }
 
     if (currentRatio > 0) {
-      // Fill remaining cells from solution
-      final cloned = pu.clone();
-      cloned.solve();
-      for (final (_, idx) in cloned.freeCells()) {
+      // Fill remaining cells from solution. In boss mode `solvedPu` is
+      // `bossSolvedState` itself — no need to re-clone-and-solve.
+      final Puzzle reference;
+      if (config.useBossPrefill && bossSolvedState != null) {
+        reference = bossSolvedState;
+      } else {
+        reference = pu.clone();
+        reference.solve(tryForce: !config.useBossPrefill);
+      }
+      for (final (_, idx) in reference.freeCells()) {
         pu.cells[idx].setForSolver(solvedValues[idx]);
         pu.cells[idx].readonly = true;
       }
@@ -353,12 +741,23 @@ class PuzzleGenerator {
     // We use `solveExplained` rather than `isDeductivelyUnique`/`solve`
     // because the trace it produces is also what the level classifier
     // needs — running both would mean two solves for the same answer.
-    final steps = pu.solveExplained();
+    //
+    // In boss mode we propagate-only here too — force is intractable on
+    // 30×20 (see batch loop comments above). Trace will only contain
+    // propagation steps, and the puzzle is accepted iff propagation
+    // alone closes it.
+    final phase8Sw = Stopwatch()..start();
+    final steps = pu.solveExplained(tryForce: !config.useBossPrefill);
+    final solveExplainedMs = phase8Sw.elapsedMilliseconds;
     final replay = pu.clone();
     for (final s in steps) {
       replay.setValue(s.cellIdx, s.value);
     }
     final isUnique = replay.complete && replay.check(saveResult: false).isEmpty;
+    onLog?.call(
+      'phase8 solveExplained: steps=${steps.length} unique=$isUnique '
+      'solveExplained=${solveExplainedMs}ms phaseTotal=${phaseDelta()}ms',
+    );
     if (!isUnique) {
       onReject?.call(GenerationRejectReason.notUnique, pu);
       return null;
@@ -411,8 +810,12 @@ class PuzzleGenerator {
       }
       // Reuse simplify's final trace for sort if it ran — it's a
       // fresher signal than `steps` (which predates any graft).
+      // Skipped in boss mode: large grids accept verbose constraint
+      // sets, and the sort cost is non-negligible on 30×20+.
       if (simplifyResult != null) {
-        pu.sortConstraintsByDifficulty(simplifyResult.finalSteps);
+        if (!config.useBossPrefill) {
+          pu.sortConstraintsByDifficulty(simplifyResult.finalSteps);
+        }
         return (line: pu.lineExport(), level: level);
       }
     }
@@ -427,7 +830,14 @@ class PuzzleGenerator {
     // fresh parse would see. The asset-routing may sit one tier high
     // for borderline puzzles — acceptable trade-off vs paying a full
     // re-solve here.
-    pu.sortConstraintsByDifficulty(steps);
+    //
+    // Boss mode skips this final sort entirely: with batch addition
+    // the constraint set can carry "passenger" constraints we don't
+    // want to spend cycles reordering, and boss puzzles aren't held
+    // to the easier-first invariant.
+    if (!config.useBossPrefill) {
+      pu.sortConstraintsByDifficulty(steps);
+    }
 
     return (line: pu.lineExport(), level: level);
   }
@@ -538,6 +948,204 @@ class PuzzleGenerator {
         _defaultDomain[_rng.nextInt(_defaultDomain.length)],
       );
     }
+    return solved;
+  }
+
+  /// Experimental "seed-and-grow" prefill used for large "Boss" grids.
+  ///
+  /// Phase 1 (until ~70% of cells are filled): plant seeds — choose an
+  /// empty cell weighted by Chebyshev distance to the nearest edge AND to
+  /// the nearest already-filled cell (so seeds spread away from borders
+  /// and from each other). Assign a random color and a target group size
+  /// in [_bossMinGroupSize, _bossMaxGroupSize], then grow the seed by
+  /// painting random free neighbours until the target is reached (or the
+  /// group runs out of free neighbours).
+  ///
+  /// Phase 2 (remaining ~30%): paint every still-empty cell with a random
+  /// colour. This can grow some of the seeded groups (when the random
+  /// colour matches a neighbouring seeded group's colour). Then, for each
+  /// seeded pivot, recompute the actual final group size and post a
+  /// `GroupSize` constraint reflecting reality — so the player still has
+  /// the deductive pressure of a known group size, just with the
+  /// final-after-fill value.
+  ///
+  /// Phase 3 (in `generateOne`, unchanged): the standard iterative loop
+  /// adds more constraints until the puzzle is uniquely deductive.
+  ///
+  /// Debug: dumps the post-prefill state to `/tmp/boss_prefill_<ts>.txt`
+  /// so we can inspect blob shapes visually before phase 3 runs. To be
+  /// removed (or gated behind a debug flag) once the algorithm is
+  /// validated — see plan "Hors scope".
+  static Puzzle _preFillBoss(int width, int height) {
+    const fillRatio = 0.70;
+    const minGroupSize = 15;
+    const maxGroupSize = 25;
+    // After phase 2a's random fill, many seeds end up sharing the same
+    // connected component (their identical-colour blobs merge through the
+    // random fill). Posting one GS per seed in that case yields N copies
+    // of the same "this component has size K" statement. We cap the
+    // number of GS constraints that can target the same component to
+    // [maxSameGroup] to keep the constraint set lean.
+    const maxSameGroup = 3;
+
+    final solved = Puzzle.empty(width, height, _defaultDomain);
+    final size = width * height;
+    final targetFilled = (size * fillRatio).round();
+
+    // Distance to the nearest edge in Chebyshev metric: 0 on the border,
+    // grows toward the centre. Used as the seed-weight floor.
+    int distToEdge(int idx) {
+      final x = idx % width;
+      final y = idx ~/ width;
+      return min(min(x, width - 1 - x), min(y, height - 1 - y));
+    }
+
+    // BFS-based Chebyshev distance from every cell to the nearest filled
+    // cell. Recomputed before each seed (cheap: O(size)). Empty grid →
+    // returns -1 everywhere, signaling "no constraint from this term".
+    List<int> distToFilled() {
+      final dist = List<int>.filled(size, -1);
+      final queue = <int>[];
+      for (int i = 0; i < size; i++) {
+        if (solved.cells[i].value != 0) {
+          dist[i] = 0;
+          queue.add(i);
+        }
+      }
+      if (queue.isEmpty) return dist;
+      // BFS in Chebyshev metric: include the 4 axis neighbours plus the 4
+      // diagonals so the metric matches `distToEdge`.
+      int head = 0;
+      while (head < queue.length) {
+        final cur = queue[head++];
+        final cx = cur % width;
+        final cy = cur ~/ width;
+        for (int dy = -1; dy <= 1; dy++) {
+          for (int dx = -1; dx <= 1; dx++) {
+            if (dx == 0 && dy == 0) continue;
+            final nx = cx + dx;
+            final ny = cy + dy;
+            if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+            final nIdx = ny * width + nx;
+            if (dist[nIdx] != -1) continue;
+            dist[nIdx] = dist[cur] + 1;
+            queue.add(nIdx);
+          }
+        }
+      }
+      return dist;
+    }
+
+    // Pick a free cell with weight = min(distToEdge, distToFilled). +1 so
+    // border cells still have a tiny chance to be picked — pure 0 would
+    // make the first growth step on an edge-only board impossible.
+    int? pickSeed() {
+      final dEdge = List<int>.generate(size, distToEdge);
+      final dFilled = distToFilled();
+      final weights = List<double>.filled(size, 0);
+      double total = 0;
+      for (int i = 0; i < size; i++) {
+        if (solved.cells[i].value != 0) continue;
+        final fillTerm = dFilled[i] == -1 ? dEdge[i] : dFilled[i];
+        // +1 to keep weights strictly positive for free cells.
+        final w = (min(dEdge[i], fillTerm) + 1).toDouble();
+        weights[i] = w;
+        total += w;
+      }
+      if (total <= 0) return null;
+      var r = _rng.nextDouble() * total;
+      for (int i = 0; i < size; i++) {
+        if (weights[i] == 0) continue;
+        r -= weights[i];
+        if (r <= 0) return i;
+      }
+      // Floating-point edge case: fall through to last positive-weight cell.
+      for (int i = size - 1; i >= 0; i--) {
+        if (weights[i] > 0) return i;
+      }
+      return null;
+    }
+
+    int filled = 0;
+    // Tracks seeded pivots → final colour. Phase 2 posts a `GroupSize`
+    // per entry using the post-fill actual group size, so growth during
+    // the random-fill step is absorbed into the constraint value rather
+    // than violating it.
+    final List<({int pivot, int color})> seeds = [];
+
+    // Phase 1: plant seeds and grow.
+    while (filled < targetFilled) {
+      final seed = pickSeed();
+      if (seed == null) break;
+      final color = _defaultDomain[_rng.nextInt(_defaultDomain.length)];
+      final target =
+          minGroupSize + _rng.nextInt(maxGroupSize - minGroupSize + 1);
+      solved.cells[seed].setForSolver(color);
+      filled++;
+      seeds.add((pivot: seed, color: color));
+      final groupCells = <int>[seed];
+
+      while (groupCells.length < target) {
+        // Collect free 4-neighbours of every cell in the current group.
+        final frontier = <int>{};
+        for (final c in groupCells) {
+          for (final n in solved.getNeighbors(c)) {
+            if (solved.cells[n].value == 0) frontier.add(n);
+          }
+        }
+        if (frontier.isEmpty) break;
+        final frontierList = frontier.toList();
+        final pick = frontierList[_rng.nextInt(frontierList.length)];
+        solved.cells[pick].setForSolver(color);
+        groupCells.add(pick);
+        filled++;
+        if (filled >= size) break;
+      }
+      if (filled >= size) break;
+    }
+
+    // Phase 2a: random-fill the remaining ~30%.
+    for (int i = 0; i < size; i++) {
+      if (solved.cells[i].value != 0) continue;
+      solved.cells[i].setForSolver(
+        _defaultDomain[_rng.nextInt(_defaultDomain.length)],
+      );
+    }
+
+    // Phase 2b: post one `GroupSize` per seed, using the post-fill actual
+    // size of the connected same-colour blob anchored at the pivot. We
+    // walk the connected component directly (BFS over same-colour
+    // 4-neighbours) rather than calling `getGroups()` — we only need one
+    // group per pivot, and `getMyColorGroup` is just 1-ring deep.
+    //
+    // Components are identified by their smallest cell index (canonical
+    // pivot). We cap GS constraints per component at `maxSameGroup` to
+    // avoid posting N redundant copies of the same statement when several
+    // seeds collapsed into one component during phase 2a.
+    final componentCounts = <int, int>{};
+    for (final seed in seeds) {
+      final pivot = seed.pivot;
+      final color = solved.cells[pivot].value;
+      final visited = <int>{pivot};
+      final stack = <int>[pivot];
+      int canonical = pivot;
+      while (stack.isNotEmpty) {
+        final cur = stack.removeLast();
+        if (cur < canonical) canonical = cur;
+        for (final n in solved.getNeighbors(cur)) {
+          if (visited.contains(n)) continue;
+          if (solved.cells[n].value != color) continue;
+          visited.add(n);
+          stack.add(n);
+          if (n < canonical) canonical = n;
+        }
+      }
+      final count = componentCounts[canonical] ?? 0;
+      if (count >= maxSameGroup) continue;
+      componentCounts[canonical] = count + 1;
+      solved.addConstraint(GroupSize('$pivot.${visited.length}'));
+    }
+
     return solved;
   }
 }

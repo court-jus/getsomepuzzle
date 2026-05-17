@@ -174,7 +174,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (mounted) setState(() {});
     });
     initialize();
-    _saveTimer = Timer.periodic(const Duration(seconds: 60), (tmr) {
+    // Periodic stats persistence heartbeat. `writeStats` re-reads every
+    // stats file before merging + writing
+    _saveTimer = Timer.periodic(const Duration(minutes: 5), (tmr) {
       if (database == null) return;
       database!.writeStats();
     });
@@ -335,10 +337,46 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       database!.playlist.length,
       progressRestoredText: AppLocalizations.of(context)!.progressRestored,
     );
-    if (settings.hintType == HintType.addConstraint) {
+    _applyHintsEnabledSetting();
+    _applyGrayoutSetting();
+    if (settings.hintsEnabled && settings.hintType == HintType.addConstraint) {
       game.startHintConstraintComputation();
     }
     _surfaceNewConstraintsIfAny(puz);
+  }
+
+  /// Push `settings.grayoutEnabled` onto the current puzzle and refresh
+  /// the per-constraint `isComplete` flags accordingly:
+  ///   - disabled → every `isComplete` forced to `false` so widgets
+  ///     render full opacity. The per-tap scan is skipped from now on.
+  ///   - enabled  → re-run `updateConstraintStatus` so the grayout
+  ///     reappears immediately on already-satisfied constraints.
+  void _applyGrayoutSetting() {
+    final p = game.currentPuzzle;
+    if (p == null) return;
+    p.grayoutEnabled = settings.grayoutEnabled;
+    // `updateConstraintStatus` handles both branches now: it clears
+    // every `isComplete` when grayout is disabled, or recomputes
+    // `isCompleteFor` when re-enabled.
+    p.updateConstraintStatus();
+    // Notify ChangeNotifier listeners (the constraint widgets repaint
+    // through `game.addListener` in `initState`). The `setState` at
+    // the call site only rebuilds the local Scaffold subtree — without
+    // this, a constraint widget that listens directly to `game`
+    // wouldn't see the new `isComplete` until the next mutation.
+    game.refresh();
+  }
+
+  /// Push `settings.hintsEnabled` onto the GameModel. When disabled, the
+  /// three post-mutation hint pre-computes early-return — no
+  /// `findAMove`, no `HintWorker`, no `HintRankWorker` on every tap.
+  /// When toggled off mid-game we also cancel any in-flight worker so
+  /// it doesn't deliver a stale result.
+  void _applyHintsEnabledSetting() {
+    game.hintsEnabled = settings.hintsEnabled;
+    if (!settings.hintsEnabled) {
+      game.cancelHintConstraintComputation();
+    }
   }
 
   /// If the puzzle declares constraint slugs the player has never
@@ -686,9 +724,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   bool _isHintButtonEnabled() {
-    // Tap 1 of the hint flow must always be available so the player can
-    // surface errors / "all correct" feedback regardless of mode.
-    return game.currentPuzzle != null;
+    // Tap 1 of the hint flow surfaces errors / "all correct" feedback,
+    // so we keep it available by default. The `hintsEnabled` opt-out
+    // disables it for very large grids (boss puzzles) where running
+    // the solver from the UI would lock the app for many seconds.
+    return game.currentPuzzle != null && settings.hintsEnabled;
   }
 
   // ---------------------------------------------------------------------------
@@ -945,6 +985,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 if (newValue.idleTimeout != null) {
                   game.idleTimeoutDuration = settings.idleTimeoutDuration;
                   game.rearmIdleTimer();
+                }
+                if (newValue.grayoutEnabled != null) {
+                  _applyGrayoutSetting();
+                  setState(() {});
+                }
+                if (newValue.hintsEnabled != null) {
+                  _applyHintsEnabledSetting();
+                  setState(() {});
                 }
                 // Recompute immediately when auto is toggled on, so
                 // the player doesn't have to finish a puzzle first.

@@ -19,6 +19,8 @@ class ChangeableSettings {
   IdleTimeout? idleTimeout;
   int? playerLevel;
   bool? autoLevel;
+  bool? hintsEnabled;
+  bool? grayoutEnabled;
 
   ChangeableSettings({
     this.validateType,
@@ -28,11 +30,13 @@ class ChangeableSettings {
     this.idleTimeout,
     this.playerLevel,
     this.autoLevel,
+    this.hintsEnabled,
+    this.grayoutEnabled,
   });
 
   @override
   String toString() {
-    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}";
+    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}; HintsOn: $hintsEnabled; GrayoutOn: $grayoutEnabled";
   }
 }
 
@@ -45,6 +49,18 @@ class Settings {
   int playerLevel;
   bool autoLevel;
 
+  /// When `false`, the hint button (and the underlying solver-on-demand
+  /// it triggers) is disabled. Lets the player opt out of in-app solving
+  /// on very large grids ("boss" puzzles, 30×20+) where running the
+  /// solver from the UI would lock the app for many seconds.
+  bool hintsEnabled;
+
+  /// When `false`, the per-tap `Puzzle.updateConstraintStatus` scan is
+  /// skipped and every constraint stays at full opacity. Same intent as
+  /// `hintsEnabled`: dodge solver-side work that scales poorly on
+  /// large boss grids.
+  bool grayoutEnabled;
+
   final log = Logger("Settings");
 
   Settings({
@@ -55,11 +71,13 @@ class Settings {
     this.idleTimeout = IdleTimeout.disabled,
     this.playerLevel = 0,
     this.autoLevel = true,
+    this.hintsEnabled = true,
+    this.grayoutEnabled = true,
   });
 
   @override
   String toString() {
-    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Hint: ${hintType.name}; Idle: ${idleTimeout.name}";
+    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Hint: ${hintType.name}; Idle: ${idleTimeout.name}; HintsOn: $hintsEnabled";
   }
 
   /// Duration corresponding to the current [idleTimeout], or null when the
@@ -127,6 +145,8 @@ class Settings {
     );
     playerLevel = prefs.getInt("settingsPlayerLevel") ?? 0;
     autoLevel = prefs.getBool("settingsAutoLevel") ?? true;
+    hintsEnabled = prefs.getBool("settingsHintsEnabled") ?? true;
+    grayoutEnabled = prefs.getBool("settingsGrayoutEnabled") ?? true;
   }
 
   Future<void> save() async {
@@ -138,6 +158,8 @@ class Settings {
     prefs.setString("settingsIdleTimeout", idleTimeout.name);
     prefs.setInt("settingsPlayerLevel", playerLevel);
     prefs.setBool("settingsAutoLevel", autoLevel);
+    prefs.setBool("settingsHintsEnabled", hintsEnabled);
+    prefs.setBool("settingsGrayoutEnabled", grayoutEnabled);
   }
 
   void change(ChangeableSettings newValue) {
@@ -161,6 +183,12 @@ class Settings {
     }
     if (newValue.autoLevel != null) {
       autoLevel = newValue.autoLevel!;
+    }
+    if (newValue.hintsEnabled != null) {
+      hintsEnabled = newValue.hintsEnabled!;
+    }
+    if (newValue.grayoutEnabled != null) {
+      grayoutEnabled = newValue.grayoutEnabled!;
     }
     save();
   }

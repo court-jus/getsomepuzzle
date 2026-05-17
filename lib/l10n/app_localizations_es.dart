@@ -190,6 +190,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsLiveCheckTypeComplete => 'Esperar';
 
   @override
+  String get settingHintsEnabled => 'Activar las pistas';
+
+  @override
+  String get settingGrayoutEnabled => 'Atenuar las restricciones completas';
+
+  @override
   String get settingHintType => 'Pistas';
 
   @override

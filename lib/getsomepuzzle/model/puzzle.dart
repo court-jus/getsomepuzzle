@@ -536,7 +536,27 @@ class Puzzle {
     return result;
   }
 
+  /// When `false`, `updateConstraintStatus` skips the per-constraint
+  /// `isCompleteFor` scan and explicitly clears `isComplete` on every
+  /// constraint so widgets render them at full opacity. Lets the
+  /// player opt out of the per-tap scan, which iterates every
+  /// constraint on every `setValue` — fine on small grids, but
+  /// noticeable on boss puzzles where several constraints walk the
+  /// full grid (GS, SY, EY, …).
+  bool grayoutEnabled = true;
+
   void updateConstraintStatus() {
+    if (!grayoutEnabled) {
+      // Defensive: even if `isComplete` was set true by a code path
+      // we don't fully control (constraint instance shared across
+      // clones, legacy load order, etc.), clear it on every call so a
+      // tap is always enough to surface the "no grayout" state.
+      // Cheap: O(constraints) bool writes, no `isCompleteFor`.
+      for (final constraint in constraints) {
+        constraint.isComplete = false;
+      }
+      return;
+    }
     for (final constraint in constraints) {
       constraint.isComplete = constraint.isCompleteFor(this);
     }
@@ -585,7 +605,17 @@ class Puzzle {
   /// Next deducible move, or null if stuck. Does not mutate `this`.
   /// [checkErrors] returns a corrective move for invalid constraints (UI-only).
   /// [tryForce] enables the force fallback when propagation is stuck.
-  Move? findAMove({bool checkErrors = true, bool tryForce = true}) {
+  /// [onForceProgress] is an opt-in instrumentation hook for the force
+  /// scan. It is called periodically inside [_forceOneCell] with
+  /// `(cellsScanned, totalFreeCells, elapsedMs)`. Use it from the
+  /// generator on big grids to see where the time goes — force has to
+  /// clone the puzzle once per (cell, value) pair.
+  Move? findAMove({
+    bool checkErrors = true,
+    bool tryForce = true,
+    void Function(int cellsScanned, int totalFreeCells, int elapsedMs)?
+    onForceProgress,
+  }) {
     if (checkErrors) {
       final hasErrors = check(saveResult: false);
       if (hasErrors.isNotEmpty) {
@@ -599,7 +629,7 @@ class Puzzle {
     final easyMove = apply();
     if (easyMove != null) return easyMove;
     if (!tryForce) return null;
-    return _forceOneCell();
+    return _forceOneCell(onForceProgress);
   }
 
   /// Try setting each free cell to each domain value on a fresh clone; if a
@@ -612,9 +642,17 @@ class Puzzle {
   /// 10-step cascade when a 1-step refutation existed elsewhere on the
   /// grid. Short-circuits as soon as a depth-0 refutation is found (can't
   /// do better).
-  Move? _forceOneCell() {
+  Move? _forceOneCell(
+    void Function(int cellsScanned, int totalFreeCells, int elapsedMs)?
+    onProgress,
+  ) {
     Move? best;
     int bestDepth = -1;
+    final sw = onProgress == null ? null : (Stopwatch()..start());
+    final totalFree = onProgress == null
+        ? 0
+        : cells.where((c) => c.value == 0).length;
+    int scannedFree = 0;
     for (final (idx, cell) in cells.indexed) {
       if (cell.value != 0) continue;
       for (final value in domain) {
@@ -665,6 +703,13 @@ class Puzzle {
           if (bestDepth == 0) return best;
         }
       }
+      scannedFree++;
+      if (onProgress != null && scannedFree % 10 == 0) {
+        onProgress(scannedFree, totalFree, sw!.elapsedMilliseconds);
+      }
+    }
+    if (onProgress != null) {
+      onProgress(scannedFree, totalFree, sw!.elapsedMilliseconds);
     }
     return best;
   }
@@ -860,7 +905,11 @@ class Puzzle {
   /// Step-by-step solving trace, returning each deduction made.
   /// Does not modify the puzzle — works on a clone.
   /// If [timeoutMs] is provided, stops after that many milliseconds.
-  List<SolveStep> solveExplained({int? timeoutMs}) {
+  /// If [tryForce] is `false`, only propagation steps are produced
+  /// (no `_forceOneCell` fallback). The trace will be incomplete on
+  /// puzzles that need force to finish, but on big grids the force
+  /// scan is intractable — boss-mode callers pass `false` here.
+  List<SolveStep> solveExplained({int? timeoutMs, bool tryForce = true}) {
     final steps = <SolveStep>[];
     final test = clone();
     final stopwatch = timeoutMs != null ? (Stopwatch()..start()) : null;
@@ -869,7 +918,7 @@ class Puzzle {
 
     for (int step = 0; step < 1000; step++) {
       if (timedOut()) return [];
-      final m = test.findAMove(checkErrors: false);
+      final m = test.findAMove(checkErrors: false, tryForce: tryForce);
       if (m == null || m.isImpossible != null) break;
       test.setValue(m.idx, m.value);
       steps.add(
@@ -891,11 +940,35 @@ class Puzzle {
 
   /// Unified solving: loop `findAMove` until stuck, contradiction, or complete.
   /// Returns true if fully solved.
-  bool solve({int maxSteps = 200}) {
+  ///
+  /// `onIter` is an opt-in instrumentation hook called after every iteration
+  /// of the solve loop, before checking the next move. Receives
+  /// `(iter, findAMoveMs, moveTaken)` where `iter` is the 0-based iteration
+  /// number, `findAMoveMs` is the wall-clock time spent on the latest
+  /// `findAMove` call only, and `moveTaken` is `true` iff a move was
+  /// applied (false on break — `null` move or contradiction). Throttling
+  /// is the caller's responsibility.
+  bool solve({
+    int maxSteps = 200,
+    bool tryForce = true,
+    void Function(int iter, int findAMoveMs, bool moveTaken)? onIter,
+    void Function(int cellsScanned, int totalFreeCells, int elapsedMs)?
+    onForceProgress,
+  }) {
     for (int i = 0; i < maxSteps; i++) {
-      final m = findAMove(checkErrors: false);
-      if (m == null || m.isImpossible != null) break;
+      final sw = onIter == null ? null : (Stopwatch()..start());
+      final m = findAMove(
+        checkErrors: false,
+        tryForce: tryForce,
+        onForceProgress: onForceProgress,
+      );
+      final findMs = sw?.elapsedMilliseconds ?? 0;
+      if (m == null || m.isImpossible != null) {
+        onIter?.call(i, findMs, false);
+        break;
+      }
       setValue(m.idx, m.value);
+      onIter?.call(i, findMs, true);
     }
     return complete && check(saveResult: false).isEmpty;
   }

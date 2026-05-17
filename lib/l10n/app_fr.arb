@@ -63,6 +63,8 @@
     "settingsLiveCheckTypeAll": "Temps réel",
     "settingsLiveCheckTypeCount": "Décompte",
     "settingsLiveCheckTypeComplete": "Attendre",
+    "settingHintsEnabled": "Activer les astuces",
+    "settingGrayoutEnabled": "Griser les contraintes complètes",
     "settingHintType": "Astuces",
     "settingHintTypeDeducibleCell": "Cellule déductible",
     "settingHintTypeAddConstraint": "Ajout de contrainte",

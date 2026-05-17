@@ -80,6 +80,7 @@ class GeneratorWorker {
         jobsCount: jobsCount,
         workerIndex: workerIndex,
         logFilePath: logFilePath,
+        useBossPrefill: config.useBossPrefill,
       ),
     );
 
@@ -134,6 +135,7 @@ class _IsolateParams {
   final int jobsCount;
   final int workerIndex;
   final String? logFilePath;
+  final bool useBossPrefill;
 
   _IsolateParams({
     required this.sendPort,
@@ -155,6 +157,7 @@ class _IsolateParams {
     this.jobsCount = 1,
     this.workerIndex = 0,
     this.logFilePath,
+    this.useBossPrefill = false,
   });
 }
 
@@ -311,6 +314,7 @@ void _isolateEntryPoint(_IsolateParams params) {
           ? PuzzleLevel.values[params.targetLevelIndex!]
           : null,
       easingBudget: Duration(milliseconds: params.easingBudgetMs),
+      useBossPrefill: params.useBossPrefill,
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;
@@ -339,6 +343,7 @@ void _isolateEntryPoint(_IsolateParams params) {
       result = PuzzleGenerator.generateOne(
         config,
         usageStats: usageStats,
+        onLog: log,
         onProgress: (p) {
           lastTried = p.constraintsTried;
           lastTotalConstraints = p.constraintsTotal;
@@ -353,8 +358,12 @@ void _isolateEntryPoint(_IsolateParams params) {
           });
           final now = stopwatch.elapsedMilliseconds;
           if (now - lastProgressLogMs >= progressLogIntervalMs) {
+            // `scanned` is the number of candidates *queued for testing*
+            // so far — `onProgress` fires before the solve, so it doesn't
+            // count completed verifications, only candidates pulled off
+            // `allConstraints`.
             log(
-              '  progress: tried=$lastTried/$lastTotalConstraints '
+              '  progress: scanned=$lastTried/$lastTotalConstraints '
               'ratio=${lastRatio.toStringAsFixed(3)} '
               'elapsed=${now - attemptStartMs}ms',
             );

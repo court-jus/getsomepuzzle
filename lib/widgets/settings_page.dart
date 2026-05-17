@@ -117,6 +117,38 @@ class _SettingsPageState extends State<SettingsPage> {
                         );
                       }),
                     ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(l10n.settingHintsEnabled),
+                        Switch(
+                          value: widget.settings.hintsEnabled,
+                          onChanged: (newValue) {
+                            setState(() {
+                              widget.onSettingsChange(
+                                ChangeableSettings(hintsEnabled: newValue),
+                              );
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(l10n.settingGrayoutEnabled),
+                        Switch(
+                          value: widget.settings.grayoutEnabled,
+                          onChanged: (newValue) {
+                            setState(() {
+                              widget.onSettingsChange(
+                                ChangeableSettings(grayoutEnabled: newValue),
+                              );
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                     _EnumSettingRow<HintType>(
                       label: l10n.settingHintType,
                       value: widget.settings.hintType,
