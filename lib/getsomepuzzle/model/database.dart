@@ -151,6 +151,17 @@ class Filters {
   Set<String> bannedFlags;
   final log = Logger("Filters");
 
+  /// Default value of [bannedFlags] for a fresh install or a player who
+  /// never customised the filter. Exposed so widgets can compare the
+  /// live filter to the default (e.g. to grey the "reset" button)
+  /// without re-hardcoding the literal — a future change to the
+  /// default would otherwise silently desync the UI.
+  static const Set<String> defaultBannedFlags = {
+    "played",
+    "skipped",
+    "disliked",
+  };
+
   Filters({
     this.minWidth = 2,
     this.maxWidth = 10,
@@ -161,7 +172,7 @@ class Filters {
     this.wantedRules = const {},
     this.bannedRules = const {},
     this.wantedFlags = const {},
-    this.bannedFlags = const {"played", "skipped", "disliked"},
+    this.bannedFlags = defaultBannedFlags,
   });
 
   Future<void> load() async {
@@ -178,7 +189,7 @@ class Filters {
       wantedFlags = (prefs.getStringList("wantedFlagsFilter") ?? []).toSet();
       bannedFlags =
           (prefs.getStringList("bannedFlagsFilter") ??
-                  ["played", "skipped", "disliked"])
+                  defaultBannedFlags.toList())
               .toSet();
       // Cleanup of obsolete keys (cplx filter replaced by adaptive player level).
       await prefs.remove("minCplxFilter");

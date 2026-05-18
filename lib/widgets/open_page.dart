@@ -294,11 +294,12 @@ class _OpenPageState extends State<OpenPage> {
 
   @override
   Widget build(BuildContext context) {
-    final Set<String> defaultWFlags = {};
-    final Set<String> defaultBFlags = {"played", "skipped", "disliked"};
     final bool flagsAreDefault =
-        setEquals(widget.database.currentFilters.wantedFlags, defaultWFlags) &&
-        setEquals(widget.database.currentFilters.bannedFlags, defaultBFlags);
+        widget.database.currentFilters.wantedFlags.isEmpty &&
+        setEquals(
+          widget.database.currentFilters.bannedFlags,
+          Filters.defaultBannedFlags,
+        );
     final bool rulesAreDefault =
         widget.database.currentFilters.wantedRules.isEmpty &&
         widget.database.currentFilters.bannedRules.isEmpty;
@@ -587,9 +588,9 @@ class _OpenPageState extends State<OpenPage> {
                                             ? null
                                             : () {
                                                 applyFilter(
-                                                  newWFlags: defaultWFlags
-                                                      .toList(),
-                                                  newBFlags: defaultBFlags
+                                                  newWFlags: const [],
+                                                  newBFlags: Filters
+                                                      .defaultBannedFlags
                                                       .toList(),
                                                 );
                                               },
