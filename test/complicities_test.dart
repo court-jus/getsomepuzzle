@@ -5,11 +5,11 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsall.dart'
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsgs.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/ltfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/ltgs.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/pafm.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/pa_balanced_side.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/shgs.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/syfm.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
@@ -64,20 +64,25 @@ void main() {
     },
   );
 
-  group('PAFMComplicity', () {
+  group('PABalancedSideComplicity', () {
     test('detected with vertical FM + top PA', () {
       // 3x3, FM:2.1 forces columns to read `1* 2*` (top to bottom).
       // PA:8.top = parity on column 2 above cell 8 (rows 0..1, length 2).
       final puzzle = Puzzle('v2_12_3x3_000000000_FM:2.1;PA:8.top_0:0_100');
-      expect(puzzle.complicities.whereType<PAFMComplicity>(), hasLength(1));
+      expect(
+        puzzle.complicities.whereType<PABalancedSideComplicity>(),
+        hasLength(1),
+      );
     });
 
     test('apply forces vertical pattern (FM:2.1, PA:8.top)', () {
       // Top side of length 2 on column 2: cells [2, 5]. Pattern is
       // (1, 2) → cell 2 must be 1 (first half), cell 5 must be 2.
       final puzzle = Puzzle('v2_12_3x3_000000000_FM:2.1;PA:8.top_0:0_100');
-      final pafm = puzzle.complicities.whereType<PAFMComplicity>().first;
-      final move = pafm.apply(puzzle);
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      final move = pabs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 2);
       expect(move.value, 1);
@@ -89,8 +94,10 @@ void main() {
       // segment to the right of cell 0 — cells [1, 2] on a 3x3 grid.
       // First half = 1, second half = 2 → cell 1 must be 1.
       final puzzle = Puzzle('v2_12_3x3_000000000_FM:21;PA:0.right_0:0_100');
-      final pafm = puzzle.complicities.whereType<PAFMComplicity>().first;
-      final move = pafm.apply(puzzle);
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      final move = pabs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 1);
       expect(move.value, 1);
@@ -101,8 +108,10 @@ void main() {
       // restrict any vertical configuration of the side, so every
       // balanced colouring survives the enumeration → no force.
       final puzzle = Puzzle('v2_12_3x3_000000000_FM:21;PA:8.top_0:0_100');
-      final pafm = puzzle.complicities.whereType<PAFMComplicity>().first;
-      expect(pafm.apply(puzzle), isNull);
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      expect(pabs.apply(puzzle), isNull);
     });
 
     test('apply returns null when FM does not bind on the side', () {
@@ -111,8 +120,10 @@ void main() {
       // 2,1 are both safe for FM:11 (no horizontal pair of 1s either
       // way). Both survive → nothing forced.
       final puzzle = Puzzle('v2_12_3x3_000000000_FM:11;PA:0.right_0:0_100');
-      final pafm = puzzle.complicities.whereType<PAFMComplicity>().first;
-      expect(pafm.apply(puzzle), isNull);
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      expect(pabs.apply(puzzle), isNull);
     });
 
     test('skips already-correct cells and fills the next empty one', () {
@@ -126,8 +137,10 @@ void main() {
       final puzzle = Puzzle(
         'v2_12_5x5_0010000000000000000000000_FM:2.1;PA:22.top_0:0_100',
       );
-      final pafm = puzzle.complicities.whereType<PAFMComplicity>().first;
-      final move = pafm.apply(puzzle);
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      final move = pabs.apply(puzzle);
       expect(move, isNotNull);
       // Column 2 indices on a 5-wide grid: [2, 7, 12, 17, 22].
       // Anchor 22 → top side rows 0..3 → [2, 7, 12, 17]. Cell 2 is
@@ -146,8 +159,10 @@ void main() {
       final puzzle = Puzzle(
         'v2_12_3x5_000000000000000_PA:13.top;FM:1.2.2_0:0_100',
       );
-      final pafm = puzzle.complicities.whereType<PAFMComplicity>().first;
-      expect(pafm.apply(puzzle), isNull);
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      expect(pabs.apply(puzzle), isNull);
     });
 
     test(
@@ -161,8 +176,10 @@ void main() {
         final puzzle = Puzzle(
           'v2_12_3x5_010000000000000_PA:13.top;FM:1.2.2_0:0_100',
         );
-        final pafm = puzzle.complicities.whereType<PAFMComplicity>().first;
-        final move = pafm.apply(puzzle);
+        final pabs = puzzle.complicities
+            .whereType<PABalancedSideComplicity>()
+            .first;
+        final move = pabs.apply(puzzle);
         expect(move, isNotNull);
         expect(move!.idx, 4);
         expect(move.value, 2);
@@ -177,8 +194,10 @@ void main() {
       final puzzle = Puzzle(
         'v2_12_3x3_000000000_PA:0.right;FM:12;FM:21_0:0_100',
       );
-      final pafm = puzzle.complicities.whereType<PAFMComplicity>().first;
-      final move = pafm.apply(puzzle);
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      final move = pabs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNotNull);
     });
@@ -192,12 +211,72 @@ void main() {
       // on cell 6, the trailing 1 lines up with the pre-coloured cell
       // 7). Only (3=2, 4=1) survives → cell 3 is forced to 2.
       final puzzle = Puzzle('v2_12_3x3_000000010_FM:12.01;PA:5.left_0:0_100');
-      final pafm = puzzle.complicities.whereType<PAFMComplicity>().first;
-      final move = pafm.apply(puzzle);
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      final move = pabs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 3);
       expect(move.value, 2);
       expect(move.complexity, 3);
+    });
+
+    test('apply filters by LT when two LT cells lie on the PA side', () {
+      // 5x2 grid, row 0 = `0 0 0 2 0`, row 1 empty. Cell 3 = white (2).
+      // LT:B.0.1 ties cells 0 and 1 to the same colour. PA:4.left
+      // covers the row-0 side {0, 1, 2, 3} with target 2/2.
+      //
+      // Of the C(3,2)=3 balanced configs over the free cells {0,1,2}:
+      //   - 0=1, 1=1, 2=2 → LT OK (0 and 1 agree).        SURVIVES.
+      //   - 0=1, 1=2, 2=1 → LT VIOLATED (0 and 1 differ). REJECTED.
+      //   - 0=2, 1=1, 2=1 → LT VIOLATED.                  REJECTED.
+      // Single survivor → every free cell is forced. apply() returns
+      // the first free position, cell 0, with value 1.
+      //
+      // Before the fix, `LetterGroup.verify` was too lax on partial
+      // states (returned true whenever the puzzle was incomplete) and
+      // the PA enumerator did not filter by LT at all, so this state
+      // only resolved through the force phase.
+      final puzzle = Puzzle('v2_12_5x2_0002000000_LT:B.0.1;PA:4.left_0:0_100');
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      final move = pabs.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.idx, 0);
+      expect(move.value, 1);
+      expect(move.complexity, 3);
+      // Rejection slug should be LT (no FM in the puzzle), letting the
+      // hint UI render "PA + LT" instead of the generic "PA + other".
+      expect((move.givenBy as PABalancedSideComplicity).slugs, ('PA', 'LT'));
+    });
+
+    test('apply combines FM and LT filters; rejector slug is the wildcard', () {
+      // Two filters must reject *different* configs for the wildcard
+      // tag to fire — if they both reject the same config, the first
+      // filter to fire (FM here) short-circuits the second and the
+      // rejectingSlugs set ends up as a singleton.
+      //
+      // 5x2 grid, cell 3 = black (1). LT:B.0.1 ties cells 0 and 1.
+      // FM:22 forbids the horizontal motif "2 2". PA:4.left covers
+      // the row-0 side {0, 1, 2, 3} with target 2 black / 2 white;
+      // cell 3 is already black so we need 1 more black + 2 whites
+      // among the free cells {0, 1, 2}. Three balanced configs:
+      //   - 0=1, 1=2, 2=2 → FM REJECTS (cells 1,2 form "2 2").
+      //   - 0=2, 1=1, 2=2 → LT REJECTS (cells 0 and 1 differ).
+      //   - 0=2, 1=2, 2=1 → FM REJECTS (cells 0,1 form "2 2").
+      // Two different constraint types contributed rejections → the
+      // move falls back to the '*' wildcard tag.
+      final puzzle = Puzzle(
+        'v2_12_5x2_0001000000_LT:B.0.1;PA:4.left;FM:22_0:0_100',
+      );
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      final move = pabs.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+      expect((move.givenBy as PABalancedSideComplicity).slugs, ('PA', '*'));
     });
   });
 

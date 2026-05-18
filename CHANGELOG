@@ -1,10 +1,12 @@
 # Get Some Puzzle Release Notes
 
-## Unreleased
+## 1.6.13 (18 May 2026)
 
 * **Help pages** updated with more details about the UI.
 * **Onboarding tightened**: during strict phases, the playlist now only surfaces puzzles that contain the constraint being introduced. Refresh-only puzzles using just previously-learned constraints no longer dilute the 30-puzzle teaching budget.
 * **Hint constraints skipped when useless**: the background pass that searches for a constraint to suggest no longer runs when the puzzle is already fully solvable without one, saving CPU and battery.
+* **Most useful hint first**: when adding a constraint hint, the candidate that unlocks the most cells in one step is now offered first, instead of being picked at random among the useful pool.
+* **Drag stays inside the grid**: dragging past the side of the grid no longer "jumps" the paint to a cell on a different row through index wrap-around.
 
 ## 1.6.12 (16 May 2026)
 

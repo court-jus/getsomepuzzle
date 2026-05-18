@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
@@ -83,11 +83,11 @@ void main() {
       // constraint set changes; otherwise mid-build code that read
       // `complicities` once would freeze the result against an outdated
       // snapshot. Concretely: a puzzle with only FM has no complicity,
-      // adding PA opens up PAFMComplicity.
+      // adding PA opens up PABalancedSideComplicity.
       final p = Puzzle('v2_12_3x3_000000000_FM:2.1_0:0_0');
       expect(p.complicities, isEmpty);
       p.addConstraint(
-        // PA:8.top forms the canonical PAFMComplicity pair with FM:2.1.
+        // PA:8.top forms the canonical PABalancedSideComplicity pair with FM:2.1.
         // Built by createConstraint via the registry.
         _buildConstraint('PA', '8.top'),
       );

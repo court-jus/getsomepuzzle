@@ -164,7 +164,7 @@ Out of 709 unsolved puzzles (`0:0_100` in `assets/default.txt`):
 Numbers should be re-measured against current `assets/default.txt`
 once more complicities ship.
 
-## Complicity: PA + FM (Parity × Motif filtering)
+## Complicity: PA + (FM | LT) — PA balanced-side enumeration
 
 ### Reasoning
 
@@ -174,40 +174,70 @@ coloured 1 and `n/2` coloured 2.
 
 For each PA side we **enumerate every balanced colouring** of the
 free cells and **drop those that would violate any
-`ForbiddenMotif`** anywhere on the grid (in interaction with the
-already-coloured cells, including the side's free cells filled by
-the simulation). Any free cell that takes the same value across
-*every* surviving configuration is forced.
+`ForbiddenMotif` or `LetterGroup`** anywhere on the grid (in
+interaction with the already-coloured cells, including the side's
+free cells filled by the simulation). Any free cell that takes the
+same value across *every* surviving configuration is forced.
 
-The classical 2-cell-mixed-FM case (`FM:12` makes rows read `2* 1*`,
-etc.) is a special case: only the monotone configuration survives,
-so every empty cell is forced. But the same enumeration handles much
-more:
+The complicity is called `PABalancedSideComplicity` — generic in the
+constraint type that does the filtering. Two filter families are
+currently wired:
 
-- **3+ cell FMs** (`FM:1.2.2`, `FM:11.21.11`, …) — partial filtering
-  rather than monotonicity. The force fires only on cells where every
-  survivor agrees; chained reasoning (another constraint colouring
-  one side cell) typically collapses survivors to a single one.
+- **`ForbiddenMotif`** — the classical PA + FM case. Any FM whose
+  motif binds against the side (directly or through wildcards
+  touching off-side coloured cells) prunes configurations.
+- **`LetterGroup`** — when ≥ 2 LT cells lie on the same PA side, the
+  "same-colour" contract rejects configurations that assign different
+  colours to those cells. Off-side LT cells with an existing colour
+  anchor the LT colour for the side enumeration. Detection uses
+  `LetterGroup.verify`, which returns `false` immediately when any
+  two LT cells carry different colours — even on partial states.
+
+Notable patterns the enumeration handles:
+
+- **2-cell mixed FM** (`FM:12`, `FM:21`, `FM:1.2`, `FM:2.1`) — only
+  the monotone configuration survives, so every empty cell is
+  forced.
+- **3+ cell FMs** (`FM:1.2.2`, `FM:11.21.11`, …) — partial filtering;
+  the force fires only on cells where every survivor agrees.
 - **FMs with wildcards** (`0` cells in the motif) — the pattern can
   bind via the wildcard against an already-coloured cell off the
   side. Example: 3×3 grid, cell 7 = 1, `FM:12.01` (motif
   `[[1,2],[0,1]]`) forbids the 2×2 pattern with `1` at the bottom
   right. With `PA:5.left` on cells `[3, 4]`, the config `(3=1, 4=2)`
-  matches the motif at top-left (1, 0) — wildcard cell 6, fixed cell
-  7 = 1 — so it's rejected. Only `(3=2, 4=1)` survives → cell 3
-  forced to 2.
-- **Multiple FMs** participate jointly in the filter, so combinations
-  no single FM catches alone are still pruned.
+  matches the motif via the wildcard — so it's rejected. Only
+  `(3=2, 4=1)` survives → cell 3 forced to 2.
+- **LT alignment** — 5×2 grid, row 0 = `0 0 0 2 0`, `LT:B.0.1`,
+  `PA:4.left` (side `{0, 1, 2, 3}`, cell 3 = 2 white). The three
+  balanced configs over the free cells `{0, 1, 2}` reduce to a
+  single survivor (0 = 1 = black, 2 = white) because the two
+  "split colour" configs violate the LT contract. Every free cell
+  is forced.
+- **Multiple FMs / LTs** participate jointly in the filter, so
+  combinations no single constraint catches alone are still pruned.
+
+### Slug tagging for hints
+
+The complicity tracks which constraint *type* contributed each
+rejection. When all rejections came from a single type the move's
+`givenBy` carries a tagged instance with the precise pair (e.g.
+`('PA', 'FM')` or `('PA', 'LT')`), so the hint UI renders
+"deducible by combining PA and FM" rather than the generic "PA and
+other". When rejections come from multiple types — typical of
+chained reasoning — the second slug falls back to the `'*'`
+wildcard and the UI renders the "combined with another constraint"
+template.
 
 ### Implementation
 
-See `lib/getsomepuzzle/constraints/complicities/pafm.dart`. The
-enumerator generates every k-combination of "1" positions among the
-free cells of a PA side, instantiates each on a clone, calls
-`ForbiddenMotif.verify` for every FM, and keeps the configurations
-no FM rejects. Force fires when at least one free cell is
-unanimously valued across all survivors. If zero configurations
-survive, the complicity returns an `isImpossible` move.
+See `lib/getsomepuzzle/constraints/complicities/pa_balanced_side.dart`.
+The enumerator generates every k-combination of "1" positions among
+the free cells of a PA side, instantiates each on a clone, calls
+`ForbiddenMotif.verify` then `LetterGroup.verify`, and keeps the
+configurations no filter rejects. Force fires when at least one free
+cell is unanimously valued across all survivors. If zero
+configurations survive, the complicity returns an `isImpossible`
+move.
 
 ### Domain and side-length bounds
 
@@ -603,46 +633,11 @@ violating DF. So the unique colour-2 cell is in {19, 24}, and cells
 Source puzzle:
 `v2_12_5x6_000000000000000000200000000000_SH:11.10;DF:8.right;DF:19.down;SY:28.5;GS:22.1;CC:4.1.4;PA:20.top;GS:14.8_1:112111222121122221222121121121_100`.
 
-### Complicity: PA + LT (Parity × Letter group)
-
-#### Reasoning
-
-A `LetterGroup` forces every listed cell to share the same colour. On a
-domain `{1, 2}` where parity-of-value is the colouring axis, that means
-the LT cells share the same **parity** in any final colouring.
-
-When two or more cells of a single LT lie on the same side of a
-`ParityConstraint`, the parity-balanced enumeration that PA + FM already
-performs can be filtered further: configurations that assign different
-parities to LT-linked cells are invalid. If a single partition survives,
-every free cell in the side is forced.
-
-A "block" view captures the same logic without enumeration: the LT cells
-on a given PA side count as one **same-parity unit** of `k` cells. The
-parity counters on that side become integer linear constraints over
-units rather than cells, and a small case split usually collapses to a
-single feasible split.
-
-#### Concrete example
-
-```
-5-cell row `00020` (cell 3 = 2). Domain {1, 2}.
-LT:B.0.1 — cells 0 and 1 share a colour.
-PA:4.left covers cells {0, 1, 2, 3}, target 2 even / 2 odd.
-
-If {0, 1} are even: side has 3 evens (0, 1, 3) → overshoot, rejected.
-If {0, 1} are odd : side has 1 even, 2 odds → cell 2 must be even.
-
-Surviving config is unique: cells 0, 1 = 1 and cell 2 = 2.
-Neither PA.apply nor LT.apply forces anything on its own at this state.
-```
-
-#### Open question
-
-Whether to implement this as a dedicated `PA + LT` complicity or to
-extend `pafm.dart`'s enumerator to also reject configurations that
-violate any LT (and, by extension, any future "same-colour" constraint
-like SY anchors when both ends sit on the side). The latter is the
-natural generalisation — the current PA-side enumeration already filters
-by every FM, and adding LT as another verifier is a one-line change
-once the enumerator is parametrised by "list of constraints to verify".
+> **Update.** PA + LT was originally listed here as a future
+> complicity. It is now part of `PABalancedSideComplicity` (the PA
+> enumerator filters by both FM and LT — see the section above).
+> The fix that unlocked the LT path was tightening
+> `LetterGroup.verify` so that it returns `false` immediately when
+> two LT cells already carry different colours, instead of waiting
+> for the puzzle to be complete. Same-colour extensions to SY
+> anchors and similar constraints are still open.

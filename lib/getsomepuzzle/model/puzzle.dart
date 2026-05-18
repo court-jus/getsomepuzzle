@@ -6,7 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.dart'
     as complicities_registry;
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';

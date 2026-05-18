@@ -49,7 +49,7 @@ void main() {
   test(
     'solveExplained reports complexity and complicity flag on prop steps',
     () {
-      // FM:2.1;PA:8.top is the canonical PAFMComplicity case (see
+      // FM:2.1;PA:8.top is the canonical PABalancedSideComplicity case (see
       // complicities_test.dart): individual constraints can't deduce
       // cell 2 alone, only the cross-constraint complicity can. So the
       // resolution trace must contain at least one step flagged
@@ -60,7 +60,7 @@ void main() {
       // At least one prop step is flagged as a complicity.
       expect(steps.any((s) => s.isComplicity), isTrue);
       // That complicity step should carry a non-zero complexity tier
-      // (PAFMComplicity defaults to 3).
+      // (PABalancedSideComplicity defaults to 3).
       expect(steps.any((s) => s.isComplicity && s.complexity > 0), isTrue);
       // Force steps never set those fields.
       for (final s in steps.where((s) => s.method == SolveMethod.force)) {

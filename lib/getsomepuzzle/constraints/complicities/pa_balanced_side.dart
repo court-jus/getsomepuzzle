@@ -1,28 +1,32 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-/// PA + FM complicity (generalised): a `ParityConstraint` fixes the
+/// PA + (FM | LT) complicity: a `ParityConstraint` fixes the
 /// composition of one of its sides (n/2 of each colour). For each
 /// such side we enumerate every balanced colouring of the free cells,
-/// drop the ones that would violate any `ForbiddenMotif`, and force
-/// the cells whose value is identical across every survivor.
+/// drop the ones that would violate any `ForbiddenMotif` or
+/// `LetterGroup`, and force the cells whose value is identical across
+/// every survivor.
 ///
-/// This generalises the original 2-cell-FM monotonicity argument:
+/// This generalises the original PA + FM complicity to also cover
+/// PA + LT:
 ///
-/// - 2-cell mixed FM (`FM:12`, `FM:21`, `FM:1.2`, `FM:2.1`) — the
-///   surviving configuration on an aligned PA side is the unique
-///   monotone one, so the force fires on every empty cell.
-/// - 3+ cell FM (`FM:1.2.2`, `FM:11.21.11`, …) — partial filtering;
-///   the force fires only on cells that take the same value in every
-///   surviving configuration. Useful in chained reasoning: another
-///   constraint colouring one cell often collapses the survivor set
-///   to a single configuration.
-/// - Multiple FMs of any sizes — they all participate in the filter
-///   simultaneously, so the complicity captures combinations that no
-///   single FM alone would catch.
+/// - **PA + FM (2-cell mixed FM)** — the surviving configuration on
+///   an aligned PA side is the unique monotone one, so the force
+///   fires on every empty cell.
+/// - **PA + FM (3+ cell FM, multiple FMs)** — partial filtering;
+///   each FM participates in the filter simultaneously.
+/// - **PA + LT** — when two or more cells of a single LT lie on the
+///   same PA side, configurations that assign different colours to
+///   LT-linked cells are dropped (`LetterGroup.verify` already
+///   detects this on partial states). Off-side LT cells with an
+///   existing colour anchor the LT colour across the side.
+/// - **Mixed FM and LT** — both filters run on every candidate;
+///   complementary cuts often combine to leave a single survivor.
 ///
 /// Domain restriction: the parity-as-colour-counter argument only
 /// holds when the domain is exactly `{1, 2}`.
@@ -30,32 +34,44 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 /// Side length is capped at [_maxSideLen] = 10 (so up to 10×10 grids
 /// are handled in full). `C(10, 5) = 252` configurations is the
 /// practical upper bound on enumeration cost per side.
-class PAFMComplicity extends Complicity {
+class PABalancedSideComplicity extends Complicity {
   static const int _maxSideLen = 10;
 
-  @override
-  String serialize() => "PAFMComplicity";
+  /// Slug of the constraint that explains this particular deduction
+  /// alongside `PA`. Set when [apply] returns a move whose dropped
+  /// configurations were all rejected by the same single constraint
+  /// type (FM, LT, …). Falls back to `'*'` (any) when rejections come
+  /// from multiple types — or when none rejected anything (rare).
+  final String _secondSlug;
+
+  PABalancedSideComplicity([this._secondSlug = '*']);
 
   @override
-  (String, String) get slugs => ('PA', 'FM');
+  String serialize() => "PABalancedSideComplicity";
+
+  @override
+  (String, String) get slugs => ('PA', _secondSlug);
 
   @override
   bool isPresent(Puzzle puzzle) {
     if (!_domainIsOneTwo(puzzle)) return false;
     final pas = puzzle.constraints.whereType<ParityConstraint>();
     if (pas.isEmpty) return false;
-    return puzzle.constraints.whereType<ForbiddenMotif>().isNotEmpty;
+    final hasFm = puzzle.constraints.whereType<ForbiddenMotif>().isNotEmpty;
+    final hasLt = puzzle.constraints.whereType<LetterGroup>().isNotEmpty;
+    return hasFm || hasLt;
   }
 
   @override
   Move? apply(Puzzle puzzle) {
     if (!_domainIsOneTwo(puzzle)) return null;
     final fms = puzzle.constraints.whereType<ForbiddenMotif>().toList();
-    if (fms.isEmpty) return null;
+    final lts = puzzle.constraints.whereType<LetterGroup>().toList();
+    if (fms.isEmpty && lts.isEmpty) return null;
 
     for (final pa in puzzle.constraints.whereType<ParityConstraint>()) {
       for (final side in _sideCellIndices(pa, puzzle)) {
-        final move = _solveSide(side, puzzle, fms);
+        final move = _solveSide(side, puzzle, fms, lts);
         if (move != null) return move;
       }
     }
@@ -65,7 +81,12 @@ class PAFMComplicity extends Complicity {
   /// Run the enumeration on a single PA side and return either an
   /// `isImpossible` move (no surviving config), a force move (all
   /// survivors agree on at least one free cell), or null.
-  Move? _solveSide(List<int> side, Puzzle puzzle, List<ForbiddenMotif> fms) {
+  Move? _solveSide(
+    List<int> side,
+    Puzzle puzzle,
+    List<ForbiddenMotif> fms,
+    List<LetterGroup> lts,
+  ) {
     if (side.isEmpty || side.length.isOdd) return null;
     if (side.length > _maxSideLen) return null;
 
@@ -88,6 +109,11 @@ class PAFMComplicity extends Complicity {
     if (ones < 0 || ones > freePositions.length) return null;
 
     final survivors = <List<int>>[];
+    // Track which constraint *types* rejected at least one config.
+    // Used to tag the returned move so the hint UI can render
+    // "PA + FM", "PA + LT" or "PA + other" rather than always "PA + *".
+    final rejectingSlugs = <String>{};
+
     _enumerate(freePositions.length, ones, (selected) {
       final selSet = selected.toSet();
       final config = List<int>.from(current);
@@ -101,13 +127,22 @@ class PAFMComplicity extends Complicity {
         }
       }
       for (final fm in fms) {
-        if (!fm.verify(clone)) return; // configuration violates an FM
+        if (!fm.verify(clone)) {
+          rejectingSlugs.add('FM');
+          return;
+        }
+      }
+      for (final lt in lts) {
+        if (!lt.verify(clone)) {
+          rejectingSlugs.add('LT');
+          return;
+        }
       }
       survivors.add(config);
     });
 
     if (survivors.isEmpty) {
-      return Move(0, 0, this, isImpossible: this);
+      return _withTag(Move(0, 0, this, isImpossible: this), rejectingSlugs);
     }
     // Partial determination: any free cell that takes the same value
     // in every surviving configuration is forced. With a single
@@ -115,12 +150,30 @@ class PAFMComplicity extends Complicity {
     for (final freePos in freePositions) {
       final v0 = survivors.first[freePos];
       if (survivors.every((s) => s[freePos] == v0)) {
-        // Combination deduction (PA × FMs): two rules in mind at once.
-        // Tier 3 weight per docs/dev/complexity.md.
-        return Move(side[freePos], v0, this, complexity: 3);
+        // Combination deduction (PA × FMs/LTs): two rules in mind at
+        // once. Tier 3 weight per docs/dev/complexity.md.
+        return _withTag(
+          Move(side[freePos], v0, this, complexity: 3),
+          rejectingSlugs,
+        );
       }
     }
     return null;
+  }
+
+  /// Wrap [move] so its `givenBy` carries the unique rejector slug
+  /// when there is one — letting the hint UI render "PA + FM" or
+  /// "PA + LT" instead of the generic "PA + other".
+  Move _withTag(Move move, Set<String> rejectingSlugs) {
+    if (rejectingSlugs.length != 1) return move;
+    final tagged = PABalancedSideComplicity(rejectingSlugs.first);
+    return Move(
+      move.idx,
+      move.value,
+      tagged,
+      isImpossible: move.isImpossible == null ? null : tagged,
+      complexity: move.complexity,
+    );
   }
 
   /// Cells covered by [pa] for each of its sides, in natural reading

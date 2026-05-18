@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 
 class GroupSizeWidget extends StatelessWidget {
   const GroupSizeWidget({
