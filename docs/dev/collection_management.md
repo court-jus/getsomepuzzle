@@ -27,6 +27,7 @@ declared slugs. See `levels.md` for the cascade.
 | Tool                                  | Purpose                                                      |
 |---------------------------------------|--------------------------------------------------------------|
 | `bin/generate.dart`                   | Generate new puzzles, validate / re-validate existing ones   |
+| `bin/maintain.dart`                   | Full periodic-maintenance pipeline (6 steps, apply mode)     |
 | `bin/recompute.dart`                  | Re-sort constraints, refresh stored cplx, re-route by level  |
 | `bin/dedup_puzzles.dart`              | Drop puzzles that are exact duplicates (canonical key match) |
 | `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated puzzles                 |
@@ -216,6 +217,45 @@ dart run bin/aggregate_player_stats.dart stats_gle/ -o stats_aggregated/gle.txt
 # constants used by Database.computePlayerLevel.
 dart run bin/analyze_stats.dart stats_aggregated/gle.txt
 ```
+
+## Periodic maintenance
+
+`bin/maintain.dart` chains the six routine maintenance tools into a
+single fail-fast pipeline that applies as it goes. Run it from the
+project root whenever the corpus needs a refresh — typically after a
+formula tweak, a new constraint, or just on a periodic cadence:
+
+```bash
+dart run bin/maintain.dart
+```
+
+Pipeline (each step applies directly; the next step sees the updated
+`assets/`):
+
+1. **`recompute --route`** — refresh stored cplx, re-sort
+   constraints, redistribute each puzzle to its classified level.
+2. **`dedup_puzzles`** — drop exact duplicates per file
+   (defence-in-depth: `--route` already enforces canonical-key
+   uniqueness, but this catches anything that slipped through).
+3. **`cleanup_collections --apply`** — drop disliked and boring
+   (≥ 90 % trivial-FM) puzzles.
+4. **`vectorize_puzzles`** — refresh `puzzle_vectors.csv` from the
+   cleaned corpus.
+5. **`cluster_puzzles --apply`** — drop near-duplicates
+   (`--max-distance 0.15`, `--keep-per-cluster 1`), protecting the
+   current onboarding bank.
+6. **`extract_onboarding`** — refresh `assets/1-easy_onboarding.txt`
+   (300 per phase) from the post-cleanup corpus.
+
+The pipeline never commits — every change lands in `assets/*.txt`
+directly, so `git diff` is the canonical "what just happened?" view.
+At the end the orchestrator prints a per-step status, the per-file
+line-count delta, and total wall time. The first failing step aborts
+the rest; subsequent steps can be resumed by re-running the script
+after fixing the issue (each step independently snapshots and applies).
+
+Wall time on a 26 k-puzzle corpus is dominated by step 4
+(vectorize, ~20-30 min) and step 5 (cluster, a few minutes).
 
 ## Typical workflows
 
