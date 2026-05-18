@@ -33,6 +33,35 @@ void main() {
         isNull,
       );
     });
+
+    test('returns the first incomplete phase, even when later phases are '
+        'already complete', () {
+      // Boundary contract: `phaseForCompletions` walks phases in order
+      // and returns the first one whose introducing slug has < phaseLength
+      // completions. Equivalently: `null` iff every phase is complete.
+      //
+      // For each phase i: mark every OTHER phase's introducing slug
+      // complete and leave phase i one short. The walk MUST land on
+      // phase i — proving (a) non-null whenever any phase is short, and
+      // (b) the in-order traversal is not broken by an early-exit or
+      // an over-eager skip past an already-complete entry.
+      for (final target in OnboardingPhase.phases) {
+        final completions = <String, int>{
+          for (final ph in OnboardingPhase.phases)
+            ph.introducing: ph.index == target.index
+                ? OnboardingPhase.phaseLength - 1
+                : OnboardingPhase.phaseLength,
+        };
+        final result = phaseForCompletions(completions);
+        expect(
+          result?.index,
+          target.index,
+          reason:
+              'only phase ${target.index} (${target.introducing}) incomplete; '
+              'expected phaseForCompletions to land on it, got ${result?.index}',
+        );
+      }
+    });
   });
 
   group('puzzlePassesSoftFilter', () {

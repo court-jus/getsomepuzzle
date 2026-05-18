@@ -732,6 +732,43 @@ void main() {
       final move = gc.apply(p);
       if (move != null) expect(move.isImpossible, isNull);
     });
+
+    test(
+      'chain-merges-only, no addable cell → falls back to calculateMinGroups',
+      () {
+        // Companion to the addable-cell test above: this one exercises the
+        // OTHER reason `_safeReachableCountsByMerges` can return null —
+        // when at least one mergeable group pair has no single direct
+        // merge-cell, only multi-step chains through intermediate free
+        // cells. The helper falls back to `calculateMinGroups > count` as
+        // its always-sound lower bound.
+        //
+        // Grid (0=empty, 1=black, 2=white) with `GC:2.2`:
+        //
+        //   2 0 2
+        //   2 0 0
+        //   1 1 2
+        //
+        // White groups: A={(0,0),(1,0)}, B={(0,2)}, C={(2,2)} (count=3,
+        // target=2). The free cells (0,1), (1,1), (1,2) each have at
+        // least one white neighbour → no addable cell. A↔C can be merged
+        // only via the 3-cell chain (1,0)→(1,1)→(1,2)→(2,2): no single
+        // free cell is adjacent to both A and C, so
+        // `_mergesAreDirectOnly` is false and the direct-merge
+        // enumeration is unsafe.
+        //
+        // `calculateMinGroups` flood-fills through free-or-white cells
+        // and reaches every white cell from any starting point →
+        // minGroups = 1 ≤ target 2 → the state is NOT impossible.
+        // `verify` must return true.
+        final p = makePuzzle('202\n200\n112');
+        final gc = GroupCountConstraint('2.2');
+        p.addConstraint(gc);
+        expect(gc.verify(p), isTrue);
+        final move = gc.apply(p);
+        if (move != null) expect(move.isImpossible, isNull);
+      },
+    );
   });
 
   group('GroupCountConstraint.apply - not enough groups', () {
