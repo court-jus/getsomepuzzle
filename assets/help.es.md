@@ -4,7 +4,7 @@ En este juego, tu objetivo es colorear las celdas de la cuadrícula en blanco o 
 
 Para saber qué celda debe ir en qué color, debes seguir algunas restricciones (las reglas se explican a continuación).
 
-Haz clic (o toca en móvil) en una celda para cambiar su color.
+Haz clic (o toca en móvil) en una celda para cambiar su color. También puedes deslizar el dedo (o el ratón) sobre varias celdas para pintarlas de un solo gesto.
 
 Algunas celdas ya pueden estar rellenas y no podrás cambiarlas, están indicadas por un borde interno más grueso.
 
@@ -14,7 +14,13 @@ Si estás atascado, el ícono de la papelera restablece el rompecabezas a su est
 
 Mientras juegas, tu tiempo se registra (ver la sección de Estadísticas más abajo). Si lo necesitas, el juego se puede pausar y reanudar.
 
-Hay unos 10.000 rompecabezas incluidos en la aplicación. Cada vez que abras la aplicación, la colección se baraja y obtendrás rompecabezas aleatorios. Los rompecabezas que ya resolviste no volverán a aparecer, y verás tu progreso debajo del rompecabezas.
+Hay unos 25.000 rompecabezas incluidos en la aplicación. Cada vez que abras la aplicación, la colección se baraja y obtendrás rompecabezas aleatorios. Los rompecabezas que ya resolviste no volverán a aparecer, y verás tu progreso debajo del rompecabezas.
+
+## Aprendizaje
+
+Cuando lanzas el juego por primera vez, una secuencia de aprendizaje presenta las restricciones una a una. Cada nueva regla aparece en una pequeña ventana de explicación la primera vez que la encuentras, y el juego te sigue proponiendo puzzles centrados en esa regla hasta que hayas jugado suficientes (5 puzzles por defecto) antes de pasar a la siguiente. Puedes saltar la secuencia en cualquier momento con el botón "Saltar aprendizaje" en la ventana de explicación, o reiniciarla desde el principio en la página Ajustes.
+
+La página **Aprendizaje**, accesible desde el menú principal, lista todas las restricciones con su descripción y la fecha en que las encontraste por primera vez. El botón "Refrescarme la memoria" junto a cada regla lanza una pequeña playlist de puzzles centrados en esa regla — útil para volver a una restricción que no has visto desde hace un tiempo.
 
 ## Restricciones
 
@@ -56,23 +62,37 @@ Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores dif
 
 Un número en un círculo encima de una columna indica cuántas celdas de ese color deben estar en esa columna específica.
 
+### Número por fila
+
+Un número en un círculo a la izquierda de una fila indica cuántas celdas de ese color deben estar en esa fila. Es el equivalente horizontal de Número por columna.
+
 ### Número de grupos
 
 Un número en un cuadro con un icono de enlace indica cuántos grupos (componentes conectados) de ese color deben estar en la solución.
+
+### Número de vecinos
+
+Una celda marcada con una pequeña cruz que contiene un número debe tener exactamente ese número de vecinos ortogonales del color de la cruz. La propia celda no se cuenta — solo las cuatro celdas directamente arriba, abajo, a la izquierda y a la derecha.
 
 ### Ojos
 
 Una celda con un símbolo de ojo debe «ver» exactamente el número indicado de celdas del color del ojo. Una celda ve en línea recta en cada una de las cuatro direcciones ortogonales hasta llegar al borde de la cuadrícula o a una celda del color opuesto (que bloquea la línea de visión). El color del ojo es el color objetivo; el borde alrededor del ojo es el color opuesto.
 
+## La página Abrir
+
+La página Abrir es donde eliges qué jugar. Arriba, el menú *Colección* lista los niveles de dificultad (Fácil → Loco), seguidos de tus propios puzzles y las playlists que has creado. A su lado, el botón `+` crea una nueva playlist, el botón de archivo importa puzzles desde un archivo, y el icono de papelera elimina la playlist actual si te pertenece.
+
+La opción *Mezclar* propone los puzzles en orden aleatorio. Más abajo, unos filtros permiten afinar la lista: tamaño de la cuadrícula, restricciones que quieres ver o evitar, y puzzles ya jugados u omitidos. El número que aparece encima del botón Jugar indica cuántos puzzles coinciden con los filtros activos, y un pequeño botón junto a cada filtro restablece el valor por defecto.
+
 ## Puzzles personalizados
 
 ### Generar puzzles
 
-Abre el menú y toca "Generar" para acceder al generador. Puedes elegir el tamaño de la cuadrícula, qué tipos de restricciones incluir o excluir, y cuántos puzzles generar. También puedes elegir en qué playlist guardarlos.
+Abre el menú y toca "Generar" para fabricar nuevos puzzles al vuelo. Elige las dimensiones de la cuadrícula, los tipos de restricciones a incluir o excluir, un límite de tiempo por puzzle, y cuántos puzzles producir. Elige la playlist de destino, luego toca "Generar" — la barra de progreso muestra cuántos ya están hechos. La generación se ejecuta en segundo plano; puedes detenerla en cualquier momento y conservar lo que ya se haya producido.
 
 ### Crear puzzles
 
-Abre el menú y toca "Crear" para diseñar tu propio puzzle. Puedes definir las dimensiones, fijar colores de celdas, agregar restricciones, y el editor te mostrará en tiempo real qué celdas son deducibles. Los bordes verdes indican deducción directa, los bordes naranjas indican deducción por eliminación.
+Abre el menú y toca "Crear" para diseñar tu propio puzzle a mano. Elige las dimensiones y toca "Comenzar" para entrar en el editor. Toca las celdas para fijarlas en negro o blanco, y usa la barra superior para añadir restricciones; las celdas con borde verde se encuentran por razonamiento directo, las de borde naranja por eliminación. La barra inferior muestra las dimensiones, el número de restricciones y una puntuación aproximada de dificultad. "Probar" te permite jugar el puzzle para comprobar que funciona, y "Guardar" lo guarda en la playlist elegida.
 
 ### Playlists
 
@@ -104,6 +124,30 @@ El modo por defecto. Tras el diagnóstico de errores, los toques siguientes te g
 En lugar de señalar una celda, el segundo toque añade una nueva restricción al puzzle. Esta regla es coherente con la solución y te da información adicional para avanzar — el puzzle se vuelve más fácil sin que nadie te diga qué celda rellenar.
 
 Tras añadir una restricción, el ciclo vuelve al diagnóstico de errores en el siguiente toque.
+
+## Ajustes
+
+La página de ajustes configura cómo el juego comprueba tu trabajo y te ayuda.
+
+**Idioma**: elige el idioma de visualización de la aplicación (inglés, francés o español).
+
+**Validación**: elige si la cuadrícula se comprueba manualmente (tocas un botón) o automáticamente (en cuanto se rellena por completo).
+
+**Comprobación en vivo**: cómo se muestran los errores mientras juegas — todas las celdas incorrectas, solo el número de errores, o ninguna indicación hasta que la cuadrícula esté completa.
+
+**Mostrar puntuación**: si la pantalla de puntuación aparece entre puzzles para que puedas dar like o dislike a lo que acabas de jugar.
+
+**Tipo de pista**: cómo te ayuda el botón de pista — señalando una celda deducible ("Celda deducible") o añadiendo una nueva restricción que simplifica el puzzle ("Añadir restricción"). Mira la sección Pistas más arriba para los detalles.
+
+**Tiempo de inactividad**: si no hay interacción durante el tiempo elegido (o si la aplicación pierde el foco), el cronómetro se pausa automáticamente para no seguir corriendo durante tu ausencia.
+
+**Nivel del jugador** (0-100): orienta los puzzles que se te proponen hacia tu velocidad de razonamiento. Cuanto más alto, más difícil.
+
+**Nivel automático**: cuando está activado, tu nivel se ajusta solo a partir de tus tiempos de resolución. Desactívalo para fijar el nivel a mano.
+
+**Reproducir onboarding**: reinicia la secuencia de introducción desde la fase 0 — útil para volver a ver los diálogos de presentación de las reglas.
+
+**Borrar estadísticas**: elimina las estadísticas por puzzle almacenadas localmente. La acción es irreversible y pide confirmación.
 
 ## Estadísticas
 

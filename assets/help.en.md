@@ -4,7 +4,7 @@ In this game, your aim is to color the cells of the grid in black or white.
 
 To know which cell has to be which color, you have to follow some constraints (rules are explained below).
 
-Click (or touch on mobile) a cell to change its color.
+Click (or touch on mobile) a cell to change its color. You can also drag across cells to paint several of them in one gesture.
 
 Some cells can be already filled and you won't be able to change them, they are indicated by a thicker inside border.
 
@@ -14,7 +14,13 @@ If you are stuck, the "restart" icon resets the puzzle to its initial state.
 
 While playing, your timing is recorded (see the Stats section below). If needed, the game can be paused and resumed.
 
-There are about 10,000 puzzles bundled within the app. Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see your progress below the puzzle.
+There are about 25,000 puzzles bundled within the app. Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see your progress below the puzzle.
+
+## Learning
+
+When you launch the game for the first time, a learning sequence introduces the constraints one at a time. Each new rule is shown in a short dialog the first time you meet it, and the game then keeps offering puzzles centered on that rule until you have played enough of them (5 puzzles by default) before moving on to the next one. You can skip the whole sequence at any time with the "Skip learning" button in the rule dialog, or restart it from scratch from the Settings page.
+
+The **Learning** page, reachable from the main menu, lists every constraint with its description and the date you first met it. The "Refresh my memory" button next to each rule launches a short playlist of puzzles centered on that rule — handy to come back to a constraint you have not seen in a while.
 
 ## Constraints
 
@@ -56,23 +62,37 @@ When two cells are separated by the ≠ symbol, they must be different colors.
 
 A number in a circle above a column indicates how many cells of that color must be in that specific column.
 
+### Row count
+
+A number in a circle to the left of a row indicates how many cells of that color must be in that specific row. This is the horizontal counterpart of Column count.
+
 ### Group count
 
 A number in a box with a link icon indicates how many groups (connected components) of that color must be in the solution.
+
+### Neighbor count
+
+A cell marked with a small cross containing a number must have exactly that many orthogonal neighbors of the cross's color. The cell itself is not counted — only the four cells directly above, below, left and right.
 
 ### Eyes
 
 A cell with an eye symbol must "see" exactly the indicated number of cells of the eye's color. A cell sees in a straight line in each of the four orthogonal directions until it reaches the edge of the grid or a cell of the opposite color (which blocks the line of sight). The eye's color is the target color; the border around the eye is the opposite color.
 
+## The Open page
+
+The Open page is where you pick what to play. At the top, the *Collection* dropdown lists the difficulty levels (Easy → Mad), followed by your own puzzles and any playlists you have created. Next to it, the `+` button creates a new playlist, the file button imports puzzles from a file, and the trash button deletes the current playlist if you own it.
+
+The *Shuffle* toggle plays puzzles in random order. Below it, filters let you narrow the list: grid size, the constraint types you want to see or avoid, and whether to keep puzzles you have already played or skipped. The number shown above the Play button tells you how many puzzles match the active filters, and a small reset button next to each filter brings the default value back.
+
 ## Custom puzzles
 
 ### Generating puzzles
 
-Open the menu and tap "Generate" to access the puzzle generator. You can choose the grid size, which constraint types to include or exclude, and how many puzzles to generate. You can also choose which playlist to save them to.
+Open the menu and tap "Generate" to make new puzzles on the fly. Pick the grid dimensions, the constraint types to include or exclude, a time limit per puzzle, and how many puzzles to produce. Choose the playlist that will receive them, then tap "Generate" — the progress bar shows how many have been made. Generation runs in the background; you can stop early at any time and keep what has been produced so far.
 
 ### Creating puzzles
 
-Open the menu and tap "Create" to design your own puzzle. You can set the grid dimensions, fix cell colors, add constraints, and the editor will show you in real time which cells are solvable. Green borders mean the cell can be deduced by direct reasoning, orange borders mean it requires elimination.
+Open the menu and tap "Create" to design your own puzzle by hand. Pick the grid dimensions and tap "Start" to enter the editor. Tap cells to fix them black or white, and use the top bar to add constraints; cells with a green border can be found by direct reasoning, those with an orange border by elimination. The bottom bar shows the current dimensions, the number of constraints, and a rough difficulty score. "Test" lets you play through the puzzle to check it works, and "Save" stores it in the chosen playlist.
 
 ### Playlists
 
@@ -104,6 +124,30 @@ Useful when you want a small push without spoiling the rest: stop at the second 
 Instead of pointing at a cell, the second tap adds a brand-new constraint to the puzzle. The new rule is consistent with the solution and gives you extra information to work from — the puzzle becomes easier without anyone telling you which cell to fill.
 
 After a constraint is added, the next tap restarts the cycle at the error check.
+
+## Settings
+
+The settings page tunes how the game checks your work and asks for help.
+
+**Language**: choose the app's display language (English, French or Spanish).
+
+**Validation**: choose whether the grid is checked manually (you tap a button) or automatically (as soon as it is fully filled).
+
+**Live check**: how errors are surfaced while you play — show every wrong cell, just an error count, or wait until the grid is complete.
+
+**Show rating**: whether the rating screen appears between puzzles so you can like or dislike what you just played.
+
+**Hint type**: how the hint button helps — by pointing at a cell you can deduce ("Deducible cell"), or by adding a fresh constraint that simplifies the puzzle ("Add constraint"). See the Hints section above for details.
+
+**Idle timeout**: when no input arrives for the chosen delay (or the app loses focus), the timer auto-pauses so it does not keep running while you are away.
+
+**Player level** (0-100): nudges the puzzles you are offered toward your reasoning speed. Higher means harder.
+
+**Auto level**: when on, your level is updated automatically from your completion times. Turn it off to set the level by hand.
+
+**Replay onboarding**: restart the new-player onboarding sequence from phase 0 — useful if you want to revisit the rule-introduction dialogs.
+
+**Clear stats**: wipe the locally stored per-puzzle stats. The action is irreversible and asks for confirmation.
 
 ## Stats
 
