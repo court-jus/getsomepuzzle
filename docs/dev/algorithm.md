@@ -33,6 +33,7 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 | CC | Column Count | A given column must contain exactly N cells of a color |
 | GC | Group Count | The grid must contain exactly N connected groups of a color |
 | NC | Neighbor Count | A given cell must have exactly N orthogonal neighbors of a color |
+| RC | Row Count | A given row must contain exactly N cells of a color |
 
 ## Solving Algorithm
 
@@ -90,7 +91,7 @@ Select a random subset of cells (controlled by a ratio parameter, randomly drawn
 
 ### Step 3: Enumerate Valid Constraints
 
-For each constraint type (FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
+For each constraint type (FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC, RC), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
 
 ### Step 4: Iterative Constraint Selection
 
@@ -131,6 +132,52 @@ was deductively determined, leaving no ambiguity).
 ### Retry Strategy
 
 The worker retries generation with new random grids until the requested number of puzzles is produced or the time limit is reached.
+
+## Constraint Ordering
+
+The order in which constraints appear in a puzzle's constraint list is
+significant. `Puzzle.apply()` iterates the list in order on every solver
+step and returns the first deduction it finds, so earlier constraints
+get first dibs on any cell they can determine. `lineExport` serialises
+constraints in list order, so the on-disk representation round-trips
+through `Puzzle(...)` with the order preserved.
+
+Two APIs on `Puzzle` let maintenance tooling and the generator reshape
+that order:
+
+- **`prependConstraint(c)`** — insert at index 0 so `apply()` consults
+  `c` before any pre-existing constraint. Used by `Puzzle.simplify` when
+  grafting an "indispensable" candidate onto a puzzle that is already
+  dominated by a high-complexity constraint (e.g. `--require SH`): the
+  cheaper deduction must run first, otherwise the dominant constraint
+  fires first and the easier deduction never surfaces. Honours the
+  LetterGroup-aggregation contract from `addConstraint` (one entry per
+  letter).
+- **`sortConstraintsByDifficulty(steps)`** — reorder constraints by the
+  *minimum* `Move.complexity` each contributed in `steps` (ascending,
+  ties broken lexicographically on `serialize()`). Steps with empty
+  `constraint` (force) and steps credited to Complicity instances are
+  ignored. Constraints that contributed nothing to `steps` are pushed
+  to the tail via a `1 << 30` sentinel rank. Side effect: drops
+  `cachedComplexity` because reordering changes the trace `apply()`
+  produces and thus the per-move complexities.
+
+The hint system in `addConstraint` mode picks the front of
+`availableHintConstraints`, so reordering directly affects which
+constraints the player sees first. `bin/recompute.dart`,
+`bin/dedup_puzzles.dart`, and `bin/aggregate_player_stats.dart` run
+`sortConstraintsByDifficulty` over the trace they already computed for
+classification, so shipped puzzles carry the easier-first ordering on
+disk.
+
+`PuzzleGenerator.generateOne` also calls
+`sortConstraintsByDifficulty` before returning the serialised line, so
+freshly generated puzzles ship with the same easier-first contract as
+the maintenance-tool output. When the easing loop ran (`simplify`),
+the sort uses `SimplifyResult.finalSteps` rather than the pre-simplify
+trace — it is a fresher signal that accounts for any constraint
+grafted by `prependConstraint` during easing, which would not appear
+in the earlier trace.
 
 ## Complexity Scoring
 

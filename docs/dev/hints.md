@@ -87,8 +87,12 @@ the puzzle's solution.
 
 **Method** — same pattern as the generator (`generator.dart:136-154`):
 
-- For each constraint type (FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC),
-  call `generateAllParameters(width, height, domain)` to get every
+- The worker takes the full `Puzzle` object (`HintWorker.compute(puzzle: ...)`)
+  and derives `width`, `height`, `domain`, `cachedSolution`,
+  `existingConstraints` (via `serialize()`) and `readonlyIndices`
+  internally — callers no longer have to unpack those fields.
+- For each constraint type (FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC,
+  RC), call `generateAllParameters(width, height, domain)` to get every
   possible parameter set.
 - Instantiate each constraint and check `constraint.verify(solved)`.
 - Filter out constraints already present on the puzzle (compare via
@@ -96,8 +100,23 @@ the puzzle's solution.
   `serialize()`. The base class returns `''`, so any future type that
   forgets to override will never be filtered — keep this in mind when
   adding a new type.
+- Skip candidates whose `isCompleteFor(clone)` returns `true` — those
+  constraints can no longer fire on the current state, so adding them
+  would not unlock any deduction. Cheap pre-filter that avoids paying
+  for a full `clone.solve()` on dead-on-arrival candidates.
+- For each surviving candidate, clone the current puzzle, add the
+  candidate, run `clone.solve()`, and keep the candidate iff the solve
+  reaches a complete state where `constraint.verify(clone)` still holds.
 
 The result is a `List<Constraint>` kept in memory (no persistent cache).
+
+**Gated on `addConstraint` mode.** `GameModel.startHintConstraintComputation`
+short-circuits when `hintType != addConstraint`. On web the worker runs
+on the main isolate (no true background thread), so re-firing the
+clone+solve loop on every cell mutation used to freeze the UI in
+`deducibleCell` mode where the candidate list is never shown.
+`GameModel.hintType` mirrors `Settings.hintType`; `main.dart` keeps the
+mirror in sync before each call to the worker.
 
 **Puzzles without a solution** (`0:0`): the feature is skipped. The
 hint button stays disabled in `addConstraint` mode when the puzzle
@@ -107,7 +126,28 @@ has no stored solution.
 (`hint_worker_io.dart` / `hint_worker_web.dart`, selected via conditional
 imports through `hint_worker.dart` / `hint_worker_stub.dart`). On web,
 where there are no isolates, the worker is a cooperative async loop that
-yields to the event loop every N candidates.
+yields to the event loop every N candidates. The per-puzzle setup and
+the per-candidate decision both live in `hint_worker_core.dart`
+(`HintContext.forPuzzle` + `classifyHintCandidate`) so the two
+platform shells only differ on their concurrency model (isolate spawn
+vs cooperative yield + cancellation).
+
+### Status state machine
+
+`GameModel.hintConstraintsReady` is a `HintConstraintStatus` enum:
+
+| Value          | Meaning                                                                  |
+|----------------|--------------------------------------------------------------------------|
+| `inprogress`   | Worker is computing. The hint button shows the localised "in progress" message (`hintConstraintInprogress`). |
+| `ready`        | Worker finished and `availableHintConstraints` is non-empty. The button can graft a constraint. |
+| `nohint`       | Worker finished and no candidate survived (`availableHintConstraints` is empty). The button shows `hintConstraintNone`. |
+| `canceled`     | A puzzle change (cell tap, undo, mode toggle, puzzle rotate, exit) cancelled the in-flight worker. The button is treated as not-ready until a new worker is started. |
+
+Transitions: `inprogress → ready/nohint` on worker completion;
+`inprogress|ready|nohint → canceled` on player action; `canceled →
+inprogress` when the worker is restarted (e.g. after a hint constraint
+is grafted and the next round is computed). `canAddHintConstraint` is
+true only in the `ready` state with a non-empty candidate list.
 
 ### Redundancy ranking
 

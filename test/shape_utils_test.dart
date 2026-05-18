@@ -615,6 +615,60 @@ void main() {
         expect(move.idx, 7);
       });
     });
+
+    test('full chain on a neighbour-blocked group solved by SH alone', () {
+      // Regression for a scenario the dev docs once filed as a hypothetical
+      // "SH + DF complicity": when an existing constraint (DF, GS:_.1, …)
+      // has already coloured a neighbour of an under-target SH group, the
+      // shape constraint on its own runs the whole chain — Level 4 blocks
+      // an extension that would yield the wrong shape, Level 5 forces the
+      // single surviving completion, then Level 2 seals the closed group.
+      // No multi-constraint complicity is required.
+      //
+      // Setup: 5x6 grid, SH:11.10 (L-shape of 3, color 1), partial state
+      // where (1,3) is already colour 2 (the cell DF would have set
+      // upstream):
+      //
+      //   .  .  .  .  ■
+      //   .  .  .  □  ■
+      //   .  .  .  .  .
+      //   .  .  .  .  .
+      //   .  .  .  .  .
+      //   .  .  .  .  .
+      //
+      // Each `setForSolver` here stands in for the propagation engine
+      // applying the previous step's move; the test exercises three
+      // successive `apply` calls on the same puzzle, verifying the full
+      // end-to-end chain. The per-Level mechanisms are already covered
+      // individually by the level-1..5 tests above; this test locks in
+      // that they compose correctly on this specific scenario.
+      final p = _make('00001\n00021\n00000\n00000\n00000\n00000');
+      final sh = ShapeConstraint('11.10');
+
+      // Step 1 — Level 4: extending into (2,4) would produce a vertical
+      // I, not an L → (2,4) is forced to the opposite colour.
+      final m1 = sh.apply(p);
+      expect(m1, isNotNull);
+      expect(m1!.idx, 14); // (2,4)
+      expect(m1.value, 2);
+      p.cells[m1.idx].setForSolver(m1.value);
+
+      // Step 2 — Level 5: with both (1,3) and (2,4) blocked, the only
+      // L placement still covering the group is {(0,3), (0,4), (1,4)};
+      // the missing cell (0,3) is forced.
+      final m2 = sh.apply(p);
+      expect(m2, isNotNull);
+      expect(m2!.idx, 3); // (0,3)
+      expect(m2.value, 1);
+      p.cells[m2.idx].setForSolver(m2.value);
+
+      // Step 3 — Level 2: the group is now exactly an L; its only free
+      // neighbour (0,2) must take the opposite colour to keep it closed.
+      final m3 = sh.apply(p);
+      expect(m3, isNotNull);
+      expect(m3!.idx, 2); // (0,2)
+      expect(m3.value, 2);
+    });
   });
   test('ShapeConstraint.findAdditionalPositions', () {
     final p = _make('110\n120\n000');

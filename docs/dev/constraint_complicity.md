@@ -560,10 +560,10 @@ candidates. None are implemented yet.
 > solved without `force` by the empty-anchor branch of
 > `SymmetryConstraint.apply` (a `SY` whose anchor is still empty
 > propagates from a coloured direct neighbour to its mirror). The
-> `CC + DF` and `SH + DF` patterns documented here are still valid
-> general candidates — they fire on configurations that don't depend
-> on a SY being present, and the example just happens to also be
-> reachable via SY on this particular grid.
+> `CC + DF` pattern documented here is still a valid general
+> candidate — it fires on configurations that don't depend on a SY
+> being present, and the example just happens to also be reachable
+> via SY on this particular grid.
 
 ### Complicity: CC + DF (Column count × Different from)
 
@@ -602,51 +602,6 @@ violating DF. So the unique colour-2 cell is in {19, 24}, and cells
 
 Source puzzle:
 `v2_12_5x6_000000000000000000200000000000_SH:11.10;DF:8.right;DF:19.down;SY:28.5;GS:22.1;CC:4.1.4;PA:20.top;GS:14.8_1:112111222121122221222121121121_100`.
-
-### Complicity: SH + DF (Shape × neighbour-already-excluded)
-
-#### Reasoning
-
-`ShapeConstraint` mandates that every group of its colour `c` has a
-specific shape, fixing the group size at `shapeSize`. The current
-`ShapeConstraint.apply` (`shape.dart:270`) closes an open group of the
-right shape by sealing its borders, but it does not actively look at
-neighbours that are *already excluded* from `c` by other constraints
-(`DF`, `GS:_.1` adjacency, parity-driven seals, …). When an
-under-target group of colour `c` has only one frontier branch left
-unblocked, that single free neighbour must take colour `c` to grow the
-group toward `shapeSize`.
-
-More general framing: this is `SH + (anything-that-excludes-a-
-neighbour)`. The most common excluder in practice is a `DF` whose
-opposite end is already coloured `c`, but the same logic fires for an
-isolate `GS:k.1` whose single cell is `c` (every neighbour must be the
-opposite colour).
-
-#### Concrete example
-
-```
-SH:11.10 mandates colour-1 groups of shape "L" (3 cells).
-Current colour-1 group {4, 9} (size 2): neighbours 3 and 8.
-DF:8.right ties cells 8 and 9. Cell 9 = 1 → cell 8 = 2 (DF.apply).
-Only frontier left is cell 3 → cell 3 forced to 1, completing the L.
-
-Group {3, 4, 9} now at size 3 = shapeSize. Its remaining frontier
-neighbour is cell 2 → cell 2 forced to colour 2 to keep the group
-closed.
-```
-
-Source puzzle: same as CC + DF above. Together with the CC + DF
-complicity, this chain unlocks 6 cells (idx 2, 3, 4, 8, 9, 29) that
-currently require the force phase.
-
-#### Open question
-
-Whether to implement this as a dedicated `SH + DF` complicity or as a
-broader extension of `ShapeConstraint.apply` itself (it's arguably
-single-constraint reasoning combined with already-known cell values,
-not a true multi-constraint inference). The latter keeps the apply
-path coherent; the former matches how SH + GS is already factored.
 
 ### Complicity: PA + LT (Parity × Letter group)
 

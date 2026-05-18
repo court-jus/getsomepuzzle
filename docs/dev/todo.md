@@ -1,13 +1,5 @@
 # TODO
 
-## Cleanup default.txt
-
-Remove uninteresting "gift" puzzles from the default collection.
-
-### Removal criteria
-
-1. **Trivial puzzles**: only 1 constraint type AND 0 force rounds AND >50% pre-filled cells
-
 ## Solver improvements
 
 ### GroupSize: path-based propagation — boundary rule
@@ -18,17 +10,6 @@ implemented via `blockingShrinksReachableBelow`. The dual is still missing:
 opposite color." The blocking-BFS predicate doesn't capture this. Likely
 needs explicit enumeration of size-`size` completions (or a dual flow
 argument).
-
-### Complexity: distinguish propagation difficulty levels
-
-Currently, all propagation moves are treated equally (0 complexity contribution). But some propagation moves are trivial ("group is complete, close borders") while others require subtle topological reasoning ("all growth paths go through this cell"). 
-
-When implementing advanced propagation (like path-based GroupSize), we should introduce **propagation difficulty tiers**:
-- **Tier 0**: Direct/obvious (close borders, single exit, value forced by single constraint)
-- **Tier 1**: Multi-constraint interaction or spatial reasoning (path invariants, merge avoidance)
-- **Tier 2**: Complex deductions that most players would use force/guessing for
-
-Each tier would contribute differently to complexity. The exact weights need calibration through **human playtesting sessions**: present puzzles to a player, ask them to rate difficulty of each move, and use that feedback to tune the tier weights.
 
 ### GroupSize: color-independent deductions for size 1
 
@@ -41,35 +22,6 @@ More generally, for any GS constraint where the cell is empty: if setting the ce
 This is currently partially handled by the merge-too-big check on empty cells (if a neighbor already has a colored group of size ≥ 1, the cell is forced opposite). But when the GS=1 cell has no colored neighbors yet, the direct deduction "all neighbors must be opposite" is still missing.
 
 **Partial progress from merge-too-big**: puzzle `v2_12_4x3_000010000022_GS:4.4;GS:0.4;FM:01.22;GS:3.1` went from 4 force rounds (cplx=46) to 3 force rounds (cplx=36). Full GS=1 deduction could reduce further.
-
-### Multi-constraint combination deductions
-
-Some deductions require combining two constraints simultaneously. For example:
-- **PA + FM**: parity says two cells are different, FM eliminates one arrangement → determines both cells
-- **GS + FM**: GS constrains group boundaries, which creates a forbidden motif → determines a cell
-
-These "combination deductions" should be implemented as propagation (not force) but assigned a **higher complexity weight** than single-constraint propagation, because the player needs to hold two rules in mind simultaneously.
-
-**Complexity tier proposal:**
-- Tier 0 (weight ~0): Single constraint direct deduction (e.g., "group full, close borders")
-- Tier 1 (weight ~2): Advanced single-constraint deduction (e.g., GS merge-too-big, GS=1 neighbors)
-- Tier 2 (weight ~5): Multi-constraint combination (e.g., PA+FM, GS+FM combos)
-- Force round (weight 10): Hypothesis + contradiction (current)
-
-These weights would replace the flat "force_rounds × 10" in the complexity formula, giving a more granular score.
-
-**Verified examples:**
-- `6x4` puzzle: PA:20.left + FM:212 combo deduces (1,4)=N and (2,4)=B — currently counted as 1 force round
-- `4x5` puzzle: GS:19.1 + FM:01.12 combo deduces (4,5)=N — currently counted as 1 force round
-
-### Constraint-specific complexity weights
-
-Some constraints are inherently easier to reason about than others, even within the same type. For example, among Forbidden Motifs:
-- **Easy**: two same-color cells (e.g., FM:11, FM:22, FM:1.1, FM:2.2) — trivially "no two adjacent same-color"
-- **Medium**: two different-color cells (e.g., FM:12, FM:2.1) — slightly harder to track
-- **Hard**: larger or mixed motifs (e.g., FM:122, FM:211.122) — requires more spatial reasoning
-
-The rule diversity component of complexity could be refined to weight not just the number of distinct types but also the inherent difficulty of specific constraint patterns within each type.
 
 ### Shape ↔ GroupSize redundancy
 
@@ -119,9 +71,7 @@ next-deepest gap. Reset on successful generation or on warm-up.
 
 ## QOL
 
-* Allow saving a puzzle in its current state.
-* Allow sharing a puzzle, from scratch or from its current state.
-* Allow opening the app directly with a puzzle (link for the web, intent for android, cli argument for desktop)
+* Allow opening the app directly with a puzzle on Android (custom URL scheme intent-filter for `getsomepuzzle://`). Web (query string) and Linux desktop (system handler) are already wired.
 
 ## UI
 

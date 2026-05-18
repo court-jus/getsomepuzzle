@@ -50,6 +50,35 @@ implementation (`(1 + forceDepth) * 5`) so existing scores stay in the
 same neighbourhood for puzzles that were already force-heavy. The new
 contribution is the propagation tier sum, which used to be implicitly 0.
 
+## Caching and freshness
+
+Field `[6]` of a v2 puzzle line carries the cached complexity. `Puzzle(...)`
+reads it into `cachedComplexity` at construction time;
+`computeComplexity()` returns the cached value unless `force: true` is
+passed. This makes the line on disk the **source of truth for the
+running app** — any UI sort or level filter that calls
+`computeComplexity()` will trust whatever the asset shipped.
+
+Maintenance tools — `bin/recompute.dart`, `bin/dedup_puzzles.dart`,
+`bin/aggregate_player_stats.dart`, `bin/analyze_stats.dart` — pass
+`force: true` so that re-running them after a complexity-formula change
+re-derives every line from scratch. The same `force` flag is used in
+`test/complexity_test.dart` because the test fixtures carry stored cplx
+values; the tests assert the computed value, not the loaded one.
+
+After any change to the scoring formula or to any constraint's
+`apply()` weights, run
+
+```bash
+dart run bin/recompute.dart --route assets/*.txt
+for f in assets/*.txt.new; do mv "$f" "${f%.new}"; done
+```
+
+and commit the diff — otherwise the in-app sorter and level filter will
+keep using pre-change scores until the next corpus refresh. There is no
+in-app cache-invalidation hook tied to solver-version bumps; freshness
+is enforced at corpus-build time.
+
 ## Per-constraint deduction inventory
 
 The deductions below are the distinct branches inside each constraint's
@@ -228,11 +257,14 @@ and enumeration < combinatorial probing.
 
 ## Future work
 
-- Per-FM motif weighting could go finer than the 0–3 buckets above (e.g.
-  weighting same-colour vs. mixed motifs differently).
-- Multi-constraint combination deductions (PA+FM, GS+FM, …) currently
-  surface as force moves. When they migrate to propagation they should
-  carry weight 3–4 to reflect the "two rules at once" effort.
-- The flat `5 + 5 * forceDepth` for force moves could be replaced by a
-  more nuanced model once we have data on which propagation chains
+- Per-FM motif weighting could go finer than the 0–3 buckets above
+  (e.g. weighting same-colour vs. mixed motifs differently inside the
+  same area bucket).
+- Per-complicity weight calibration. PA+FM, GS+FM, LT+FM, SY+FM,
+  GS+GS, SH+GS, LT+GS, GS+all are all live `Complicity` instances
+  (see `constraint_complicity.md`) and currently share weight 3 by
+  default. Once the calibration session described in `todo.md` runs,
+  the relative ordering between them should be refined.
+- The flat `5 + 5 * forceDepth` for force moves could be replaced by
+  a more nuanced model once we have data on which propagation chains
   players can follow.
