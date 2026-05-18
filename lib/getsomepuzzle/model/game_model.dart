@@ -92,6 +92,14 @@ class GameModel extends ChangeNotifier {
   HintConstraintStatus hintConstraintsReady = HintConstraintStatus.inprogress;
   int _usefulHintCount = 0;
 
+  /// Mirrors `settings.hintType` so [startHintConstraintComputation] can
+  /// short-circuit when the player is not in `addConstraint` mode. The
+  /// computation is expensive (clone+solve loop over every candidate
+  /// constraint) and on web it runs on the main isolate, so re-firing it on
+  /// every cell mutation makes the UI feel frozen. Owners must keep this in
+  /// sync with the settings; defaults to `deducibleCell` (cheap mode).
+  HintType hintType = HintType.deducibleCell;
+
   // --- Drag state ---
   int? firstDragValue;
   int? lastDragIdx;
@@ -769,6 +777,11 @@ class GameModel extends ChangeNotifier {
   /// Only works if the current puzzle has a cached solution.
   void startHintConstraintComputation() {
     cancelHintConstraintComputation();
+    // Skip the expensive clone+solve loop entirely when the player is in
+    // `deducibleCell` mode — the resulting list is never shown to them, and
+    // on web the work runs on the main isolate (no true background thread),
+    // which froze the UI when `_afterMutation` re-fired this on every tap.
+    if (hintType != HintType.addConstraint) return;
     final puzzle = currentPuzzle;
     if (puzzle == null || puzzle.cachedSolution == null) return;
 

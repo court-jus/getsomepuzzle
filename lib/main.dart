@@ -210,6 +210,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     await settings.load();
     await progress.load();
     game.idleTimeoutDuration = settings.idleTimeoutDuration;
+    game.hintType = settings.hintType;
     futures.add(initializeDatabase(settings.playerLevel));
     futures.add(initializeLocale());
     await Future.wait(futures);
@@ -678,6 +679,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     // Force a clean cycle: a stage from the previous mode would be confusing
     // (e.g. "stage 2 = cell shown" doesn't exist in addConstraint).
     game.resetHintCycle();
+    // Keep GameModel's mirror in sync before kicking the worker — the gate
+    // inside `startHintConstraintComputation` reads it to decide whether
+    // to actually run.
+    game.hintType = settings.hintType;
     if (settings.hintType == HintType.addConstraint) {
       game.startHintConstraintComputation();
     } else {
