@@ -6,6 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
@@ -95,6 +96,12 @@ final constraintRegistry =
         label: 'Group count',
         fromParams: GroupCountConstraint.new,
         generateAllParameters: GroupCountConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'MJ',
+        label: 'Majority',
+        fromParams: MajorityConstraint.new,
+        generateAllParameters: MajorityConstraint.generateAllParameters,
       ),
       (
         slug: 'NC',

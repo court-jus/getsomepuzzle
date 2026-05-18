@@ -44,6 +44,10 @@ If you see an arrow in a cell, there must be the same number of black and white 
 
 Cells containing the same letter should be part of the same group. A group must not contain different letters.
 
+### Majority color
+
+A dotted rectangle in a specific colour indicates that most cells inside the zone must be of that colour (more than half). The border colour itself tells you which colour must dominate.
+
 ### Quantity
 
 A black or white number over the puzzle, on a blue background indicates that the total number of cells of that color should match that number.

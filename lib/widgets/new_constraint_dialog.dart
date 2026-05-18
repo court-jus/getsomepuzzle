@@ -108,6 +108,8 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintGroupSize;
     case 'LT':
       return l.constraintLetterGroup;
+    case 'MJ':
+      return l.constraintMajority;
     case 'QA':
       return l.constraintQuantity;
     case 'SY':
@@ -143,6 +145,8 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainGS;
     case 'LT':
       return l.constraintExplainLT;
+    case 'MJ':
+      return l.constraintExplainMJ;
     case 'QA':
       return l.constraintExplainQA;
     case 'SY':

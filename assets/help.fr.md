@@ -44,6 +44,10 @@ Si une case contient une flèche, il doit y avoir le même nombre de cases noire
 
 Les lettres identiques doivent faire partie du même groupe. Un groupe ne doit pas contenir de lettres différentes.
 
+### Couleur majoritaire
+
+Un rectangle en pointillés d'une couleur donnée indique que la majorité des cellules à l'intérieur de la zone doivent être de cette couleur (plus de la moitié). La couleur de la bordure vous indique elle-même quelle couleur doit dominer.
+
 ### Quantité
 
 Un indice numérique sur fond bleu au dessus du puzzle indique que le nombre total de cases de cette couleur doit être égal à ce nombre.

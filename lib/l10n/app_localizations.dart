@@ -628,6 +628,12 @@ abstract class AppLocalizations {
   /// **'letter group'**
   String get constraintLetterGroup;
 
+  /// Name of the majority zone constraint
+  ///
+  /// In en, this message translates to:
+  /// **'majority color'**
+  String get constraintMajority;
+
   /// Name of the parity constraint
   ///
   /// In en, this message translates to:
@@ -891,6 +897,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pattern height'**
   String get createMotifHeight;
+
+  /// No description provided for @createSecondCorner.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap second corner of MJ zone'**
+  String get createSecondCorner;
+
+  /// No description provided for @createZoneTooSmall.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone must be at least 3 cells'**
+  String get createZoneTooSmall;
 
   /// No description provided for @createLetterGroupMode.
   ///
@@ -1185,6 +1203,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cells marked with the same letter must belong to the same group. A group must not contain two different letters.'**
   String get constraintExplainLT;
+
+  /// Body of the new-constraint explanation modal for the Majority (MJ) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half).'**
+  String get constraintExplainMJ;
 
   /// Body of the new-constraint explanation modal for the Quantity (QA) constraint
   ///

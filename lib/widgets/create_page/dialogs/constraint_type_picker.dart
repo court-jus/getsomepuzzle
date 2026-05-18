@@ -14,6 +14,8 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/to_flutter.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/column_count.dart';
 import 'package:getsomepuzzle/widgets/eyes.dart';
+import 'package:getsomepuzzle/widgets/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/group_count.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/neighbor_count.dart';
@@ -24,8 +26,10 @@ enum ConstraintType {
   parity,
   groupSize,
   letterGroup,
+  majority,
   quantity,
   columnCount,
+  rowCount,
   groupCount,
   neighborCount,
   shape,
@@ -58,6 +62,14 @@ Widget _previewFor(ConstraintType type, Color fgcolor) {
       return constraintToFlutter(GroupSize('0.3'), fgcolor, _previewSize);
     case ConstraintType.letterGroup:
       return constraintToFlutter(LetterGroup('A.0'), fgcolor, _previewSize);
+    case ConstraintType.majority:
+      return CustomPaint(
+        size: const Size(_previewSize, _previewSize),
+        painter: _MajorityPreviewPainter(
+          color: fgcolor,
+          cellSize: _previewSize,
+        ),
+      );
     case ConstraintType.quantity:
       return QuantityWidget(
         constraint: QuantityConstraint('1.3'),
@@ -69,6 +81,11 @@ Widget _previewFor(ConstraintType type, Color fgcolor) {
     case ConstraintType.columnCount:
       return ColumnCountWidget(
         constraint: ColumnCountConstraint('0.1.3'),
+        cellSize: _previewSize,
+      );
+    case ConstraintType.rowCount:
+      return RowCountWidget(
+        constraint: RowCountConstraint('0.1.3'),
         cellSize: _previewSize,
       );
     case ConstraintType.groupCount:
@@ -119,8 +136,10 @@ const _entries = <_TypeEntry>[
   _TypeEntry(ConstraintType.parity, _labelParity),
   _TypeEntry(ConstraintType.groupSize, _labelGroupSize),
   _TypeEntry(ConstraintType.letterGroup, _labelLetterGroup),
+  _TypeEntry(ConstraintType.majority, _labelMajority),
   _TypeEntry(ConstraintType.quantity, _labelQuantity),
   _TypeEntry(ConstraintType.columnCount, _labelColumnCount),
+  _TypeEntry(ConstraintType.rowCount, _labelRowCount),
   _TypeEntry(ConstraintType.groupCount, _labelGroupCount),
   _TypeEntry(ConstraintType.neighborCount, _labelNeighborCount),
   _TypeEntry(ConstraintType.shape, _labelShape),
@@ -134,8 +153,10 @@ String _labelForbiddenPattern(AppLocalizations l) =>
 String _labelParity(AppLocalizations l) => l.constraintParity;
 String _labelGroupSize(AppLocalizations l) => l.constraintGroupSize;
 String _labelLetterGroup(AppLocalizations l) => l.constraintLetterGroup;
+String _labelMajority(AppLocalizations l) => l.constraintMajority;
 String _labelQuantity(AppLocalizations l) => l.constraintQuantity;
 String _labelColumnCount(AppLocalizations l) => l.constraintColumnCount;
+String _labelRowCount(AppLocalizations l) => l.constraintRowCount;
 String _labelGroupCount(AppLocalizations l) => l.constraintGroupCount;
 String _labelNeighborCount(AppLocalizations l) => l.constraintNeighborCount;
 String _labelShape(AppLocalizations l) => l.constraintShape;
@@ -257,4 +278,106 @@ class _TypeTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MajorityPreviewPainter extends CustomPainter {
+  final Color color;
+  final double cellSize;
+
+  _MajorityPreviewPainter({required this.color, required this.cellSize});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const inset = 6.0;
+    final borderWidth = (cellSize * 0.09).clamp(2.0, 4.0);
+    final rect = Rect.fromLTWH(
+      inset,
+      inset,
+      size.width - 2 * inset,
+      size.height - 2 * inset,
+    );
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = borderWidth
+      ..style = PaintingStyle.stroke;
+    final dashLength = borderWidth * 2;
+    final gapLength = borderWidth * 1.5;
+    _drawDashedRect(canvas, rect, paint, dashLength, gapLength);
+  }
+
+  void _drawDashedRect(
+    Canvas canvas,
+    Rect rect,
+    Paint paint,
+    double dashLength,
+    double gapLength,
+  ) {
+    final path = Path();
+
+    final double left = rect.left;
+    final double top = rect.top;
+    final double right = rect.right;
+    final double bottom = rect.bottom;
+
+    _addDashedLine(
+      path,
+      Offset(left, top),
+      Offset(right, top),
+      dashLength,
+      gapLength,
+    );
+    _addDashedLine(
+      path,
+      Offset(right, top),
+      Offset(right, bottom),
+      dashLength,
+      gapLength,
+    );
+    _addDashedLine(
+      path,
+      Offset(right, bottom),
+      Offset(left, bottom),
+      dashLength,
+      gapLength,
+    );
+    _addDashedLine(
+      path,
+      Offset(left, bottom),
+      Offset(left, top),
+      dashLength,
+      gapLength,
+    );
+
+    canvas.drawPath(path, paint);
+  }
+
+  void _addDashedLine(
+    Path path,
+    Offset start,
+    Offset end,
+    double dashLength,
+    double gapLength,
+  ) {
+    final totalLength = (end - start).distance;
+    final direction = (end - start) / totalLength;
+    final segmentLength = dashLength + gapLength;
+
+    double currentDistance = 0;
+    while (currentDistance < totalLength) {
+      final dashEnd = currentDistance + dashLength;
+      final actualDashEnd = dashEnd > totalLength ? totalLength : dashEnd;
+
+      final p1 = start + direction * currentDistance;
+      final p2 = start + direction * actualDashEnd;
+
+      path.moveTo(p1.dx, p1.dy);
+      path.lineTo(p2.dx, p2.dy);
+
+      currentDistance += segmentLength;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MajorityPreviewPainter oldDelegate) =>
+      color != oldDelegate.color || cellSize != oldDelegate.cellSize;
 }

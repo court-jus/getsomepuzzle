@@ -302,6 +302,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintLetterGroup => 'groupe de lettres';
 
   @override
+  String get constraintMajority => 'couleur majoritaire';
+
+  @override
   String get constraintParity => 'parité';
 
   @override
@@ -437,6 +440,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get createMotifHeight => 'Hauteur du motif';
+
+  @override
+  String get createSecondCorner => 'Tapez le second coin de la zone MJ';
+
+  @override
+  String get createZoneTooSmall => 'La zone doit contenir au moins 3 cellules';
 
   @override
   String createLetterGroupMode(String letter) {
@@ -605,6 +614,10 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get constraintExplainLT =>
       'Les cases marquées de la même lettre doivent appartenir au même groupe. Un groupe ne peut pas contenir deux lettres différentes.';
+
+  @override
+  String get constraintExplainMJ =>
+      'Un cadre en pointillés d\'une couleur donnée indique que la majorité des cellules à l\'intérieur de la zone doivent être de cette couleur (plus de la moitié).';
 
   @override
   String get constraintExplainQA =>

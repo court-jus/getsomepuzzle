@@ -1,5 +1,10 @@
 # Get Some Puzzle Release Notes
 
+## Unreleased
+
+* **New constraint**: Majority color inside a zone
+* **Editor** fixes
+
 ## 1.6.13 (18 May 2026)
 
 * **Help pages** updated with more details about the UI.

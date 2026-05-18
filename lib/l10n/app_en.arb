@@ -391,6 +391,10 @@
     "@constraintLetterGroup": {
         "description": "Name of the letter group constraint"
     },
+    "constraintMajority": "majority color",
+    "@constraintMajority": {
+        "description": "Name of the majority zone constraint"
+    },
     "constraintParity": "parity",
     "@constraintParity": {
         "description": "Name of the parity constraint"
@@ -503,6 +507,8 @@
     "createChooseCount": "Count",
     "createMotifWidth": "Pattern width",
     "createMotifHeight": "Pattern height",
+    "createSecondCorner": "Tap second corner of MJ zone",
+    "createZoneTooSmall": "Zone must be at least 3 cells",
     "createLetterGroupMode": "Tap cells to add to group {letter}, then press Done",
     "@createLetterGroupMode": {
         "placeholders": {
@@ -655,6 +661,10 @@
     "constraintExplainLT": "Cells marked with the same letter must belong to the same group. A group must not contain two different letters.",
     "@constraintExplainLT": {
         "description": "Body of the new-constraint explanation modal for the Letter Group (LT) constraint"
+    },
+    "constraintExplainMJ": "A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half).",
+    "@constraintExplainMJ": {
+        "description": "Body of the new-constraint explanation modal for the Majority (MJ) constraint"
     },
     "constraintExplainQA": "A number on a blue background above the grid sets the total number of cells of that color the solution must contain.",
     "@constraintExplainQA": {

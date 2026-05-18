@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
@@ -16,6 +17,7 @@ import 'package:getsomepuzzle/widgets/column_count.dart';
 import 'package:getsomepuzzle/widgets/row_count.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/widgets/group_count.dart';
+import 'package:getsomepuzzle/widgets/majority.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
@@ -52,6 +54,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
   final GlobalKey _constraintKey = GlobalKey();
   final GlobalKey _cellKey = GlobalKey();
   final GlobalKey _stackKey = GlobalKey();
+  final GlobalKey _gridKey = GlobalKey();
   Offset? _arrowStart;
   Offset? _arrowEnd;
 
@@ -92,11 +95,9 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
   }
 
   void _computeArrowPositions() {
-    final constraintBox =
-        _constraintKey.currentContext?.findRenderObject() as RenderBox?;
     final cellBox = _cellKey.currentContext?.findRenderObject() as RenderBox?;
     final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
-    if (constraintBox == null || cellBox == null || stackBox == null) {
+    if (cellBox == null || stackBox == null) {
       if (_arrowStart != null || _arrowEnd != null) {
         setState(() {
           _arrowStart = null;
@@ -105,16 +106,45 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       }
       return;
     }
-    final constraintPos = constraintBox.localToGlobal(
-      Offset.zero,
-      ancestor: stackBox,
-    );
-    final cellPos = cellBox.localToGlobal(Offset.zero, ancestor: stackBox);
-    final start =
-        constraintPos +
-        Offset(constraintBox.size.width / 2, constraintBox.size.height / 2);
+
+    // Find the highlighted constraint to determine arrow origin
+    Constraint? highlightedConstraint;
+    for (var c in widget.currentPuzzle.constraints) {
+      if (c.isHighlighted) {
+        highlightedConstraint = c;
+        break;
+      }
+    }
+
+    Offset start;
+    if (highlightedConstraint is MajorityConstraint) {
+      final mj = highlightedConstraint;
+      final gridBox = _gridKey.currentContext?.findRenderObject() as RenderBox?;
+      if (gridBox == null) return;
+      final gridPos = gridBox.localToGlobal(Offset.zero, ancestor: stackBox);
+      start =
+          gridPos +
+          Offset(
+            (mj.c0 + mj.c1 + 1) / 2 * widget.cellSize,
+            (mj.r0 + mj.r1 + 1) / 2 * widget.cellSize,
+          );
+    } else {
+      final constraintBox =
+          _constraintKey.currentContext?.findRenderObject() as RenderBox?;
+      if (constraintBox == null) return;
+      final constraintPos = constraintBox.localToGlobal(
+        Offset.zero,
+        ancestor: stackBox,
+      );
+      start =
+          constraintPos +
+          Offset(constraintBox.size.width / 2, constraintBox.size.height / 2);
+    }
+
     final end =
-        cellPos + Offset(cellBox.size.width / 2, cellBox.size.height / 2);
+        cellBox.localToGlobal(Offset.zero, ancestor: stackBox) +
+        Offset(cellBox.size.width / 2, cellBox.size.height / 2);
+
     if (start != _arrowStart || end != _arrowEnd) {
       setState(() {
         _arrowStart = start;
@@ -190,6 +220,14 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       constraintCellIdx = highlightedConstraint.indices.first;
     }
 
+    // For MJ zone highlight: collect all cell indices inside the zone
+    Set<int>? mjZoneHighlightIndices;
+    if (highlightedConstraint is MajorityConstraint) {
+      mjZoneHighlightIndices = highlightedConstraint
+          .indicesFor(widget.currentPuzzle.width)
+          .toSet();
+    }
+
     // Only assign arrow keys when there's a highlighted cell (arrow endpoint).
     // Without a highlighted cell, there's no arrow to draw, so no need for
     // _constraintKey on a Table cell (avoids GlobalKey migration conflicts).
@@ -203,6 +241,10 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
 
     final hasDF = widget.currentPuzzle.constraints.any(
       (c) => c is DifferentFromConstraint,
+    );
+
+    final hasMJ = widget.currentPuzzle.constraints.any(
+      (c) => c is MajorityConstraint,
     );
 
     return LayoutBuilder(
@@ -356,6 +398,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                             ),
                           ),
                         SizedBox(
+                          key: _gridKey,
                           width: gridWidth,
                           height: gridHeight,
                           child: Stack(
@@ -380,6 +423,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                             constraintCellIdx,
                                             hasHighlightedCell,
                                             groups,
+                                            mjZoneHighlightIndices,
                                           ),
                                       ],
                                     ),
@@ -398,6 +442,20 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                       gridWidth: widget.currentPuzzle.width,
                                       defaultColor: Colors.black87,
                                       highlightColor: highlightColor,
+                                    ),
+                                  ),
+                                ),
+                              if (hasMJ)
+                                IgnorePointer(
+                                  child: CustomPaint(
+                                    painter: MajorityZonePainter(
+                                      constraints: widget
+                                          .currentPuzzle
+                                          .constraints
+                                          .whereType<MajorityConstraint>()
+                                          .toList(),
+                                      cellSize: adjustedCellSize,
+                                      gridWidth: widget.currentPuzzle.width,
                                     ),
                                   ),
                                 ),
@@ -437,8 +495,14 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     int? constraintCellIdx,
     bool hasHighlightedCell,
     List<List<int>> groups,
+    Set<int>? mjZoneHighlightIndices,
   ) {
     final idx = rowidx * widget.currentPuzzle.width + cellidx;
+
+    final Color? zoneTint =
+        mjZoneHighlightIndices != null && mjZoneHighlightIndices.contains(idx)
+        ? highlightColor.withValues(alpha: 0.15)
+        : null;
 
     // Assign _cellKey to highlighted cell, _constraintKey to constraint's home cell.
     // Only assign _constraintKey when there's also a highlighted cell (arrow endpoint),
@@ -485,6 +549,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
         }
         return 0;
       },
+      zoneHighlightColor: zoneTint,
     );
   }
 }

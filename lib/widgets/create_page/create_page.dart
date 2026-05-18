@@ -10,7 +10,10 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/majority.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/eyes_dialog.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
@@ -34,7 +37,9 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/motif_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/parity_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/playlist_name_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/quantity_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/row_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/symmetry_dialog.dart';
+import 'package:getsomepuzzle/widgets/row_count.dart';
 
 export 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
 
@@ -67,6 +72,10 @@ class _CreatePageState extends State<CreatePage> {
   bool _letterGroupMode = false;
   String _letterGroupLetter = 'A';
   List<int> _letterGroupIndices = [];
+
+  bool _majorityZoneMode = false;
+  int _majorityZoneColor = 1;
+  int? _majorityZoneFirstIdx;
 
   Timer? _solveDebounce;
   Set<int> _propagationCells = {};
@@ -199,6 +208,11 @@ class _CreatePageState extends State<CreatePage> {
   // --- Cell tap handling ---
 
   Future<void> _onCellTap(int cellIdx) async {
+    if (_majorityZoneMode) {
+      _finishMajorityZone(cellIdx);
+      return;
+    }
+
     if (_letterGroupMode) {
       setState(() {
         if (_letterGroupIndices.contains(cellIdx)) {
@@ -216,11 +230,59 @@ class _CreatePageState extends State<CreatePage> {
         .toList();
     final isFixed = _fixedCells.containsKey(cellIdx);
 
+    final mjZones = _constraints
+        .whereType<MajorityConstraint>()
+        .where((mj) => _cellInMjZone(cellIdx, mj))
+        .toList();
+
+    if (mjZones.isNotEmpty) {
+      final toRemove = await _showMjDeletePicker(mjZones);
+      if (toRemove != null) {
+        _removeConstraint(toRemove);
+        return;
+      }
+    }
+
     if (cellConstraints.isEmpty && !isFixed) {
       await _pickAndAddConstraint(cellIdx);
     } else {
       await _openCellActions(cellIdx, cellConstraints, isFixed);
     }
+  }
+
+  bool _cellInMjZone(int idx, MajorityConstraint mj) {
+    final r = idx ~/ _width;
+    final c = idx % _width;
+    return r >= mj.r0 && r <= mj.r1 && c >= mj.c0 && c <= mj.c1;
+  }
+
+  Future<MajorityConstraint?> _showMjDeletePicker(
+    List<MajorityConstraint> zones,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    return showDialog<MajorityConstraint>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${loc.createDeleteConstraint} MJ'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final z in zones)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: Text(z.serialize()),
+                onTap: () => Navigator.pop(ctx, z),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _openCellActions(
@@ -285,6 +347,9 @@ class _CreatePageState extends State<CreatePage> {
       case ConstraintType.letterGroup:
         await _startLetterGroup(cellIdx);
         return;
+      case ConstraintType.majority:
+        await _startMajorityZone(cellIdx);
+        return;
       case ConstraintType.quantity:
         added = await showQuantityDialog(
           context,
@@ -293,6 +358,13 @@ class _CreatePageState extends State<CreatePage> {
         );
       case ConstraintType.columnCount:
         added = await showColumnCountDialog(
+          context,
+          cellIdx: cellIdx,
+          width: _width,
+          height: _height,
+        );
+      case ConstraintType.rowCount:
+        added = await showRowCountDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
@@ -367,6 +439,70 @@ class _CreatePageState extends State<CreatePage> {
     });
   }
 
+  Future<void> _startMajorityZone(int cellIdx) async {
+    final loc = AppLocalizations.of(context)!;
+    final color = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.createChooseType),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            TextButton.icon(
+              onPressed: () => Navigator.pop(ctx, 1),
+              icon: const Icon(Icons.circle, color: Colors.black),
+              label: Text(loc.createFixBlack),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.pop(ctx, 2),
+              icon: const Icon(Icons.circle, color: Colors.white),
+              label: Text(loc.createFixWhite),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (color == null) return;
+    setState(() {
+      _majorityZoneMode = true;
+      _majorityZoneColor = color;
+      _majorityZoneFirstIdx = cellIdx;
+    });
+  }
+
+  void _finishMajorityZone(int cellIdx) {
+    final loc = AppLocalizations.of(context)!;
+    final first = _majorityZoneFirstIdx!;
+    final r0 = first ~/ _width;
+    final c0 = first % _width;
+    final r1 = cellIdx ~/ _width;
+    final c1 = cellIdx % _width;
+    final rMin = min(r0, r1);
+    final rMax = max(r0, r1);
+    final cMin = min(c0, c1);
+    final cMax = max(c0, c1);
+    final area = (rMax - rMin + 1) * (cMax - cMin + 1);
+    if (area < 3) {
+      setState(() {
+        _majorityZoneMode = false;
+        _majorityZoneFirstIdx = null;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(loc.createZoneTooSmall)));
+      });
+      return;
+    }
+    _addConstraint(
+      MajorityConstraint('$rMin.$cMin.$rMax.$cMax.$_majorityZoneColor'),
+    );
+    setState(() {
+      _majorityZoneMode = false;
+      _majorityZoneFirstIdx = null;
+    });
+  }
+
   void _setFixedCell(int cellIdx, int value) {
     setState(() {
       if (_fixedCells[cellIdx] == value) {
@@ -422,11 +558,21 @@ class _CreatePageState extends State<CreatePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _letterGroupMode
-              ? loc.createLetterGroupMode(_letterGroupLetter)
-              : loc.createTitle,
+          _majorityZoneMode
+              ? loc.createSecondCorner
+              : (_letterGroupMode
+                    ? loc.createLetterGroupMode(_letterGroupLetter)
+                    : loc.createTitle),
         ),
         actions: [
+          if (_majorityZoneMode)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => setState(() {
+                _majorityZoneMode = false;
+                _majorityZoneFirstIdx = null;
+              }),
+            ),
           if (_letterGroupMode)
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -723,6 +869,13 @@ class _CreatePageState extends State<CreatePage> {
     final dfConstraints = _constraints
         .whereType<DifferentFromConstraint>()
         .toList();
+    final mjConstraints = _constraints.whereType<MajorityConstraint>().toList();
+
+    final rcConstraints = _constraints.whereType<RowCountConstraint>();
+    final rcByRow = <int, RowCountConstraint>{};
+    for (final c in rcConstraints) {
+      rcByRow[c.rowIdx] = c;
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -731,7 +884,7 @@ class _CreatePageState extends State<CreatePage> {
           (MediaQuery.sizeOf(context).height * 0.5) / _height,
         );
 
-        return Stack(
+        final grid = Stack(
           children: [
             Table(
               border: TableBorder.all(),
@@ -764,6 +917,44 @@ class _CreatePageState extends State<CreatePage> {
                   ),
                 ),
               ),
+            if (mjConstraints.isNotEmpty)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: MajorityZonePainter(
+                      constraints: mjConstraints,
+                      cellSize: cellSize,
+                      gridWidth: _width,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+
+        if (rcByRow.isEmpty) return grid;
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Column(
+              children: [
+                for (int row = 0; row < _height; row++)
+                  if (rcByRow.containsKey(row))
+                    GestureDetector(
+                      onTap: () => _confirmDeleteTopBar(rcByRow[row]!),
+                      child: RowCountWidget(
+                        constraint: rcByRow[row]!,
+                        cellSize: cellSize,
+                      ),
+                    )
+                  else
+                    SizedBox(width: cellSize * 0.7, height: cellSize),
+              ],
+            ),
+            const SizedBox(width: 4),
+            grid,
           ],
         );
       },
@@ -778,6 +969,7 @@ class _CreatePageState extends State<CreatePage> {
     final constraints = cellConstraintsMap[cellIdx];
     final isLetterGroupSelected =
         _letterGroupMode && _letterGroupIndices.contains(cellIdx);
+    final isMjZoneFirst = _majorityZoneMode && _majorityZoneFirstIdx == cellIdx;
     final fixedValue = _fixedCells[cellIdx];
     final isFixed = fixedValue != null;
 
@@ -785,7 +977,10 @@ class _CreatePageState extends State<CreatePage> {
 
     Color? borderColor;
     double? borderWidth;
-    if (isLetterGroupSelected) {
+    if (isMjZoneFirst) {
+      borderColor = Colors.amber;
+      borderWidth = 3;
+    } else if (isLetterGroupSelected) {
       borderColor = Colors.amber;
       borderWidth = 3;
     } else if (_propagationCells.contains(cellIdx)) {

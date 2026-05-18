@@ -35,6 +35,7 @@ class CellWidget extends StatelessWidget {
     this.onRightDrag,
     this.onRightDragEnd,
     this.getCellGroupSize,
+    this.zoneHighlightColor,
   });
 
   // Attributes
@@ -63,6 +64,10 @@ class CellWidget extends StatelessWidget {
 
   /// Callback to get the actual group size for a cell (for GroupSize constraint)
   final int Function(int idx)? getCellGroupSize;
+
+  /// When set, draws a low-opacity tinted overlay behind the cell content
+  /// (used for MJ zone highlighting).
+  final Color? zoneHighlightColor;
 
   // Build UI
   @override
@@ -159,6 +164,12 @@ class CellWidget extends StatelessWidget {
             height: cellSize,
             child: Stack(
               children: [
+                if (zoneHighlightColor != null)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(color: zoneHighlightColor),
+                    ),
+                  ),
                 Center(child: label),
                 if (cornerIndicatorValue != null)
                   Positioned(

@@ -44,6 +44,10 @@ Si ves una flecha en una celda, debe haber el mismo número de celdas negras y b
 
 Las celdas que contengan la misma letra deben formar parte del mismo grupo. Un grupo no debe contener letras diferentes.
 
+### Color mayoritario
+
+Un rectángulo punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad). El color del borde le indica qué color debe dominar.
+
 ### Cantidad
 
 Un número negro o blanco sobre el rompecabezas, sobre un fondo azul, indica que el número total de celdas de ese color debe coincidir con ese número.

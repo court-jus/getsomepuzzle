@@ -608,6 +608,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return l10n.constraintGroupSize;
       case 'LT':
         return l10n.constraintLetterGroup;
+      case 'MJ':
+        return l10n.constraintMajority;
       case 'PA':
         return l10n.constraintParity;
       case 'QA':
@@ -624,6 +626,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return l10n.constraintNeighborCount;
       case 'EY':
         return l10n.constraintEyes;
+      case 'RC':
+        return l10n.constraintRowCount;
       case '*':
         return l10n.complicityOtherConstraint;
       default:
