@@ -87,18 +87,22 @@ void _isolateEntryPoint(_RankParams params) {
     existingConstraints: params.existingConstraints,
   );
 
-  final useful = <String>[];
+  final useful = <(String, int)>[];
   final notUseful = <String>[];
   for (final cs in params.candidateConstraints) {
-    if (classifyCandidate(puzzle, cs, baselineMoves)) {
-      useful.add(cs);
+    final score = scoreCandidate(puzzle, cs, baselineMoves);
+    if (score != null) {
+      useful.add((cs, score));
     } else {
       notUseful.add(cs);
     }
   }
+  // Sort useful candidates by descending score so the hint button
+  // surfaces the constraint that unlocks the most cells first.
+  useful.sort((a, b) => b.$2.compareTo(a.$2));
 
   params.sendPort.send({
-    'ranked': [...useful, ...notUseful],
+    'ranked': [...useful.map((e) => e.$1), ...notUseful],
     'usefulCount': useful.length,
   });
 }

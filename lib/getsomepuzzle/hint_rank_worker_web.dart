@@ -25,7 +25,7 @@ class HintRankWorker {
       existingConstraints: existingConstraints,
     );
 
-    final useful = <String>[];
+    final useful = <(String, int)>[];
     final notUseful = <String>[];
 
     int processed = 0;
@@ -37,8 +37,9 @@ class HintRankWorker {
         break;
       }
 
-      if (classifyCandidate(puzzle, cs, baselineMoves)) {
-        useful.add(cs);
+      final score = scoreCandidate(puzzle, cs, baselineMoves);
+      if (score != null) {
+        useful.add((cs, score));
       } else {
         notUseful.add(cs);
       }
@@ -48,8 +49,14 @@ class HintRankWorker {
         await Future.delayed(Duration.zero);
       }
     }
+    // Sort useful candidates by descending score so the hint button
+    // surfaces the constraint that unlocks the most cells first.
+    useful.sort((a, b) => b.$2.compareTo(a.$2));
 
-    return HintRankResult([...useful, ...notUseful], useful.length);
+    return HintRankResult([
+      ...useful.map((e) => e.$1),
+      ...notUseful,
+    ], useful.length);
   }
 
   void cancel() {

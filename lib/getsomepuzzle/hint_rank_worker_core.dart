@@ -37,19 +37,28 @@ class HintRankResult {
   return (puzzle, baselineMoves);
 }
 
-/// Whether adding [candidate] to [puzzle] unlocks more deductions than the
-/// baseline. Returns false for invalid candidate strings, candidates that
-/// make no extra progress, or candidates that make the puzzle contradictory.
-bool classifyCandidate(Puzzle puzzle, String candidate, int baselineMoves) {
+/// Score [candidate] by the number of *additional* propagation moves it
+/// unlocks over [baselineMoves]. Returns `null` for invalid candidate
+/// strings, candidates that make no extra progress, or candidates that
+/// make the puzzle contradictory. Otherwise returns a positive integer:
+/// higher = unlocks more cells immediately = "more useful" hint.
+///
+/// Callers should sort candidates by descending score so the hint
+/// button surfaces the most useful constraint first. A null score puts
+/// the candidate in the non-useful tail.
+int? scoreCandidate(Puzzle puzzle, String candidate, int baselineMoves) {
   final colonIdx = candidate.indexOf(':');
-  if (colonIdx < 0) return false;
+  if (colonIdx < 0) return null;
   final slug = candidate.substring(0, colonIdx);
   final p = candidate.substring(colonIdx + 1);
   final constraint = createConstraint(slug, p);
-  if (constraint == null) return false;
+  if (constraint == null) return null;
 
   final test = puzzle.clone();
   test.addConstraint(constraint);
   final testMoves = test.propagateToFixpoint();
-  return testMoves != null && testMoves > baselineMoves;
+  if (testMoves == null) return null;
+  final delta = testMoves - baselineMoves;
+  if (delta <= 0) return null;
+  return delta;
 }

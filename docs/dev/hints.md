@@ -159,13 +159,15 @@ doesn't help solve) should not be proposed.
 shuffled. A second background job (`hint_rank_worker_io.dart` /
 `hint_rank_worker_web.dart`, selected via conditional imports) ranks
 candidates: it runs `applyConstraintsPropagation()` against each one
-and keeps the *useful* ones (those that unlock at least one extra
-cell) at the front. Non-useful candidates are moved to the tail. Any
-player interaction (`tap`, `undo`, etc.) cancels the current ranking
-pass and reschedules it with a 300 ms debounce.
-
-A more ambitious direction (prioritize the "most useful" constraints)
-is tracked in `docs/todo.md` for future exploration.
+and records the *delta* — the number of additional cells the candidate
+unlocks compared to the baseline (`scoreCandidate` in
+`hint_rank_worker_core.dart`). Useful candidates (delta > 0) are
+sorted by descending delta and placed at the front, so the hint
+button surfaces the constraint that unlocks the most cells first.
+Non-useful candidates (no extra progress, contradiction, or invalid)
+are kept in the tail in their incoming order. Any player interaction
+(`tap`, `undo`, etc.) cancels the current ranking pass and
+reschedules it with a 300 ms debounce.
 
 ### Per-tap flow
 
