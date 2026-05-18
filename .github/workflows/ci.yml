@@ -40,7 +40,10 @@ jobs:
         id: tag
         run: |
           VERSION=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
-          TAG="v${VERSION}"
+          # Strip the Flutter build-number suffix (+N) so the source tag
+          # stays clean as `vX.Y.Z`. Build numbers live in pubspec.yaml
+          # for the Play Store and are not meaningful on the git side.
+          TAG="v${VERSION%+*}"
           echo "tag_name=$TAG" >> "$GITHUB_OUTPUT"
 
           if git ls-remote --exit-code origin "refs/tags/${TAG}" > /dev/null 2>&1; then
@@ -170,7 +173,9 @@ jobs:
       - name: Extract version from pubspec.yaml
         run: |
           version=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
-          echo "VERSION=$version" >> $GITHUB_ENV
+          # Strip the Flutter build-number suffix to match the tag form
+          # produced by the auto-tag job (vX.Y.Z, no +N).
+          echo "VERSION=${version%+*}" >> $GITHUB_ENV
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
