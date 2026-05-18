@@ -60,25 +60,7 @@ class GroupCountConstraint extends Constraint {
       return currentCount == count;
     }
     if (currentCount > count) {
-      // `_reachableCountsByMerges` only enumerates counts reachable by
-      // colouring existing merge-cells — it does NOT consider that new
-      // isolated groups can also appear on free cells with no `color`
-      // neighbour. When such "addable" cells exist, the reachable set is
-      // an under-approximation and "target ∉ reachable" no longer proves
-      // impossibility (you can raise the count by adding, then merge the
-      // originals separately to land on the target). The strictly sound
-      // lower-bound check `calculateMinGroups > count` stays usable in
-      // both cases.
-      final canAddNewGroup = getFreeCellsWithoutNeighborColor(
-        puzzle,
-        color,
-      ).isNotEmpty;
-      final reachable = _safeReachableCountsByMerges(puzzle);
-      if (reachable != null && !canAddNewGroup) {
-        if (!reachable.contains(count)) return false;
-      } else if (calculateMinGroups(puzzle, color) > count) {
-        return false;
-      }
+      if (_exceedingTargetIsImpossible(puzzle)) return false;
     }
     if (currentCount < count) {
       // Look for free cells where we could put a 'color' cell without
@@ -96,21 +78,7 @@ class GroupCountConstraint extends Constraint {
     final currentCount = _getGroupCount(puzzle);
 
     if (currentCount > count) {
-      // See `verify` — the merges-only enumeration under-approximates the
-      // reachable set whenever a free cell with no `color` neighbour can
-      // start a new isolated group. Only trust `!reachable.contains(count)`
-      // as an impossibility proof when no such cell exists; otherwise fall
-      // back to the always-sound `calculateMinGroups > count` lower bound.
-      final canAddNewGroup = getFreeCellsWithoutNeighborColor(
-        puzzle,
-        color,
-      ).isNotEmpty;
-      final reachable = _safeReachableCountsByMerges(puzzle);
-      if (reachable != null && !canAddNewGroup) {
-        if (!reachable.contains(count)) {
-          return Move(0, 0, this, isImpossible: this);
-        }
-      } else if (calculateMinGroups(puzzle, color) > count) {
+      if (_exceedingTargetIsImpossible(puzzle)) {
         return Move(0, 0, this, isImpossible: this);
       }
       // Force on a single direct merge-cell only if colouring it opposite
@@ -195,6 +163,31 @@ class GroupCountConstraint extends Constraint {
     // forever. It also implies that no merge-cell exists now or can appear
     // later, so apply() will never fire again.
     return calculateMinGroups(puzzle, color) == currentCount;
+  }
+
+  /// Soundness check for the `currentCount > count` over-count case:
+  /// returns `true` iff no future play can bring the count back down
+  /// to the target.
+  ///
+  /// `_reachableCountsByMerges` only enumerates counts reachable by
+  /// colouring existing merge-cells — it does NOT consider that new
+  /// isolated groups can appear on free cells with no `color`
+  /// neighbour. When such "addable" cells exist, the reachable set is
+  /// an under-approximation and "target ∉ reachable" no longer proves
+  /// impossibility (you can raise the count by adding, then merge the
+  /// originals separately to land on the target). The strictly sound
+  /// `calculateMinGroups > count` lower bound stays usable in both
+  /// cases as a fallback.
+  bool _exceedingTargetIsImpossible(Puzzle puzzle) {
+    final canAddNewGroup = getFreeCellsWithoutNeighborColor(
+      puzzle,
+      color,
+    ).isNotEmpty;
+    final reachable = _safeReachableCountsByMerges(puzzle);
+    if (reachable != null && !canAddNewGroup) {
+      return !reachable.contains(count);
+    }
+    return calculateMinGroups(puzzle, color) > count;
   }
 
   /// True iff at least two candidates are adjacent cells in the grid.

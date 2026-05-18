@@ -826,8 +826,9 @@ class GameModel extends ChangeNotifier {
 
   void _scheduleHintRanking() {
     if (hintConstraintsReady != HintConstraintStatus.ready ||
-        availableHintConstraints.isEmpty)
+        availableHintConstraints.isEmpty) {
       return;
+    }
     _hintRankDebounce?.cancel();
     _hintRankDebounce = Timer(
       const Duration(milliseconds: 300),

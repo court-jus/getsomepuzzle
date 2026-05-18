@@ -842,7 +842,7 @@ class Database {
   /// level collections. End-of-batch is the natural moment to surface
   /// a level-rotation suggestion — capping at 5 avoids the player going
   /// months without seeing it on collections that hold ~1k+ puzzles.
-  /// Custom, and user playlists are not capped.
+  /// Custom and user playlists are not capped.
   static const int playlistBatchSize = 5;
 
   bool _isPlayableLevel(String key) =>

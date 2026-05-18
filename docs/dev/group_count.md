@@ -45,19 +45,34 @@ Performs deductions based on current puzzle state. Four cases:
    subset's union-find yields a component count). For up to ~15 merge-cells
    this is cheap (2^k ≤ 32768 cases).
 
-   **Direct-merge requirement.** This enumeration is sound only when every
-   mergeable pair of groups has a direct merge-cell (a free cell adjacent
-   to a member of each). If some pair can only be merged via a multi-step
-   flood-fill path (e.g., two distant singletons with a long empty corridor
-   between them), the enumeration would under-count reachable partitions
-   and falsely flag the state as impossible. In that case we fall back to
-   the weaker `calculateMinGroups > count` check. Concretely:
+   **Soundness requirements.** The merge-only enumeration is an
+   *under-approximation*: it only considers counts reachable by colouring
+   existing merge-cells, and ignores two other ways the count can change
+   between now and the final state. To trust `count ∉ reachable` as proof
+   of impossibility, both gaps must be closed:
 
-   - If every mergeable pair has a direct merge-cell AND the enumeration
-     succeeds (≤ 15 merge-cells): use it.
+   - **Direct-merge requirement.** Every mergeable pair of groups must
+     have a direct merge-cell (a free cell adjacent to a member of each).
+     If some pair can only be merged via a multi-step flood-fill path
+     (e.g., two distant singletons with a long empty corridor between
+     them), the enumeration would under-count reachable partitions.
+   - **No-addable-cell requirement.** `getFreeCellsWithoutNeighborColor`
+     must be empty for the colour. Otherwise a free cell with no `color`
+     neighbour can start a new isolated group, lifting the count above
+     `currentCount`; the new group can then be merged into existing ones
+     separately. A target between `currentCount` and `min reachable` is
+     reachable via *add-then-merge*, even when it's absent from the
+     merge-only enumeration.
+
+   Concretely:
+
+   - If every mergeable pair has a direct merge-cell, the enumeration
+     succeeds (≤ 15 merge-cells), AND no free cell can start a new
+     isolated group: use it.
      - If `count ∉ reachable` → contradiction (`isImpossible`).
-   - Otherwise: fall back to `calculateMinGroups > count` → contradiction
-     if it holds.
+   - Otherwise (chain merge needed, or addable cells exist, or the
+     subset-enumeration was skipped on size): fall back to the always-sound
+     `calculateMinGroups > count` lower bound → contradiction if it holds.
 
    **Single-merge-cell force.** When exactly one merge-cell exists, we
    cannot blindly force `color` on it. The enumeration only considers
@@ -75,6 +90,22 @@ Performs deductions based on current puzzle state. Four cases:
    14 (joining with {0,1,7}), then 2 and 3 (joining with the middle
    group). The probe confirms `calculateMinGroups` is still 1 with cell
    23 = 2, so we do *not* force cell 23.
+
+   Example for the addable-cell case (regression-tested in
+   `test/constraints_test.dart` under "new isolated groups + merge can
+   reach target → not impossible"): grid `0122 / 0012 / 0020 / 1012`
+   with `GC:2.2`. After 6 propagation steps the state has 3 isolated
+   white groups (`{2,3,7}`, `{10}`, `{15}`) — three groups already, so
+   `currentCount > count = 2`. The only direct merge-cell is cell 11,
+   adjacent to all three groups simultaneously; colouring it collapses
+   the three into one. Merge-only reachable counts = `{3, 1}` — `2` is
+   absent. But cells 0, 4, 5, 8, 13 are all free with no white
+   neighbour: any one of them can become a fourth isolated white group,
+   after which colouring cell 11 collapses the original three into one,
+   leaving exactly two groups. Target 2 *is* reachable via
+   add-then-merge, so `apply`/`verify` must not flag impossibility.
+   The `!canAddNewGroup` gate forces the fall-back to
+   `calculateMinGroups > count` (= 1 > 2 → false → not impossible).
 
 2. **Not enough groups** (`currentCount < count`):
    - If `candidates + currentCount < count` → contradiction (even colouring
