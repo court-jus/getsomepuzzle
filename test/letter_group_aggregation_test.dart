@@ -76,24 +76,21 @@ void main() {
     );
   });
 
-  test(
-    'complicity cache is recomputed after addConstraint mutates the set',
-    () {
-      // The lazy complicity cache must be invalidated whenever the
-      // constraint set changes; otherwise mid-build code that read
-      // `complicities` once would freeze the result against an outdated
-      // snapshot. Concretely: a puzzle with only FM has no complicity,
-      // adding PA opens up PABalancedSideComplicity.
-      final p = Puzzle('v2_12_3x3_000000000_FM:2.1_0:0_0');
-      expect(p.complicities, isEmpty);
-      p.addConstraint(
-        // PA:8.top forms the canonical PABalancedSideComplicity pair with FM:2.1.
-        // Built by createConstraint via the registry.
-        _buildConstraint('PA', '8.top'),
-      );
-      expect(p.complicities, isNotEmpty);
-    },
-  );
+  test('complicity cache is recomputed after addConstraint mutates the set', () {
+    // The lazy complicity cache must be invalidated whenever the
+    // constraint set changes; otherwise mid-build code that read
+    // `complicities` once would freeze the result against an outdated
+    // snapshot. Concretely: a puzzle with only FM has no complicity,
+    // adding PA opens up PABalancedSideComplicity.
+    final p = Puzzle('v2_12_3x3_000000000_FM:2.1_0:0_0');
+    expect(p.complicities, isEmpty);
+    p.addConstraint(
+      // PA:8.top forms the canonical PABalancedSideComplicity pair with FM:2.1.
+      // Built by createConstraint via the registry.
+      _buildConstraint('PA', '8.top'),
+    );
+    expect(p.complicities, isNotEmpty);
+  });
 }
 
 dynamic _buildConstraint(String slug, String params) {
