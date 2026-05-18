@@ -740,7 +740,7 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
           if (!match) {
             invalid++;
             categoryCounts[_DetailedCategory.cachedMismatch] =
-                (categoryCounts[_DetailedCategory.cachedMismatch] ?? 0) + 1;
+                categoryCounts[_DetailedCategory.cachedMismatch]! + 1;
             badSink.writeln(
               '# INVALID (${_DetailedCategory.cachedMismatch.label} — '
               'cached _1: differs from deduced solution)',
@@ -772,7 +772,7 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
           } else {
             cat = _DetailedCategory.needsBacktrack;
           }
-          categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+          categoryCounts[cat] = categoryCounts[cat]! + 1;
           final detail = switch (cat) {
             _DetailedCategory.unsolvable => '0 solutions found',
             _DetailedCategory.nonUnique => '≥2 solutions found',
@@ -811,7 +811,7 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
   );
   if (detailed && invalid > 0) {
     for (final c in _DetailedCategory.values) {
-      final n = categoryCounts[c] ?? 0;
+      final n = categoryCounts[c]!;
       if (n > 0) stderr.writeln('    ${c.label.padRight(16)} $n');
     }
   }
@@ -862,7 +862,7 @@ void _renderCheckDashboard({
 
   if (detailed) {
     final breakdown = <String, int>{
-      for (final c in _DetailedCategory.values) c.label: categoryCounts[c] ?? 0,
+      for (final c in _DetailedCategory.values) c.label: categoryCounts[c]!,
     };
     stderr.writeln('');
     stderr.writeln('Invalid breakdown:');
