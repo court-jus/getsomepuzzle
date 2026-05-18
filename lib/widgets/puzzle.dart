@@ -60,6 +60,24 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     if (secondary) widget.onCellTap(idx);
   }
 
+  /// Convert a per-cell drag [offset] (in cell units, relative to the
+  /// starting cell at `(rowidx, cellidx)`) into a flat grid index, or
+  /// return `null` when the cursor has left the grid. The bounds check
+  /// is per-axis so a cursor leaving the grid horizontally does NOT
+  /// silently wrap onto the previous/next row via row-major
+  /// arithmetic — that wrap puts the painted cell visually far from
+  /// the pointer and is the symptom the player sees as a "stray paint"
+  /// when their drag exits the side of the grid.
+  int? _dragTargetIdx(int rowidx, int cellidx, Offset offset) {
+    final targetRow = rowidx + offset.dy.floor();
+    final targetCell = cellidx + offset.dx.floor();
+    final w = widget.currentPuzzle.width;
+    final h = widget.currentPuzzle.height;
+    if (targetRow < 0 || targetRow >= h) return null;
+    if (targetCell < 0 || targetCell >= w) return null;
+    return targetRow * w + targetCell;
+  }
+
   @override
   void didUpdateWidget(PuzzleWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -448,18 +466,14 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
           ? () => _handleCellTap(idx, secondary: true)
           : null,
       onDrag: (Offset offset) {
-        final int targetRow = (rowidx + offset.dy).floor();
-        final int targetCell = (cellidx + offset.dx).floor();
-        widget.onCellDrag(targetRow * widget.currentPuzzle.width + targetCell);
+        final idx = _dragTargetIdx(rowidx, cellidx, offset);
+        if (idx != null) widget.onCellDrag(idx);
       },
       onDragEnd: widget.onCellDragEnd,
       onRightDrag: widget.onCellRightDrag != null
           ? (Offset offset) {
-              final int targetRow = (rowidx + offset.dy).floor();
-              final int targetCell = (cellidx + offset.dx).floor();
-              widget.onCellRightDrag!(
-                targetRow * widget.currentPuzzle.width + targetCell,
-              );
+              final idx = _dragTargetIdx(rowidx, cellidx, offset);
+              if (idx != null) widget.onCellRightDrag!(idx);
             }
           : null,
       onRightDragEnd: widget.onCellRightDragEnd,
