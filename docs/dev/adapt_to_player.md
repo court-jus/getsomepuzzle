@@ -149,12 +149,13 @@ backfire, `EndOfPlaylist` surfaces it (see below).
 ### Batch cap and `EndOfPlaylist` rotation
 
 On the six built-in level collections (`1-easy` … `6-mad`),
-`preparePlaylist` truncates the result to **`playlistBatchSize = 20`
-puzzles** (`tutorial`, `custom`, and user playlists are exempt). The
-truncation makes `EndOfPlaylist` fire predictably every ~20 plays —
-without the cap, a collection holding ~1 000 puzzles would never
-exhaust, and we'd never get a natural moment to surface the
-cross-collection suggestion below.
+`preparePlaylist` truncates the result to **`playlistBatchSize = 5`
+puzzles** (`custom` and user playlists are exempt; the `tutorial`
+collection itself was removed in the onboarding rework — see
+[`onboarding.md`](onboarding.md)). The truncation makes `EndOfPlaylist`
+fire predictably every ~5 plays — without the cap, a collection holding
+~1 000 puzzles would never exhaust, and we'd never get a natural moment
+to surface the cross-collection suggestion below.
 
 The cap is applied uniformly whether the playlist comes from the
 Gaussian draw or from `shouldShuffle`: it's about pacing the

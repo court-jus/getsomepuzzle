@@ -73,27 +73,43 @@ void main() {
   });
 
   group('puzzleEligibleForPhase', () {
-    test('accepts puzzles whose slugs are a subset of allowed', () {
-      // Phase 2 allows {FM, PA, NC}. A puzzle declaring just FM and PA
-      // is eligible.
+    test('accepts puzzles within the allowed envelope and containing'
+        ' the introducing slug', () {
+      // Phase 2 allows {FM, PA, NC} and introduces PA. Puzzles that
+      // stay within the envelope AND declare PA are eligible.
       final phase = OnboardingPhase.phases[2];
       expect(puzzleEligibleForPhase(['FM', 'PA'], phase), isTrue);
-      expect(puzzleEligibleForPhase(['FM'], phase), isTrue);
-      expect(puzzleEligibleForPhase(['NC'], phase), isTrue);
+      expect(puzzleEligibleForPhase(['PA'], phase), isTrue);
+      expect(puzzleEligibleForPhase(['FM', 'PA', 'NC'], phase), isTrue);
+    });
+
+    test('rejects puzzles missing the introducing slug (no refresh share)', () {
+      // Load-bearing for the Q1 decision (v1.6.x review): during a
+      // strict phase, refresh-only puzzles (slugs within envelope but
+      // no introducing slug) must NOT surface — they would dilute the
+      // teaching focus given the short 5-puzzle budget per phase.
+      // Phase 2 introduces PA: an FM-only or NC-only puzzle is a
+      // refresh, not a teaching opportunity.
+      final phase = OnboardingPhase.phases[2];
+      expect(puzzleEligibleForPhase(['FM'], phase), isFalse);
+      expect(puzzleEligibleForPhase(['NC'], phase), isFalse);
+      expect(puzzleEligibleForPhase(['FM', 'NC'], phase), isFalse);
     });
 
     test('rejects puzzles with any slug outside the allowed set', () {
-      // Phase 2 disallows GS. A puzzle that uses both FM and GS is
-      // out-of-phase and must be filtered.
+      // Phase 2 disallows GS. Even though FM and PA are inside the
+      // envelope, the GS slug pushes the puzzle out-of-phase. The
+      // envelope check fires before the introducing check.
       final phase = OnboardingPhase.phases[2];
-      expect(puzzleEligibleForPhase(['FM', 'GS'], phase), isFalse);
+      expect(puzzleEligibleForPhase(['FM', 'PA', 'GS'], phase), isFalse);
       expect(puzzleEligibleForPhase(['SY'], phase), isFalse);
     });
 
     test('skips empty and TX entries', () {
       // The legacy TX (HelpText) slug is dropped at parse time but
       // could still appear in stale stat lines or imported playlists.
-      // The eligibility check tolerates it.
+      // The eligibility check tolerates it without counting it for
+      // either the envelope or the introducing check.
       final phase = OnboardingPhase.phases[0];
       expect(puzzleEligibleForPhase(['FM', 'TX', ''], phase), isTrue);
     });

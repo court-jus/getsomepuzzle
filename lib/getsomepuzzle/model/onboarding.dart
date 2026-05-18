@@ -2,11 +2,13 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 
 /// Phase definitions for the new-player onboarding.
 ///
-/// Each phase narrows the catalog to a subset of constraint slugs and
-/// nominates one slug as "currently being introduced". The playlist
-/// sampler biases ~80 % of picks toward puzzles containing the
-/// `introducing` slug and ~20 % toward refresh puzzles using only the
-/// previously-unlocked slugs.
+/// Each phase narrows the catalog to a subset of constraint slugs
+/// (`allowed`) and nominates one slug as "currently being introduced".
+/// During strict phases the playlist sampler only surfaces puzzles
+/// that **both** stay within the allowed envelope **and** contain the
+/// introducing slug — see [puzzleEligibleForPhase]. There is no
+/// refresh share: refresh of already-met rules happens organically in
+/// the post-strict soft-filter mode.
 class OnboardingPhase {
   /// Phase index. 0 is the first phase (FM only); the last entry in
   /// [phases] is the latest defined phase.
@@ -114,16 +116,27 @@ bool puzzlePassesSoftFilter(
   return true;
 }
 
-/// Whether the puzzle's declared slug set is allowed under [phase].
-/// Puzzles with at least one slug outside [OnboardingPhase.allowed]
-/// are filtered out by the onboarding sampler.
+/// Whether the puzzle can be surfaced during the strict [phase].
+///
+/// Two conditions, both required:
+/// 1. **Slug envelope** — every declared slug must be in
+///    [OnboardingPhase.allowed]. Empty entries and the legacy `TX`
+///    slug are tolerated (skipped).
+/// 2. **Introducing slug present** — the puzzle must declare
+///    [OnboardingPhase.introducing]. This is the "no refresh share"
+///    contract: during a strict phase, every surfaced puzzle teaches
+///    or re-exercises the slug currently being introduced. Refresh of
+///    previously-met rules is handled in soft-filter mode (post-P5),
+///    not here.
 bool puzzleEligibleForPhase(
   Iterable<String> declaredRules,
   OnboardingPhase phase,
 ) {
+  bool containsIntroducing = false;
   for (final s in declaredRules) {
     if (s.isEmpty || s == 'TX') continue;
     if (!phase.allowed.contains(s)) return false;
+    if (s == phase.introducing) containsIntroducing = true;
   }
-  return true;
+  return containsIntroducing;
 }

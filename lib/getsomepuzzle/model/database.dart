@@ -951,10 +951,11 @@ class Database {
   }
 
   /// Phase-aware variant of [getPuzzlesByLevel]: same Gaussian-on-cplx
-  /// + variety bias, plus a multiplicative phase weight that filters
-  /// out-of-phase puzzles (weight 0) and gives a 4× boost to puzzles
-  /// containing the slug being introduced (≈ 80/20 expected ratio
-  /// between introduction and refresh puzzles).
+  /// + variety bias, applied to the subset of puzzles that pass
+  /// [puzzleEligibleForPhase] (slug envelope + introducing slug
+  /// present). The eligibility check is the single source of truth for
+  /// the strict-phase contract; there is no separate phase weight in
+  /// the sampler.
   ///
   /// The Gaussian still centers on the player's `playerLevel`: the
   /// catalog itself is bounded to `1-easy + overfilled-easy`, both of
@@ -988,12 +989,7 @@ class Database {
       final wCplx = math.exp(-math.min(d * d / twoSigmaSq, 700));
       final gap = _varietyGapForPuzzle(p, varietyStats);
       final wVariety = 1 + selectionVarietyAlpha * gap;
-      final wPhase =
-          (puzzleEligibleForPhase(p.rules, phase) &&
-              p.rules.contains(phase.introducing)
-          ? 1
-          : 0);
-      final w = wCplx * wVariety * wPhase;
+      final w = wCplx * wVariety;
       final u = _samplingRandom.nextDouble() + 1e-300;
       final key = -math.log(u) / w;
       return (p, key);
