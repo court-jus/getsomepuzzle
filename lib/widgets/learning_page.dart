@@ -55,39 +55,42 @@ class LearningPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(l.learningPageTitle)),
-      body: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: slugs.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final slug = slugs[index];
-          final firstSeen = progress.firstSeen[slug];
-          final playCount = database.playCountForSlug(slug);
-          final name = constraintNameForSlug(l, slug);
-          final status = firstSeen == null
-              ? l.learningNeverSeen
-              : l.learningSeenOn(dateFormat.format(firstSeen));
-          return ListTile(
-            leading: Icon(
-              firstSeen == null ? Icons.lock_outline : Icons.check_circle,
-              color: firstSeen == null
-                  ? Theme.of(context).disabledColor
-                  : Theme.of(context).colorScheme.primary,
-            ),
-            title: Text(_capitalise(name)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [Text(status), Text(l.learningPlayCount(playCount))],
-            ),
-            isThreeLine: true,
-            trailing: TextButton.icon(
-              icon: const Icon(Icons.refresh),
-              label: Text(l.learningRefreshButton),
-              onPressed: () =>
-                  NewConstraintDialog.show(context, <String>{slug}),
-            ),
-          );
-        },
+      body: SafeArea(
+        top: false,
+        child: ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: slugs.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final slug = slugs[index];
+            final firstSeen = progress.firstSeen[slug];
+            final playCount = database.playCountForSlug(slug);
+            final name = constraintNameForSlug(l, slug);
+            final status = firstSeen == null
+                ? l.learningNeverSeen
+                : l.learningSeenOn(dateFormat.format(firstSeen));
+            return ListTile(
+              leading: Icon(
+                firstSeen == null ? Icons.lock_outline : Icons.check_circle,
+                color: firstSeen == null
+                    ? Theme.of(context).disabledColor
+                    : Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(_capitalise(name)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [Text(status), Text(l.learningPlayCount(playCount))],
+              ),
+              isThreeLine: true,
+              trailing: TextButton.icon(
+                icon: const Icon(Icons.refresh),
+                label: Text(l.learningRefreshButton),
+                onPressed: () =>
+                    NewConstraintDialog.show(context, <String>{slug}),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

@@ -584,7 +584,10 @@ class _CreatePageState extends State<CreatePage> {
             ),
         ],
       ),
-      body: _editing ? _buildEditor(loc) : _buildDimensionsForm(loc),
+      body: SafeArea(
+        top: false,
+        child: _editing ? _buildEditor(loc) : _buildDimensionsForm(loc),
+      ),
       bottomNavigationBar: _editing
           ? BottomAppBar(
               height: 40,

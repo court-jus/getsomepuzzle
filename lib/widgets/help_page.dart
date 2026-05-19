@@ -48,46 +48,49 @@ class _HelpPageState extends State<HelpPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(AppLocalizations.of(context)!.help)),
-      body: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints viewportConstraints) {
-          return SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: viewportConstraints.maxHeight,
-              ),
-              child: Container(
-                margin: const EdgeInsets.all(8),
-                child: Column(
-                  children: [
-                    MarkdownTheme(
-                      data: mdTheme,
-                      child: MarkdownWidget(
-                        markdown: (widget.locale == "fr"
-                            ? helpFr
-                            : (widget.locale == "es" ? helpEs : helpEn)),
+      body: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints viewportConstraints) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: viewportConstraints.maxHeight,
+                ),
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  child: Column(
+                    children: [
+                      MarkdownTheme(
+                        data: mdTheme,
+                        child: MarkdownWidget(
+                          markdown: (widget.locale == "fr"
+                              ? helpFr
+                              : (widget.locale == "es" ? helpEs : helpEn)),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton.icon(
-                      icon: const Icon(Icons.privacy_tip_outlined),
-                      label: Text(
-                        AppLocalizations.of(context)!.viewPrivacyPolicy,
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        icon: const Icon(Icons.privacy_tip_outlined),
+                        label: Text(
+                          AppLocalizations.of(context)!.viewPrivacyPolicy,
+                        ),
+                        onPressed: () {
+                          final url = Uri.parse(
+                            '$_privacyBaseUrl/privacy.${widget.locale}.html',
+                          );
+                          launchUrl(url, mode: LaunchMode.externalApplication);
+                        },
                       ),
-                      onPressed: () {
-                        final url = Uri.parse(
-                          '$_privacyBaseUrl/privacy.${widget.locale}.html',
-                        );
-                        launchUrl(url, mode: LaunchMode.externalApplication);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

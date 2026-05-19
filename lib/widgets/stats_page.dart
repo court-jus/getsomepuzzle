@@ -106,76 +106,80 @@ class _StatsPageState extends State<StatsPage> {
         : AppLocalizations.of(context)!.btnShareStats;
     return Scaffold(
       appBar: AppBar(title: Text(AppLocalizations.of(context)!.stats)),
-      body: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints viewportConstraints) {
-          return SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: viewportConstraints.maxHeight,
-              ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: SegmentedButton<_StatsScope>(
-                      segments: [
-                        ButtonSegment(
-                          value: _StatsScope.current,
-                          label: Text(
-                            AppLocalizations.of(context)!.statsScopeCurrent,
+      body: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints viewportConstraints) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: viewportConstraints.maxHeight,
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SegmentedButton<_StatsScope>(
+                        segments: [
+                          ButtonSegment(
+                            value: _StatsScope.current,
+                            label: Text(
+                              AppLocalizations.of(context)!.statsScopeCurrent,
+                            ),
                           ),
+                          ButtonSegment(
+                            value: _StatsScope.all,
+                            label: Text(
+                              AppLocalizations.of(context)!.statsScopeAll,
+                            ),
+                          ),
+                        ],
+                        selected: {scope},
+                        onSelectionChanged: (s) => _onScopeChanged(s.first),
+                      ),
+                    ),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      children: [
+                        TextButton.icon(
+                          onPressed: loading || stats.isEmpty ? null : setData,
+                          label: Text(shareText),
+                          icon: const Icon(Icons.copy),
                         ),
-                        ButtonSegment(
-                          value: _StatsScope.all,
+                        TextButton.icon(
+                          onPressed: loading ? null : _importData,
                           label: Text(
-                            AppLocalizations.of(context)!.statsScopeAll,
+                            AppLocalizations.of(context)!.btnImportStats,
                           ),
+                          icon: const Icon(Icons.file_upload),
                         ),
                       ],
-                      selected: {scope},
-                      onSelectionChanged: (s) => _onScopeChanged(s.first),
                     ),
-                  ),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 8,
-                    children: [
-                      TextButton.icon(
-                        onPressed: loading || stats.isEmpty ? null : setData,
-                        label: Text(shareText),
-                        icon: const Icon(Icons.copy),
-                      ),
-                      TextButton.icon(
-                        onPressed: loading ? null : _importData,
-                        label: Text(
-                          AppLocalizations.of(context)!.btnImportStats,
-                        ),
-                        icon: const Icon(Icons.file_upload),
-                      ),
-                    ],
-                  ),
-                  if (loading)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
-                    )
-                  else
-                    Container(
-                      margin: const EdgeInsets.all(8),
-                      child: Text(
-                        stats.join("\n"),
-                        style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                          fontFamily: "monospace",
-                          fontFamilyFallback: ["Courier", "Courier New"],
+                    if (loading)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(),
+                      )
+                    else
+                      Container(
+                        margin: const EdgeInsets.all(8),
+                        child: Text(
+                          stats.join("\n"),
+                          style: Theme.of(context).textTheme.bodySmall!
+                              .copyWith(
+                                fontFamily: "monospace",
+                                fontFamilyFallback: ["Courier", "Courier New"],
+                              ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

@@ -40,210 +40,213 @@ class _SettingsPageState extends State<SettingsPage> {
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settings)),
-      body: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints viewportConstraints) {
-          return SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: viewportConstraints.maxHeight,
-              ),
-              child: Container(
-                margin: const EdgeInsets.all(8),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(l10n.tooltipLanguage),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.language),
-                          label: Text(_localeDisplayName(context)),
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            widget.onChangeLanguage();
-                          },
-                        ),
-                      ],
-                    ),
-                    _EnumSettingRow<ValidateType>(
-                      label: l10n.settingValidateType,
-                      value: widget.settings.validateType,
-                      // ValidateType.intermediate is intentionally excluded.
-                      options: const [
-                        ValidateType.manual,
-                        ValidateType.automatic,
-                      ],
-                      labels: {
-                        ValidateType.manual: l10n.settingValidateTypeManual,
-                        ValidateType.intermediate:
-                            l10n.settingValidateTypeDefault,
-                        ValidateType.automatic:
-                            l10n.settingValidateTypeAutomatic,
-                      },
-                      onChanged: (v) => setState(() {
-                        widget.onSettingsChange(
-                          ChangeableSettings(validateType: v),
-                        );
-                      }),
-                    ),
-                    _EnumSettingRow<ShowRating>(
-                      label: l10n.settingShowRating,
-                      value: widget.settings.showRating,
-                      options: ShowRating.values,
-                      labels: {
-                        ShowRating.yes: l10n.settingShowRatingYes,
-                        ShowRating.no: l10n.settingShowRatingNo,
-                      },
-                      onChanged: (v) => setState(() {
-                        widget.onSettingsChange(
-                          ChangeableSettings(showRating: v),
-                        );
-                      }),
-                    ),
-                    _EnumSettingRow<LiveCheckType>(
-                      label: l10n.settingsLiveCheckType,
-                      value: widget.settings.liveCheckType,
-                      options: LiveCheckType.values,
-                      labels: {
-                        LiveCheckType.all: l10n.settingsLiveCheckTypeAll,
-                        LiveCheckType.count: l10n.settingsLiveCheckTypeCount,
-                        LiveCheckType.complete:
-                            l10n.settingsLiveCheckTypeComplete,
-                      },
-                      onChanged: (v) => setState(() {
-                        widget.onSettingsChange(
-                          ChangeableSettings(liveCheckType: v),
-                        );
-                      }),
-                    ),
-                    _EnumSettingRow<HintType>(
-                      label: l10n.settingHintType,
-                      value: widget.settings.hintType,
-                      options: HintType.values,
-                      labels: {
-                        HintType.deducibleCell:
-                            l10n.settingHintTypeDeducibleCell,
-                        HintType.addConstraint:
-                            l10n.settingHintTypeAddConstraint,
-                      },
-                      onChanged: (v) => setState(() {
-                        widget.onSettingsChange(
-                          ChangeableSettings(hintType: v),
-                        );
-                      }),
-                    ),
-                    _EnumSettingRow<IdleTimeout>(
-                      label: l10n.settingIdleTimeout,
-                      value: widget.settings.idleTimeout,
-                      options: IdleTimeout.values,
-                      labels: {
-                        IdleTimeout.disabled: l10n.settingIdleTimeoutDisabled,
-                        IdleTimeout.s5: l10n.settingIdleTimeoutS5,
-                        IdleTimeout.s10: l10n.settingIdleTimeoutS10,
-                        IdleTimeout.s30: l10n.settingIdleTimeoutS30,
-                        IdleTimeout.m1: l10n.settingIdleTimeoutM1,
-                        IdleTimeout.m2: l10n.settingIdleTimeoutM2,
-                      },
-                      onChanged: (v) => setState(() {
-                        widget.onSettingsChange(
-                          ChangeableSettings(idleTimeout: v),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l10n.settingDifficultyLevel,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(l10n.settingPlayerLevel),
-                            if (widget.settings.autoLevel) ...[
-                              const SizedBox(width: 8),
-                              Text(
-                                "(${l10n.settingPlayerLevelAuto})",
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(fontStyle: FontStyle.italic),
-                              ),
-                            ],
-                          ],
-                        ),
-                        SizedBox(
-                          width: 150,
-                          child: Slider(
-                            value: widget.settings.playerLevel.toDouble(),
-                            min: 0,
-                            max: 100,
-                            divisions: 100,
-                            label: widget.settings.playerLevel.toString(),
-                            onChanged: widget.settings.autoLevel
-                                ? null
-                                : (newValue) {
-                                    setState(() {
-                                      widget.onSettingsChange(
-                                        ChangeableSettings(
-                                          playerLevel: newValue.toInt(),
-                                        ),
-                                      );
-                                    });
-                                  },
+      body: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints viewportConstraints) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: viewportConstraints.maxHeight,
+                ),
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(l10n.tooltipLanguage),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.language),
+                            label: Text(_localeDisplayName(context)),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              widget.onChangeLanguage();
+                            },
                           ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(l10n.settingAutoLevel),
-                        Switch(
-                          value: widget.settings.autoLevel,
-                          onChanged: (newValue) {
-                            setState(() {
-                              widget.onSettingsChange(
-                                ChangeableSettings(autoLevel: newValue),
-                              );
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.replay),
-                        label: Text(l10n.settingReplayOnboarding),
-                        onPressed: _confirmReplayOnboarding,
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        icon: Icon(
-                          Icons.delete_forever,
-                          color: Theme.of(context).colorScheme.error,
+                      _EnumSettingRow<ValidateType>(
+                        label: l10n.settingValidateType,
+                        value: widget.settings.validateType,
+                        // ValidateType.intermediate is intentionally excluded.
+                        options: const [
+                          ValidateType.manual,
+                          ValidateType.automatic,
+                        ],
+                        labels: {
+                          ValidateType.manual: l10n.settingValidateTypeManual,
+                          ValidateType.intermediate:
+                              l10n.settingValidateTypeDefault,
+                          ValidateType.automatic:
+                              l10n.settingValidateTypeAutomatic,
+                        },
+                        onChanged: (v) => setState(() {
+                          widget.onSettingsChange(
+                            ChangeableSettings(validateType: v),
+                          );
+                        }),
+                      ),
+                      _EnumSettingRow<ShowRating>(
+                        label: l10n.settingShowRating,
+                        value: widget.settings.showRating,
+                        options: ShowRating.values,
+                        labels: {
+                          ShowRating.yes: l10n.settingShowRatingYes,
+                          ShowRating.no: l10n.settingShowRatingNo,
+                        },
+                        onChanged: (v) => setState(() {
+                          widget.onSettingsChange(
+                            ChangeableSettings(showRating: v),
+                          );
+                        }),
+                      ),
+                      _EnumSettingRow<LiveCheckType>(
+                        label: l10n.settingsLiveCheckType,
+                        value: widget.settings.liveCheckType,
+                        options: LiveCheckType.values,
+                        labels: {
+                          LiveCheckType.all: l10n.settingsLiveCheckTypeAll,
+                          LiveCheckType.count: l10n.settingsLiveCheckTypeCount,
+                          LiveCheckType.complete:
+                              l10n.settingsLiveCheckTypeComplete,
+                        },
+                        onChanged: (v) => setState(() {
+                          widget.onSettingsChange(
+                            ChangeableSettings(liveCheckType: v),
+                          );
+                        }),
+                      ),
+                      _EnumSettingRow<HintType>(
+                        label: l10n.settingHintType,
+                        value: widget.settings.hintType,
+                        options: HintType.values,
+                        labels: {
+                          HintType.deducibleCell:
+                              l10n.settingHintTypeDeducibleCell,
+                          HintType.addConstraint:
+                              l10n.settingHintTypeAddConstraint,
+                        },
+                        onChanged: (v) => setState(() {
+                          widget.onSettingsChange(
+                            ChangeableSettings(hintType: v),
+                          );
+                        }),
+                      ),
+                      _EnumSettingRow<IdleTimeout>(
+                        label: l10n.settingIdleTimeout,
+                        value: widget.settings.idleTimeout,
+                        options: IdleTimeout.values,
+                        labels: {
+                          IdleTimeout.disabled: l10n.settingIdleTimeoutDisabled,
+                          IdleTimeout.s5: l10n.settingIdleTimeoutS5,
+                          IdleTimeout.s10: l10n.settingIdleTimeoutS10,
+                          IdleTimeout.s30: l10n.settingIdleTimeoutS30,
+                          IdleTimeout.m1: l10n.settingIdleTimeoutM1,
+                          IdleTimeout.m2: l10n.settingIdleTimeoutM2,
+                        },
+                        onChanged: (v) => setState(() {
+                          widget.onSettingsChange(
+                            ChangeableSettings(idleTimeout: v),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n.settingDifficultyLevel,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(l10n.settingPlayerLevel),
+                              if (widget.settings.autoLevel) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  "(${l10n.settingPlayerLevelAuto})",
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(fontStyle: FontStyle.italic),
+                                ),
+                              ],
+                            ],
+                          ),
+                          SizedBox(
+                            width: 150,
+                            child: Slider(
+                              value: widget.settings.playerLevel.toDouble(),
+                              min: 0,
+                              max: 100,
+                              divisions: 100,
+                              label: widget.settings.playerLevel.toString(),
+                              onChanged: widget.settings.autoLevel
+                                  ? null
+                                  : (newValue) {
+                                      setState(() {
+                                        widget.onSettingsChange(
+                                          ChangeableSettings(
+                                            playerLevel: newValue.toInt(),
+                                          ),
+                                        );
+                                      });
+                                    },
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(l10n.settingAutoLevel),
+                          Switch(
+                            value: widget.settings.autoLevel,
+                            onChanged: (newValue) {
+                              setState(() {
+                                widget.onSettingsChange(
+                                  ChangeableSettings(autoLevel: newValue),
+                                );
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.replay),
+                          label: Text(l10n.settingReplayOnboarding),
+                          onPressed: _confirmReplayOnboarding,
                         ),
-                        label: Text(
-                          l10n.settingClearStats,
-                          style: TextStyle(
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          icon: Icon(
+                            Icons.delete_forever,
                             color: Theme.of(context).colorScheme.error,
                           ),
+                          label: Text(
+                            l10n.settingClearStats,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                          onPressed: _confirmClearStats,
                         ),
-                        onPressed: _confirmClearStats,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
