@@ -193,6 +193,7 @@ class GameModel extends ChangeNotifier {
     bool? screenIsLandscape,
   }) {
     _beforeMutation();
+    history = [];
     _cancelIdleTimer();
     dbSize = playlistLength;
     currentMeta = puz;
