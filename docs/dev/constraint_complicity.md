@@ -423,6 +423,60 @@ coloured, the other coloured, both coloured).
   pairwise mismatches on a 2-colour grid would be jointly
   unsatisfiable; the current code only handles pairwise contradictions.
 
+## Complicity: GS + QA (Group size vs quantity cap)
+
+### Reasoning
+
+A `GS:i.s` constraint pins the group containing cell `i` to exactly
+`s` cells, all of a single colour. A `QA:c.n` constraint caps the
+total number of colour-`c` cells in the grid at `n`. If the anchor's
+group were colour `c`, the grid would need at least `s + (cells of
+colour c already placed outside the group)` cells of `c`. When that
+lower bound exceeds `n`, colour `c` is **infeasible** for the anchor.
+
+On a 2-colour grid, ruling out one colour forces the other.
+Concretely, `GS:15.9` + `QA:1.8` on the puzzle from
+`docs/dev/complicities_to_explore.md` § "GS-size vs QA" reads "a
+9-cell group can't be colour 1 because only 8 colour-1 cells fit in
+the grid" → cell 15 = 2.
+
+### Why GSAllComplicity does not catch it
+
+`GSAllComplicity` enumerates sealings around the anchor, but is gated
+by `_maxGap = 6` (gsall.dart:26) — when `gs.size - |currentGroup| > 6`
+it bails out (`return null`, gsall.dart:136) without checking
+feasibility. Large groups against tight QA caps fall straight through.
+The arithmetic check in `GSQAComplicity` does the same deduction in
+O(constraints × colors) without enumeration.
+
+### Implementation
+
+See `lib/getsomepuzzle/constraints/complicities/gsqa.dart`. For each
+`(GS, colour)` pair the complicity:
+
+1. Computes the hypothetical merged cluster size if the anchor were
+   `colour` (flood-fill over already-coloured `colour` neighbours).
+2. Subtracts that from the total `colour` cells already placed to get
+   the count *outside* the would-be group.
+3. Compares `gs.size + outside` against `qa.count` for the matching
+   `QA:colour.*` constraint.
+
+When only one colour survives the check, the anchor is forced to it
+(or flagged impossible if already on the rejected colour). Tier 3 per
+the default complicity weight.
+
+### Limitations
+
+- **Same-colour merges across the grid.** The cluster absorption only
+  looks at cells reachable from the anchor; same-colour cells *not*
+  yet connected but inevitably joining via narrow corridors are
+  counted as "outside" (conservative — never produces a false force,
+  but may miss tighter deductions).
+- **Single QA per colour.** Assumes at most one `QA:c.*` constraint
+  per colour value (the puzzle format does not generate duplicates).
+- **No interaction with other GS constraints.** A second `GS` on the
+  same anchor colour would tighten the cap further; not modelled.
+
 ## Complicity: GS + (anything) — group sealing enumeration
 
 `GSAllComplicity` filters survivors against **every** constraint of

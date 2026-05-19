@@ -2,6 +2,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/fmfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsall.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsgs.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsqa.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/ltfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/ltgs.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/pa_balanced_side.dart';
@@ -15,6 +16,7 @@ List<Complicity> allComplicities() => <Complicity>[
   FMFMComplicity(),
   GSAllComplicity(),
   GSGSComplicity(),
+  GSQAComplicity(),
   LTFMComplicity(),
   LTGSComplicity(),
   PABalancedSideComplicity(),

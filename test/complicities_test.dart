@@ -3,6 +3,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/fmfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsall.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsgs.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsqa.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/ltfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/ltgs.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/pa_balanced_side.dart';
@@ -566,6 +567,109 @@ void main() {
       final move = gsgs.apply(puzzle);
       expect(move, isNull);
     });
+  });
+
+  group('GSQAComplicity', () {
+    test('detected when both GS and QA are present', () {
+      // 5x5 empty grid with GS:0.10 + QA:1.5. GS gap is 9, way above
+      // GSAllComplicity's _maxGap=6, so GSAll bails and we genuinely
+      // need GSQA to catch the size-vs-cap deduction.
+      final puzzle = Puzzle(
+        'v2_12_5x5_0000000000000000000000000_GS:0.10;QA:1.5_0:0_100',
+      );
+      expect(puzzle.complicities.whereType<GSQAComplicity>(), hasLength(1));
+    });
+
+    test('not detected when QA is absent', () {
+      final puzzle = Puzzle(
+        'v2_12_5x5_0000000000000000000000000_GS:0.10_0:0_100',
+      );
+      expect(puzzle.complicities.whereType<GSQAComplicity>(), isEmpty);
+    });
+
+    test('not detected when GS is absent', () {
+      final puzzle = Puzzle(
+        'v2_12_5x5_0000000000000000000000000_QA:1.5_0:0_100',
+      );
+      expect(puzzle.complicities.whereType<GSQAComplicity>(), isEmpty);
+    });
+
+    test('apply forces opposite colour when GS size exceeds QA cap', () {
+      // GS:0.10 needs a 10-cell group of one colour, QA:1.5 caps
+      // colour 1 at 5. So colour 1 is infeasible for the anchor; only
+      // colour 2 (uncapped) survives → cell 0 = 2.
+      final puzzle = Puzzle(
+        'v2_12_5x5_0000000000000000000000000_GS:0.10;QA:1.5_0:0_100',
+      );
+      final gsqa = puzzle.complicities.whereType<GSQAComplicity>().first;
+      final move = gsqa.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.idx, 0);
+      expect(move.value, 2);
+      // Combination deduction: tier 3 (per docs/dev/complexity.md).
+      expect(move.complexity, 3);
+      expect(move.isImpossible, isNull);
+    });
+
+    test('apply reports impossibility when anchor is already infeasible', () {
+      // Cell 0 = 1, but GS:0.10 + QA:1.5 makes colour 1 impossible for
+      // its group. The mismatch surfaces as an explicit impossibility
+      // (rather than waiting for downstream verification to fail).
+      final puzzle = Puzzle(
+        'v2_12_5x5_1000000000000000000000000_GS:0.10;QA:1.5_0:0_100',
+      );
+      final gsqa = puzzle.complicities.whereType<GSQAComplicity>().first;
+      final move = gsqa.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('apply does nothing when QA cap leaves both colours feasible', () {
+      // GS:0.3 + QA:1.8 — a 3-cell group of colour 1 fits under the
+      // cap (3 ≤ 8), and colour 2 is uncapped. Both feasible → no
+      // force. Guards against the complicity overreaching.
+      final puzzle = Puzzle(
+        'v2_12_5x5_0000000000000000000000000_GS:0.3;QA:1.8_0:0_100',
+      );
+      final gsqa = puzzle.complicities.whereType<GSQAComplicity>().first;
+      final move = gsqa.apply(puzzle);
+      expect(move, isNull);
+    });
+
+    test('apply accounts for same-colour cells outside the anchor group', () {
+      // Cell 24 = 1 (far corner, not reachable from cell 0). GS:0.5 +
+      // QA:1.5 — colouring cell 0 as 1 would create a 5-cell group of
+      // colour 1, plus the isolated cell 24, total 6 cells > QA cap 5
+      // → colour 1 infeasible. Force cell 0 = 2.
+      final puzzle = Puzzle(
+        'v2_12_5x5_0000000000000000000000001_GS:0.5;QA:1.5_0:0_100',
+      );
+      final gsqa = puzzle.complicities.whereType<GSQAComplicity>().first;
+      final move = gsqa.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.idx, 0);
+      expect(move.value, 2);
+    });
+
+    test(
+      'apply absorbs adjacent same-colour cells into the hypothetical group',
+      () {
+        // Cell 0 = 0 (empty anchor), cell 1 = 1 (already same colour as
+        // the hypothetical group), cell 24 = 1 (isolated, outside). GS:0.5
+        // + QA:1.5. If anchor = 1, the cluster absorbs cell 1 → cluster
+        // size starts at 2, grows to 5; cells outside cluster of colour 1
+        // = 1 (only cell 24). Total = 5 + 1 = 6 > 5 → still infeasible →
+        // force cell 0 = 2.
+        final puzzle = Puzzle(
+          'v2_12_5x5_0100000000000000000000001_GS:0.5;QA:1.5_0:0_100',
+        );
+        final gsqa = puzzle.complicities.whereType<GSQAComplicity>().first;
+        final move = gsqa.apply(puzzle);
+        expect(move, isNotNull);
+        expect(move!.idx, 0);
+        expect(move.value, 2);
+      },
+    );
   });
 
   group('GSAllComplicity', () {
