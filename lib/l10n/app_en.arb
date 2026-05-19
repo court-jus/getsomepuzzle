@@ -841,17 +841,17 @@
     "@emptyPlaylistFiltersTooStrict": {
         "description": "Reason shown under the disabled Play button when filter() returns 0 puzzles"
     },
-    "emptyPlaylistOnboardingPhase": "No puzzle in this collection fits the current onboarding step. Finish the introductory puzzles or switch collection.",
-    "@emptyPlaylistOnboardingPhase": {
-        "description": "Reason shown under the disabled Play button when the onboarding phase eligibility excludes every filtered puzzle"
-    },
-    "emptyPlaylistSoftFilter": "Every remaining puzzle would introduce more than one new rule at once. Play a few more puzzles from earlier collections first.",
-    "@emptyPlaylistSoftFilter": {
-        "description": "Reason shown under the disabled Play button when the post-strict onboarding soft filter rejects every candidate"
-    },
     "emptyPlaylistGeneric": "No puzzle is currently available.",
     "@emptyPlaylistGeneric": {
         "description": "Generic fallback reason shown under the disabled Play button"
+    },
+    "bannerOnboardingFiltersDefault": "These filters reflect your learning track. You can override them — tap the reset icon to restore the recommendation.",
+    "@bannerOnboardingFiltersDefault": {
+        "description": "Banner on OpenPage while the player is still in the onboarding journey, explaining that the rule filter chips were preset by the learning track."
+    },
+    "bannerOnboardingFiltersOverridden": "You're using your own filters. Tap reset to return to the learning track's recommendation.",
+    "@bannerOnboardingFiltersOverridden": {
+        "description": "Variant of the onboarding-filters banner shown when the player has manually changed the rule filters away from the learning track defaults."
     },
     "browse": "Browse",
     "@browse": {

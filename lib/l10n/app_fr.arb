@@ -305,7 +305,7 @@
     "emptyPlaylistUserAllPlayed": "Tous les puzzles de cette playlist ont été joués. Choisis une autre collection ou crée une nouvelle playlist.",
     "emptyPlaylistNoPuzzlesLoaded": "Aucun puzzle chargé pour cette collection.",
     "emptyPlaylistFiltersTooStrict": "Tes filtres excluent tous les puzzles de cette collection. Essaie d'élargir les dimensions, les règles ou les marqueurs.",
-    "emptyPlaylistOnboardingPhase": "Aucun puzzle de cette collection ne correspond à l'étape d'apprentissage en cours. Termine les puzzles d'introduction ou change de collection.",
-    "emptyPlaylistSoftFilter": "Tous les puzzles restants introduiraient plus d'une nouvelle règle à la fois. Joue encore quelques puzzles des collections précédentes.",
-    "emptyPlaylistGeneric": "Aucun puzzle n'est actuellement disponible."
+    "emptyPlaylistGeneric": "Aucun puzzle n'est actuellement disponible.",
+    "bannerOnboardingFiltersDefault": "Ces filtres correspondent à ta progression d'apprentissage. Tu peux les modifier — appuie sur l'icône reset pour revenir aux recommandations.",
+    "bannerOnboardingFiltersOverridden": "Tu utilises tes propres filtres. Appuie sur reset pour revenir aux filtres recommandés par l'apprentissage."
 }

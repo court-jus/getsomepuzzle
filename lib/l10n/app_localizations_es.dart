@@ -761,16 +761,16 @@ class AppLocalizationsEs extends AppLocalizations {
       'Tus filtros excluyen todos los puzzles de esta colección. Prueba a relajar dimensiones, reglas o marcadores.';
 
   @override
-  String get emptyPlaylistOnboardingPhase =>
-      'Ningún puzzle de esta colección encaja con el paso de aprendizaje actual. Termina los puzzles introductorios o cambia de colección.';
-
-  @override
-  String get emptyPlaylistSoftFilter =>
-      'Los puzzles restantes introducirían más de una regla nueva a la vez. Juega algunos puzzles más de las colecciones anteriores.';
-
-  @override
   String get emptyPlaylistGeneric =>
       'No hay ningún puzzle disponible por ahora.';
+
+  @override
+  String get bannerOnboardingFiltersDefault =>
+      'Estos filtros reflejan tu progresión de aprendizaje. Puedes modificarlos — pulsa el icono de reinicio para volver a la recomendación.';
+
+  @override
+  String get bannerOnboardingFiltersOverridden =>
+      'Estás usando tus propios filtros. Pulsa reinicio para volver a la recomendación de la ruta de aprendizaje.';
 
   @override
   String get browse => 'Explorar';

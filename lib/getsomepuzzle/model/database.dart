@@ -30,8 +30,6 @@ enum EmptyPlaylistReason {
   userAllPlayed,
   noPuzzlesLoaded,
   filtersTooStrict,
-  onboardingPhase,
-  softFilter,
   generic,
 }
 
@@ -527,6 +525,8 @@ class Database {
   /// counter from prefs and would otherwise silently undo the reset.
   Future<void> resetOnboardingProgress() async {
     onboardingCompletions = {};
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_onboardingFiltersAppliedKey);
     await _persistOnboardingCompletions();
   }
 
@@ -543,6 +543,8 @@ class Database {
     for (var phase in OnboardingPhase.phases) {
       onboardingCompletions[phase.introducing] = OnboardingPhase.phaseLength;
     }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_onboardingFiltersAppliedKey);
     await _persistOnboardingCompletions();
   }
 
@@ -759,7 +761,38 @@ class Database {
     await currentFilters.load();
     final stats = await _readRawStatsFromStorage();
     loadStats(stats);
+    // After `loadStats` because it populates `progress.firstSeen` from
+    // the play history, which the soft-filter recommendation reads.
+    await maybeApplyOnboardingFilterDefaults(prefs);
     preparePlaylist();
+  }
+
+  /// SharedPreferences key gating the one-shot application of
+  /// onboarding-derived filters at first launch. Cleared by
+  /// [resetOnboardingProgress] and [skipOnboarding] so the next
+  /// `loadPuzzlesFile` re-applies the fresh recommendation.
+  static const _onboardingFiltersAppliedKey = 'onboardingFiltersApplied';
+
+  /// Apply the onboarding filter recommendation to [currentFilters] the
+  /// first time we see this player post-refactor (flag absent in prefs).
+  /// Subsequent calls are no-ops so the player's manual overrides stick.
+  ///
+  /// We always set the flag — even when the player has already
+  /// graduated and there is no recommendation to apply — so the
+  /// migration probe terminates and we don't pay the recheck cost on
+  /// every boot.
+  @visibleForTesting
+  Future<void> maybeApplyOnboardingFilterDefaults(
+    SharedPreferences prefs,
+  ) async {
+    if (prefs.getBool(_onboardingFiltersAppliedKey) == true) return;
+    final reco = recommendedOnboardingFilters;
+    if (reco != null) {
+      currentFilters.wantedRules = reco.wantedRules;
+      currentFilters.bannedRules = reco.bannedRules;
+      await currentFilters.save();
+    }
+    await prefs.setBool(_onboardingFiltersAppliedKey, true);
   }
 
   /// Read every persisted raw stat line from disk (or `SharedPreferences`
@@ -864,9 +897,7 @@ class Database {
       // User-curated playlists honour the full filter pipeline and the
       // shuffle toggle exactly like built-in collections — the player
       // expects an explicit FM ban or an enabled shuffle to take effect
-      // here too. What stays specific to custom/user_* is the exemption
-      // from onboarding gating (importing or hand-crafting a playlist
-      // is an opt-in that supersedes the curated track) and the absence
+      // here too. What stays specific to custom/user_* is the absence
       // of a batch cap (the whole playlist plays as a single flow).
       // When shuffle is off we keep the catalog order from `filter()`,
       // which itself iterates `puzzles` in insertion order — so the
@@ -874,38 +905,21 @@ class Database {
       final base = filter().toList();
       playlist = shouldShuffle ? (base..shuffle()) : base;
     } else {
-      final phase = currentPhase;
-      if (phase != null && _isPlayableLevel(collection)) {
-        if (shouldShuffle) {
-          // Shuffle within phase-eligible puzzles so the player who
-          // explicitly opted into shuffle still doesn't get
-          // multi-constraint surprises during strict onboarding.
-          playlist =
-              filter()
-                  .where((p) => puzzleEligibleForPhase(p.rules, phase))
-                  .toList()
-                ..shuffle();
-        } else {
-          playlist = _getPuzzlesInPhase(phase);
-        }
-      } else {
-        if (shouldShuffle) {
-          playlist = filter().toList()..shuffle();
-        } else {
-          playlist = getPuzzlesByLevel(playerLevel);
-        }
-        // Soft filter applies whether the player went via shuffle or
-        // the regular sampler — the goal is "≤1 unseen slug per
-        // proposed puzzle" regardless of selection mechanism.
-        playlist = _applySoftOnboardingFilter(playlist);
-      }
+      // Sampling Gaussien+variety is the source of truth for the
+      // selection. The shuffle toggle now only reorders the resulting
+      // batch — the top-N puzzles are the same whether the player asked
+      // for ordered or shuffled play, so the level-adaptive contract
+      // holds in both modes. Onboarding gating is no longer applied
+      // here; the recommended filters in `currentFilters` (see
+      // [recommendedOnboardingFilters]) do the gating via `filter()`,
+      // which `getPuzzlesByLevel` already consults.
+      playlist = getPuzzlesByLevel(playerLevel);
       _maybeCapBatch();
+      if (shouldShuffle) playlist.shuffle();
     }
     log.fine(
       "Playlist prepared with ${playlist.length} puzzles "
-      "(shuffled: $shouldShuffle, capped: ${_isPlayableLevel(collection)}, "
-      "phase: ${currentPhase?.index}, "
-      "softFilter: ${_softFilterActive ? 'on' : 'off'})",
+      "(shuffled: $shouldShuffle, capped: ${_isPlayableLevel(collection)})",
     );
   }
 
@@ -927,6 +941,54 @@ class Database {
   /// end-of-batch and to keep the Apprentissage page actionable.
   bool get isInOnboarding => currentPhase != null || _softFilterActive;
 
+  /// Pre-set filter recommendation derived from the player's onboarding
+  /// state. Null when [isInOnboarding] is false.
+  ///
+  /// **Strict phase**: `wantedRules = {phase.introducing}`,
+  /// `bannedRules = allKnownSlugs \ phase.allowed`. Reproduces the
+  /// previous `puzzleEligibleForPhase` contract exactly as a pair of
+  /// slug filters that the user can inspect and override.
+  ///
+  /// **Soft filter**: `wantedRules = {}`,
+  /// `bannedRules = (notYetSeen \ {elected})`, where `elected` is the
+  /// first slug in [OnboardingPhase.postStrictDiscoveryOrder] still
+  /// missing from `progress.firstSeen`. Lets puzzles with 0 new slugs
+  /// pass (refresh) AND lets the elected slug surface (single new
+  /// rule), while banning every other unseen slug — a faithful
+  /// translation of the old soft-filter "≤1 new slug" contract into
+  /// the visible-filter model.
+  ({Set<String> wantedRules, Set<String> bannedRules})?
+  get recommendedOnboardingFilters {
+    final phase = currentPhase;
+    if (phase != null) return _strictPhaseRecommendation(phase);
+    if (_softFilterActive) return _softFilterRecommendation();
+    return null;
+  }
+
+  ({Set<String> wantedRules, Set<String> bannedRules})
+  _strictPhaseRecommendation(OnboardingPhase phase) => (
+    wantedRules: {phase.introducing},
+    bannedRules: OnboardingPhase.allKnownSlugs.difference(phase.allowed),
+  );
+
+  ({Set<String> wantedRules, Set<String> bannedRules})?
+  _softFilterRecommendation() {
+    final p = progress;
+    if (p == null) return null;
+    final unseen = <String>{};
+    String? elected;
+    for (final slug in OnboardingPhase.postStrictDiscoveryOrder) {
+      if (!p.isFirstTimeFor(slug)) continue;
+      if (elected == null) {
+        elected = slug;
+      } else {
+        unseen.add(slug);
+      }
+    }
+    if (elected == null) return null;
+    return (wantedRules: <String>{}, bannedRules: unseen);
+  }
+
   /// Classifies *why* the current [playlist] is empty, or null if it
   /// isn't. The UI uses this to explain a disabled Play button instead
   /// of just graying it out. Probes are ordered from most specific to
@@ -945,72 +1007,7 @@ class Database {
     if (filter().isEmpty) {
       return EmptyPlaylistReason.filtersTooStrict;
     }
-    if (currentPhase != null && _isPlayableLevel(collection)) {
-      return EmptyPlaylistReason.onboardingPhase;
-    }
-    if (_softFilterActive) {
-      return EmptyPlaylistReason.softFilter;
-    }
     return EmptyPlaylistReason.generic;
-  }
-
-  /// Drop puzzles that would force the player to meet two or more new
-  /// constraints in a single grid. Pure pass-through when the soft
-  /// filter is inactive (no [progress] wired, still in a strict phase,
-  /// or every slug already met).
-  List<PuzzleData> _applySoftOnboardingFilter(List<PuzzleData> input) {
-    if (!_softFilterActive) return input;
-    final p = progress!;
-    return input
-        .where((puz) => puzzlePassesSoftFilter(puz.rules, p.isFirstTimeFor))
-        .toList();
-  }
-
-  /// Phase-aware variant of [getPuzzlesByLevel]: same Gaussian-on-cplx
-  /// + variety bias, applied to the subset of puzzles that pass
-  /// [puzzleEligibleForPhase] (slug envelope + introducing slug
-  /// present). The eligibility check is the single source of truth for
-  /// the strict-phase contract; there is no separate phase weight in
-  /// the sampler.
-  ///
-  /// The Gaussian still centers on the player's `playerLevel`: the
-  /// catalog itself is bounded to `1-easy + overfilled-easy`, both of
-  /// which are *beginner* by trace shape, so a fast learner's higher
-  /// level just biases sampling toward the upper end of *that*
-  /// bucket — never out of it.
-  ///
-  /// Falls back to the regular [getPuzzlesByLevel] result when the
-  /// phase filter would leave the playlist empty — this avoids
-  /// stranding a player on an out-of-track collection during
-  /// onboarding (e.g., they wandered from `1-easy` into `6-mad` mid
-  /// onboarding; nothing in 6-mad will satisfy a phase 1 filter, so
-  /// we just give them the regular pick).
-  List<PuzzleData> _getPuzzlesInPhase(OnboardingPhase phase) {
-    final mu = playerLevel + selectionOffset;
-    final twoSigmaSq = 2 * selectionSigma * selectionSigma;
-    final filtered = filter().toList();
-    final eligible = filtered
-        .where((p) => puzzleEligibleForPhase(p.rules, phase))
-        .toList();
-    if (eligible.isEmpty) {
-      // Out-of-track collection (e.g., player jumped from 1-easy to
-      // 6-mad mid-onboarding). Fall through to the regular sampler so
-      // they still get something playable, even if the phase filter
-      // produced nothing.
-      return getPuzzlesByLevel(playerLevel);
-    }
-    final varietyStats = _buildRecencyWeightedStats(eligible);
-    final keyed = eligible.map((p) {
-      final d = p.cplx - mu;
-      final wCplx = math.exp(-math.min(d * d / twoSigmaSq, 700));
-      final gap = _varietyGapForPuzzle(p, varietyStats);
-      final wVariety = 1 + selectionVarietyAlpha * gap;
-      final w = wCplx * wVariety;
-      final u = _samplingRandom.nextDouble() + 1e-300;
-      final key = -math.log(u) / w;
-      return (p, key);
-    }).toList()..sort((a, b) => a.$2.compareTo(b.$2));
-    return keyed.map((e) => e.$1).toList();
   }
 
   void _maybeCapBatch() {

@@ -1450,23 +1450,23 @@ abstract class AppLocalizations {
   /// **'Your filters exclude every puzzle in this collection. Try relaxing the dimensions, rules or flags.'**
   String get emptyPlaylistFiltersTooStrict;
 
-  /// Reason shown under the disabled Play button when the onboarding phase eligibility excludes every filtered puzzle
-  ///
-  /// In en, this message translates to:
-  /// **'No puzzle in this collection fits the current onboarding step. Finish the introductory puzzles or switch collection.'**
-  String get emptyPlaylistOnboardingPhase;
-
-  /// Reason shown under the disabled Play button when the post-strict onboarding soft filter rejects every candidate
-  ///
-  /// In en, this message translates to:
-  /// **'Every remaining puzzle would introduce more than one new rule at once. Play a few more puzzles from earlier collections first.'**
-  String get emptyPlaylistSoftFilter;
-
   /// Generic fallback reason shown under the disabled Play button
   ///
   /// In en, this message translates to:
   /// **'No puzzle is currently available.'**
   String get emptyPlaylistGeneric;
+
+  /// Banner on OpenPage while the player is still in the onboarding journey, explaining that the rule filter chips were preset by the learning track.
+  ///
+  /// In en, this message translates to:
+  /// **'These filters reflect your learning track. You can override them — tap the reset icon to restore the recommendation.'**
+  String get bannerOnboardingFiltersDefault;
+
+  /// Variant of the onboarding-filters banner shown when the player has manually changed the rule filters away from the learning track defaults.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re using your own filters. Tap reset to return to the learning track\'s recommendation.'**
+  String get bannerOnboardingFiltersOverridden;
 
   /// Drawer entry that opens the puzzle selection page (filters, collections)
   ///

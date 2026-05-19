@@ -70,6 +70,19 @@ class OnboardingPhase {
   static final Set<String> allKnownSlugs = constraintRegistry
       .map((c) => c.slug)
       .toSet();
+
+  /// Slugs not covered by [phases] (the strict-phase introducers), in
+  /// the order they appear in `constraintRegistry`. Used by the soft
+  /// filter to elect the next slug for the player to discover. Adding
+  /// a new constraint to the registry automatically extends this list,
+  /// so post-P5 discovery stays in sync with no manual bookkeeping.
+  static List<String> get postStrictDiscoveryOrder {
+    final strictSlugs = phases.map((p) => p.introducing).toSet();
+    return constraintRegistry
+        .map((c) => c.slug)
+        .where((s) => !strictSlugs.contains(s))
+        .toList();
+  }
 }
 
 /// Returns the strict onboarding phase the player is currently in
@@ -89,31 +102,6 @@ OnboardingPhase? phaseForCompletions(Map<String, int> completions) {
   // The player has played enough puzzle for each phase, they can move
   // on with soft filtering
   return null;
-}
-
-/// Soft-filter check: a puzzle passes when at most one of its declared
-/// slugs is unseen by the player. The unseen count is computed via
-/// [isFirstTimeForSlug], which the caller wires to
-/// `ConstraintProgress.isFirstTimeFor` in the live app and to a fixed
-/// set in tests.
-///
-/// Used after the strict phases to keep introducing new constraints
-/// gradually while letting the player roam freely across collections.
-/// A puzzle with zero unseen slugs trivially passes (refresh) — the
-/// filter only kicks in to block multi-new puzzles.
-bool puzzlePassesSoftFilter(
-  Iterable<String> declaredRules,
-  bool Function(String slug) isFirstTimeForSlug,
-) {
-  int unseen = 0;
-  for (final s in declaredRules) {
-    if (s.isEmpty || s == 'TX') continue;
-    if (isFirstTimeForSlug(s)) {
-      unseen++;
-      if (unseen > 1) return false;
-    }
-  }
-  return true;
 }
 
 /// Whether the puzzle can be surfaced during the strict [phase].

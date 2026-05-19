@@ -763,16 +763,16 @@ class AppLocalizationsFr extends AppLocalizations {
       'Tes filtres excluent tous les puzzles de cette collection. Essaie d\'élargir les dimensions, les règles ou les marqueurs.';
 
   @override
-  String get emptyPlaylistOnboardingPhase =>
-      'Aucun puzzle de cette collection ne correspond à l\'étape d\'apprentissage en cours. Termine les puzzles d\'introduction ou change de collection.';
-
-  @override
-  String get emptyPlaylistSoftFilter =>
-      'Tous les puzzles restants introduiraient plus d\'une nouvelle règle à la fois. Joue encore quelques puzzles des collections précédentes.';
-
-  @override
   String get emptyPlaylistGeneric =>
       'Aucun puzzle n\'est actuellement disponible.';
+
+  @override
+  String get bannerOnboardingFiltersDefault =>
+      'Ces filtres correspondent à ta progression d\'apprentissage. Tu peux les modifier — appuie sur l\'icône reset pour revenir aux recommandations.';
+
+  @override
+  String get bannerOnboardingFiltersOverridden =>
+      'Tu utilises tes propres filtres. Appuie sur reset pour revenir aux filtres recommandés par l\'apprentissage.';
 
   @override
   String get browse => 'Parcourir';

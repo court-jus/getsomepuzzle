@@ -154,10 +154,6 @@ class _OpenPageState extends State<OpenPage> {
         return loc.emptyPlaylistNoPuzzlesLoaded;
       case EmptyPlaylistReason.filtersTooStrict:
         return loc.emptyPlaylistFiltersTooStrict;
-      case EmptyPlaylistReason.onboardingPhase:
-        return loc.emptyPlaylistOnboardingPhase;
-      case EmptyPlaylistReason.softFilter:
-        return loc.emptyPlaylistSoftFilter;
       case EmptyPlaylistReason.generic:
         return loc.emptyPlaylistGeneric;
     }
@@ -301,6 +297,34 @@ class _OpenPageState extends State<OpenPage> {
     chooseCollection(key);
   }
 
+  /// True when the live rule filters match the onboarding
+  /// recommendation. Used by the banner (default vs overridden text)
+  /// and by the reset button to decide whether resetting would do
+  /// anything visible. Returns true when there is no recommendation,
+  /// so the banner is naturally hidden once the player has graduated.
+  bool _filtersMatchRecommendation() {
+    final reco = widget.database.recommendedOnboardingFilters;
+    if (reco == null) return true;
+    return setEquals(
+          widget.database.currentFilters.wantedRules,
+          reco.wantedRules,
+        ) &&
+        setEquals(widget.database.currentFilters.bannedRules, reco.bannedRules);
+  }
+
+  /// Restore the recommended onboarding filters. Called by the banner
+  /// reset action and by the existing rules-reset IconButton when the
+  /// player is in onboarding (so the same icon means "back to
+  /// recommendation" or "clear" depending on context).
+  void _resetToRecommendation() {
+    final reco = widget.database.recommendedOnboardingFilters;
+    if (reco == null) return;
+    applyFilter(
+      newWRules: reco.wantedRules.toList(),
+      newBRules: reco.bannedRules.toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool flagsAreDefault =
@@ -309,9 +333,15 @@ class _OpenPageState extends State<OpenPage> {
           widget.database.currentFilters.bannedFlags,
           Filters.defaultBannedFlags,
         );
-    final bool rulesAreDefault =
-        widget.database.currentFilters.wantedRules.isEmpty &&
-        widget.database.currentFilters.bannedRules.isEmpty;
+    // Behaviour of the rules-reset IconButton differs in onboarding:
+    // "default" means "matches the recommended preset" rather than
+    // "no filter set". The icon greys out when there is nothing to
+    // reset toward in both cases.
+    final bool inOnboarding = widget.database.isInOnboarding;
+    final bool rulesAreDefault = inOnboarding
+        ? _filtersMatchRecommendation()
+        : (widget.database.currentFilters.wantedRules.isEmpty &&
+              widget.database.currentFilters.bannedRules.isEmpty);
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.titleOpenPuzzlePage),
@@ -427,6 +457,11 @@ class _OpenPageState extends State<OpenPage> {
                       "${AppLocalizations.of(context)!.msgCountMatchingPuzzles}: $matchingCount",
                     ),
                     const Divider(),
+                    if (inOnboarding)
+                      _OnboardingFiltersBanner(
+                        overridden: !_filtersMatchRecommendation(),
+                        onReset: _resetToRecommendation,
+                      ),
                     if (widget.database.collection == "custom" &&
                         widget.database.puzzles.isEmpty)
                       Padding(
@@ -650,10 +685,14 @@ class _OpenPageState extends State<OpenPage> {
                                         onPressed: rulesAreDefault
                                             ? null
                                             : () {
-                                                applyFilter(
-                                                  newWRules: [],
-                                                  newBRules: [],
-                                                );
+                                                if (inOnboarding) {
+                                                  _resetToRecommendation();
+                                                } else {
+                                                  applyFilter(
+                                                    newWRules: [],
+                                                    newBRules: [],
+                                                  );
+                                                }
                                               },
                                       ),
                                     ),
@@ -727,6 +766,50 @@ class _OpenPageState extends State<OpenPage> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Surface the onboarding-derived rule filters so the player knows
+/// where they come from and how to opt out. Two copy variants:
+/// [overridden] false → "these are your learning track defaults",
+/// [overridden] true → "you've moved away from the recommendation".
+/// Both expose a reset action so the path back is always one tap away.
+class _OnboardingFiltersBanner extends StatelessWidget {
+  final bool overridden;
+  final VoidCallback onReset;
+
+  const _OnboardingFiltersBanner({
+    required this.overridden,
+    required this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final text = overridden
+        ? loc.bannerOnboardingFiltersOverridden
+        : loc.bannerOnboardingFiltersDefault;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        child: Row(
+          children: [
+            const Icon(Icons.school, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(text)),
+            IconButton(
+              icon: Icon(
+                Icons.restart_alt,
+                color: overridden ? Colors.blue : Colors.grey,
+              ),
+              tooltip: text,
+              onPressed: overridden ? onReset : null,
+            ),
+          ],
+        ),
       ),
     );
   }

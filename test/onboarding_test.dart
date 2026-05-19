@@ -64,40 +64,40 @@ void main() {
     });
   });
 
-  group('puzzlePassesSoftFilter', () {
-    test('passes a puzzle whose slugs are all seen', () {
-      // Pure refresh case: the player has met every constraint in
-      // this puzzle. isFirstTimeForSlug returns false for all → 0
-      // unseen → passes.
-      bool isFirstTime(String _) => false;
-      expect(puzzlePassesSoftFilter(['FM', 'GS', 'PA'], isFirstTime), isTrue);
+  group('OnboardingPhase.postStrictDiscoveryOrder', () {
+    test('contains exactly the slugs not introduced by any strict phase', () {
+      // Strict phases introduce {FM, NC, PA, CC, RC, GS}; everything
+      // else from the registry must end up in the post-strict
+      // discovery list so the soft filter has a slug to elect for
+      // every remaining unseen rule.
+      final strict = OnboardingPhase.phases.map((p) => p.introducing).toSet();
+      final post = OnboardingPhase.postStrictDiscoveryOrder;
+      expect(post.toSet().intersection(strict), isEmpty);
+      expect(
+        post.toSet().union(strict),
+        equals(OnboardingPhase.allKnownSlugs),
+        reason:
+            'every registered slug must be covered either by a strict '
+            'phase or by postStrictDiscoveryOrder; missing slugs would '
+            'silently never be introduced.',
+      );
     });
 
-    test('passes a puzzle introducing exactly one new slug', () {
-      // Single new slug → modal fires for it, the rest is familiar.
-      // The player handles one new concept at a time. OK.
-      bool isFirstTime(String s) => s == 'NC';
-      expect(puzzlePassesSoftFilter(['FM', 'NC'], isFirstTime), isTrue);
-      expect(puzzlePassesSoftFilter(['NC'], isFirstTime), isTrue);
-    });
-
-    test('rejects a puzzle introducing two or more new slugs', () {
-      // Two unseen slugs would fire two modals back-to-back and pile up
-      // cognitive load — filter rejects so the player meets them
-      // separately on later puzzles. isFirstTime is true for every
-      // slug here → all unseen → fails the ≤1 cap.
-      bool isFirstTime(String _) => true;
-      expect(puzzlePassesSoftFilter(['LT', 'QA'], isFirstTime), isFalse);
-      expect(puzzlePassesSoftFilter(['FM', 'LT', 'QA'], isFirstTime), isFalse);
-    });
-
-    test('skips empty and TX entries when counting', () {
-      // Defensive: stale TX legacy entries or empty splits don't
-      // count toward the "unseen" budget. Even with isFirstTime
-      // returning true (everything reportedly unseen), TX and ''
-      // should not be counted.
-      bool isFirstTime(String _) => true;
-      expect(puzzlePassesSoftFilter(['FM', 'TX', ''], isFirstTime), isTrue);
+    test('preserves registry declaration order', () {
+      // The soft filter elects the first not-yet-seen slug in this
+      // list. Pinning the order keeps the discovery sequence
+      // predictable and reviewable; if someone reorders the registry,
+      // the order test fails and we revisit it intentionally.
+      expect(OnboardingPhase.postStrictDiscoveryOrder, [
+        'LT',
+        'QA',
+        'SY',
+        'DF',
+        'SH',
+        'GC',
+        'MJ',
+        'EY',
+      ]);
     });
   });
 

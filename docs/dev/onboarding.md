@@ -5,6 +5,17 @@ Locked-in plan to replace the `tutorial` collection (and its
 mechanism driven by the player's stats. Open discussion is limited to
 the [Still open](#7-decisions-and-still-open) section.
 
+> **2026-05 architecture update.** The gating mechanism described in
+> sections 5 and 6 below (`puzzleEligibleForPhase`,
+> `_applySoftOnboardingFilter`, `_getPuzzlesInPhase`) was replaced by
+> a *visible* filter preset. Phase semantics, slug rotation and the
+> "≤1 new slug at a time" contract are preserved, but they are now
+> expressed as recommended `wantedRules` / `bannedRules` values that
+> the player can see in OpenPage and override. See `playlist.md` §8
+> for the new code path. The discussion below remains useful as
+> rationale; the implementation details (function names, fallback
+> behaviour) are outdated.
+
 ## 1. Previous state
 
 - Dedicated `tutorial` collection (`assets/tutorial.txt`, 23 puzzles).
