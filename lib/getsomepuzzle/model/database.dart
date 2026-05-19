@@ -861,13 +861,18 @@ class Database {
 
   void preparePlaylist() {
     if (collection == 'custom' || collection.startsWith('user_')) {
-      // User-curated playlists keep their insertion order — the player
-      // chose this sequence explicitly. Filters and shuffle do not
-      // apply; only "already played" is honoured. The onboarding
-      // phase filter is *not* applied here either: importing or
-      // hand-crafting a playlist is an opt-in that supersedes the
-      // curated track.
-      playlist = puzzles.where((p) => !p.played).toList();
+      // User-curated playlists honour the full filter pipeline and the
+      // shuffle toggle exactly like built-in collections — the player
+      // expects an explicit FM ban or an enabled shuffle to take effect
+      // here too. What stays specific to custom/user_* is the exemption
+      // from onboarding gating (importing or hand-crafting a playlist
+      // is an opt-in that supersedes the curated track) and the absence
+      // of a batch cap (the whole playlist plays as a single flow).
+      // When shuffle is off we keep the catalog order from `filter()`,
+      // which itself iterates `puzzles` in insertion order — so the
+      // "play in the order I imported them" contract still holds.
+      final base = filter().toList();
+      playlist = shouldShuffle ? (base..shuffle()) : base;
     } else {
       final phase = currentPhase;
       if (phase != null && _isPlayableLevel(collection)) {

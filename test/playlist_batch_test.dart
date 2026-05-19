@@ -9,9 +9,10 @@ PuzzleData _puz({
   int width = 5,
   int height = 5,
   int nCons = 1,
+  String constraintSlug = 'FM',
 }) {
   final cellsStr = '0' * (width * height);
-  final cons = List.filled(nCons, 'FM').map((s) => '$s:1').join(';');
+  final cons = List.filled(nCons, constraintSlug).map((s) => '$s:1').join(';');
   return PuzzleData('v2_12_${width}x${height}_${cellsStr}_${cons}_0:0_$cplx');
 }
 
@@ -61,6 +62,80 @@ void main() {
       );
       db.preparePlaylist();
       expect(db.playlist.length, Database.playlistBatchSize);
+    });
+  });
+
+  group('Database.preparePlaylist — custom/user_ filters & shuffle', () {
+    test('bannedRules filters out matching puzzles on custom', () {
+      // Regression: previously the custom branch bypassed the filter
+      // pipeline, so a player who banned `FM` would still be served
+      // FM puzzles. The fix routes custom/user_* through `filter()`
+      // exactly like the level branches.
+      final db = Database(playerLevel: 50);
+      db.collection = 'custom';
+      db.puzzles = [
+        _puz(cplx: 20, constraintSlug: 'FM'),
+        _puz(cplx: 20, constraintSlug: 'PA'),
+        _puz(cplx: 20, constraintSlug: 'GS'),
+      ];
+      db.currentFilters.bannedRules = {'FM'};
+      db.preparePlaylist();
+      expect(db.playlist.map((p) => p.rules.first), ['PA', 'GS']);
+    });
+
+    test('bannedRules filters apply on user_* playlists too', () {
+      // Same contract for named user playlists — they share the
+      // custom branch in `preparePlaylist`.
+      final db = Database(playerLevel: 50);
+      db.collection = 'user_my_list';
+      db.puzzles = [
+        _puz(cplx: 20, constraintSlug: 'FM'),
+        _puz(cplx: 20, constraintSlug: 'PA'),
+      ];
+      db.currentFilters.bannedRules = {'PA'};
+      db.preparePlaylist();
+      expect(db.playlist.map((p) => p.rules.first), ['FM']);
+    });
+
+    test('shuffle reorders the playlist on custom', () {
+      // The shuffle toggle now affects custom/user_*. We can't assert
+      // a specific order (it's random), but with a large enough list
+      // the chance of `shuffle()` returning the input order is
+      // vanishingly small — assert "ordering differs" instead.
+      final db = Database(playerLevel: 50);
+      db.collection = 'custom';
+      // 50 puzzles is plenty to make accidental fixed-point shuffles
+      // statistically negligible (1/50! ≈ 0).
+      db.puzzles = List.generate(50, (i) => _puz(cplx: i));
+      final originalCplx = db.puzzles.map((p) => p.cplx).toList();
+      db.shouldShuffle = true;
+      db.preparePlaylist();
+      final shuffledCplx = db.playlist.map((p) => p.cplx).toList();
+      expect(shuffledCplx, hasLength(50));
+      expect(shuffledCplx, isNot(equals(originalCplx)));
+    });
+
+    test('shuffle off keeps insertion order on custom', () {
+      // Preserves the long-standing contract: when shuffle is off the
+      // player gets the puzzles in the exact order they appear in
+      // the on-disk file.
+      final db = Database(playerLevel: 50);
+      db.collection = 'custom';
+      db.puzzles = List.generate(10, (i) => _puz(cplx: i));
+      db.shouldShuffle = false;
+      db.preparePlaylist();
+      expect(db.playlist.map((p) => p.cplx).toList(), [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+      ]);
     });
   });
 
