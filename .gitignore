@@ -53,3 +53,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+scripts
+backup
+.claude/agent-memory
+.claude/settings.local.json
