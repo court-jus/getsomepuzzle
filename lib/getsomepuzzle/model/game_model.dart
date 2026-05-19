@@ -190,6 +190,7 @@ class GameModel extends ChangeNotifier {
     PuzzleData puz,
     int playlistLength, {
     String? progressRestoredText,
+    bool? screenIsLandscape,
   }) {
     _beforeMutation();
     _cancelIdleTimer();
@@ -197,6 +198,23 @@ class GameModel extends ChangeNotifier {
     currentMeta = puz;
     currentPuzzle = currentMeta!.begin();
     _isPuzzleRotated = false;
+    // Apply auto-rotation synchronously here — before `_afterMutation`
+    // notifies listeners — so the very first build sees the puzzle in the
+    // correct orientation. Without this, the build-time post-frame
+    // callback in `main.dart` would rotate one frame later, producing a
+    // visible flicker on puzzle open. `Puzzle.rotated()` preserves cell
+    // values, readonly flags, the cached solution, and restored
+    // progress, so this is logically transparent.
+    if (screenIsLandscape != null && currentPuzzle != null) {
+      final p = currentPuzzle!;
+      if (p.width != p.height) {
+        final puzzleLandscape = p.width > p.height;
+        if (puzzleLandscape != screenIsLandscape) {
+          currentPuzzle = p.rotated();
+          _isPuzzleRotated = true;
+        }
+      }
+    }
     paused = false;
     betweenPuzzles = false;
     _stoppedForCompletion = false;

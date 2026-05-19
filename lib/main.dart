@@ -331,10 +331,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   void openPuzzle(PuzzleData puz) {
+    // Pass the current screen orientation so `GameModel.openPuzzle` can
+    // apply the auto-rotation BEFORE the first build, avoiding a one-frame
+    // flicker where the puzzle would otherwise appear in the wrong
+    // orientation then snap into place. Orientation changes during play
+    // are still handled by the post-frame callback in build().
+    final size = MediaQuery.sizeOf(context);
     game.openPuzzle(
       puz,
       database!.playlist.length,
       progressRestoredText: AppLocalizations.of(context)!.progressRestored,
+      screenIsLandscape: size.width > size.height,
     );
     if (settings.hintType == HintType.addConstraint) {
       game.startHintConstraintComputation();
@@ -730,7 +737,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     // with huge empty bands. Rotation is logically transparent — same
     // solutions, same constraints (re-expressed) — so the player keeps the
     // same stats entry across orientations (canonicalPuzzleKey is rotation-
-    // invariant). Scheduled post-frame to avoid mutating state during build.
+    // invariant).
+    //
+    // The *initial* rotation at puzzle-open time is applied synchronously
+    // by `GameModel.openPuzzle(screenIsLandscape:)` so the first build
+    // already sees the correct orientation. This post-frame branch only
+    // catches device-orientation changes that happen *after* the puzzle is
+    // displayed (and a safety net if the orientation hint wasn't passed).
+    // Scheduled post-frame to avoid mutating state during build.
     if (game.currentPuzzle != null) {
       final p = game.currentPuzzle!;
       if (p.width != p.height) {
