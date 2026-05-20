@@ -98,6 +98,32 @@ void main() {
       expect(reco.bannedRules, {'SY', 'DF', 'SH', 'GC', 'MJ', 'EY'});
     });
 
+    test('forces the last unseen post-strict slug into wantedRules', () {
+      // Terminal soft-filter case: every post-strict slug has been seen
+      // except one. The default soft-filter shape ({}, unseen \ elected)
+      // would collapse to ({}, {}) — an empty recommendation that makes
+      // the open-page banner show without any visible chip and grays
+      // out the reset action. Flipping to wantedRules: {elected} keeps
+      // a single chip visible AND focuses the next playlist on the
+      // missing slug.
+      final progress = ConstraintProgress();
+      final now = DateTime(2026, 5, 19);
+      for (final s in OnboardingPhase.phases.map((p) => p.introducing)) {
+        progress.noteSeen(s, now);
+      }
+      // Seen everything in postStrictDiscoveryOrder except the last one.
+      final lastSlug = OnboardingPhase.postStrictDiscoveryOrder.last;
+      for (final s in OnboardingPhase.postStrictDiscoveryOrder) {
+        if (s == lastSlug) continue;
+        progress.noteSeen(s, now);
+      }
+      final db = Database(playerLevel: 50, progress: progress);
+      db.onboardingCompletions = _allStrictPhasesCompleted();
+      final reco = db.recommendedOnboardingFilters!;
+      expect(reco.wantedRules, {lastSlug});
+      expect(reco.bannedRules, isEmpty);
+    });
+
     test('returns null once every known slug has been seen', () {
       // No more discovery to drive: every constraint has been met.
       // recommendedOnboardingFilters drops back to null and the player

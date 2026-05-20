@@ -957,6 +957,11 @@ class Database {
   /// rule), while banning every other unseen slug — a faithful
   /// translation of the old soft-filter "≤1 new slug" contract into
   /// the visible-filter model.
+  ///
+  /// **Terminal case** (one unseen slug left): `wantedRules =
+  /// {elected}`, `bannedRules = {}`. We flip from "let refresh pass"
+  /// to "force the missing slug" so the open-page banner references a
+  /// real chip and onboarding converges faster.
   ({Set<String> wantedRules, Set<String> bannedRules})?
   get recommendedOnboardingFilters {
     final phase = currentPhase;
@@ -986,6 +991,14 @@ class Database {
       }
     }
     if (elected == null) return null;
+    // Terminal case: the elected slug is the only one still unseen.
+    // Force it into wantedRules — leaving the reco as ({}, {}) would
+    // collapse the open-page banner onto a filter set with no visible
+    // chips, and the playlist would lack any pressure to surface the
+    // missing slug.
+    if (unseen.isEmpty) {
+      return (wantedRules: <String>{elected}, bannedRules: <String>{});
+    }
     return (wantedRules: <String>{}, bannedRules: unseen);
   }
 

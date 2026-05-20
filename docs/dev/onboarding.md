@@ -5,16 +5,16 @@ Locked-in plan to replace the `tutorial` collection (and its
 mechanism driven by the player's stats. Open discussion is limited to
 the [Still open](#7-decisions-and-still-open) section.
 
-> **2026-05 architecture update.** The gating mechanism described in
-> sections 5 and 6 below (`puzzleEligibleForPhase`,
-> `_applySoftOnboardingFilter`, `_getPuzzlesInPhase`) was replaced by
-> a *visible* filter preset. Phase semantics, slug rotation and the
-> "≤1 new slug at a time" contract are preserved, but they are now
-> expressed as recommended `wantedRules` / `bannedRules` values that
-> the player can see in OpenPage and override. See `playlist.md` §8
-> for the new code path. The discussion below remains useful as
-> rationale; the implementation details (function names, fallback
-> behaviour) are outdated.
+> **2026-05 architecture update.** The phase semantics, slug
+> rotation and the "≤ 1 new slug at a time" contract are unchanged,
+> but they are now expressed as a *visible* filter preset
+> (`recommendedOnboardingFilters` → `currentFilters`) rather than a
+> hidden gating step inside the playlist sampler. The player sees
+> the preset chips in OpenPage and can override them. Sections 5–6
+> below describe the current implementation; see `playlist.md` §8
+> for the OpenPage banner and reset flow. Sections 3–4 keep the
+> original (early-2026) corpus snapshots — informative but no
+> longer regenerated.
 
 ## 1. Previous state
 
@@ -254,14 +254,29 @@ JSON in `SharedPreferences` under the
 
 ### Strict phases (P0-P5)
 
-Filters are expressed as **sets of declared slugs** in the puzzle
-(`TX` is excluded by default since it is gone). The eligibility
-predicate `puzzleEligibleForPhase` enforces two conditions
-simultaneously: the puzzle's slugs must sit inside the phase's
-`allowed` envelope **and** the puzzle must declare the phase's
-`introducing` slug. The sampler does no extra phase weighting — once
-a puzzle is eligible, it competes purely on Gaussian-cplx + variety
-score. No refresh share, no anti-forgetting sprinkle.
+The two conditions of the original `puzzleEligibleForPhase` predicate
+(allow-envelope + introducing-slug-present) are expressed as a visible
+filter preset on `currentFilters`:
+
+- `wantedRules = {phase.introducing}` — the puzzle must declare the
+  introducing slug.
+- `bannedRules = allKnownSlugs \ phase.allowed` — every slug outside
+  the phase envelope is forbidden.
+
+`Database.recommendedOnboardingFilters` returns this pair from
+`_strictPhaseRecommendation(phase)`, and
+`maybeApplyOnboardingFilterDefaults` (run once per launch, gated by
+the `onboardingFiltersApplied` prefs key) writes it into
+`currentFilters` if the player hasn't customised them. From there the
+existing `Database.filter()` does the actual filtering — there is no
+dedicated onboarding sampler. The player can inspect the preset in
+OpenPage and override it via the standard chip UI; the original
+contract holds exactly while the preset is in effect. The sampler
+does no extra phase weighting: once `filter()` passes, puzzles compete
+on Gaussian-cplx + variety score. No refresh share, no
+anti-forgetting sprinkle. `puzzleEligibleForPhase` is still exported
+for `bin/` tools (e.g. `bin/check_phase_coverage.dart`) but is no
+longer consulted at runtime.
 
 | Phase | Length | Introducing | Allowed slugs               |
 |------:|-------:|:------------|:----------------------------|
@@ -276,36 +291,48 @@ Past P5 the player enters the soft-filter mode described below.
 
 ### Empty-playlist surfacing
 
-When the strict-phase filter produces an empty playlist on the
+When the strict-phase filter would produce an empty playlist on the
 currently-selected collection (e.g. a beginner-level player tries
-6-mad before finishing phase 5),
-`Database.emptyPlaylistReason` returns
-`EmptyPlaylistReason.onboardingPhase` and `open_page.dart` renders the
-localised `emptyPlaylistOnboardingPhase` message under the disabled
-Play button. The reason cascade in `emptyPlaylistReason` covers the
-six other empty-state cases too: see `database.dart` near the
-`EmptyPlaylistReason` enum for the full ordering.
+6-mad before finishing phase 5), the OpenPage banner introduced in
+2026-05 (see `playlist.md` §8) surfaces the recommended preset and
+offers a one-tap reset to apply it, instead of the
+previous empty-state message under a disabled Play button. The
+`EmptyPlaylistReason` enum still exists for the residual empty states
+(`customEmpty`, `userAllPlayed`, `noPuzzlesLoaded`, `filtersTooStrict`,
+`generic`) — it no longer contains a dedicated onboarding case.
 
 ### "Soft filter" mode (post-P5)
 
 Why no strict phase past P5? The corpus doesn't easily sustain strict
-phases for the remaining slugs (LT, QA, SY, DF, SH, GC, EY): too few
-puzzles whose declared rules sit cleanly inside a narrow envelope.
-Generating more in such a narrow envelope is counter-productive (the
-generator classifies elsewhere or yields very little).
+phases for the remaining slugs (the eight in
+`OnboardingPhase.postStrictDiscoveryOrder` — currently
+`LT, QA, SY, DF, SH, GC, MJ, EY`, derived from `constraintRegistry`):
+too few puzzles whose declared rules sit cleanly inside a narrow
+envelope. Generating more in such a narrow envelope is
+counter-productive (the generator classifies elsewhere or yields very
+little).
 
-Adopted model:
+Adopted model — also expressed as a filter preset, via
+`_softFilterRecommendation()`:
 
 - The player can explore **every level collection** (the user-level
   filter still drives the sampler).
-- A **soft filter** rejects any puzzle whose declared rules contain
-  ≥ 2 slugs with `firstSeen[s] == null`. Consequence: each surfaced
-  puzzle introduces at most **one** new rule (for which the modal
-  fires), while still serving realistic puzzles that combine
-  already-mastered rules.
-- The soft filter becomes a no-op once the player has met every known
-  constraint (`firstSeen.length == OnboardingPhase.allKnownSlugs`)
-  → onboarding is implicitly over.
+- The recommendation **elects** the first slug in
+  `postStrictDiscoveryOrder` that the player has not yet met. While
+  ≥ 2 slugs are still unseen, the preset is
+  `wantedRules = {}`, `bannedRules = (unseen \ {elected})` — puzzles
+  with 0 new slugs pass (refresh) AND the elected slug can surface
+  (single new rule), while every other unseen slug is banned. The
+  resulting playlist matches the original "≤ 1 new rule" contract.
+- **Terminal case** (one unseen slug left): the preset flips to
+  `wantedRules = {elected}`, `bannedRules = {}` so the OpenPage banner
+  references a real chip and the missing slug surfaces faster.
+- The soft filter becomes a no-op once
+  `progress.firstSeen.length == OnboardingPhase.allKnownSlugs.length`
+  (every known slug encountered). At that point
+  `_softFilterActive` is false, `recommendedOnboardingFilters`
+  returns `null`, and `isInOnboarding` flips to false → onboarding is
+  implicitly over.
 
 For up-to-date corpus coverage figures per phase, run
 `bin/check_phase_coverage.dart` (and `--soft` for the post-strict
@@ -315,49 +342,48 @@ diagnostic cheap.
 
 ### Learning page (menu)
 
-A new **Learning** menu entry is added next to Help. It serves as a
-rule reference + memory-refresher tool.
+A **Learning** menu entry (labelled "Apprentissage" in French) sits
+next to Help. It serves as a rule reference and refresh tool.
 
-For each constraint (the 12 slugs), the page shows:
+For each entry in `OnboardingPhase.allKnownSlugs` (currently 14 slugs,
+read from the registry), the page shows:
 
 - The localised **icon** + **name**.
-- A status: `seen on 12 March 2026` if `firstSeen[slug] != null`,
-  otherwise `not yet encountered`.
-- The **number of puzzles already played** (finished, skipped
-  excluded) that contained this constraint. Computed from
-  `puzzles.where(p => p.played && p.skipped == null &&
-  p.rules.contains(slug))` over the entire stats history (across
-  every collection, not just the current one).
-- A **"Refresh my memory"** button which:
-  1. Re-displays the explanation modal (same content as the first-
-     encounter modal — the slug isn't unlearned, `firstSeen` stays
-     set).
-  2. Prepares a **temporary playlist of about 10 onboarding
-     puzzles** centred on the constraint. Implementation: we reuse
-     the phase machinery from § 5 by simulating a state where `slug`
-     was just unlocked, and sample ten unplayed puzzles that satisfy
-     its introduction filter (e.g. `{FM, slug}` for slugs introduced
-     via FM, `{NC, slug}` for those introduced via NC), with optional
-     sprinkling.
-  3. At the end of the refresh playlist, the player returns to the
-     collection they had before.
+- A status: `seen on 12 March 2026` if `progress.firstSeen[slug]` is
+  set, otherwise "not yet encountered".
+- The **number of puzzles already played** (finished, non-skipped)
+  that contained this constraint. Computed by
+  `Database.playCountForSlug(slug)` over the entire stats history
+  (across every collection, not just the current one).
+- A **"Refresh"** button that re-opens the constraint's explanation
+  modal (`NewConstraintDialog.show(context, {slug})`) so the player
+  can review the rule any time without affecting their progress —
+  `firstSeen` stays untouched.
+
+Slugs are sorted seen-first, by first-seen date ascending, then
+alphabetical. The page is rebuilt every time it is opened — counts
+and dates are pulled live from `Database` and `ConstraintProgress`.
 
 This page also serves as a gateway for a player who **never went
 through onboarding** (custom-only path, a player playing 6-mad out of
-curiosity): they can browse the list, read each rule, and launch a
-mini-walkthrough for any rule they're curious about, without
-disturbing their main progress.
+curiosity): they can browse the list and read each rule on demand,
+without disturbing their main progress. A previous spec proposed a
+"mini refresher playlist" launched from this page; that feature was
+not retained — the modal-only refresh ships today.
 
 ### Exiting onboarding
 
 Onboarding is implicitly complete once
-`progress.firstSeen.length == OnboardingPhase.allKnownSlugs` (the 12
-constraints have all been encountered at least once). From that point:
+`progress.firstSeen.length == OnboardingPhase.allKnownSlugs.length`
+(every constraint encountered at least once). From that point:
 
-- The soft filter becomes a no-op (nothing to filter, no slug left
-  unknown).
-- The playlist falls back to `getPuzzlesByLevel(playerLevel)` with
-  no extra constraint.
+- `_softFilterActive` returns false and
+  `recommendedOnboardingFilters` returns `null`; `isInOnboarding`
+  flips to false.
+- `currentFilters` keeps whatever values the player last had — the
+  preset is no longer overridden at boot. The standard
+  `Database.filter()` + `getPuzzlesByLevel(playerLevel)` pipeline
+  runs without onboarding-specific gating.
 - The EOP shows the standard message ("continue / switch
   collection"), without the "you haven't met every rule yet" note.
 
@@ -368,27 +394,41 @@ The implementation reached a stable shape in v1.6.x. Key landing zones:
 - **`lib/getsomepuzzle/model/onboarding.dart`**: 6 strict
   `OnboardingPhase` entries (FM, NC, PA, CC, RC, GS),
   `phaseLength = 5`, `phaseForCompletions(Map<String,int>)`
-  selector, `puzzleEligibleForPhase` + `puzzlePassesSoftFilter`
-  helpers. Flutter-free so it can be reused in `bin/`.
+  selector, `puzzleEligibleForPhase` helper. The soft-filter
+  predicate that used to live here is now expressed as a filter
+  preset (`_softFilterActive` / `_softFilterRecommendation` in
+  `database.dart`, surfaced through `recommendedOnboardingFilters`).
+  Flutter-free so it can be reused in `bin/`.
 - **`lib/getsomepuzzle/model/database.dart`**:
   - `onboardingCompletions : Map<String,int>` (was `int` pre-v1.6),
     JSON-serialised in `SharedPreferences` under the
     `onboardingCompletions` key.
+  - `currentPhase` getter delegates to
+    `phaseForCompletions(onboardingCompletions)`.
   - `notePuzzleCompleted` increments every slug in `puz.rules`
     when `currentPhase != null` and persists fire-and-forget.
   - `skipOnboarding` and `resetOnboardingProgress` both persist
     immediately to avoid the
     "loadPuzzlesFile-rebuilds-from-prefs-and-drops-the-update"
     regression.
-  - `preparePlaylist` filters candidates through
-    `puzzleEligibleForPhase` during strict phases (slug envelope +
-    introducing slug present), then ranks the survivors with the
-    plain Gaussian-cplx + variety score; falls back to
-    `getPuzzlesByLevel + softFilter` after.
+  - `recommendedOnboardingFilters` returns the
+    `(wantedRules, bannedRules)` preset for the current state
+    (`_strictPhaseRecommendation` for P0-P5,
+    `_softFilterRecommendation` for the post-strict discovery), or
+    `null` once onboarding is over. `maybeApplyOnboardingFilterDefaults`
+    runs this once per launch, behind the `onboardingFiltersApplied`
+    prefs flag, and writes the result into `currentFilters`.
+  - `preparePlaylist` no longer carries an onboarding-specific path
+    — once the preset is applied to `currentFilters`, the standard
+    `getPuzzlesByLevel(playerLevel)` pipeline (which consults
+    `filter()`) does the gating for free.
   - `EmptyPlaylistReason` enum + `emptyPlaylistReason` getter
     surface a localised reason under the Play button when the
-    playlist is empty (onboarding mismatch, filters too strict,
-    soft-filter exclusion, no puzzles loaded, …).
+    playlist is empty. As of 2026-05 the enum carries the residual
+    cases only (`customEmpty`, `userAllPlayed`, `noPuzzlesLoaded`,
+    `filtersTooStrict`, `generic`); the previous onboarding-specific
+    and soft-filter-specific cases are absorbed by the upstream
+    `recommendedOnboardingFilters` preset (see `playlist.md` §8).
 - **Removed earlier**: `tutorial` dropdown entry, `restartTutorial`,
   the tutorial settings section, `assets/tutorial.txt`, the
   `HelpText` (`TX:`) class + registration, the `tutorial` mode in
@@ -400,12 +440,14 @@ The implementation reached a stable shape in v1.6.x. Key landing zones:
   `_MyHomePageState` when a puzzle introduces a slug with
   `firstSeen[slug] == null`.
 - **`widgets/learning_page.dart`** page reachable from the main menu
-  next to Help: list of the 13 constraints with `firstSeen` status
-  and a "refresh my memory" button that launches a short refresher
-  playlist.
+  next to Help: list of `OnboardingPhase.allKnownSlugs` (14 today)
+  with `firstSeen` status, play count, and a refresh button that
+  re-opens the explanation modal — no refresher playlist.
 - **ARB entries**: `constraintExplain<Slug>` (title + body) per
-  constraint, the `learning` menu label, and the
-  `emptyPlaylist*` reasons for the Play-button gating message.
+  constraint, the `learningPage*` labels, the `bannerOnboardingFilters*`
+  banner strings for OpenPage, and the residual `emptyPlaylist*`
+  reasons (`customEmpty`, `userAllPlayed`, `noPuzzlesLoaded`,
+  `filtersTooStrict`, `generic`).
 
 ## 7. Decisions and still open
 
