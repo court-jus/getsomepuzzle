@@ -11,6 +11,21 @@ import 'dart:math';
 // Tunable parameters
 // ---------------------------------------------------------------------------
 
+/// Target distribution for the "profile" axis (pre-fill mode).
+///
+/// 90 % of puzzles come from the regular flow (`preFillRegular`); the
+/// remaining 10 % is split equally between SH-themed and path-based-LT
+/// scenarios. Each scenario has its own pre-fill function and the path
+/// the puzzle takes through `generateOne` differs accordingly.
+///
+/// Identification of an existing puzzle's profile is heuristic when no
+/// explicit marker exists in the v2 format — see [detectPuzzleProfile].
+const Map<ProfileCategory, double> kTargetProfile = {
+  ProfileCategory.classic: 0.90,
+  ProfileCategory.sh: 0.05,
+  ProfileCategory.pathBased: 0.05,
+};
+
 /// Target distribution for the "number of types per puzzle" axis.
 /// Only keys 1..5 are pushed by the equilibrium engine. Puzzles with ≥ 6
 /// distinct types are accepted (they can fall out of cross-axis recycling
@@ -85,6 +100,9 @@ double targetShare(Axis axis, Object category, int categoryCount) {
     case Axis.ntypes:
       final n = category as int;
       return kTargetNTypesProfile[n] ?? 0.0;
+    case Axis.profile:
+      final p = category as ProfileCategory;
+      return kTargetProfile[p] ?? 0.0;
   }
 }
 
@@ -116,7 +134,26 @@ double sizeTargetShare(int width, int height, TargetUniverse universe) {
 // Types
 // ---------------------------------------------------------------------------
 
-enum Axis { slug, ntypes, pair, size }
+enum Axis { slug, ntypes, pair, size, profile }
+
+/// Pre-fill scenario categories. Each puzzle has exactly one profile,
+/// determined either at generation time (when `pathBasedScenario` or
+/// `prioritySlugs.contains("SH")` is set) or post-hoc via heuristic
+/// detection on a v2 line (see [detectPuzzleProfile]).
+enum ProfileCategory {
+  /// Default: regular pre-fill (random grid) followed by the greedy
+  /// constraint cherry-pick. The bulk of generated puzzles.
+  classic,
+
+  /// SH-themed: `preFillSh` seeds a Shape motif. The puzzle contains at
+  /// least one SH constraint.
+  sh,
+
+  /// Path-based-LT: `preFillPath` builds a topology of LT constraints
+  /// and runs the bipartite desambiguation. LT is the dominant
+  /// deductive driver.
+  pathBased,
+}
 
 /// A single target the equilibrium algorithm wants to push next.
 sealed class Target {
@@ -183,6 +220,75 @@ class SizeTarget extends Target {
   String get label => 'size=${width}x$height';
 }
 
+class ProfileTarget extends Target {
+  final ProfileCategory profile;
+  const ProfileTarget(this.profile);
+  @override
+  Axis get axis => Axis.profile;
+  @override
+  String get key => 'profile:${profile.name}';
+  @override
+  String get label => 'profile=${profile.name}';
+}
+
+/// Detect a puzzle's profile from its v2 line via heuristics. Used to
+/// populate [EquilibriumStats.profileCounts] from existing corpus data
+/// (no marker exists in the v2 format).
+///
+/// Rules (priority order):
+/// - any constraint with slug `SH` → [ProfileCategory.sh].
+/// - ≥ 2 LT constraints AND each LT's anchors are at Manhattan
+///   distance ≥ 2 from each other → [ProfileCategory.pathBased].
+/// - otherwise → [ProfileCategory.classic].
+///
+/// The path-based heuristic over-counts: some legacy classic puzzles
+/// happen to have two well-spread LT constraints and would be flagged.
+/// This is acceptable for equilibrium balancing — the algorithm
+/// self-corrects regardless.
+ProfileCategory detectPuzzleProfile(String v2Line) {
+  final parts = v2Line.split('_');
+  if (parts.length < 5) return ProfileCategory.classic;
+  final dims = parts[2].split('x');
+  if (dims.length != 2) return ProfileCategory.classic;
+  final width = int.tryParse(dims[0]);
+  if (width == null) return ProfileCategory.classic;
+
+  final ltIndices = <List<int>>[];
+  bool hasSh = false;
+  for (final c in parts[4].split(';')) {
+    if (c.isEmpty) continue;
+    if (c.startsWith('SH:')) {
+      hasSh = true;
+    } else if (c.startsWith('LT:')) {
+      final body = c.substring(3).split('.');
+      if (body.length < 2) continue;
+      final idxs = <int>[];
+      for (int i = 1; i < body.length; i++) {
+        final v = int.tryParse(body[i]);
+        if (v == null) {
+          idxs.clear();
+          break;
+        }
+        idxs.add(v);
+      }
+      if (idxs.isNotEmpty) ltIndices.add(idxs);
+    }
+  }
+  if (hasSh) return ProfileCategory.sh;
+  if (ltIndices.length < 2) return ProfileCategory.classic;
+  for (final lt in ltIndices) {
+    if (lt.length < 2) continue;
+    for (int i = 0; i < lt.length; i++) {
+      for (int j = i + 1; j < lt.length; j++) {
+        final dx = (lt[i] % width - lt[j] % width).abs();
+        final dy = (lt[i] ~/ width - lt[j] ~/ width).abs();
+        if (dx + dy < 2) return ProfileCategory.classic;
+      }
+    }
+  }
+  return ProfileCategory.pathBased;
+}
+
 // ---------------------------------------------------------------------------
 // Stats
 // ---------------------------------------------------------------------------
@@ -193,6 +299,7 @@ class EquilibriumStats {
   final Map<int, int> ntypesCounts;
   final Map<(String, String), int> pairCounts;
   final Map<(int, int), int> sizeCounts;
+  final Map<ProfileCategory, int> profileCounts;
   final int totalPuzzles;
 
   const EquilibriumStats({
@@ -200,6 +307,7 @@ class EquilibriumStats {
     required this.ntypesCounts,
     required this.pairCounts,
     required this.sizeCounts,
+    required this.profileCounts,
     required this.totalPuzzles,
   });
 
@@ -208,6 +316,7 @@ class EquilibriumStats {
     ntypesCounts: {},
     pairCounts: {},
     sizeCounts: {},
+    profileCounts: {},
     totalPuzzles: 0,
   );
 
@@ -221,6 +330,7 @@ class EquilibriumStats {
     final ntypes = <int, int>{};
     final pairs = <(String, String), int>{};
     final sizes = <(int, int), int>{};
+    final profiles = <ProfileCategory, int>{};
     int total = 0;
 
     for (final raw in lines) {
@@ -257,6 +367,8 @@ class EquilibriumStats {
         final pair = (sorted[0], sorted[1]);
         pairs[pair] = (pairs[pair] ?? 0) + 1;
       }
+      final profile = detectPuzzleProfile(line);
+      profiles[profile] = (profiles[profile] ?? 0) + 1;
     }
 
     return EquilibriumStats(
@@ -264,20 +376,26 @@ class EquilibriumStats {
       ntypesCounts: ntypes,
       pairCounts: pairs,
       sizeCounts: sizes,
+      profileCounts: profiles,
       totalPuzzles: total,
     );
   }
 
-  /// Returns a copy with one more puzzle's slugs/size accounted for.
+  /// Returns a copy with one more puzzle's slugs/size/profile accounted for.
+  ///
+  /// [profile] defaults to [ProfileCategory.classic] so callers that don't
+  /// care about the profile axis (and tests pre-dating it) stay terse.
   EquilibriumStats withPuzzle({
     required Set<String> slugs,
     required int width,
     required int height,
+    ProfileCategory profile = ProfileCategory.classic,
   }) {
     final newSlug = Map<String, int>.from(slugCounts);
     final newNtypes = Map<int, int>.from(ntypesCounts);
     final newPairs = Map<(String, String), int>.from(pairCounts);
     final newSizes = Map<(int, int), int>.from(sizeCounts);
+    final newProfiles = Map<ProfileCategory, int>.from(profileCounts);
 
     for (final s in slugs) {
       newSlug[s] = (newSlug[s] ?? 0) + 1;
@@ -289,12 +407,14 @@ class EquilibriumStats {
       final pair = (sorted[0], sorted[1]);
       newPairs[pair] = (newPairs[pair] ?? 0) + 1;
     }
+    newProfiles[profile] = (newProfiles[profile] ?? 0) + 1;
 
     return EquilibriumStats(
       slugCounts: newSlug,
       ntypesCounts: newNtypes,
       pairCounts: newPairs,
       sizeCounts: newSizes,
+      profileCounts: newProfiles,
       totalPuzzles: totalPuzzles + 1,
     );
   }
@@ -545,6 +665,15 @@ List<_ScoredTarget> _scoreAll(EquilibriumStats stats, TargetUniverse universe) {
     final c = stats.sizeCounts[(w, h)] ?? 0;
     final expSize = sizeTargetShare(w, h, universe);
     out.add(_ScoredTarget(SizeTarget(w, h), _gap(_share(c, total), expSize)));
+  }
+
+  // --- Profile (scenario) ---
+  // Three categories with explicit targets in [kTargetProfile]. Existing
+  // corpus puzzles are bucketed by [detectPuzzleProfile] (heuristic).
+  for (final entry in kTargetProfile.entries) {
+    final c = stats.profileCounts[entry.key] ?? 0;
+    final share = _share(c, total);
+    out.add(_ScoredTarget(ProfileTarget(entry.key), _gap(share, entry.value)));
   }
 
   return out;

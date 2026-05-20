@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
@@ -45,6 +46,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final logDir = parsed['logDir'] as String?;
   final targetLevel = parsed['targetLevel'] as PuzzleLevel?;
   final easingBudget = parsed['easingBudget'] as int;
+  final scenarioPathBased = (parsed['scenario'] as String?) == 'path-based';
   if (logDir != null) {
     final dir = Directory(logDir);
     if (!dir.existsSync()) dir.createSync(recursive: true);
@@ -235,6 +237,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       count: workerCount,
       targetLevel: targetLevel,
       easingBudget: Duration(seconds: easingBudget),
+      pathBasedScenario: scenarioPathBased,
     );
     final worker = GeneratorWorker();
     workers.add(worker);
@@ -319,13 +322,18 @@ class _CollectionStats {
   // n=1..5 mapped to '1'..'5'; n>=6 collapsed into '6+' (reliquat bucket,
   // never targeted by equilibrium).
   final Map<String, int> nTypes;
+  // Profile axis: classic / sh / pathBased (heuristically detected per
+  // `detectPuzzleProfile` in equilibrium.dart). Keys match the display
+  // labels used in the dashboard histogram.
+  final Map<String, int> profiles;
 
-  _CollectionStats(this.slugs, this.sizeBuckets, this.nTypes);
+  _CollectionStats(this.slugs, this.sizeBuckets, this.nTypes, this.profiles);
 
   factory _CollectionStats.fromLines(List<String> lines) {
     final slugs = {for (final s in constraintSlugs) s: 0};
     final sizeBuckets = [0, 0, 0, 0];
     final nTypes = <String, int>{};
+    final profiles = <String, int>{'classic': 0, 'sh': 0, 'pathBased': 0};
 
     for (final line in lines) {
       final trimmed = line.trim();
@@ -360,9 +368,12 @@ class _CollectionStats {
       final n = puzzleSlugs.length;
       final key = n >= 6 ? '6+' : n.toString();
       nTypes[key] = (nTypes[key] ?? 0) + 1;
+
+      final profile = detectPuzzleProfile(trimmed);
+      profiles[profile.name] = (profiles[profile.name] ?? 0) + 1;
     }
 
-    return _CollectionStats(slugs, sizeBuckets, nTypes);
+    return _CollectionStats(slugs, sizeBuckets, nTypes, profiles);
   }
 }
 
@@ -444,10 +455,17 @@ void _renderDashboard({
   // the bin the picker is most likely to chase next. Target=0 buckets (e.g.
   // ntypes 6+) always have gap=0 → no bar, which is the right signal: they
   // are reliquats, never pushed.
+  // Profile axis: ordered classic → sh → pathBased to match the target
+  // priority. Missing buckets default to 0 (e.g. early corpus).
+  final orderedProfiles = <String, int>{
+    for (final k in ['classic', 'sh', 'pathBased']) k: stats.profiles[k] ?? 0,
+  };
+
   final globalMaxGap = [
     _maxGap(stats.slugs, axisTargets.slug),
     _maxGap(sizeBuckets, axisTargets.size),
     _maxGap(orderedTypes, axisTargets.ntypes),
+    _maxGap(orderedProfiles, axisTargets.profile),
   ].fold<double>(0.0, max);
 
   stderr.writeln('');
@@ -474,16 +492,26 @@ void _renderDashboard({
     targets: axisTargets.ntypes,
     globalMaxGap: globalMaxGap,
   );
+  stderr.writeln('');
+  stderr.writeln('Pre-fill profile:');
+  _writeHistogram(
+    orderedProfiles,
+    sortByValue: false,
+    targets: axisTargets.profile,
+    globalMaxGap: globalMaxGap,
+  );
 }
 
 class _AxisTargets {
   final Map<String, double> slug;
   final Map<String, double> size;
   final Map<String, double> ntypes;
+  final Map<String, double> profile;
   const _AxisTargets({
     required this.slug,
     required this.size,
     required this.ntypes,
+    required this.profile,
   });
 }
 
@@ -546,7 +574,14 @@ _AxisTargets _computeAxisTargets({
   }
   ntypes['6+'] = 0;
 
-  return _AxisTargets(slug: slug, size: size, ntypes: ntypes);
+  // Profile axis: three buckets (classic / sh / pathBased) with explicit
+  // targets in kTargetProfile.
+  final profile = <String, double>{};
+  for (final entry in kTargetProfile.entries) {
+    profile[entry.key.name] = totalCorpus * entry.value;
+  }
+
+  return _AxisTargets(slug: slug, size: size, ntypes: ntypes, profile: profile);
 }
 
 /// Largest `target - observed` across all rows of one histogram, clamped to 0.
@@ -625,42 +660,6 @@ enum _DetailedCategory {
     _DetailedCategory.needsBacktrack => 'NEEDS-BACKTRACK',
     _DetailedCategory.cachedMismatch => 'CACHED MISMATCH',
   };
-}
-
-/// Enumerate at most [limit] valid completions of [puzzle] by exhaustive
-/// backtracking over free cells. Cell values are plain ints in the current
-/// API (`0` = free, the puzzle's `domain` holds the legal non-free values).
-/// Lifted from the former `bin/check_uniqueness_batch.dart`.
-List<List<int>> _enumerateSolutions(Puzzle puzzle, {int limit = 2}) {
-  final out = <List<int>>[];
-  final freeIdx = <int>[];
-  for (int i = 0; i < puzzle.cells.length; i++) {
-    if (puzzle.cells[i].value == 0) freeIdx.add(i);
-  }
-
-  void rec(int k) {
-    if (out.length >= limit) return;
-    if (k == freeIdx.length) {
-      if (puzzle.check(saveResult: false).isEmpty) {
-        out.add(List<int>.from(puzzle.cellValues));
-      }
-      return;
-    }
-    final idx = freeIdx[k];
-    for (final v in puzzle.domain) {
-      puzzle.cells[idx].setValue(v);
-      if (puzzle.check(saveResult: false).isEmpty) {
-        rec(k + 1);
-      }
-      if (out.length >= limit) return;
-    }
-    // Untry: cell back to free so the parent frame can pick a different
-    // candidate without leaking state into sibling branches.
-    puzzle.cells[idx].setValue(0);
-  }
-
-  rec(0);
-  return out;
 }
 
 Future<void> _runCheck(String filePath, {bool detailed = false}) async {
@@ -763,7 +762,7 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
           // completions. 0 → UNSOLVABLE, ≥2 → NON-UNIQUE, exactly 1 →
           // NEEDS-BACKTRACK (the puzzle has a unique mathematical
           // solution but the deductive solver can't reach it).
-          final solutions = _enumerateSolutions(p.clone(), limit: 2);
+          final solutions = enumerateSolutions(p.clone(), limit: 2);
           final _DetailedCategory cat;
           if (solutions.isEmpty) {
             cat = _DetailedCategory.unsolvable;
@@ -1049,6 +1048,15 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['easingBudget'] = int.parse(args[++i]);
       case '--no-equilibrium':
         result['equilibrium'] = false;
+      case '--scenario':
+        final scenario = args[++i];
+        if (scenario != 'path-based') {
+          stderr.writeln(
+            '--scenario must be one of: path-based (got "$scenario")',
+          );
+          exit(1);
+        }
+        result['scenario'] = scenario;
       case '-j':
       case '--jobs':
         result['jobs'] = int.parse(args[++i]);

@@ -74,6 +74,7 @@ class GeneratorWorker {
         count: config.count,
         targetLevelIndex: config.targetLevel?.index,
         easingBudgetMs: config.easingBudget.inMilliseconds,
+        pathBasedScenario: config.pathBasedScenario,
         usageStats: usageStats,
         puzzleLines: puzzleLines,
         equilibriumRequested: equilibriumRequested,
@@ -128,6 +129,7 @@ class _IsolateParams {
   final int count;
   final int? targetLevelIndex;
   final int easingBudgetMs;
+  final bool pathBasedScenario;
   final Map<String, int>? usageStats;
   final List<String>? puzzleLines;
   final bool equilibriumRequested;
@@ -149,6 +151,7 @@ class _IsolateParams {
     required this.count,
     this.targetLevelIndex,
     required this.easingBudgetMs,
+    this.pathBasedScenario = false,
     this.usageStats,
     this.puzzleLines,
     this.equilibriumRequested = false,
@@ -223,6 +226,7 @@ void _isolateEntryPoint(_IsolateParams params) {
     int h;
     Set<String>? allowedSlugs = baseAllowedSlugs;
     Set<String> preferredSlugs = const {};
+    bool attemptPathBased = false;
 
     // Estimate the global corpus size: this worker only sees its own output,
     // so we approximate other workers' contributions by `generated × jobsCount`.
@@ -260,6 +264,7 @@ void _isolateEntryPoint(_IsolateParams params) {
         );
         allowedSlugs = resolved.allowedSlugs;
         preferredSlugs = resolved.preferredSlugs;
+        attemptPathBased = resolved.pathBasedScenario;
         if (resolved.width != null && resolved.height != null) {
           w = resolved.width!;
           h = resolved.height!;
@@ -311,6 +316,9 @@ void _isolateEntryPoint(_IsolateParams params) {
           ? PuzzleLevel.values[params.targetLevelIndex!]
           : null,
       easingBudget: Duration(milliseconds: params.easingBudgetMs),
+      // CLI flag (`--scenario path-based`) OR equilibrium-driven choice
+      // (`ProfileTarget(pathBased)`) both activate the path-based pre-fill.
+      pathBasedScenario: params.pathBasedScenario || attemptPathBased,
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;
@@ -446,6 +454,7 @@ void _isolateEntryPoint(_IsolateParams params) {
           slugs: producedSlugs,
           width: w,
           height: h,
+          profile: detectPuzzleProfile(line),
         );
       }
     }
@@ -469,11 +478,17 @@ class _ResolvedTarget {
   /// `generateOne` separately.
   final Set<String> preferredSlugs;
 
+  /// True when the equilibrium picked `ProfileTarget(pathBased)` — the
+  /// next attempt should route through `preFillPath`. Combined with the
+  /// CLI flag via OR.
+  final bool pathBasedScenario;
+
   const _ResolvedTarget({
     this.width,
     this.height,
     this.allowedSlugs,
     this.preferredSlugs = const {},
+    this.pathBasedScenario = false,
   });
 }
 
@@ -519,5 +534,26 @@ _ResolvedTarget _resolveTarget(
         height: height,
         preferredSlugs: extra,
       );
+
+    case ProfileTarget(:final profile):
+      // Profile axis fixed. The pre-fill mode is picked up by the
+      // generator config; other axes (slug / ntypes / pair / size) are
+      // filled by the worker loop's secondary push.
+      switch (profile) {
+        case ProfileCategory.classic:
+          // No special restriction — default flow. The profile axis is
+          // "satisfied" by any non-SH non-path-based puzzle the loop
+          // produces.
+          return const _ResolvedTarget();
+        case ProfileCategory.sh:
+          // Push SH as soft preference; `_preFillSh` activates whenever
+          // SH ∈ prioritySlugs (cf. `generator.dart` dispatch).
+          return const _ResolvedTarget(preferredSlugs: {'SH'});
+        case ProfileCategory.pathBased:
+          // Activate path-based pre-fill. The path generator picks its
+          // own L / K / colors / topology — slug-level preferences are
+          // ignored.
+          return const _ResolvedTarget(pathBasedScenario: true);
+      }
   }
 }

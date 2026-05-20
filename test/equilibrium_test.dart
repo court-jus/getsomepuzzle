@@ -130,11 +130,12 @@ void main() {
     );
 
     test('on an empty corpus, picks the bin with highest expected share', () {
-      // total=0 → observed=0 → gap = expected. With this universe,
-      // ntypes=2 (target 0.30) is the maximum.
+      // total=0 → observed=0 → gap = expected. The profile axis
+      // dominates on an empty corpus: classic target is 0.90 (well
+      // above ntypes=2 at 0.30 or any slug/size share).
       final t = pickTarget(EquilibriumStats.empty(), universe);
-      expect(t, isA<NTypesTarget>());
-      expect((t as NTypesTarget).n, 2);
+      expect(t, isA<ProfileTarget>());
+      expect((t as ProfileTarget).profile, ProfileCategory.classic);
     });
 
     test('over-represented categories are ignored (gap clamped to 0)', () {
@@ -176,15 +177,15 @@ void main() {
 
     test('blacklist filters out the requested target', () {
       final stats = EquilibriumStats.empty();
-      // Without blacklist: top is ntypes=2.
+      // Without blacklist: top is ProfileTarget(classic) (gap 0.90).
       final top = pickTarget(stats, universe)!;
-      expect(top, isA<NTypesTarget>());
-      expect((top as NTypesTarget).n, 2);
-      // Blacklist ntypes=2 → a different target wins.
+      expect(top, isA<ProfileTarget>());
+      expect((top as ProfileTarget).profile, ProfileCategory.classic);
+      // Blacklist that target → a different target wins.
       final next = pickTarget(
         stats,
         universe,
-        blacklistedKeys: {const NTypesTarget(2).key},
+        blacklistedKeys: {const ProfileTarget(ProfileCategory.classic).key},
       );
       expect(next!.key, isNot(equals(top.key)));
     });

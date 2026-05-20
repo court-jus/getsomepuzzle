@@ -16,6 +16,7 @@
 import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 String _gridString(List<int> values, int width) {
@@ -43,43 +44,6 @@ String _coord(int idx, int width) {
   final r = idx ~/ width;
   final c = idx % width;
   return '(r$r,c$c)';
-}
-
-void _enumerateSolutions(
-  Puzzle puzzle,
-  List<List<int>> out, {
-  required int limit,
-}) {
-  // Indices of free cells (those whose initial value is 0).
-  final freeIdx = <int>[];
-  for (int i = 0; i < puzzle.cells.length; i++) {
-    if (puzzle.cells[i].value == 0) freeIdx.add(i);
-  }
-
-  void rec(int k) {
-    if (out.length >= limit) return;
-    if (k == freeIdx.length) {
-      // All free cells are assigned. Check all constraints.
-      final errors = puzzle.check(saveResult: false);
-      if (errors.isEmpty) {
-        out.add(List<int>.from(puzzle.cellValues));
-      }
-      return;
-    }
-    final idx = freeIdx[k];
-    for (final v in puzzle.domain) {
-      puzzle.setValue(idx, v);
-      // Light pruning: if any constraint already fails (state itself broken
-      // or unreachable), abort this branch.
-      if (puzzle.check(saveResult: false).isEmpty) {
-        rec(k + 1);
-      }
-      if (out.length >= limit) return;
-    }
-    puzzle.setValue(idx, 0);
-  }
-
-  rec(0);
 }
 
 void main(List<String> args) {
@@ -264,8 +228,7 @@ void main(List<String> args) {
   // --- Enumerate up to enumLimit solutions ---
   stdout.writeln('=== Solution enumeration (brute force, max $enumLimit) ===');
   final enumClone = puzzle.clone();
-  final solutions = <List<int>>[];
-  _enumerateSolutions(enumClone, solutions, limit: enumLimit);
+  final solutions = enumerateSolutions(enumClone, limit: enumLimit);
   stdout.writeln(
     'Found ${solutions.length} solution(s) (search capped at $enumLimit).',
   );
