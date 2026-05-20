@@ -457,4 +457,70 @@ void main() {
       expect(wc.allowedSlugs.contains('YY'), isFalse);
     });
   });
+
+  group('detectPuzzleProfile', () {
+    // Base 3x3 line with 7 strict fields. We append `_scenario:…` and/or
+    // `_p:…` to exercise the different suffix combinations.
+    const base = 'v2_12_3x3_100000000_FM:11_1:122122122_0';
+
+    test('reads scenario:syBased as the last suffix', () {
+      // Authoritative case: a freshly generated puzzle carries
+      // `_scenario:syBased` at the end of its line.
+      expect(
+        detectPuzzleProfile('${base}_scenario:syBased'),
+        ProfileCategory.syBased,
+      );
+    });
+
+    test('reads scenario: before a play-state suffix (order-agnostic)', () {
+      // After `lineWithPlayState` the play-state is appended and the
+      // scenario marker shifts up. Detection must still find it.
+      expect(
+        detectPuzzleProfile('${base}_scenario:pathBased_p:000000000'),
+        ProfileCategory.pathBased,
+      );
+    });
+
+    test('reads scenario: after a play-state suffix (order-agnostic)', () {
+      // A v2 line can carry `p:` before `scenario:` (e.g. produced by a
+      // tool that always appends play-state first). Position must not
+      // matter as long as both prefixes are recognised.
+      expect(
+        detectPuzzleProfile('${base}_p:000000000_scenario:sh'),
+        ProfileCategory.sh,
+      );
+    });
+
+    test('legacy line with only p: resolves to classic', () {
+      // Saved puzzles from before the scenario field are stamped as
+      // `classic`. No heuristic, no guessing.
+      expect(
+        detectPuzzleProfile('${base}_p:000000000'),
+        ProfileCategory.classic,
+      );
+    });
+
+    test('legacy line without any suffix resolves to classic', () {
+      // Bare 7-field corpus line: classic by definition.
+      expect(detectPuzzleProfile(base), ProfileCategory.classic);
+    });
+
+    test('two well-spread LT constraints alone are no longer pathBased', () {
+      // Regression on the old heuristic: a classic puzzle with two
+      // distant LT pairs must be classified `classic`, not `pathBased`.
+      // The new logic ignores constraint shape entirely.
+      const ltLine =
+          'v2_12_4x4_2210000010000000_LT:A.0.5;LT:B.10.15_1:1212121212121212_2';
+      expect(detectPuzzleProfile(ltLine), ProfileCategory.classic);
+    });
+
+    test('unknown scenario name falls back to classic', () {
+      // Defensive: if a future writer emits a scenario name we don't yet
+      // know, the equilibrium must not crash — treat it as classic.
+      expect(
+        detectPuzzleProfile('${base}_scenario:martian'),
+        ProfileCategory.classic,
+      );
+    });
+  });
 }

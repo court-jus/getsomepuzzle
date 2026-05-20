@@ -75,6 +75,7 @@ class GeneratorWorker {
         targetLevelIndex: config.targetLevel?.index,
         easingBudgetMs: config.easingBudget.inMilliseconds,
         pathBasedScenario: config.pathBasedScenario,
+        syBasedScenario: config.syBasedScenario,
         usageStats: usageStats,
         puzzleLines: puzzleLines,
         equilibriumRequested: equilibriumRequested,
@@ -130,6 +131,7 @@ class _IsolateParams {
   final int? targetLevelIndex;
   final int easingBudgetMs;
   final bool pathBasedScenario;
+  final bool syBasedScenario;
   final Map<String, int>? usageStats;
   final List<String>? puzzleLines;
   final bool equilibriumRequested;
@@ -152,6 +154,7 @@ class _IsolateParams {
     this.targetLevelIndex,
     required this.easingBudgetMs,
     this.pathBasedScenario = false,
+    this.syBasedScenario = false,
     this.usageStats,
     this.puzzleLines,
     this.equilibriumRequested = false,
@@ -227,6 +230,7 @@ void _isolateEntryPoint(_IsolateParams params) {
     Set<String>? allowedSlugs = baseAllowedSlugs;
     Set<String> preferredSlugs = const {};
     bool attemptPathBased = false;
+    bool attemptSyBased = false;
 
     // Estimate the global corpus size: this worker only sees its own output,
     // so we approximate other workers' contributions by `generated × jobsCount`.
@@ -265,6 +269,7 @@ void _isolateEntryPoint(_IsolateParams params) {
         allowedSlugs = resolved.allowedSlugs;
         preferredSlugs = resolved.preferredSlugs;
         attemptPathBased = resolved.pathBasedScenario;
+        attemptSyBased = resolved.syBasedScenario;
         if (resolved.width != null && resolved.height != null) {
           w = resolved.width!;
           h = resolved.height!;
@@ -319,6 +324,8 @@ void _isolateEntryPoint(_IsolateParams params) {
       // CLI flag (`--scenario path-based`) OR equilibrium-driven choice
       // (`ProfileTarget(pathBased)`) both activate the path-based pre-fill.
       pathBasedScenario: params.pathBasedScenario || attemptPathBased,
+      // Same OR pattern for the SY-based scenario.
+      syBasedScenario: params.syBasedScenario || attemptSyBased,
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;
@@ -483,12 +490,18 @@ class _ResolvedTarget {
   /// CLI flag via OR.
   final bool pathBasedScenario;
 
+  /// True when the equilibrium picked `ProfileTarget(syBased)` — the
+  /// next attempt should route through `preFillSy`. Combined with the
+  /// CLI flag via OR.
+  final bool syBasedScenario;
+
   const _ResolvedTarget({
     this.width,
     this.height,
     this.allowedSlugs,
     this.preferredSlugs = const {},
     this.pathBasedScenario = false,
+    this.syBasedScenario = false,
   });
 }
 
@@ -554,6 +567,11 @@ _ResolvedTarget _resolveTarget(
           // own L / K / colors / topology — slug-level preferences are
           // ignored.
           return const _ResolvedTarget(pathBasedScenario: true);
+        case ProfileCategory.syBased:
+          // Activate SY-based pre-fill. The SY generator picks its own
+          // island count, axes and topology; slug-level preferences are
+          // ignored.
+          return const _ResolvedTarget(syBasedScenario: true);
       }
   }
 }

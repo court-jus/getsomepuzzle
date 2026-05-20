@@ -18,12 +18,15 @@ import 'dart:math';
 /// scenarios. Each scenario has its own pre-fill function and the path
 /// the puzzle takes through `generateOne` differs accordingly.
 ///
-/// Identification of an existing puzzle's profile is heuristic when no
-/// explicit marker exists in the v2 format — see [detectPuzzleProfile].
+/// Identification of an existing puzzle's profile reads the
+/// authoritative `scenario:` suffix written by the generator — see
+/// [detectPuzzleProfile]. Lines without that suffix are treated as
+/// `classic` (legacy corpus included).
 const Map<ProfileCategory, double> kTargetProfile = {
-  ProfileCategory.classic: 0.90,
+  ProfileCategory.classic: 0.85,
   ProfileCategory.sh: 0.05,
   ProfileCategory.pathBased: 0.05,
+  ProfileCategory.syBased: 0.05,
 };
 
 /// Target distribution for the "number of types per puzzle" axis.
@@ -153,6 +156,11 @@ enum ProfileCategory {
   /// and runs the bipartite desambiguation. LT is the dominant
   /// deductive driver.
   pathBased,
+
+  /// SY-themed: `preFillSy` grows symmetric islands and ambiguates via a
+  /// bipartite cascade dominated by SY constraints. See
+  /// `docs/dev/prefill_sy.md`.
+  syBased,
 }
 
 /// A single target the equilibrium algorithm wants to push next.
@@ -231,62 +239,28 @@ class ProfileTarget extends Target {
   String get label => 'profile=${profile.name}';
 }
 
-/// Detect a puzzle's profile from its v2 line via heuristics. Used to
-/// populate [EquilibriumStats.profileCounts] from existing corpus data
-/// (no marker exists in the v2 format).
+/// Detect a puzzle's profile from its v2 line by reading the
+/// authoritative `scenario:<name>` suffix written by the generator at
+/// emission time (see `Puzzle.lineExport`). Any trailing part starting
+/// with `scenario:` is honoured, regardless of position relative to a
+/// `p:` play-state suffix.
 ///
-/// Rules (priority order):
-/// - any constraint with slug `SH` → [ProfileCategory.sh].
-/// - ≥ 2 LT constraints AND each LT's anchors are at Manhattan
-///   distance ≥ 2 from each other → [ProfileCategory.pathBased].
-/// - otherwise → [ProfileCategory.classic].
-///
-/// The path-based heuristic over-counts: some legacy classic puzzles
-/// happen to have two well-spread LT constraints and would be flagged.
-/// This is acceptable for equilibrium balancing — the algorithm
-/// self-corrects regardless.
+/// Lines without a `scenario:` suffix — including the entire legacy
+/// corpus — are reported as [ProfileCategory.classic]. There is no
+/// heuristic fallback: explicitness is what the equilibrium relies on
+/// to avoid false `pathBased` positives.
 ProfileCategory detectPuzzleProfile(String v2Line) {
   final parts = v2Line.split('_');
-  if (parts.length < 5) return ProfileCategory.classic;
-  final dims = parts[2].split('x');
-  if (dims.length != 2) return ProfileCategory.classic;
-  final width = int.tryParse(dims[0]);
-  if (width == null) return ProfileCategory.classic;
-
-  final ltIndices = <List<int>>[];
-  bool hasSh = false;
-  for (final c in parts[4].split(';')) {
-    if (c.isEmpty) continue;
-    if (c.startsWith('SH:')) {
-      hasSh = true;
-    } else if (c.startsWith('LT:')) {
-      final body = c.substring(3).split('.');
-      if (body.length < 2) continue;
-      final idxs = <int>[];
-      for (int i = 1; i < body.length; i++) {
-        final v = int.tryParse(body[i]);
-        if (v == null) {
-          idxs.clear();
-          break;
-        }
-        idxs.add(v);
-      }
-      if (idxs.isNotEmpty) ltIndices.add(idxs);
+  for (int i = parts.length - 1; i >= 7; i--) {
+    final field = parts[i];
+    if (!field.startsWith('scenario:')) continue;
+    final name = field.substring('scenario:'.length);
+    for (final p in ProfileCategory.values) {
+      if (p.name == name) return p;
     }
+    break;
   }
-  if (hasSh) return ProfileCategory.sh;
-  if (ltIndices.length < 2) return ProfileCategory.classic;
-  for (final lt in ltIndices) {
-    if (lt.length < 2) continue;
-    for (int i = 0; i < lt.length; i++) {
-      for (int j = i + 1; j < lt.length; j++) {
-        final dx = (lt[i] % width - lt[j] % width).abs();
-        final dy = (lt[i] ~/ width - lt[j] ~/ width).abs();
-        if (dx + dy < 2) return ProfileCategory.classic;
-      }
-    }
-  }
-  return ProfileCategory.pathBased;
+  return ProfileCategory.classic;
 }
 
 // ---------------------------------------------------------------------------

@@ -83,4 +83,67 @@ void main() {
       expect(reloaded.hasRestoredProgress, isTrue);
     });
   });
+
+  group('Puzzle scenario field', () {
+    // Same 3x3 baseline as the play-state tests so cell parsing is shared.
+    const baseLine = 'v2_12_3x3_100000000_FM:11_0:0_0';
+
+    test('legacy line has null generationScenario', () {
+      // No `_scenario:` suffix → field stays null. This is what the
+      // equilibrium reads as `ProfileCategory.classic`.
+      final p = Puzzle(baseLine);
+      expect(p.generationScenario, isNull);
+    });
+
+    test('scenario:<name> suffix is parsed into generationScenario', () {
+      // Authoritative tag. The exact name is preserved verbatim — the
+      // equilibrium maps it to a `ProfileCategory` value.
+      final p = Puzzle('${baseLine}_scenario:syBased');
+      expect(p.generationScenario, 'syBased');
+    });
+
+    test('scenario: can appear before a play-state suffix', () {
+      // Order is free. Both fields must be picked up.
+      final p = Puzzle('${baseLine}_scenario:pathBased_p:120000000');
+      expect(p.generationScenario, 'pathBased');
+      expect(p.hasRestoredProgress, isTrue);
+    });
+
+    test('scenario: can appear after a play-state suffix', () {
+      // Order is free, reverse case.
+      final p = Puzzle('${baseLine}_p:120000000_scenario:sh');
+      expect(p.generationScenario, 'sh');
+      expect(p.hasRestoredProgress, isTrue);
+    });
+
+    test('lineExport round-trips the scenario tag', () {
+      // Build a puzzle, stamp a scenario, export, reparse. The tag must
+      // survive the trip.
+      final p = Puzzle(baseLine);
+      p.generationScenario = 'syBased';
+      final exported = p.lineExport();
+      expect(exported.endsWith('_scenario:syBased'), isTrue);
+      final reloaded = Puzzle(exported);
+      expect(reloaded.generationScenario, 'syBased');
+    });
+
+    test('lineExport without a scenario adds no suffix', () {
+      // A puzzle never stamped (e.g. parsed from a legacy line) must not
+      // gain a `_scenario:` field on re-export.
+      final p = Puzzle(baseLine);
+      final exported = p.lineExport();
+      expect(exported.contains('_scenario:'), isFalse);
+    });
+
+    test('lineWithPlayState preserves an existing scenario tag', () {
+      // The play-state save path must not strip the scenario marker —
+      // otherwise we'd lose the authoritative scenario the moment the
+      // player makes a move.
+      final p = Puzzle('${baseLine}_scenario:pathBased');
+      p.setValue(1, 2);
+      final out = p.lineWithPlayState();
+      expect(out.contains('_scenario:pathBased'), isTrue);
+      expect(out.contains('_p:'), isTrue);
+    });
+  });
 }

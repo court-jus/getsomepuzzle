@@ -21,10 +21,16 @@ grid, then collects the constraints that characterise it best.
 ### 1.1. Pipeline
 
 1. **Build a random solution grid.** Each cell is filled with a random domain
-   value (`{1, 2}`). Special case for the `SH` (Shape) constraint: when SH
-   is required or pushed by the equilibrium target, the grid is pre-seeded
-   with a valid Shape motif before completion, so a Shape constraint will
-   always be satisfiable.
+   value (`{1, 2}`) by `preFillRegular`. Themed pre-fills replace the
+   random grid for specific scenarios: `preFillSh` when SH is required
+   (or pushed by the equilibrium target), `preFillPath` when
+   `pathBasedScenario` is set, `preFillSy` when `syBasedScenario` is
+   set. Each themed pre-fill stamps a `scenario:<name>` suffix on the
+   emitted v2 line and may exit early with `pathPrefillFailed` /
+   `syPrefillFailed` if it can't converge within its retry budget.
+   See `equilibrium.md` "Pre-fill scenarios" for the dispatch table
+   and `docs/dev/path_based.md` / `docs/dev/prefill_sy.md` for the
+   themed algorithms.
 
 2. **Pre-fill a few cells.** A random ratio in `[0.75, 1.0]` decides what
    fraction of cells stays empty for the player; the others are locked
@@ -79,15 +85,18 @@ grid, then collects the constraints that characterise it best.
 
 7. **Target-collection filter** (optional, `--target-collection NAME`).
    When the player has asked for a specific level, the just-classified
-   puzzle is routed:
+   puzzle is routed (each branch maps to a `GenerationRejectReason`):
    - level matches the target → emit.
-   - level is *lower* (too easy) → drop, caller retries.
+   - level is *lower* (too easy) → reject with `targetTooEasy`; the
+     caller retries with a fresh seed.
    - level is *higher* (too hard) → enter the **easing loop** described
      in § 4. The loop attempts to lower the trace difficulty by adding
-     constraints, bounded by `--easing-budget` (default 30 s).
-   - level is `overfilled`, `overfilledEasy`, or `undetermined` → drop.
-     The prefill ratio doesn't change with more constraints, so these
-     puzzles cannot be eased into a playable collection.
+     constraints, bounded by `--easing-budget` (default 30 s). If
+     easing plateaus or times out, reject with `targetEasingFailed`.
+   - level is `overfilled`, `overfilledEasy`, or `undetermined` →
+     reject with `targetOutOfCascade`. The prefill ratio doesn't
+     change with more constraints, so these puzzles cannot be eased
+     into a playable collection.
 
 ### 1.2. Why this design
 
@@ -126,15 +135,18 @@ When a `generateOne` attempt returns `null`, the generator now reports
 *why* via the `onReject(GenerationRejectReason, Puzzle)` callback.
 `GenerationRejectReason` (see `generator.dart`) enumerates the exits:
 
-| Reason            | Trigger                                                                          |
-|-------------------|----------------------------------------------------------------------------------|
-| `noCandidates`    | `generateAllParameters ∩ verify(solution)` was empty (extreme `--allow`/`--ban`).|
-| `cancelled`       | The caller's `shouldStop` callback fired mid-loop.                              |
-| `requiredMissing` | A `--require RULES` slug was never accepted by the iterative cherry-pick.       |
-| `ratioTooHigh`    | Iterative loop finished but `solve()` left > 25 % of cells free.                |
-| `notUnique`       | `isDeductivelyUnique()` failed on the assembled puzzle.                         |
-| `notSolvable`     | Defensive: trace replay didn't reach a clean completion. Should be unreachable. |
-| `easingFailed`    | Target-collection filter rejected the puzzle (easing didn't reach the target).  |
+| Reason                | Trigger                                                                              |
+|-----------------------|--------------------------------------------------------------------------------------|
+| `noCandidates`        | `generateAllParameters ∩ verify(solution)` was empty (extreme `--allow`/`--ban`).    |
+| `ratioTooHigh`        | Iterative loop finished but `solve()` left > 25 % of cells free.                    |
+| `requiredMissing`     | A `--require RULES` slug was never accepted by the iterative cherry-pick.           |
+| `notUnique`           | Defensive: trace replay didn't reach a clean completion. Should be unreachable after the ratio check. |
+| `targetOutOfCascade`  | `--target-collection` set and the puzzle classified into `overfilled`, `overfilledEasy`, or `undetermined`. |
+| `targetTooEasy`       | `--target-collection` set and the puzzle classified strictly easier than the target (can't be made harder by adding constraints). |
+| `targetEasingFailed`  | `--target-collection` set and `Puzzle.simplify` couldn't reach the target within `--easing-budget`. |
+| `cancelled`           | The caller's `shouldStop` callback fired mid-loop.                                   |
+| `pathPrefillFailed`   | `preFillPath` exhausted its retry budget without producing a deductively-unique puzzle. |
+| `syPrefillFailed`     | `preFillSy` exhausted its retry budget without producing a deductively-unique puzzle.  |
 
 The worker (`worker_io.dart`) persists every rejected puzzle to
 `assets/<reason>.txt` for post-run analysis. The path is currently
@@ -156,8 +168,8 @@ each failed attempt.
 ## 2. Equilibrium
 
 `bin/generate.dart` invokes the generator inside a per-iteration loop
-that rebalances the corpus across four axes (slug, number of types,
-pair of types, size). The full description lives in
+that rebalances the corpus across five axes (slug, number of types,
+pair of types, size, profile). The full description lives in
 [`equilibrium.md`](equilibrium.md). In short: every iteration picks the
 most under-represented `(axis, category)`, configures the generator
 accordingly, and lets the greedy algorithm produce a puzzle for that

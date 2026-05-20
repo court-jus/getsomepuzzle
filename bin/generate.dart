@@ -47,6 +47,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final targetLevel = parsed['targetLevel'] as PuzzleLevel?;
   final easingBudget = parsed['easingBudget'] as int;
   final scenarioPathBased = (parsed['scenario'] as String?) == 'path-based';
+  final scenarioSyBased = (parsed['scenario'] as String?) == 'sy-based';
   if (logDir != null) {
     final dir = Directory(logDir);
     if (!dir.existsSync()) dir.createSync(recursive: true);
@@ -238,6 +239,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       targetLevel: targetLevel,
       easingBudget: Duration(seconds: easingBudget),
       pathBasedScenario: scenarioPathBased,
+      syBasedScenario: scenarioSyBased,
     );
     final worker = GeneratorWorker();
     workers.add(worker);
@@ -322,9 +324,9 @@ class _CollectionStats {
   // n=1..5 mapped to '1'..'5'; n>=6 collapsed into '6+' (reliquat bucket,
   // never targeted by equilibrium).
   final Map<String, int> nTypes;
-  // Profile axis: classic / sh / pathBased (heuristically detected per
-  // `detectPuzzleProfile` in equilibrium.dart). Keys match the display
-  // labels used in the dashboard histogram.
+  // Profile axis: classic / sh / pathBased / syBased (read off the
+  // authoritative `scenario:` v2 suffix via `detectPuzzleProfile` in
+  // equilibrium.dart). Keys match the `ProfileCategory.name` values.
   final Map<String, int> profiles;
 
   _CollectionStats(this.slugs, this.sizeBuckets, this.nTypes, this.profiles);
@@ -333,7 +335,12 @@ class _CollectionStats {
     final slugs = {for (final s in constraintSlugs) s: 0};
     final sizeBuckets = [0, 0, 0, 0];
     final nTypes = <String, int>{};
-    final profiles = <String, int>{'classic': 0, 'sh': 0, 'pathBased': 0};
+    final profiles = <String, int>{
+      'classic': 0,
+      'sh': 0,
+      'pathBased': 0,
+      'syBased': 0,
+    };
 
     for (final line in lines) {
       final trimmed = line.trim();
@@ -455,10 +462,12 @@ void _renderDashboard({
   // the bin the picker is most likely to chase next. Target=0 buckets (e.g.
   // ntypes 6+) always have gap=0 → no bar, which is the right signal: they
   // are reliquats, never pushed.
-  // Profile axis: ordered classic → sh → pathBased to match the target
-  // priority. Missing buckets default to 0 (e.g. early corpus).
+  // Profile axis: ordered classic → sh → pathBased → syBased to match
+  // the `ProfileCategory` enum order. Missing buckets default to 0
+  // (e.g. early corpus).
   final orderedProfiles = <String, int>{
-    for (final k in ['classic', 'sh', 'pathBased']) k: stats.profiles[k] ?? 0,
+    for (final k in ['classic', 'sh', 'pathBased', 'syBased'])
+      k: stats.profiles[k] ?? 0,
   };
 
   final globalMaxGap = [
@@ -1050,9 +1059,11 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['equilibrium'] = false;
       case '--scenario':
         final scenario = args[++i];
-        if (scenario != 'path-based') {
+        const validScenarios = ['path-based', 'sy-based'];
+        if (!validScenarios.contains(scenario)) {
           stderr.writeln(
-            '--scenario must be one of: path-based (got "$scenario")',
+            '--scenario must be one of: ${validScenarios.join(', ')} '
+            '(got "$scenario")',
           );
           exit(1);
         }

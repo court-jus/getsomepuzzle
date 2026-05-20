@@ -125,6 +125,13 @@ PathPrefillResult? preFillPath(
     // Build the actual player-facing puzzle: empty grid, LT only, no
     // anchors marked readonly yet. The bipartite loop will reveal as
     // needed.
+    //
+    // TODO(prefill-readonly): evaluate `preFillRegular`-style random
+    // readonly sprinkling (ratio ∈ [0.75, 1.0]) here before the
+    // bipartite cascade — same lever applied to SY in `sy.dart`
+    // unblocked convergence for the majority of seeds. The 4400+
+    // guardrail candidate scan is wasted when the puzzle starts with
+    // zero anchored cells.
     final puzzle = Puzzle.empty(width, height, _domain);
     for (final entry in anchorMap.entries) {
       puzzle.addConstraint(

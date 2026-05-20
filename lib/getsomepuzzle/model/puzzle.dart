@@ -214,6 +214,13 @@ class Puzzle {
   /// to surface a "progress restored" message.
   bool hasRestoredProgress = false;
 
+  /// Generation scenario stamped by the generator and round-tripped via
+  /// the v2 line `scenario:<name>` suffix. Null means "unmarked legacy
+  /// line", which equilibrium-side resolves to `classic`. Recognised
+  /// values match the `ProfileCategory` enum names: `classic`, `sh`,
+  /// `pathBased`, `syBased`.
+  String? generationScenario;
+
   List<Cell> get cells => _cells;
   set cells(List<Cell> value) {
     _cells = value;
@@ -270,23 +277,32 @@ class Puzzle {
     if (attributesStr.length > 6 && !attributesStr[6].startsWith('p:')) {
       cachedComplexity = int.tryParse(attributesStr[6]);
     }
-    // Optional trailing play-state field "p:<cellvalues>" (length must
-    // match the grid). Values for readonly cells are ignored — those
-    // already carry the puzzle's initial state. Non-zero values for the
-    // remaining cells are applied so the player resumes where they left
-    // off. Backward compatible: missing field = no saved progress.
-    for (var i = 6; i < attributesStr.length; i++) {
+    // Optional trailing fields, recognised by their prefix and accepted
+    // at any position ≥ 7. Two prefixes today:
+    //   - `p:<cellvalues>` — saved play-state. Length must match the
+    //     grid. Values for readonly cells are ignored; non-zero values
+    //     for the remaining cells are applied so the player resumes
+    //     where they left off.
+    //   - `scenario:<name>` — generation scenario tag (classic, sh,
+    //     pathBased, syBased). Null when absent. See
+    //     `ProfileCategory` and `detectPuzzleProfile` in
+    //     `equilibrium.dart`.
+    // Backward compatible: missing fields = no saved progress + null
+    // scenario (legacy lines).
+    for (var i = 7; i < attributesStr.length; i++) {
       final field = attributesStr[i];
-      if (!field.startsWith('p:')) continue;
-      final values = field.substring(2);
-      if (values.length != cells.length) break;
-      for (int j = 0; j < cells.length; j++) {
-        if (cells[j].readonly) continue;
-        final v = int.tryParse(values[j]);
-        if (v != null && v != 0) cells[j].setValue(v);
+      if (field.startsWith('p:')) {
+        final values = field.substring(2);
+        if (values.length != cells.length) continue;
+        for (int j = 0; j < cells.length; j++) {
+          if (cells[j].readonly) continue;
+          final v = int.tryParse(values[j]);
+          if (v != null && v != 0) cells[j].setValue(v);
+        }
+        hasRestoredProgress = true;
+      } else if (field.startsWith('scenario:')) {
+        generationScenario = field.substring('scenario:'.length);
       }
-      hasRestoredProgress = true;
-      break;
     }
   }
 
@@ -1197,6 +1213,9 @@ class Puzzle {
     final complexity = compute ? computeComplexity() : 0;
     final sol = cachedSolution;
     final solutionStr = sol != null ? '1:${sol.join('')}' : '0:0';
-    return 'v2_${domainStr}_${width}x${height}_${valuesStr}_${constraintsStr}_${solutionStr}_$complexity';
+    final base =
+        'v2_${domainStr}_${width}x${height}_${valuesStr}_${constraintsStr}_${solutionStr}_$complexity';
+    final scenario = generationScenario;
+    return scenario == null ? base : '${base}_scenario:$scenario';
   }
 }

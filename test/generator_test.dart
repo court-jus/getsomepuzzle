@@ -197,4 +197,24 @@ void main() {
       expect(p.constraints.isNotEmpty, isTrue);
     }
   });
+
+  test('generateOne stamps a non-null generationScenario', () {
+    // Every puzzle produced by the regular flow must carry an explicit
+    // scenario tag — either `classic` or `sh` depending on whether
+    // preFillSh planted a Shape motif. A null value would make the
+    // equilibrium silently miscount the puzzle as `classic`-by-default,
+    // which is the exact source of bug we're guarding against.
+    final result = PuzzleGenerator.generateOne(
+      GeneratorConfig(
+        width: 4,
+        height: 4,
+        count: 1,
+        maxTime: Duration(seconds: 10),
+      ),
+    );
+    if (result == null) return;
+    final p = Puzzle(result.line);
+    expect(p.generationScenario, isNotNull);
+    expect(['classic', 'sh'], contains(p.generationScenario));
+  });
 }

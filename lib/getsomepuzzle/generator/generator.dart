@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/path.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/regular.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/sh.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/sy.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
@@ -50,6 +51,12 @@ class GeneratorConfig {
   /// the internal bipartite desambiguation, not the regular greedy.
   final bool pathBasedScenario;
 
+  /// When true, every `generateOne` invocation routes through
+  /// `preFillSy` (the SY-based pre-fill, cf. `docs/dev/prefill_sy.md`).
+  /// Symmetric islands become the structural backbone; other constraints
+  /// are added via the internal bipartite cascade.
+  final bool syBasedScenario;
+
   const GeneratorConfig({
     required this.width,
     required this.height,
@@ -65,6 +72,7 @@ class GeneratorConfig {
     this.targetLevel,
     this.easingBudget = const Duration(seconds: 30),
     this.pathBasedScenario = false,
+    this.syBasedScenario = false,
   });
 }
 
@@ -121,6 +129,11 @@ enum GenerationRejectReason {
   /// topology + colors + DPLL routing + bipartite desambiguation
   /// couldn't converge for this size.
   pathPrefillFailed,
+
+  /// SY-based pre-fill (`preFillSy`) exhausted its retry budget without
+  /// producing a deductively-unique puzzle. Symptom: random seeds +
+  /// axes + island growth + bipartite cascade couldn't converge.
+  syPrefillFailed,
 }
 
 class GeneratorProgress {
@@ -193,6 +206,22 @@ class PuzzleGenerator {
       }
       final pu = result.puzzle;
       pu.cachedSolution = result.solution;
+      pu.generationScenario = 'pathBased';
+      return _finalize(pu, config, onReject: onReject, shouldStop: shouldStop);
+    }
+
+    if (config.syBasedScenario) {
+      final result = preFillSy(width, height, _rng);
+      if (result == null) {
+        onReject?.call(
+          GenerationRejectReason.syPrefillFailed,
+          Puzzle.empty(width, height, _defaultDomain),
+        );
+        return null;
+      }
+      final pu = result.puzzle;
+      pu.cachedSolution = result.solution;
+      pu.generationScenario = 'syBased';
       return _finalize(pu, config, onReject: onReject, shouldStop: shouldStop);
     }
 
@@ -377,6 +406,14 @@ class PuzzleGenerator {
       }
     }
 
+    // Stamp the generation scenario. `sh` requires that `preFillSh`
+    // actually planted a Shape motif (detected by the SH constraint
+    // being attached to the solved grid). When SH was requested but the
+    // pre-fill didn't find a valid motif, the flow falls back to
+    // classic.
+    final shAttached = pu.constraints.any((c) => c.slug == 'SH');
+    pu.generationScenario = (hasSH && shAttached) ? 'sh' : 'classic';
+
     return _finalize(pu, config, onReject: onReject, shouldStop: shouldStop);
   }
 
@@ -444,10 +481,16 @@ class PuzzleGenerator {
       if (level.index > target.index) {
         // Path-based mode bans LT from easing: adding more letters would
         // dilute the puzzle's identity (the bipartite already placed the
-        // intended LT set).
+        // intended LT set). SY-based mode bans SY for the same reason —
+        // the islands are already placed and adding more anchors would
+        // muddy the player's shape-recovery intent.
         final easingAllowed = config.pathBasedScenario
             ? (config.allowedSlugs ?? <String>{})
                   .where((s) => s != 'LT')
+                  .toSet()
+            : config.syBasedScenario
+            ? (config.allowedSlugs ?? <String>{})
+                  .where((s) => s != 'SY')
                   .toSet()
             : config.allowedSlugs;
         simplifyResult = pu.simplify(

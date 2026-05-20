@@ -1,8 +1,8 @@
 # Equilibrium
 
 The CLI generator (`bin/generate.dart`) biases generation toward
-under-represented categories across four independent axes (slug, number of
-types, pair of types, size). This document describes how the system works.
+under-represented categories across five independent axes (slug, number of
+types, pair of types, size, profile). This document describes how the system works.
 
 The implementation lives in `lib/getsomepuzzle/generator/equilibrium.dart`
 (pure logic — constants, stats, gap-based picker) and
@@ -20,7 +20,7 @@ the algorithm simply moves on to the next most under-represented bin.
 
 ## Axes
 
-The four axes are counted independently (no conditional distributions,
+The five axes are counted independently (no conditional distributions,
 except as noted on axis 3):
 
 1. **Slug** — every constraint type (FM, SH, GC, …), counted at most once
@@ -36,6 +36,11 @@ except as noted on axis 3):
 4. **Size** — `(width, height)` ordered pair. `4x5` and `5x4` are
    **distinct**. Range: `kMinSide × kMinSide` up to `kMaxSide × kMaxSide`
    (3 to 10 inclusive).
+5. **Profile** — pre-fill scenario category (`classic`, `sh`, `pathBased`,
+   `syBased`). Identification reads the authoritative `scenario:<name>`
+   suffix written by the generator at emission time (see
+   `detectPuzzleProfile` in `equilibrium.dart`); unmarked lines —
+   including the legacy corpus — are counted as `classic`.
 
 ## Algorithm
 
@@ -43,7 +48,7 @@ except as noted on axis 3):
 
 Each iteration in `worker_io.dart`:
 
-1. Recompute the four distributions from the existing puzzle corpus
+1. Recompute the five distributions from the existing puzzle corpus
    (absolute counters; recomputed at startup, never persisted). The
    pair-axis distribution aggregates only puzzles with exactly 2 types.
 2. Identify the most-imbalanced `(axis, category)` — the one whose
@@ -102,6 +107,20 @@ target.
 
 Tunable via `kTargetNTypesProfile`.
 
+### Profile axis distribution
+
+The bulk of puzzles come from the regular flow; the remaining ~15 % is
+split between the three themed pre-fills.
+
+| Profile     | Target share | Pre-fill source                                       |
+| ----------- | ------------ | ----------------------------------------------------- |
+| `classic`   | 85 %         | `preFillRegular` (random grid + greedy cherry-pick)   |
+| `sh`        | 5 %          | `preFillSh` (seeded Shape motif)                      |
+| `pathBased` | 5 %          | `preFillPath` (LT topology + bipartite desambiguation, cf. `path_based.md`) |
+| `syBased`   | 5 %          | `preFillSy` (symmetric island growth, cf. `prefill_sy.md`) |
+
+Tunable via `kTargetProfile`.
+
 ### Per-axis mechanism
 
 The general principle: **filter at the candidate-selection step** rather
@@ -119,6 +138,10 @@ than reject after the fact.
   target pair. The iteration is rejected if both slugs are not actually
   used in the final puzzle (otherwise the puzzle would land in a
   different bucket and not help the targeted pair).
+- **Profile**: the resolver routes the iteration through the matching
+  pre-fill function — see the "Pre-fill scenarios" section below. The
+  iteration is rejected if the emitted puzzle's `scenario:` suffix does
+  not match the targeted profile.
 
 The post-solve free-cell ratio cap of `kMaxAcceptableRatio` (= 0.25)
 applies to every size, including 10x10.
@@ -133,23 +156,30 @@ practice (e.g. a complex pair on a `3x3` grid) are bounded by the
 worker's overall `maxTime` budget rather than by per-target retries.
 See `docs/dev/todo.md` for the planned blacklist follow-up.
 
-## SH special case
+## Pre-fill scenarios
 
-`ShapeConstraint` requires a custom seed grid because a random fill
-almost never contains a valid Shape motif. The generator switches between
-`_preFillSh` and `_preFillRegular` based on a single rule:
+Some constraint families need a custom seed grid because a random fill
+almost never produces a valid puzzle for them. The generator dispatches
+to one of four pre-fill functions inside `generateOne`:
 
-> If `requiredRules` contains `"SH"` (and SH is allowed by `allowedSlugs`),
-> use `_preFillSh`. Otherwise use `_preFillRegular`.
+| Pre-fill           | Trigger                                                           | Stamped `scenario:` suffix |
+| ------------------ | ----------------------------------------------------------------- | -------------------------- |
+| `preFillRegular`   | default — random grid                                             | *(none, read as `classic`)* |
+| `preFillSh`        | `requiredRules` contains `"SH"` (SH allowed by `allowedSlugs`)    | `sh`                       |
+| `preFillPath`      | `pathBasedScenario == true`                                       | `pathBased`                |
+| `preFillSy`        | `syBasedScenario == true`                                         | `syBased`                  |
 
-That rule subsumes both sources of "SH must appear":
+Sources of each trigger:
 
-- The user passing `--require SH` on the CLI.
-- Equilibrium picking a target that involves SH (slug, pair, or n-types
-  with SH in the chosen subset) — the resolver adds `"SH"` to
-  `requiredRules` for that iteration.
+- **SH**: the user passing `--require SH`, or equilibrium picking a target
+  that involves SH (slug, pair, or n-types with SH in the chosen subset)
+  — the resolver adds `"SH"` to `requiredRules` for that iteration.
+- **Path-based / SY-based**: only equilibrium can set these flags, via
+  the profile axis (`ProfileCategory.pathBased`, `ProfileCategory.syBased`).
+  See `path_based.md` and `prefill_sy.md` for the algorithms.
 
-There is no other SH-specific code path in the generator.
+The dispatch is the only puzzle-flow-level branching in `generateOne`;
+each pre-fill function is otherwise self-contained.
 
 ## Implementation details
 
@@ -170,7 +200,7 @@ override) is applied.
 
 Equilibrium is only **actually engaged** if the target file already
 contains at least `kEquilibriumWarmupSize` (= 100) puzzles. Below the
-threshold the four distributions are too sparse to drive meaningful
+threshold the five distributions are too sparse to drive meaningful
 targets — `pickTarget` would chase impossible bins and waste time
 blacklisting them. The CLI silently falls back to the legacy slug-only
 bias and logs:
@@ -189,6 +219,8 @@ algorithm:
 - `kTargetNTypesProfile` — map for axis 2 (`{1: 0.25, 2: 0.30, 3: 0.12,
   4: 0.12, 5: 0.10}`). Anything outside the map (the `6+` reliquat
   bucket) maps to share 0 and is never targeted.
+- `kTargetProfile` — map for the profile axis (`{classic: 0.85, sh: 0.05,
+  pathBased: 0.05, syBased: 0.05}`).
 - `kMinSide`, `kMaxSide` — size axis bounds (3, 10).
 - `kEquilibriumWarmupSize` — corpus size below which equilibrium stays
   off (100).
