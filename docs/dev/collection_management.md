@@ -87,14 +87,34 @@ the complexity formula, or the constraint sort changes:
 dart run bin/recompute.dart assets/1-easy.txt
 ```
 
-`--route` redistributes the six playable-level files between
-themselves and the two out-of-cascade buckets (`overfilled*`). Any
-puzzle whose `classifyTrace` changed lands in its new home; nothing
-is duplicated or lost.
+`--route` redistributes puzzles into `<dest>.tmp` files matching
+their post-sort classification. Two modes:
 
-```bash
-dart run bin/recompute.dart --route
-```
+* **No positional args** — sources are the six playable-level files
+  plus the two out-of-cascade buckets (`overfilled*`). Any puzzle
+  whose `classifyTrace` changed lands in its new home; nothing is
+  duplicated or lost.
+
+  ```bash
+  dart run bin/recompute.dart --route
+  ```
+
+* **With positional args** — those files replace the source set.
+  Useful to ventilate an unsorted feed (e.g. a fresh `/tmp/path6.txt`
+  produced by an experimental generator) into the existing cascade
+  without merging it into `assets/` first. Verbatim noise (blanks,
+  comments, parse failures) is dropped silently in this mode — the
+  feed is an input, not a destination we want to mirror.
+
+  ```bash
+  dart run bin/recompute.dart --route /tmp/path6.txt
+  ```
+
+Both modes write to `<dest>.tmp` in append mode and never touch the
+source files; the user migrates with `mv assets/<lvl>.txt.tmp
+assets/<lvl>.txt` when satisfied. Re-runs are idempotent: puzzles
+already emitted to a `.tmp` (by `canonicalPuzzleKey`) are skipped,
+so an interrupted `--route` can be resumed by simply re-launching.
 
 `--dry-run` reports the level transitions without writing any file —
 useful to see how a new complexity tweak would shift the cascade

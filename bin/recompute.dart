@@ -29,18 +29,17 @@ void main(List<String> args) {
   }
 
   if (route) {
-    // --route operates on the full set of playable-level files by
-    // default: redistribute every puzzle into the file matching its
-    // post-sort classification. Positional args are unsupported here
-    // — partial input sets would either lose puzzles (source not
-    // covered) or grow destinations unboundedly across reruns.
-    if (positional.isNotEmpty) {
-      stderr.writeln(
-        '--route ignores positional args; it operates on the six '
-        'playable-level files: ${_playableLevelPaths.join(', ')}',
-      );
-    }
-    _routeFiles(dryRun: dryRun, sample: sample, verbose: verbose);
+    // --route default: redistribute every puzzle from the six
+    // playable-level files into the file matching its post-sort
+    // classification. If positional args are supplied, they replace
+    // the source set — useful to ventilate an unsorted feed
+    // (e.g. /tmp/path6.txt) into the cascade `.tmp` files.
+    _routeFiles(
+      dryRun: dryRun,
+      sample: sample,
+      verbose: verbose,
+      sources: positional,
+    );
     return;
   }
 
@@ -78,18 +77,21 @@ Options:
                 Combined with --sample, gives a fast read on whether
                 the sort / recent code changes shift cplx or
                 classified level.
-  --route       Redistribute every puzzle from the six playable-level
-                files (assets/1-easy.txt … assets/6-mad.txt) into the
-                file matching its post-sort classification. Out-of-
-                cascade puzzles (overfilled, undetermined) go to their
-                dedicated files. Writes to `<dest>.tmp` (append mode);
-                **never modifies the source `.txt` files**. The user
+  --route       Redistribute puzzles into <dest>.tmp files matching
+                their post-sort classification. Without positional
+                args, the source set is the six playable-level files
+                (assets/1-easy.txt … assets/6-mad.txt). With positional
+                args, those files are used as sources instead —
+                useful to ventilate an unsorted feed (e.g.
+                /tmp/path6.txt) into the cascade. Out-of-cascade
+                puzzles (overfilled, undetermined) go to their
+                dedicated files. Writes to `<dest>.tmp` (append
+                mode); **never modifies source files**. The user
                 migrates manually with `mv <dest>.tmp <dest>` when
                 satisfied. Re-runs are idempotent: puzzles already
                 emitted to a `.tmp` (by `canonicalPuzzleKey`) are
                 skipped, so an interrupted `--route` can be resumed
-                by simply re-launching the command. Positional args
-                are ignored in this mode.
+                by simply re-launching the command.
   -v, --verbose Emit a per-puzzle diff line whenever the stored cplx,
                 the pre-sort level, or the post-sort level changes.
   -h, --help    Show this help.
@@ -303,9 +305,11 @@ String _fmtHistogram(Map<PuzzleLevel, int> hist) {
   return '{${parts.join(', ')}}';
 }
 
-/// Route puzzles from the six playable-level files into the file
-/// matching their post-sort classification. Off-cascade puzzles land
-/// in their dedicated `overfilled*` / `undetermined` files.
+/// Route puzzles into the file matching their post-sort
+/// classification. Source defaults to the six playable-level files;
+/// pass [sources] to route from an arbitrary set of files instead
+/// (e.g. an unsorted /tmp/*.txt feed). Off-cascade puzzles land in
+/// their dedicated `overfilled*` / `undetermined` files.
 ///
 /// Algorithm:
 ///   1. Read every line of every input file.
@@ -323,7 +327,19 @@ String _fmtHistogram(Map<PuzzleLevel, int> hist) {
 /// Idempotency: a second `--route` run on the post-routing files
 /// shouldn't move anything (modulo small numeric drift from the
 /// classification cascade).
-void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
+void _routeFiles({
+  required bool dryRun,
+  int? sample,
+  required bool verbose,
+  List<String> sources = const [],
+}) {
+  // When [sources] is non-empty, we route from an arbitrary feed
+  // (not one of the six level files). In that mode, verbatim noise
+  // (blanks, comments, parse failures) is silently dropped instead of
+  // being preserved next to the source — the caller's input file is
+  // a feed, not a destination we want to clone a `.tmp` for.
+  final external = sources.isNotEmpty;
+  final srcPaths = external ? sources : _playableLevelPaths;
   final sw = Stopwatch()..start();
 
   // ─── Pre-load: read all existing `.tmp` to build idempotence sets ──
@@ -408,7 +424,7 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
   int alreadyProcessed = 0;
   int newlyProcessed = 0;
 
-  for (final srcPath in _playableLevelPaths) {
+  for (final srcPath in srcPaths) {
     final srcFile = File(srcPath);
     if (!srcFile.existsSync()) {
       stderr.writeln('warn: $srcPath not found, skipping');
@@ -420,6 +436,7 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
 
     for (final line in srcFile.readAsLinesSync()) {
       if (line.trim().isEmpty || line.startsWith('#')) {
+        if (external) continue;
         if (existingVerbatim.add(line)) {
           emit(srcPath, line, _DestStatsKind.verbatim);
         }
@@ -451,6 +468,7 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
       try {
         final fields = line.split('_');
         if (fields.length < 7) {
+          if (external) continue;
           if (existingVerbatim.add(line)) {
             emit(srcPath, line, _DestStatsKind.verbatim);
           }
@@ -523,6 +541,7 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
           stderr.write('\r$srcPath: ${stats.processed} new processed...');
         }
       } catch (e) {
+        if (external) continue;
         if (existingVerbatim.add(line)) {
           emit(srcPath, line, _DestStatsKind.verbatim);
         }
@@ -566,16 +585,23 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
   );
   if (newlyProcessed == 0 && alreadyProcessed > 0) {
     stderr.writeln('');
-    stderr.writeln(
-      'All source puzzles are present in the .tmp files. '
-      'You can review them, then migrate with:',
-    );
-    for (final p in _playableLevelPaths) {
-      stderr.writeln('  mv $p.tmp $p');
+    if (external) {
+      stderr.writeln(
+        'All source puzzles are already routed. Review the .tmp files '
+        'under assets/ and migrate them when satisfied.',
+      );
+    } else {
+      stderr.writeln(
+        'All source puzzles are present in the .tmp files. '
+        'You can review them, then migrate with:',
+      );
+      for (final p in _playableLevelPaths) {
+        stderr.writeln('  mv $p.tmp $p');
+      }
     }
   }
   stderr.writeln('');
-  for (final srcPath in _playableLevelPaths) {
+  for (final srcPath in srcPaths) {
     final s = perFileStats[srcPath];
     if (s == null) continue;
     stderr.writeln(
