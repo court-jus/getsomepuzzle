@@ -35,7 +35,8 @@ const _domain = [1, 2];
 // explicitly excluded (already placed by the pre-fill). SH is
 // excluded because it conflicts with the path-based scenario. MJ
 // (majority) is excluded for now — to be re-evaluated.
-const _gardeFouSlugs = [
+const _guardRailSlugs = [
+  'CH',
   'GC', // group count — most path-friendly per user feedback
   'CC', // column count
   'RC', // row count
@@ -562,7 +563,7 @@ List<Constraint> _enumerateGardeFou(
   Random rng,
 ) {
   final out = <Constraint>[];
-  for (final slug in _gardeFouSlugs) {
+  for (final slug in _guardRailSlugs) {
     final params = generateAllParameters(slug, width, height, _domain, null);
     if (params == null) continue;
     for (final p in params) {

@@ -125,6 +125,7 @@
     "constraintShape": "forme",
     "constraintNeighborCount": "nombre de voisins",
     "constraintEyes": "yeux",
+    "constraintChain": "chaîne",
     "newConstraintModalTitle": "Nouvelle règle !",
     "newConstraintModalSkip": "Ignorer l'apprentissage",
     "welcomeModalTitle": "Bienvenue",
@@ -173,6 +174,10 @@
     "constraintExplainEY": "Une case affichée comme un œil doit « voir » exactement le nombre indiqué de cases de la couleur de l'œil. Le regard se propage en ligne droite dans chacune des quatre directions orthogonales jusqu'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue).",
     "@constraintExplainEY": {
         "description": "Body of the new-constraint explanation modal for the Eyes (EY) constraint"
+    },
+    "constraintExplainCH": "Une icône de mini-grille montre deux côtés de la grille reliés par une chaîne. La solution doit contenir un chemin orthogonal ininterrompu de cette couleur allant du côté marqué à l'autre côté marqué.",
+    "@constraintExplainCH": {
+        "description": "Body of the new-constraint explanation modal for the Chain (CH) constraint"
     },
     "createLetterGroupDone": "Terminer",
     "createAddNew": "Ajouter une contrainte",

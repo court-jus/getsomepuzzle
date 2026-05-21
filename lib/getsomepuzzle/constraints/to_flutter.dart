@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
@@ -9,6 +10,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/widgets/chain.dart';
 import 'package:getsomepuzzle/widgets/eyes.dart';
 import 'package:getsomepuzzle/widgets/neighbor_count.dart';
 import 'package:getsomepuzzle/widgets/row_count.dart';
@@ -61,6 +63,9 @@ Widget constraintToFlutter(
   }
   if (constraint is RowCountConstraint) {
     return _rowCountWidget(constraint, cellSize, count);
+  }
+  if (constraint is ChainConstraint) {
+    return _chainWidget(constraint, fgcolor, cellSize, count);
   }
 
   // Default: use toString()
@@ -183,5 +188,23 @@ Widget _rowCountWidget(
     width: widgetSize,
     height: widgetSize,
     child: RowCountWidget(constraint: constraint, cellSize: widgetSize),
+  );
+}
+
+Widget _chainWidget(
+  ChainConstraint constraint,
+  Color fgcolor,
+  double cellSize,
+  int count,
+) {
+  final double widgetSize = cellSize / count;
+  return SizedBox(
+    width: widgetSize,
+    height: widgetSize,
+    child: ChainWidget(
+      constraint: constraint,
+      fgcolor: fgcolor,
+      cellSize: widgetSize,
+    ),
   );
 }

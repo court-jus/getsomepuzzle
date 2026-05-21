@@ -82,6 +82,10 @@ Una celda marcada con una pequeña cruz que contiene un número debe tener exact
 
 Una celda con un símbolo de ojo debe «ver» exactamente el número indicado de celdas del color del ojo. Una celda ve en línea recta en cada una de las cuatro direcciones ortogonales hasta llegar al borde de la cuadrícula o a una celda del color opuesto (que bloquea la línea de visión). El color del ojo es el color objetivo; el borde alrededor del ojo es el color opuesto.
 
+### Cadena
+
+Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por un camino. La solución debe contener una cadena ortogonal ininterrumpida de ese color desde el lado marcado hasta el otro lado marcado. El camino no necesita ser una línea recta — puede girar, ramificarse o ensancharse, siempre que haya al menos una conexión continua entre los dos lados.
+
 ## La página Abrir
 
 La página Abrir es donde eliges qué jugar. Arriba, el menú *Colección* lista los niveles de dificultad (Fácil → Loco), seguidos de tus propios puzzles y las playlists que has creado. A su lado, el botón `+` crea una nueva playlist, el botón de archivo importa puzzles desde un archivo, y el icono de papelera elimina la playlist actual si te pertenece.

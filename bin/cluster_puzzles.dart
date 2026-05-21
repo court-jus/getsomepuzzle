@@ -45,6 +45,7 @@ const _collections = [
 
 const _slugs = [
   'CC',
+  'CH',
   'CX',
   'DF',
   'EY',

@@ -41,7 +41,7 @@ import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.6.13";
+const versionText = "Version 1.6.14";
 
 /// Where the GitHub Pages web build lives. Share links target this URL with
 /// a `?puzzle=<line>` query — works as a browser fallback everywhere, and
@@ -607,6 +607,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   String _constraintNameBySlug(String slug) {
     final l10n = AppLocalizations.of(context)!;
     switch (slug) {
+      case 'CH':
+        return l10n.constraintChain;
       case 'FM':
         return l10n.constraintForbiddenPattern;
       case 'SH':

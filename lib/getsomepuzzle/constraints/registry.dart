@@ -1,3 +1,4 @@
+import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
@@ -90,6 +91,12 @@ final constraintRegistry =
         label: 'Column count',
         fromParams: ColumnCountConstraint.new,
         generateAllParameters: ColumnCountConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'CH',
+        label: 'Chain',
+        fromParams: ChainConstraint.new,
+        generateAllParameters: ChainConstraint.generateAllParameters,
       ),
       (
         slug: 'GC',

@@ -54,6 +54,7 @@ Future<void> prepareApp(
   // The seed simulates a veteran player who has already met every
   // currently-known slug.
   const allSlugs = [
+    'CH',
     'FM',
     'PA',
     'GS',

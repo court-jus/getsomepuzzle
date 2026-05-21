@@ -95,7 +95,7 @@ void main() {
       expect(reco.wantedRules, isEmpty);
       // elected = QA (first unseen in postStrictDiscoveryOrder after LT).
       // banned = postStrict \ {seen-LT, elected-QA} = {SY, DF, SH, GC, MJ, EY}.
-      expect(reco.bannedRules, {'SY', 'DF', 'SH', 'GC', 'MJ', 'EY'});
+      expect(reco.bannedRules, {'SY', 'DF', 'SH', 'CH', 'GC', 'MJ', 'EY'});
     });
 
     test('forces the last unseen post-strict slug into wantedRules', () {

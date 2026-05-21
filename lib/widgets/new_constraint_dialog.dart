@@ -122,6 +122,8 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintColumnCount;
     case 'GC':
       return l.constraintGroupCount;
+    case 'CH':
+      return l.constraintChain;
     case 'NC':
       return l.constraintNeighborCount;
     case 'EY':
@@ -159,6 +161,8 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainCC;
     case 'GC':
       return l.constraintExplainGC;
+    case 'CH':
+      return l.constraintExplainCH;
     case 'NC':
       return l.constraintExplainNC;
     case 'EY':

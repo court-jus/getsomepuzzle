@@ -1114,6 +1114,12 @@ abstract class AppLocalizations {
   /// **'eyes'**
   String get constraintEyes;
 
+  /// Name of the chain constraint
+  ///
+  /// In en, this message translates to:
+  /// **'chain'**
+  String get constraintChain;
+
   /// Title of the dialog shown the first time a player encounters a new constraint
   ///
   /// In en, this message translates to:
@@ -1257,6 +1263,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).'**
   String get constraintExplainEY;
+
+  /// Body of the new-constraint explanation modal for the Chain (CH) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.'**
+  String get constraintExplainCH;
 
   /// Fallback name used when a complicity's secondary slug is the wildcard '*' (kept as a safety fallback; the dedicated 'hintComplicityWithAny' template is preferred for the wildcard case)
   ///

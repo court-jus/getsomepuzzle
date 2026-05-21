@@ -39,6 +39,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 
 const _slugs = [
   'CC',
+  'CH',
   'CX',
   'DF',
   'EY',

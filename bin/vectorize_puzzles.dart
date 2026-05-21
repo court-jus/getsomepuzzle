@@ -51,6 +51,7 @@ const _collections = [
 // slug used for complicity moves (multi-constraint deductions).
 const _slugs = [
   'CC',
+  'CH',
   'CX',
   'DF',
   'EY',

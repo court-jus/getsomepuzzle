@@ -82,6 +82,10 @@ A cell marked with a small cross containing a number must have exactly that many
 
 A cell with an eye symbol must "see" exactly the indicated number of cells of the eye's color. A cell sees in a straight line in each of the four orthogonal directions until it reaches the edge of the grid or a cell of the opposite color (which blocks the line of sight). The eye's color is the target color; the border around the eye is the opposite color.
 
+### Chain
+
+A mini-grid icon shows two sides of the grid connected by a path. The solution must contain an unbroken orthogonal chain of that color from the marked side to the other marked side. The path does not need to be a straight line — it can bend, branch, or widen, as long as there is at least one continuous connection between the two sides.
+
 ## The Open page
 
 The Open page is where you pick what to play. At the top, the *Collection* dropdown lists the difficulty levels (Easy → Mad), followed by your own puzzles and any playlists you have created. Next to it, the `+` button creates a new playlist, the file button imports puzzles from a file, and the trash button deletes the current playlist if you own it.

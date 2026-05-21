@@ -35,7 +35,8 @@ const _domain = [1, 2];
 // slug, already placed). SH is excluded — two shape-flavored
 // constraints would compete. LT is included but inter-island candidates
 // get filtered out (would force a merge that breaks symmetry).
-const _gardeFouSlugs = [
+const _guardRailSlugs = [
+  'CH',
   'GC',
   'CC',
   'RC',
@@ -417,7 +418,7 @@ List<Constraint> _enumerateGardeFou(
   Random rng,
 ) {
   final out = <Constraint>[];
-  for (final slug in _gardeFouSlugs) {
+  for (final slug in _guardRailSlugs) {
     final params = generateAllParameters(slug, width, height, _domain, null);
     if (params == null) continue;
     for (final p in params) {

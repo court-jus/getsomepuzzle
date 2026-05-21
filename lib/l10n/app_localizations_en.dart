@@ -549,6 +549,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintEyes => 'eyes';
 
   @override
+  String get constraintChain => 'chain';
+
+  @override
   String get newConstraintModalTitle => 'New rule!';
 
   @override
@@ -645,6 +648,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get constraintExplainEY =>
       'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).';
+
+  @override
+  String get constraintExplainCH =>
+      'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.';
 
   @override
   String get complicityOtherConstraint => 'another constraint';

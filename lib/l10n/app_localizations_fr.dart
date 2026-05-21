@@ -554,6 +554,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintEyes => 'yeux';
 
   @override
+  String get constraintChain => 'chaîne';
+
+  @override
   String get newConstraintModalTitle => 'Nouvelle règle !';
 
   @override
@@ -650,6 +653,10 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get constraintExplainEY =>
       'Une case affichée comme un œil doit « voir » exactement le nombre indiqué de cases de la couleur de l\'œil. Le regard se propage en ligne droite dans chacune des quatre directions orthogonales jusqu\'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue).';
+
+  @override
+  String get constraintExplainCH =>
+      'Une icône de mini-grille montre deux côtés de la grille reliés par une chaîne. La solution doit contenir un chemin orthogonal ininterrompu de cette couleur allant du côté marqué à l\'autre côté marqué.';
 
   @override
   String get complicityOtherConstraint => 'une autre contrainte';

@@ -82,6 +82,10 @@ Une cellule marquée d'une petite croix contenant un nombre doit avoir exactemen
 
 Une case contenant un symbole d'œil doit « voir » exactement le nombre indiqué de cases de la couleur de l'œil. Une case voit en ligne droite dans chacune des quatre directions orthogonales jusqu'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue). La couleur de l'œil est la couleur cible ; la bordure autour de l'œil est la couleur opposée.
 
+### Chaîne
+
+Une icône de mini-grille montre deux côtés de la grille reliés par un chemin. La solution doit contenir une chaîne orthogonale ininterrompue de cette couleur allant du côté marqué à l'autre côté marqué. Le chemin n'a pas besoin d'être une ligne droite — il peut tourner, se ramifier ou s'élargir, tant qu'il existe au moins une connexion continue entre les deux côtés.
+
 ## La page Ouvrir
 
 La page Ouvrir est l'endroit où vous choisissez quoi jouer. En haut, le menu *Collection* liste les niveaux de difficulté (Facile → Fou), suivis de vos puzzles personnels et des playlists que vous avez créées. À côté, le bouton `+` crée une nouvelle playlist, le bouton fichier importe des puzzles depuis un fichier, et l'icône corbeille supprime la playlist en cours si elle vous appartient.

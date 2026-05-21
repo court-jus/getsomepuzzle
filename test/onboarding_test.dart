@@ -94,6 +94,7 @@ void main() {
         'SY',
         'DF',
         'SH',
+        'CH',
         'GC',
         'MJ',
         'EY',

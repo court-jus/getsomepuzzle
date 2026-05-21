@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
@@ -13,6 +14,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/chain.dart';
 import 'package:getsomepuzzle/widgets/column_count.dart';
 import 'package:getsomepuzzle/widgets/row_count.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
@@ -159,7 +161,10 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     int numberOfTopBarConstraints = widget.currentPuzzle.constraints
         .where(
           (constraint) =>
-              (constraint is Motif || constraint is QuantityConstraint),
+              (constraint is Motif ||
+              constraint is QuantityConstraint ||
+              constraint is GroupCountConstraint ||
+              constraint is ChainConstraint),
         )
         .length;
     double totalWidth = MediaQuery.sizeOf(context).width;
@@ -210,7 +215,8 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
         highlightedConstraint is Motif ||
         highlightedConstraint is QuantityConstraint ||
         highlightedConstraint is ColumnCountConstraint ||
-        highlightedConstraint is GroupCountConstraint;
+        highlightedConstraint is GroupCountConstraint ||
+        highlightedConstraint is ChainConstraint;
 
     // For cell-centric constraints, find the constraint's home cell index
     int? constraintCellIdx;
@@ -334,6 +340,15 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                     constraint.color,
                               )
                               .length,
+                          cellSize: topBarConstraintsSize,
+                        )
+                      else if (constraint is ChainConstraint)
+                        ChainWidget(
+                          key:
+                              (constraint.isHighlighted && constraintIsInTopBar)
+                              ? _constraintKey
+                              : null,
+                          constraint: constraint,
                           cellSize: topBarConstraintsSize,
                         ),
                   ],

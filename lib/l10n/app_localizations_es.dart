@@ -554,6 +554,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintEyes => 'ojos';
 
   @override
+  String get constraintChain => 'cadena';
+
+  @override
   String get newConstraintModalTitle => '¡Regla nueva!';
 
   @override
@@ -650,6 +653,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get constraintExplainEY =>
       'Una casilla mostrada como un ojo debe «ver» exactamente el número indicado de casillas del color del ojo. La vista se propaga en línea recta en cada una de las cuatro direcciones ortogonales hasta alcanzar el borde de la cuadrícula o una casilla del color opuesto (que bloquea la vista).';
+
+  @override
+  String get constraintExplainCH =>
+      'Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por una cadena. La solución debe contener un camino ortogonal ininterrumpido de ese color desde el lado marcado hasta el otro lado marcado.';
 
   @override
   String get complicityOtherConstraint => 'otra restricción';
