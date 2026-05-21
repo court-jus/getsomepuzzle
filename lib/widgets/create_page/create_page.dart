@@ -421,6 +421,7 @@ class _CreatePageState extends State<CreatePage> {
       usedLetters: usedLetters,
     );
     if (letter == null) return;
+    if (!mounted) return;
     setState(() {
       _letterGroupMode = true;
       _letterGroupLetter = letter;
@@ -463,6 +464,7 @@ class _CreatePageState extends State<CreatePage> {
       ),
     );
     if (color == null) return;
+    if (!mounted) return;
     setState(() {
       _majorityZoneMode = true;
       _majorityZoneColor = color;
