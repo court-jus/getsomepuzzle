@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
@@ -12,6 +13,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/to_flutter.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/chain.dart';
 import 'package:getsomepuzzle/widgets/column_count.dart';
 import 'package:getsomepuzzle/widgets/dashed_painter.dart';
 import 'package:getsomepuzzle/widgets/eyes.dart';
@@ -37,6 +39,7 @@ enum ConstraintType {
   symmetry,
   differentFrom,
   eyes,
+  chain,
   fixBlack,
   fixWhite,
 }
@@ -105,6 +108,11 @@ Widget _previewFor(ConstraintType type, Color fgcolor) {
         constraint: EyesConstraint('2.1.5'),
         cellSize: _previewSize,
       );
+    case ConstraintType.chain:
+      return ChainWidget(
+        constraint: ChainConstraint('1.top.bottom'),
+        cellSize: _previewSize,
+      );
     case ConstraintType.shape:
       // A small L-tromino: visually distinct from the 2x2 checker used for
       // ForbiddenMotif so the two pattern-based types don't look identical.
@@ -147,6 +155,7 @@ const _entries = <_TypeEntry>[
   _TypeEntry(ConstraintType.symmetry, _labelSymmetry),
   _TypeEntry(ConstraintType.differentFrom, _labelDifferentFrom),
   _TypeEntry(ConstraintType.eyes, _labelEyes),
+  _TypeEntry(ConstraintType.chain, _labelChain),
 ];
 
 String _labelForbiddenPattern(AppLocalizations l) =>
@@ -164,6 +173,7 @@ String _labelShape(AppLocalizations l) => l.constraintShape;
 String _labelSymmetry(AppLocalizations l) => l.constraintSymmetry;
 String _labelDifferentFrom(AppLocalizations l) => l.constraintDifferentFrom;
 String _labelEyes(AppLocalizations l) => l.constraintEyes;
+String _labelChain(AppLocalizations l) => l.constraintChain;
 
 Future<ConstraintType?> showConstraintTypePicker(BuildContext context) {
   final loc = AppLocalizations.of(context)!;

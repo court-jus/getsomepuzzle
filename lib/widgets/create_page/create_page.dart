@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
@@ -13,6 +14,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/chain.dart';
 import 'package:getsomepuzzle/widgets/majority.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/eyes_dialog.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
@@ -25,6 +27,7 @@ import 'package:getsomepuzzle/widgets/group_count.dart';
 import 'package:getsomepuzzle/widgets/column_count.dart';
 import 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/cell_actions_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/chain_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/column_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/confirm_delete_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/constraint_type_picker.dart';
@@ -82,6 +85,8 @@ class _CreatePageState extends State<CreatePage> {
   Set<int> _forceCells = {};
   Map<int, int> _solvedValues = {};
   int? _autoComplexity;
+  String? _autoImpossibleBy;
+  bool _autoSolving = false;
 
   final Map<int, int> _fixedCells = {};
 
@@ -118,6 +123,16 @@ class _CreatePageState extends State<CreatePage> {
 
   void _scheduleAutoSolve() {
     _solveDebounce?.cancel();
+    setState(() {
+      _autoSolving = true;
+      // Clear any leftover orange-border highlight from the previous solve so
+      // the UI doesn't keep marking a constraint that may no longer be the
+      // culprit (or may have just been removed).
+      for (final c in _constraints) {
+        c.isValid = true;
+      }
+    });
+    debugPrint('[editor] ${_buildPuzzle().lineExport(compute: false)}');
     _solveDebounce = Timer(const Duration(milliseconds: 500), () {
       _autoSolve();
     });
@@ -126,12 +141,12 @@ class _CreatePageState extends State<CreatePage> {
   Future<void> _autoSolve() async {
     if (!mounted) return;
     final puzzle = _buildPuzzle();
-    final steps = await compute(_solvePuzzle, puzzle);
+    final result = await compute(_solvePuzzle, puzzle);
     if (!mounted) return;
     final propCells = <int>{};
     final frcCells = <int>{};
     final values = <int, int>{};
-    for (final step in steps) {
+    for (final step in result.steps) {
       values[step.cellIdx] = step.value;
       if (step.method == SolveMethod.propagation) {
         propCells.add(step.cellIdx);
@@ -144,11 +159,57 @@ class _CreatePageState extends State<CreatePage> {
       _forceCells = frcCells;
       _solvedValues = values;
       _autoComplexity = puzzle.computeComplexity();
+      _autoImpossibleBy = result.impossibleBy;
+      _autoSolving = false;
+      // Mirror the in-game "isValid = false → orange border" convention used
+      // by _revealErrors in game_model.dart: if the contradiction was raised
+      // by a regular Constraint, flag that exact instance in our state list.
+      // Complicities have no widget representation, so we fall back to the
+      // serialize() label in the bottom bar.
+      if (result.impossibleBy != null) {
+        for (final c in _constraints) {
+          if (c.serialize() == result.impossibleBy) {
+            c.isValid = false;
+            break;
+          }
+        }
+      }
     });
   }
 
-  static List<SolveStep> _solvePuzzle(Puzzle puzzle) {
-    return puzzle.solveExplained(timeoutMs: 10000);
+  /// Runs the same step-by-step deduction loop as `Puzzle.solveExplained`
+  /// but reports the serialize() of the constraint/complicity that raised
+  /// the contradiction (if any), so the editor can distinguish "impossible"
+  /// from "merely incomplete" and surface the culprit.
+  static ({List<SolveStep> steps, String? impossibleBy}) _solvePuzzle(
+    Puzzle puzzle,
+  ) {
+    final steps = <SolveStep>[];
+    final test = puzzle.clone();
+    final stopwatch = Stopwatch()..start();
+    String? impossibleBy;
+    for (int step = 0; step < 1000; step++) {
+      if (stopwatch.elapsedMilliseconds > 10000) break;
+      final m = test.findAMove(checkErrors: false);
+      if (m == null) break;
+      if (m.isImpossible != null) {
+        impossibleBy = m.isImpossible!.serialize();
+        break;
+      }
+      test.setValue(m.idx, m.value);
+      steps.add(
+        SolveStep(
+          cellIdx: m.idx,
+          value: m.value,
+          constraint: m.isForce ? '' : m.givenBy.serialize(),
+          method: m.isForce ? SolveMethod.force : SolveMethod.propagation,
+          forceDepth: m.isForce ? m.forceDepth : 0,
+          complexity: m.isForce ? 0 : m.complexity,
+        ),
+      );
+      if (test.complete) break;
+    }
+    return (steps: steps, impossibleBy: impossibleBy);
   }
 
   void _addConstraint(Constraint c) {
@@ -401,6 +462,8 @@ class _CreatePageState extends State<CreatePage> {
           width: _width,
           height: _height,
         );
+      case ConstraintType.chain:
+        added = await showChainDialog(context);
       case ConstraintType.fixBlack:
         _setFixedCell(cellIdx, 1);
         return;
@@ -605,20 +668,41 @@ class _CreatePageState extends State<CreatePage> {
                     '${_constraints.length} ${loc.generateConstraints.toLowerCase()}',
                     style: const TextStyle(color: Colors.white),
                   ),
-                  if (_autoComplexity != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const FaIcon(
-                          FontAwesomeIcons.brain,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                        Text(
-                          ' $_autoComplexity',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ],
+                  if (_autoSolving || _autoComplexity != null)
+                    Builder(
+                      builder: (_) {
+                        final impossible =
+                            !_autoSolving && _autoImpossibleBy != null;
+                        // The orange border on the constraint widget already
+                        // points at the culprit when it's a regular Constraint
+                        // (its serialize() appears in _constraints). Only fall
+                        // back to a textual label for complicities — they have
+                        // no on-screen widget to highlight.
+                        final hasWidgetHighlight =
+                            impossible &&
+                            _constraints.any(
+                              (c) => c.serialize() == _autoImpossibleBy,
+                            );
+                        final color = impossible
+                            ? Colors.red.shade900
+                            : Colors.white;
+                        final label = _autoSolving
+                            ? '...'
+                            : impossible && !hasWidgetHighlight
+                            ? '$_autoComplexity (${_autoImpossibleBy!})'
+                            : '$_autoComplexity';
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FaIcon(
+                              FontAwesomeIcons.brain,
+                              size: 12,
+                              color: color,
+                            ),
+                            Text(' $label', style: TextStyle(color: color)),
+                          ],
+                        );
+                      },
                     ),
                 ],
               ),
@@ -824,6 +908,14 @@ class _CreatePageState extends State<CreatePage> {
                   child: GroupCountWidget(
                     constraint: constraint,
                     actualGroupCount: 0,
+                    cellSize: topBarSize,
+                  ),
+                )
+              else if (constraint is ChainConstraint)
+                GestureDetector(
+                  onTap: () => _confirmDeleteTopBar(constraint),
+                  child: ChainWidget(
+                    constraint: constraint,
                     cellSize: topBarSize,
                   ),
                 ),
