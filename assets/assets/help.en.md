@@ -44,6 +44,10 @@ If you see an arrow in a cell, there must be the same number of black and white 
 
 Cells containing the same letter should be part of the same group. A group must not contain different letters.
 
+### Majority color
+
+A dotted rectangle in a specific colour indicates that most cells inside the zone must be of that colour (more than half). The border colour itself tells you which colour must dominate.
+
 ### Quantity
 
 A black or white number over the puzzle, on a blue background indicates that the total number of cells of that color should match that number.
@@ -77,6 +81,10 @@ A cell marked with a small cross containing a number must have exactly that many
 ### Eyes
 
 A cell with an eye symbol must "see" exactly the indicated number of cells of the eye's color. A cell sees in a straight line in each of the four orthogonal directions until it reaches the edge of the grid or a cell of the opposite color (which blocks the line of sight). The eye's color is the target color; the border around the eye is the opposite color.
+
+### Chain
+
+A mini-grid icon shows two sides of the grid connected by a path. The solution must contain an unbroken orthogonal chain of that color from the marked side to the other marked side. The path does not need to be a straight line — it can bend, branch, or widen, as long as there is at least one continuous connection between the two sides.
 
 ## The Open page
 

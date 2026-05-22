@@ -44,6 +44,10 @@ Si ves una flecha en una celda, debe haber el mismo número de celdas negras y b
 
 Las celdas que contengan la misma letra deben formar parte del mismo grupo. Un grupo no debe contener letras diferentes.
 
+### Color mayoritario
+
+Un rectángulo punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad). El color del borde le indica qué color debe dominar.
+
 ### Cantidad
 
 Un número negro o blanco sobre el rompecabezas, sobre un fondo azul, indica que el número total de celdas de ese color debe coincidir con ese número.
@@ -77,6 +81,10 @@ Una celda marcada con una pequeña cruz que contiene un número debe tener exact
 ### Ojos
 
 Una celda con un símbolo de ojo debe «ver» exactamente el número indicado de celdas del color del ojo. Una celda ve en línea recta en cada una de las cuatro direcciones ortogonales hasta llegar al borde de la cuadrícula o a una celda del color opuesto (que bloquea la línea de visión). El color del ojo es el color objetivo; el borde alrededor del ojo es el color opuesto.
+
+### Cadena
+
+Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por un camino. La solución debe contener una cadena ortogonal ininterrumpida de ese color desde el lado marcado hasta el otro lado marcado. El camino no necesita ser una línea recta — puede girar, ramificarse o ensancharse, siempre que haya al menos una conexión continua entre los dos lados.
 
 ## La página Abrir
 

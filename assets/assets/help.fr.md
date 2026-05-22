@@ -44,6 +44,10 @@ Si une case contient une flèche, il doit y avoir le même nombre de cases noire
 
 Les lettres identiques doivent faire partie du même groupe. Un groupe ne doit pas contenir de lettres différentes.
 
+### Couleur majoritaire
+
+Un rectangle en pointillés d'une couleur donnée indique que la majorité des cellules à l'intérieur de la zone doivent être de cette couleur (plus de la moitié). La couleur de la bordure vous indique elle-même quelle couleur doit dominer.
+
 ### Quantité
 
 Un indice numérique sur fond bleu au dessus du puzzle indique que le nombre total de cases de cette couleur doit être égal à ce nombre.
@@ -77,6 +81,10 @@ Une cellule marquée d'une petite croix contenant un nombre doit avoir exactemen
 ### Yeux
 
 Une case contenant un symbole d'œil doit « voir » exactement le nombre indiqué de cases de la couleur de l'œil. Une case voit en ligne droite dans chacune des quatre directions orthogonales jusqu'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue). La couleur de l'œil est la couleur cible ; la bordure autour de l'œil est la couleur opposée.
+
+### Chaîne
+
+Une icône de mini-grille montre deux côtés de la grille reliés par un chemin. La solution doit contenir une chaîne orthogonale ininterrompue de cette couleur allant du côté marqué à l'autre côté marqué. Le chemin n'a pas besoin d'être une ligne droite — il peut tourner, se ramifier ou s'élargir, tant qu'il existe au moins une connexion continue entre les deux côtés.
 
 ## La page Ouvrir
 
