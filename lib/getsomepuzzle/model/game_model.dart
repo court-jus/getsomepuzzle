@@ -553,6 +553,15 @@ class GameModel extends ChangeNotifier {
     required String Function(int count) errorsCountText,
     required void Function() onPuzzleCompleted,
   }) {
+    // Manual-validation mode holds back *all* automatic feedback
+    // (errors, count, completion transition) until the player presses
+    // « Valider » — which calls us back with manualCheck=true. Without
+    // this gate, the debounce would surface errors as soon as the grid
+    // is full, even though the player explicitly opted out of automatic
+    // validation.
+    if (!manualCheck && settings.validateType == ValidateType.manual) {
+      return;
+    }
     // In `complete` (« Attendre ») mode the player asked us to hold
     // off any validation feedback until the grid is fully filled. The
     // only useful check before that is "is the puzzle complete?"
