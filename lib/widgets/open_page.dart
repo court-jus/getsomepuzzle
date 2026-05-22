@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/plusminus.dart';
@@ -739,11 +740,23 @@ class _OpenPageState extends State<OpenPage> {
                                   ),
                                   const Divider(),
                                   TextField(
-                                    onChanged: (value) => selectPuzzle(
-                                      PuzzleData(value),
-                                      context,
-                                      false,
-                                    ),
+                                    onChanged: (value) {
+                                      // Accept full v2 lines, bare canonical
+                                      // keys (the form emitted by `Puzzle
+                                      // loaded` logs and `canonicalPuzzleKey`),
+                                      // or share URLs `?puzzle=v2_...`. Stay
+                                      // silent on partial keystrokes so we
+                                      // don't crash mid-paste.
+                                      final normalized = normalizeToV2Line(
+                                        value,
+                                      );
+                                      if (normalized == null) return;
+                                      selectPuzzle(
+                                        PuzzleData(normalized),
+                                        context,
+                                        false,
+                                      );
+                                    },
                                     decoration: InputDecoration(
                                       label: Text(
                                         AppLocalizations.of(

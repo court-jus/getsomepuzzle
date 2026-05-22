@@ -117,3 +117,48 @@ bool _isVersionTag(String s) {
   if (s.length < 2 || s[0] != 'v') return false;
   return int.tryParse(s.substring(1)) != null;
 }
+
+/// Accept the three representations a user can paste and return a v2
+/// line that `Puzzle`/`PuzzleData` constructors can parse:
+///   - share URL `https://.../?puzzle=v2_...` → query param value
+///   - bare canonical `<domain>_<wxh>_<prefill>_<constraints>` (no
+///     version prefix, no solution/cplx tail — what `canonicalPuzzleKey`
+///     and the `Puzzle loaded` log emit) → prefixed with `v2_`
+///   - full v2 line `v2_...` (or any `vN_...` version tag) → returned
+///     verbatim
+///
+/// Returns `null` if the input is empty or doesn't structurally look
+/// like any of the three formats. Callers can use that to silently
+/// ignore partial input (e.g. a TextField onChanged that fires on every
+/// keystroke).
+String? normalizeToV2Line(String input) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) return null;
+
+  // 1. URL form: extract the `puzzle` query parameter and recurse so
+  //    the extracted value goes through the canonical/v2 detection too.
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      final fromUrl = Uri.parse(trimmed).queryParameters['puzzle'];
+      if (fromUrl != null && fromUrl.isNotEmpty) {
+        return normalizeToV2Line(fromUrl);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  final parts = trimmed.split('_');
+  // 2. Already-versioned line — let the existing parser handle it.
+  if (parts.isNotEmpty && _isVersionTag(parts.first)) return trimmed;
+
+  // 3. Bare canonical: need at least domain, wxh, prefill, constraints.
+  if (parts.length < 4) return null;
+  final dim = parts[1];
+  if (!RegExp(r'^\d+x\d+$').hasMatch(dim)) return null;
+  // Domain and prefill must be all digits.
+  if (!RegExp(r'^\d+$').hasMatch(parts[0])) return null;
+  if (!RegExp(r'^\d+$').hasMatch(parts[2])) return null;
+  // Constraint field must contain at least one `slug:params` token.
+  if (!parts[3].contains(':')) return null;
+  return 'v2_$trimmed';
+}

@@ -75,7 +75,10 @@ class PuzzleData {
     for (var strConstraint in strConstraints) {
       rules.add(strConstraint.split(":")[0]);
     }
-    cplx = int.tryParse(attributesStr[6]) ?? 0;
+    // Solution + complexity are optional trailing fields. Bare canonical
+    // lines (no `v2_` prefix, no tail — see `normalizeToV2Line`) stop at
+    // index 4. Match the same defensiveness as `Puzzle()` (puzzle.dart).
+    cplx = attributesStr.length > 6 ? (int.tryParse(attributesStr[6]) ?? 0) : 0;
   }
 
   Puzzle getPuzzle() {

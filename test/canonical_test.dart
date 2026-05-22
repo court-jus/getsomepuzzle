@@ -110,6 +110,82 @@ void main() {
     });
   });
 
+  group('normalizeToV2Line', () {
+    test('returns a full v2 line unchanged', () {
+      // Already-versioned lines are the dominant input — assets, stats,
+      // generator output. The helper must be a no-op for them.
+      const line = 'v2_12_3x3_100000000_FM:12_0:0_5';
+      expect(normalizeToV2Line(line), line);
+    });
+
+    test('prefixes a bare canonical key with v2_', () {
+      // `canonicalPuzzleKey` strips the version prefix and the
+      // solution/cplx tail. The helper has to put a parseable v2 prefix
+      // back so PuzzleData/Puzzle constructors can split fields by index.
+      const canonical = '12_3x3_100000000_FM:12;PA:0.right';
+      expect(normalizeToV2Line(canonical), 'v2_$canonical');
+    });
+
+    test('extracts the puzzle query parameter from a share URL', () {
+      // The share button builds URLs like https://app/?puzzle=v2_... so
+      // pasting the URL must yield the embedded line.
+      const url = 'https://example.com/play/?puzzle=v2_12_3x3_100000000_FM:12';
+      expect(normalizeToV2Line(url), 'v2_12_3x3_100000000_FM:12');
+    });
+
+    test('extracts a bare canonical key from a share URL', () {
+      // The log emits canonical keys, so a user may share a URL whose
+      // `puzzle` param is already canonical. Recurse so the canonical
+      // branch handles it.
+      const url = 'https://example.com/?puzzle=12_3x3_100000000_FM:12';
+      expect(normalizeToV2Line(url), 'v2_12_3x3_100000000_FM:12');
+    });
+
+    test('returns null on empty input', () {
+      // The paste handler fires on every keystroke — an empty buffer
+      // must not throw and must not select a puzzle.
+      expect(normalizeToV2Line(''), isNull);
+      expect(normalizeToV2Line('   '), isNull);
+    });
+
+    test('returns null on a URL with no puzzle parameter', () {
+      // Defensive: a random pasted URL shouldn't be guessed at.
+      expect(
+        normalizeToV2Line('https://example.com/somewhere?other=42'),
+        isNull,
+      );
+    });
+
+    test('returns null on garbage input', () {
+      // Anything that doesn't structurally look like the three formats
+      // is rejected so the caller can stay silent on partial input.
+      expect(normalizeToV2Line('xyz'), isNull);
+      expect(normalizeToV2Line('foo_bar'), isNull);
+      // Looks vaguely like canonical but the dimensions field is wrong.
+      expect(normalizeToV2Line('12_three_100000000_FM:12'), isNull);
+      // Same but the prefill segment isn't all digits.
+      expect(normalizeToV2Line('12_3x3_abcdef_FM:12'), isNull);
+      // Constraints field has no slug:params pair.
+      expect(normalizeToV2Line('12_3x3_100000000_nothing'), isNull);
+    });
+
+    test(
+      'round-trip: canonicalPuzzleKey output normalizes back to a parseable line',
+      () {
+        // The motivating use case: the `Puzzle loaded` log prints
+        // `canonicalPuzzleKey(...)`. Pasting that key into the open
+        // dialog must produce a line that `PuzzleData` parses without
+        // throwing — verified here by checking the round-trip canonical
+        // key matches the original.
+        const original = 'v2_12_3x3_100000000_FM:12;PA:0.right_0:0_5';
+        final key = canonicalPuzzleKey(original);
+        final normalized = normalizeToV2Line(key);
+        expect(normalized, isNotNull);
+        expect(canonicalPuzzleKey(normalized!), key);
+      },
+    );
+  });
+
   group('canonicalPuzzleKey - dual format robustness', () {
     test('legacy v2 line and its normalized form yield the same key', () {
       // After normalizeV2Line() rewrites the constraints section, the

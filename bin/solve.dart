@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
@@ -13,14 +14,13 @@ void main(List<String> args) {
   }
 
   String input = args[0];
-  // Accept a share URL like https://.../?puzzle=v2_... — extract the line.
-  if (!input.startsWith('v2_') && !File(input).existsSync()) {
-    try {
-      final fromUrl = Uri.parse(input).queryParameters['puzzle'];
-      if (fromUrl != null && fromUrl.startsWith('v2_')) {
-        input = fromUrl;
-      }
-    } catch (_) {}
+  // If the argument doesn't point at an existing file, try to normalize
+  // it as a puzzle representation (share URL, bare canonical key, or
+  // full v2 line). Falls through to the file-loading branch below when
+  // the input looks like a filesystem path.
+  if (!File(input).existsSync()) {
+    final normalized = normalizeToV2Line(input);
+    if (normalized != null) input = normalized;
   }
 
   final List<String> lines;
