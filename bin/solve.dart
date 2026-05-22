@@ -6,13 +6,25 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
   if (args.isEmpty) {
-    stderr.writeln('Usage: dart run bin/solve.dart <puzzle_file_or_line>');
+    stderr.writeln(
+      'Usage: dart run bin/solve.dart <puzzle_file | puzzle_line | share_url>',
+    );
     exit(1);
   }
 
-  final arg = args[0];
+  String input = args[0];
+  // Accept a share URL like https://.../?puzzle=v2_... — extract the line.
+  if (!input.startsWith('v2_') && !File(input).existsSync()) {
+    try {
+      final fromUrl = Uri.parse(input).queryParameters['puzzle'];
+      if (fromUrl != null && fromUrl.startsWith('v2_')) {
+        input = fromUrl;
+      }
+    } catch (_) {}
+  }
+
   final List<String> lines;
-  final file = File(arg);
+  final file = File(input);
   if (file.existsSync()) {
     lines = file
         .readAsLinesSync()
@@ -23,15 +35,15 @@ void main(List<String> args) {
     // Not a file — try to interpret the argument as a single puzzle line.
     // Puzzle(...) throws on a malformed representation.
     try {
-      Puzzle(arg);
+      Puzzle(input);
     } catch (e) {
       stderr.writeln(
-        'Argument is neither an existing file nor a valid puzzle line: $arg',
+        'Argument is neither an existing file nor a valid puzzle line: $input',
       );
       stderr.writeln('Parse error: $e');
       exit(1);
     }
-    lines = [arg];
+    lines = [input];
   }
 
   for (int i = 0; i < lines.length; i++) {
