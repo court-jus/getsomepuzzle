@@ -115,6 +115,10 @@ class _GeneratePageState extends State<GeneratePage> {
           });
         case GeneratorTargetMessage():
           break;
+        case GeneratorAttemptMessage():
+          // Per-attempt telemetry is consumed only by the CLI (writes a row
+          // to `generator_stats.csv`). The in-app generator ignores it.
+          break;
       }
     });
   }

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/feasibility.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
@@ -36,6 +38,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final minHeight = parsed['minHeight'] as int;
   final maxHeight = parsed['maxHeight'] as int;
   final maxTime = parsed['maxTime'] as int;
+  final maxAttemptTime = parsed['maxAttemptTime'] as int;
   final output = parsed['output'] as String?;
   final bannedRules = (parsed['banned'] as String?)?.split(',').toSet() ?? {};
   final allowedSlugsArg = (parsed['allowed'] as String?)?.split(',').toSet();
@@ -144,6 +147,12 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   // a puzzle. Their ratio is a live failure-rate signal.
   final attemptCounts = List<int>.filled(jobs, 0);
   final successCounts = List<int>.filled(jobs, 0);
+  // Wall-clock timestamp (ms since the run started) when the worker last
+  // received a `'target'` event. The periodic redraw turns this into a
+  // "running Xs" annotation on each worker line — visibility into how long
+  // the current attempt has been chewing. Null between attempts (after
+  // `'puzzle'` or `'done'`, before the next `'target'`).
+  final attemptStartMs = List<int?>.filled(jobs, null);
   // Cached corpus stats — only recomputed when a puzzle is appended, so
   // target-only updates (which happen many times per second) avoid the
   // O(N) rescan.
@@ -182,6 +191,9 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       targets: currentTargets,
       attemptCounts: attemptCounts,
       successCounts: successCounts,
+      attemptStartMs: attemptStartMs,
+      nowMs: totalSw.elapsedMilliseconds,
+      maxAttemptTimeMs: maxAttemptTime * 1000,
     );
   }
 
@@ -189,10 +201,16 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   render();
 
   final workers = <GeneratorWorker>[];
+  // Periodic redraw — the dashboard now updates every 10s even when no
+  // worker emits a message, so a worker stuck on a slow attempt still
+  // shows live "running Xs" feedback. Set after the workers spawn,
+  // cancelled in `finish()`.
+  Timer? dashboardTimer;
   bool finished = false;
   void finish() {
     if (finished) return;
     finished = true;
+    dashboardTimer?.cancel();
     stderr.writeln('');
     stderr.writeln(
       'Done: $generated puzzles in ${_fmt(totalSw.elapsed)} (jobs=$jobs)',
@@ -221,6 +239,44 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     exit(0);
   });
 
+  // Append-only telemetry of every attempt (success + abandon). The file
+  // is opened in append mode so re-runs accumulate; the header is emitted
+  // only on creation — re-runs preserve everything already written. The
+  // `commit` column lets us bucket rows by generator version, the `date`
+  // column by run timestamp.
+  final commitHash = _readCommitHash();
+  final statsFile = File('generator_stats.csv');
+  final statsExists = statsFile.existsSync();
+  final statsSink = statsFile.openWrite(mode: FileMode.append);
+  if (!statsExists) {
+    statsSink.writeln(_statsHeader());
+  }
+  // Serializes writes across the parallel worker consumers — without this
+  // chain, concurrent `writeln` calls on the same sink can interleave.
+  Future<void> statsChain = Future.value();
+
+  // Persistent seed for the infeasibility blacklist: combos that have been
+  // tried ≥M times historically without a single success. Distributed to
+  // every worker so they all start the run with the same view of what's
+  // known-impossible. Empty when --no-blacklist or when no prior CSV exists.
+  final useBlacklist = parsed['useBlacklist'] as bool;
+  final blacklistMinAttempts = parsed['blacklistMinAttempts'] as int;
+  final blacklistAdaptiveK = parsed['blacklistAdaptiveK'] as int;
+  final blacklistSkipSafety = parsed['blacklistSkipSafety'] as int;
+  final seedBlacklist = useBlacklist
+      ? readPersistentBlacklist(
+          csvPath: 'generator_stats.csv',
+          minAttempts: blacklistMinAttempts,
+        )
+      : const <String>{};
+  if (seedBlacklist.isNotEmpty) {
+    stderr.writeln(
+      'Blacklist seed: ${seedBlacklist.length} infeasible combo(s) loaded '
+      'from generator_stats.csv (>=$blacklistMinAttempts tries, 0 success)',
+    );
+  }
+  final seedBlacklistList = seedBlacklist.toList(growable: false);
+
   final consumers = <Future<void>>[];
   for (int j = 0; j < jobs; j++) {
     final workerCount = base + (j < remainder ? 1 : 0);
@@ -233,6 +289,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       minHeight: minHeight,
       maxHeight: maxHeight,
       maxTime: Duration(seconds: maxTime),
+      maxAttemptTime: Duration(seconds: maxAttemptTime),
       requiredRules: requiredRules,
       allowedSlugs: allowedSlugs,
       count: workerCount,
@@ -251,6 +308,9 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       jobsCount: jobs,
       workerIndex: j,
       logFilePath: logDir != null ? '$logDir/worker_$j.log' : null,
+      seedBlacklist: seedBlacklistList,
+      adaptiveK: blacklistAdaptiveK,
+      skipSafety: blacklistSkipSafety,
     );
 
     consumers.add(() async {
@@ -267,6 +327,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
             // bin with a different sub-config).
             attemptCounts[j]++;
             currentTargets[j] = label;
+            attemptStartMs[j] = totalSw.elapsedMilliseconds;
             render();
           case GeneratorPuzzleMessage(:final puzzleLine, :final level):
             successCounts[j]++;
@@ -303,16 +364,108 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
             }
             cachedStats = _CollectionStats.fromLines(currentLines);
             render();
+          case GeneratorAttemptMessage():
+            // One row per attempt — both successes and abandons. Chained
+            // through `statsChain` so concurrent worker streams don't
+            // interleave their CSV writes. The attempt is finished, so
+            // clear the "running …" timer on the dashboard.
+            attemptStartMs[j] = null;
+            final row = _statsRow(message, commitHash);
+            statsChain = statsChain.then((_) async {
+              statsSink.writeln(row);
+              await statsSink.flush();
+            });
           case GeneratorDoneMessage():
             currentTargets[j] = null;
+            attemptStartMs[j] = null;
             render();
         }
       }
     }());
   }
 
+  dashboardTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    render();
+  });
+
   await Future.wait(consumers);
+  // Drain any pending CSV writes before letting `finish()` call exit(0).
+  await statsChain;
+  await statsSink.close();
   finish();
+}
+
+/// Short HEAD commit hash, captured once per CLI run and embedded in every
+/// row of `generator_stats.csv` so post-hoc analysis can tell which version
+/// of the generator produced each attempt. Falls back to `'unknown'` when
+/// not running inside a git checkout (CI tarball, archive, …).
+String _readCommitHash() {
+  try {
+    final r = Process.runSync('git', ['rev-parse', '--short', 'HEAD']);
+    if (r.exitCode == 0) {
+      return (r.stdout as String).trim();
+    }
+  } catch (_) {}
+  return 'unknown';
+}
+
+const _statsColumns = [
+  'date',
+  'commit',
+  'worker',
+  'phase',
+  'target_key',
+  'width',
+  'height',
+  'ntypes_intended',
+  'preferred_slugs',
+  'allowed_slugs',
+  'scenario',
+  'outcome',
+  'reason',
+  'duration_ms',
+  'level',
+  'puzzle_line',
+];
+
+String _statsHeader() => _statsColumns.join(',');
+
+String _statsRow(GeneratorAttemptMessage m, String commitHash) {
+  final phase = m.inWarmup
+      ? 'warmup'
+      : (m.targetKey != null ? 'equilibrium' : 'fixed');
+  final level = m.puzzleLevelIndex != null
+      ? PuzzleLevel.values[m.puzzleLevelIndex!].name
+      : '';
+  // Slugs joined with `|` (not `,`) so the column stays single-field even
+  // without CSV-quoting; the escaper still kicks in for `puzzle_line`
+  // (which contains commas via the constraint suffix).
+  final fields = <String>[
+    _csvField(DateTime.now().toUtc().toIso8601String()),
+    _csvField(commitHash),
+    '${m.workerIndex}',
+    _csvField(phase),
+    _csvField(m.targetKey ?? ''),
+    '${m.width}',
+    '${m.height}',
+    m.ntypesIntended?.toString() ?? '',
+    _csvField(m.preferredSlugs.join('|')),
+    _csvField(m.allowedSlugs?.join('|') ?? ''),
+    _csvField(m.scenario),
+    _csvField(m.success ? 'success' : 'failure'),
+    _csvField(m.rejectReason ?? ''),
+    '${m.durationMs}',
+    _csvField(level),
+    _csvField(m.puzzleLine ?? ''),
+  ];
+  return fields.join(',');
+}
+
+String _csvField(String s) {
+  if (s.contains(',') || s.contains('"') || s.contains('\n')) {
+    return '"${s.replaceAll('"', '""')}"';
+  }
+  return s;
 }
 
 /// Aggregated corpus stats across all axes the equilibrium engine watches:
@@ -403,6 +556,9 @@ void _renderDashboard({
   List<String?> targets = const [],
   List<int> attemptCounts = const [],
   List<int> successCounts = const [],
+  List<int?> attemptStartMs = const [],
+  int nowMs = 0,
+  int maxAttemptTimeMs = 0,
 }) {
   // \x1B[2J clears the screen, \x1B[H homes the cursor.
   stderr.write('\x1B[2J\x1B[H');
@@ -428,7 +584,19 @@ void _renderDashboard({
       final att = i < attemptCounts.length ? attemptCounts[i] : 0;
       final ok = i < successCounts.length ? successCounts[i] : 0;
       final counter = 'att $att/ok $ok';
-      stderr.writeln('  #${i.toString().padLeft(2)} [$counter] → $t');
+      // Live "running Xs / Ys" annotation: visible only while a target
+      // is in flight (between `'target'` and the matching `'attempt'`).
+      // The periodic redraw keeps it growing even when the worker is
+      // not emitting messages — that's the whole point of having it.
+      final startMs = i < attemptStartMs.length ? attemptStartMs[i] : null;
+      String runtime = '';
+      if (startMs != null) {
+        final elapsedS = ((nowMs - startMs) / 1000).round();
+        runtime = maxAttemptTimeMs > 0
+            ? ' (running ${elapsedS}s / ${maxAttemptTimeMs ~/ 1000}s)'
+            : ' (running ${elapsedS}s)';
+      }
+      stderr.writeln('  #${i.toString().padLeft(2)} [$counter]$runtime → $t');
     }
   }
 
@@ -991,6 +1159,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'minHeight': 4,
     'maxHeight': 8,
     'maxTime': 60,
+    'maxAttemptTime': 120,
     'output': null,
     'banned': null,
     'allowed': null,
@@ -1003,6 +1172,10 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'equilibrium': true,
     'jobs': Platform.numberOfProcessors,
     'logDir': null,
+    'useBlacklist': true,
+    'blacklistMinAttempts': 30,
+    'blacklistAdaptiveK': 20,
+    'blacklistSkipSafety': 100,
   };
 
   for (int i = 0; i < args.length; i++) {
@@ -1033,6 +1206,8 @@ Map<String, dynamic> _parseArgs(List<String> args) {
       case '-T':
       case '--max-time':
         result['maxTime'] = int.parse(args[++i]);
+      case '--max-attempt-time':
+        result['maxAttemptTime'] = int.parse(args[++i]);
       case '-o':
       case '--output':
         result['output'] = args[++i];
@@ -1057,6 +1232,14 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['easingBudget'] = int.parse(args[++i]);
       case '--no-equilibrium':
         result['equilibrium'] = false;
+      case '--no-blacklist':
+        result['useBlacklist'] = false;
+      case '--blacklist-min-attempts':
+        result['blacklistMinAttempts'] = int.parse(args[++i]);
+      case '--blacklist-adaptive-k':
+        result['blacklistAdaptiveK'] = int.parse(args[++i]);
+      case '--blacklist-skip-safety':
+        result['blacklistSkipSafety'] = int.parse(args[++i]);
       case '--scenario':
         final scenario = args[++i];
         const validScenarios = ['path-based', 'sy-based'];
@@ -1124,6 +1307,12 @@ Generation options:
   -H, --min-height N      Minimum grid height (default: 4)
       --max-height N      Maximum grid height (default: 8)
   -T, --max-time S        Maximum generation time (in seconds, default: 60)
+      --max-attempt-time S
+                          Wall-clock cap for a single `generateOne` call (in
+                          seconds, default: 120). Once exceeded the attempt
+                          is aborted with reason=attemptTimeout. Prevents a
+                          single slow combo (e.g. CH alone on a medium grid)
+                          from monopolizing the --max-time budget.
   -o, --output FILE       Output file (default: stdout)
       --ban RULES         Comma-separated rule slugs to exclude (e.g. FM,LT)
       --allow RULES       Comma-separated whitelist — when set, only these
@@ -1148,6 +1337,26 @@ Generation options:
       --no-equilibrium    Disable the multi-axis equilibrium bias.
                           Default: ON. When OFF, only the legacy slug-usage
                           bias is applied (matches pre-equilibrium behavior).
+      --no-blacklist      Disable the infeasibility filter. By default the
+                          CLI reads `generator_stats.csv` at startup and
+                          skips any (target, slugs, scenario, size-bucket)
+                          tuple that has been tried ≥ M times across past
+                          runs with zero successes; each worker also marks
+                          tuples that fail K times in-session. Use to
+                          unblock a combo after fixing the solver.
+      --blacklist-min-attempts N
+                          M: a combo needs at least N historical tries with
+                          zero successes to enter the persistent seed
+                          blacklist (default: 30).
+      --blacklist-adaptive-k N
+                          K: in-session threshold — a combo joins the
+                          worker's local blacklist after N failures without
+                          success in this run (default: 20).
+      --blacklist-skip-safety N
+                          Safety brake: after N consecutive blacklist
+                          skips, the worker runs the next blacklisted
+                          combo anyway to avoid lock-up if every candidate
+                          tuple has been filtered (default: 100).
   -j, --jobs N            Number of parallel worker isolates
                           (default: number of CPU cores, currently
                           ${Platform.numberOfProcessors}). Clamped to [1, count].

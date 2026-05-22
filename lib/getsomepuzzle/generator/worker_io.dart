@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/feasibility.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
@@ -21,6 +22,9 @@ class GeneratorWorker {
     int jobsCount = 1,
     int workerIndex = 0,
     String? logFilePath,
+    List<String> seedBlacklist = const <String>[],
+    int adaptiveK = 20,
+    int skipSafety = 100,
   }) {
     _controller = StreamController<GeneratorMessage>();
 
@@ -32,6 +36,9 @@ class GeneratorWorker {
       jobsCount,
       workerIndex,
       logFilePath,
+      seedBlacklist,
+      adaptiveK,
+      skipSafety,
     );
 
     return _controller!.stream;
@@ -55,6 +62,9 @@ class GeneratorWorker {
     int jobsCount,
     int workerIndex,
     String? logFilePath,
+    List<String> seedBlacklist,
+    int adaptiveK,
+    int skipSafety,
   ) async {
     final receivePort = ReceivePort();
 
@@ -71,6 +81,7 @@ class GeneratorWorker {
         requiredRules: config.requiredRules.toList(),
         allowedSlugs: config.allowedSlugs?.toList(),
         maxTimeMs: config.maxTime.inMilliseconds,
+        maxAttemptTimeMs: config.maxAttemptTime.inMilliseconds,
         count: config.count,
         targetLevelIndex: config.targetLevel?.index,
         easingBudgetMs: config.easingBudget.inMilliseconds,
@@ -82,6 +93,9 @@ class GeneratorWorker {
         jobsCount: jobsCount,
         workerIndex: workerIndex,
         logFilePath: logFilePath,
+        seedBlacklist: seedBlacklist,
+        adaptiveK: adaptiveK,
+        skipSafety: skipSafety,
       ),
     );
 
@@ -109,6 +123,27 @@ class GeneratorWorker {
           );
         } else if (type == 'target') {
           _controller?.add(GeneratorTargetMessage(message['label'] as String?));
+        } else if (type == 'attempt') {
+          final preferred = (message['preferredSlugs'] as List).cast<String>();
+          final allowed = (message['allowedSlugs'] as List?)?.cast<String>();
+          _controller?.add(
+            GeneratorAttemptMessage(
+              workerIndex: message['worker'] as int,
+              inWarmup: message['inWarmup'] as bool,
+              targetKey: message['targetKey'] as String?,
+              width: message['width'] as int,
+              height: message['height'] as int,
+              ntypesIntended: message['ntypesIntended'] as int?,
+              preferredSlugs: preferred,
+              allowedSlugs: allowed,
+              scenario: message['scenario'] as String,
+              success: message['success'] as bool,
+              rejectReason: message['rejectReason'] as String?,
+              durationMs: message['durationMs'] as int,
+              puzzleLevelIndex: message['puzzleLevel'] as int?,
+              puzzleLine: message['puzzleLine'] as String?,
+            ),
+          );
         } else if (type == 'done') {
           _controller?.add(GeneratorDoneMessage(message['generated'] as int));
           _controller?.close();
@@ -127,6 +162,11 @@ class _IsolateParams {
   final List<String> requiredRules;
   final List<String>? allowedSlugs;
   final int maxTimeMs;
+
+  /// Per-`generateOne` wall-clock cap. Caps any single attempt so a
+  /// pathological combo can't monopolize [maxTimeMs].
+  final int maxAttemptTimeMs;
+
   final int count;
   final int? targetLevelIndex;
   final int easingBudgetMs;
@@ -139,6 +179,20 @@ class _IsolateParams {
   final int workerIndex;
   final String? logFilePath;
 
+  /// `AttemptKey.serialized` strings loaded at CLI startup from
+  /// `generator_stats.csv` (combos with ≥ M tries and 0 successes across
+  /// past runs). Each worker checks this set before every attempt.
+  final List<String> seedBlacklist;
+
+  /// In-session blacklist threshold: a worker blacklists a combo locally
+  /// once it has attempted it [adaptiveK] times with no successes.
+  final int adaptiveK;
+
+  /// After [skipSafety] consecutive blacklist-skips, the worker runs the
+  /// next blacklisted combo anyway. Avoids deadlocks when most candidate
+  /// tuples have been filtered out.
+  final int skipSafety;
+
   _IsolateParams({
     required this.sendPort,
     required this.width,
@@ -150,6 +204,7 @@ class _IsolateParams {
     required this.requiredRules,
     this.allowedSlugs,
     required this.maxTimeMs,
+    required this.maxAttemptTimeMs,
     required this.count,
     this.targetLevelIndex,
     required this.easingBudgetMs,
@@ -161,6 +216,9 @@ class _IsolateParams {
     this.jobsCount = 1,
     this.workerIndex = 0,
     this.logFilePath,
+    this.seedBlacklist = const <String>[],
+    this.adaptiveK = 20,
+    this.skipSafety = 100,
   });
 }
 
@@ -198,7 +256,8 @@ void _isolateEntryPoint(_IsolateParams params) {
     'sizeRange=${effectiveMinW}x$effectiveMinH..${effectiveMaxW}x$effectiveMaxH, '
     'allowedSlugs=${baseAllowedSlugs ?? "*"}, required=$requiredSet, '
     'equilibriumRequested=${params.equilibriumRequested}, '
-    'maxTime=${maxTime.inSeconds}s',
+    'maxTime=${maxTime.inSeconds}s, '
+    'maxAttemptTime=${params.maxAttemptTimeMs / 1000}s',
   );
 
   // Equilibrium state. We always build it when equilibrium is requested —
@@ -218,6 +277,17 @@ void _isolateEntryPoint(_IsolateParams params) {
       minHeight: effectiveMinH,
       maxHeight: effectiveMaxH,
     );
+  }
+
+  // Infeasibility plumbing. `seedSet` is the persistent CSV-loaded blacklist
+  // (frozen for this run); `tracker` accumulates fresh in-session evidence.
+  // A combo is skipped when either source flags it. `consecutiveSkips` is
+  // the safety brake (see [skipSafety]).
+  final seedSet = params.seedBlacklist.toSet();
+  final tracker = InfeasibilityTracker();
+  int consecutiveSkips = 0;
+  if (seedSet.isNotEmpty) {
+    log('seed blacklist: ${seedSet.length} combo(s) loaded');
   }
 
   int generated = 0;
@@ -296,17 +366,67 @@ void _isolateEntryPoint(_IsolateParams params) {
     }
 
     // Tell the UI what this worker is currently chasing so the dashboard can
-    // show per-worker progress. Includes the resolved size when relevant.
-    final String? targetLabel;
+    // show per-worker progress. We always report the 4 axes (size, ntypes,
+    // slugs, scenario) so any attempt is fully identifiable, regardless of
+    // which axis the equilibrium picker chose to push.
+    final scenario = _resolveScenario(
+      pathBased: params.pathBasedScenario || attemptPathBased,
+      syBased: params.syBasedScenario || attemptSyBased,
+      preferredSlugs: preferredSlugs,
+    );
+    final resolvedTarget = target;
+    // `ntypesIntended` is the explicit target.n when chasing NTypesTarget,
+    // otherwise the soft cap implied by the preferred slug set (`≤` in the
+    // label). `null` when no slug preference is active.
+    final int? ntypesIntended = resolvedTarget is NTypesTarget
+        ? resolvedTarget.n
+        : (preferredSlugs.isNotEmpty ? preferredSlugs.length : null);
+    final ntypesLabel = ntypesIntended == null
+        ? 'ntypes=free'
+        : (resolvedTarget is NTypesTarget
+              ? 'ntypes=$ntypesIntended'
+              : 'ntypes≤$ntypesIntended');
+    final slugsLabel = 'slugs={${preferredSlugs.join(',')}}';
+    final body = '${w}x$h $ntypesLabel $slugsLabel scenario=$scenario';
+    final String targetLabel;
     if (inWarmup) {
-      targetLabel = 'warmup ${w}x$h (${preferredSlugs.length}t)';
+      targetLabel = 'warmup $body';
     } else if (target != null) {
-      targetLabel = '${target.label} ${w}x$h';
+      targetLabel = '[${target.label}] $body';
     } else if (params.equilibriumRequested) {
-      targetLabel = '(no target) ${w}x$h';
+      targetLabel = '[balanced] $body';
     } else {
-      targetLabel = '${w}x$h';
+      targetLabel = body;
     }
+
+    // Skip-then-continue when the combo is known infeasible (seeded by a
+    // prior run's CSV, or learned in-session via the tracker). A skipped
+    // iteration emits no `'target'` / `'attempt'` event — from the CLI's
+    // point of view the attempt simply never happened. The safety brake
+    // releases the filter after [skipSafety] consecutive skips so the
+    // worker can't deadlock if every candidate tuple has been blacklisted.
+    final attemptKey = AttemptKey(
+      targetKey: resolvedTarget?.key ?? 'none',
+      sortedSlugs: preferredSlugs.toList()..sort(),
+      scenario: scenario,
+      sizeBucket: bucketForArea(w, h),
+    );
+    final blacklisted =
+        seedSet.contains(attemptKey.serialized) ||
+        tracker.isBlacklisted(attemptKey, kThreshold: params.adaptiveK);
+    if (blacklisted) {
+      if (consecutiveSkips < params.skipSafety) {
+        consecutiveSkips++;
+        log('  skip blacklisted combo: ${attemptKey.serialized}');
+        continue;
+      }
+      log(
+        '  skip safety triggered after $consecutiveSkips skips — '
+        'running blacklisted combo to avoid lockup: ${attemptKey.serialized}',
+      );
+    }
+    consecutiveSkips = 0;
+
     params.sendPort.send({'type': 'target', 'label': targetLabel});
 
     final config = GeneratorConfig(
@@ -329,10 +449,12 @@ void _isolateEntryPoint(_IsolateParams params) {
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;
+    final attemptDeadlineMs = attemptStartMs + params.maxAttemptTimeMs;
     log(
       'attempt #${generated + 1}: $targetLabel '
       'allowedSlugs=$allowedSlugs preferred=$preferredSlugs '
-      'userRequired=$requiredSet',
+      'userRequired=$requiredSet '
+      'budget=${params.maxAttemptTimeMs}ms',
     );
 
     // Throttle progress logs to one entry per [progressLogIntervalMs] inside
@@ -348,6 +470,10 @@ void _isolateEntryPoint(_IsolateParams params) {
     // so the callback fires at most once per attempt. Reset every
     // iteration so a previous attempt's reason doesn't leak forward.
     GenerationRejectReason? lastReject;
+    // Set inside `shouldStop` when the per-attempt deadline (not the
+    // global maxTime) is what triggered the abort. Used after the
+    // attempt to relabel the reject from `cancelled` to `attemptTimeout`.
+    bool attemptDeadlineHit = false;
 
     ({String line, PuzzleLevel level})? result;
     try {
@@ -376,7 +502,15 @@ void _isolateEntryPoint(_IsolateParams params) {
             lastProgressLogMs = now;
           }
         },
-        shouldStop: () => stopwatch.elapsed > maxTime,
+        shouldStop: () {
+          final nowMs = stopwatch.elapsedMilliseconds;
+          if (nowMs > params.maxTimeMs) return true;
+          if (nowMs >= attemptDeadlineMs) {
+            attemptDeadlineHit = true;
+            return true;
+          }
+          return false;
+        },
         onReject: (r, rejectedPu) {
           lastReject = r;
           // Persist every rejected puzzle to `assets/<reason>.txt` so
@@ -411,25 +545,61 @@ void _isolateEntryPoint(_IsolateParams params) {
       result = null;
     }
 
+    // When the abort was triggered by the per-attempt deadline rather than
+    // the global maxTime, relabel `cancelled` → `attemptTimeout` so the
+    // CSV row carries the more precise reason. The global maxTime case
+    // keeps `cancelled` because the worker is about to exit the loop.
+    if (attemptDeadlineHit &&
+        result == null &&
+        lastReject == GenerationRejectReason.cancelled) {
+      lastReject = GenerationRejectReason.attemptTimeout;
+    }
+
     final attemptDurationMs = stopwatch.elapsedMilliseconds - attemptStartMs;
+    // `reason=unknown` covers the rare "exception during generateOne" path
+    // (the catch above sets result=null without firing onReject). Anything
+    // else points at a specific reject site — see `GenerationRejectReason`.
+    final rejectReason = result != null
+        ? null
+        : (lastReject?.name ?? 'unknown');
     if (result != null) {
       log(
         '  result: SUCCESS in ${attemptDurationMs}ms '
         '(tried=$lastTried/$lastTotalConstraints)',
       );
     } else {
-      // `reason=unknown` covers the rare "exception during generateOne"
-      // path (the catch above sets result=null without firing
-      // onReject). Anything else points at a specific reject site —
-      // see `GenerationRejectReason` for the inventory.
-      final reason = lastReject?.name ?? 'unknown';
       log(
         '  result: FAILURE in ${attemptDurationMs}ms '
         '(tried=$lastTried/$lastTotalConstraints, '
         'lastRatio=${lastRatio.toStringAsFixed(3)}, '
-        'reason=$reason)',
+        'reason=$rejectReason)',
       );
     }
+
+    // Emit one attempt event per loop iteration so the CLI can append a row
+    // to `generator_stats.csv` — both on success and on abandon. All values
+    // are primitives so the Map passes cleanly through the SendPort.
+    params.sendPort.send({
+      'type': 'attempt',
+      'worker': params.workerIndex,
+      'inWarmup': inWarmup,
+      'targetKey': resolvedTarget?.key,
+      'width': w,
+      'height': h,
+      'ntypesIntended': ntypesIntended,
+      'preferredSlugs': preferredSlugs.toList(),
+      'allowedSlugs': allowedSlugs?.toList(),
+      'scenario': scenario,
+      'success': result != null,
+      'rejectReason': rejectReason,
+      'durationMs': attemptDurationMs,
+      'puzzleLevel': result?.level.index,
+      'puzzleLine': result?.line,
+    });
+
+    // Feed the in-session tracker so a combo with K failures and zero
+    // successes joins the local blacklist for the rest of this run.
+    tracker.record(attemptKey, success: result != null);
 
     if (result != null) {
       generated++;
@@ -574,4 +744,19 @@ _ResolvedTarget _resolveTarget(
           return const _ResolvedTarget(syBasedScenario: true);
       }
   }
+}
+
+// Effective pre-fill scenario for one attempt. Priority order matches
+// `PuzzleGenerator.generateOne` dispatch: pathBased / syBased short-circuit
+// the regular flow, and SH pre-fill activates whenever SH ∈ prioritySlugs
+// (cf. generator.dart). When none apply we're in the classic grid-first flow.
+String _resolveScenario({
+  required bool pathBased,
+  required bool syBased,
+  required Set<String> preferredSlugs,
+}) {
+  if (pathBased) return 'pathBased';
+  if (syBased) return 'syBased';
+  if (preferredSlugs.contains('SH')) return 'sh';
+  return 'classic';
 }

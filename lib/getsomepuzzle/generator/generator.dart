@@ -32,6 +32,14 @@ class GeneratorConfig {
   final Set<String> preferredSlugs;
 
   final Duration maxTime;
+
+  /// Wall-clock cap for a single `generateOne` call. Once exceeded, the
+  /// worker's `shouldStop` returns true and the attempt is aborted with
+  /// `GenerationRejectReason.attemptTimeout`. Prevents one slow combo
+  /// (e.g. CH-alone on a medium grid) from burning the entire [maxTime]
+  /// budget across a single attempt.
+  final Duration maxAttemptTime;
+
   final int count;
 
   /// When set, only puzzles classified at this exact level are emitted.
@@ -68,6 +76,7 @@ class GeneratorConfig {
     this.allowedSlugs,
     this.preferredSlugs = const {},
     this.maxTime = const Duration(seconds: 60),
+    this.maxAttemptTime = const Duration(seconds: 120),
     this.count = 1,
     this.targetLevel,
     this.easingBudget = const Duration(seconds: 30),
@@ -123,6 +132,13 @@ enum GenerationRejectReason {
   /// reached, SIGINT, etc.). Distinct from the other reasons because
   /// it's not a property of the candidate puzzle.
   cancelled,
+
+  /// Per-attempt time budget exhausted (cf. `GeneratorConfig.maxAttemptTime`).
+  /// Workers cap a single `generateOne` call so one pathological combo
+  /// can't monopolize the total `maxTime` budget. Distinct from
+  /// `cancelled` so post-run analysis can tell apart "global timeout"
+  /// from "this combo was slow".
+  attemptTimeout,
 
   /// Path-based pre-fill (`preFillPath`) exhausted its retry budget
   /// without producing a deductively-unique puzzle. Symptom: random

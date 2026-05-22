@@ -15,9 +15,13 @@ class GeneratorWorker {
     int jobsCount = 1,
     int workerIndex = 0,
     String? logFilePath,
+    List<String> seedBlacklist = const <String>[],
+    int adaptiveK = 20,
+    int skipSafety = 100,
   }) {
-    // Equilibrium and warm-up are CLI-only for now; the web/in-app generator
-    // keeps the legacy slug-only bias and ignores both flags.
+    // Equilibrium, warm-up and the infeasibility blacklist are CLI-only for
+    // now; the web/in-app generator keeps the legacy slug-only bias and
+    // ignores all three.
     _controller = StreamController<GeneratorMessage>();
     _cancelled = false;
 

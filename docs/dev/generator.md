@@ -165,7 +165,7 @@ each failed attempt.
   workers can theoretically interleave. Acceptable for human inspection
   but not for downstream re-ingestion without a sanity pass.
 
-## 2. Equilibrium
+## 2. Equilibrium and the per-worker main loop
 
 `bin/generate.dart` invokes the generator inside a per-iteration loop
 that rebalances the corpus across five axes (slug, number of types,
@@ -174,6 +174,46 @@ pair of types, size, profile). The full description lives in
 most under-represented `(axis, category)`, configures the generator
 accordingly, and lets the greedy algorithm produce a puzzle for that
 target.
+
+### 2.1. Infeasibility skip
+
+Before emitting the `'target'` event — and therefore before any attempt
+counter is incremented — the worker builds an `AttemptKey` (the tuple
+`(target_key, sorted_preferred_slugs, scenario, size_bucket)`) and checks
+it against two sources:
+
+1. **Persistent seed blacklist** — serialized keys loaded from
+   `generator_stats.csv` at CLI startup via `readPersistentBlacklist`.
+   Covers combos that historically produced zero successes across past
+   runs (threshold: `--blacklist-min-attempts`, default 30).
+2. **In-session adaptive tracker** — an `InfeasibilityTracker` owned by
+   each worker that accumulates `{attempts, successes}` per key within
+   the current run (threshold: `--blacklist-adaptive-k`, default 20).
+
+If either source flags the combo as infeasible, the iteration executes
+`continue` immediately — no `'target'` event, no `'attempt'` event, no
+CSV row. From the CLI's point of view the attempt never happened. A
+consecutive-skip counter enforces a safety brake (`--blacklist-skip-safety`,
+default 100): after that many consecutive skips, the next blacklisted combo
+runs anyway to prevent deadlock.
+
+Full details on `AttemptKey` granularity, the `generator_stats.csv` schema,
+and the CLI flags are in [`feasibility.md`](feasibility.md).
+
+### 2.2. Per-attempt telemetry
+
+After every `generateOne` call (success or abandon) the worker emits a
+`GeneratorAttemptMessage` (`lib/getsomepuzzle/generator/messages.dart`).
+The CLI receives it in the `GeneratorAttemptMessage` branch of its consumer
+loop and appends one row to `generator_stats.csv` (append-only;
+header written only on first creation). Multiple CLI runs accumulate rows
+naturally, and concurrent workers serialize their CSV writes through a
+`statsChain` Future to avoid interleaving.
+
+The CSV schema and its role in seeding the next run's blacklist are described
+in [`feasibility.md`](feasibility.md). The in-app generator
+(`lib/widgets/generate_page.dart`) ignores `GeneratorAttemptMessage` with a
+no-op case — the CSV is CLI-only telemetry.
 
 ## 3. Post-generation scoring and polishing
 

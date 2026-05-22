@@ -21,6 +21,7 @@ assets/liked
 assets/disliked
 assets/played
 /stats/
+generator_stats.csv
 
 # IntelliJ related
 *.iml

@@ -146,15 +146,51 @@ than reject after the fact.
 The post-solve free-cell ratio cap of `kMaxAcceptableRatio` (= 0.25)
 applies to every size, including 10x10.
 
-### Failure blacklist (API surface only)
+### Infeasibility blacklist
 
-`pickTarget` and `rankTargets` accept an optional `blacklistedKeys`
-parameter that filters candidate targets out of the ranking. The current
-caller (`worker_io.dart`) always passes the empty set: there is no
-session-level failure tracking yet. Targets that are unreachable in
-practice (e.g. a complex pair on a `3x3` grid) are bounded by the
-worker's overall `maxTime` budget rather than by per-target retries.
-See `docs/dev/todo.md` for the planned blacklist follow-up.
+Some `(target_key, slugs, scenario, size_bucket)` tuples are structurally
+impossible — the generator can never produce a valid puzzle for them regardless
+of how many attempts it makes (for example, `ntypes=1` with `slugs={CH}` where
+CH alone is too weak to force a unique solution on any small grid). Without
+detection, a worker chasing such a combo burns through its entire `maxTime`
+budget repeatedly.
+
+Two complementary mechanisms address this. Both are implemented in
+`lib/getsomepuzzle/generator/feasibility.dart` and wired through
+`worker_io.dart`. Full details — including the `AttemptKey` granularity, the
+`generator_stats.csv` schema, and the CLI flags — are in
+[`feasibility.md`](feasibility.md).
+
+**Persistent CSV seed.** `readPersistentBlacklist(csvPath, minAttempts)` reads
+`generator_stats.csv` and returns the set of serialized `AttemptKey`s that have
+been tried at least `minAttempts` times with zero successes across all logged
+runs. The CLI loads this set once at startup and distributes it to every worker
+via `_IsolateParams.seedBlacklist`.
+
+**In-session adaptive tracking.** Each worker owns an `InfeasibilityTracker`
+(a `Map<String, {attempts, successes}>`). After every `generateOne` call —
+success or failure — the worker calls `tracker.record(key)`. A combo is locally
+blacklisted when `attempts >= adaptiveK && successes == 0`.
+
+**Skip decision.** Just before emitting the `'target'` event for an attempt, the
+worker builds the `AttemptKey` and checks both sources. If blacklisted and the
+safety brake has not fired, the iteration executes `continue` — no `'target'`
+event, no `'attempt'` event, no dashboard counter update, no CSV row. The
+attempt simply never happened from the CLI's point of view. The worker logs the
+skip to its `.log` file.
+
+**Safety brake.** After `skipSafety` (default 100) consecutive skips, the next
+blacklisted combo runs anyway with a warning logged. This prevents deadlock when
+every candidate tuple in the current worker state has been filtered.
+
+**Relationship to `pickTarget`'s `blacklistedKeys` parameter.** `pickTarget`
+and `rankTargets` accept an optional `blacklistedKeys` parameter that would
+filter at the axis level (e.g. removing `ntypes:1` entirely). The infeasibility
+blacklist deliberately does **not** use this parameter — blacklisting an axis key
+is too coarse, as it would block every combo at that key regardless of the slug
+set or scenario. The skip-then-continue approach at the resolved-tuple level
+naturally re-rolls slugs and sizes and only suppresses the exact infeasible
+combination.
 
 ## Pre-fill scenarios
 
@@ -195,6 +231,40 @@ draw, candidate constraints sorted by `usageStats` only):
 
 When the flag is set, no hard restriction (slug filtering, size
 override) is applied.
+
+### Worker dashboard format
+
+Each line on the live dashboard shows a worker's current attempt context across
+all four resolved axes so any attempt is fully identifiable:
+
+```
+  #00 [att 12/ok 3] → [slug=SY] 10x8 ntypes≤3 slugs={SY,QA,PA} scenario=classic
+  #01 [att  8/ok 1] → [ntypes=3] 6x4 ntypes=3 slugs={SY,QA,PA} scenario=classic
+  #02 [att 15/ok 2] → [profile=pathBased] 12x8 ntypes=free slugs={} scenario=pathBased
+  #03 [att 21/ok 7] → warmup 4x4 ntypes≤3 slugs={SY,QA,PA} scenario=classic
+  #04 [att  3/ok 0] → 8x8 ntypes=free slugs={} scenario=classic
+```
+
+The prefix before the body (`WxH ntypes… slugs=… scenario=…`) encodes the
+equilibrium state for that worker:
+
+| Prefix | Meaning |
+|---|---|
+| `[<target.label>]` | Chasing a specific equilibrium target (e.g. `[slug=SY]`, `[ntypes=3]`) |
+| `warmup` | Corpus below `kEquilibriumWarmupSize`; using `pickWarmupConfig` |
+| `[balanced]` | Equilibrium on, all axes balanced, no target picked |
+| *(none)* | Equilibrium disabled (`--no-equilibrium`) |
+
+The `ntypes` field distinguishes hard from soft constraints:
+- `ntypes=N` — the target is a `NTypesTarget` with `target.n == N`.
+- `ntypes≤N` — soft cap implied by `preferredSlugs.length`; the iterative loop
+  may produce a puzzle with fewer types.
+- `ntypes=free` — no slug preference active.
+
+`slugs={…}` always lists the sorted preferred slugs. `scenario` is resolved by
+`_resolveScenario` in `worker_io.dart` following the priority order
+`pathBased > syBased > sh > classic`; `sh` activates whenever
+`SH ∈ preferredSlugs`.
 
 ### Warmup threshold
 
@@ -244,8 +314,13 @@ selection (`pickTarget`) are pure functions covered by
 
 ## Out of scope
 
-- No persistent statistics — distributions are recomputed at each run.
+- No persistent equilibrium statistics — distributions are recomputed at
+  each run from the output corpus.
 - No equilibration of triplets or larger combinations.
 - No conditional distributions, with one structural exception: the pair
   axis is by construction conditional on puzzles with exactly 2 types.
 - No quantitative quota — equilibrium is a bias, not a target count.
+
+Per-attempt telemetry is persisted (see [`feasibility.md`](feasibility.md)),
+but this is for infeasibility learning and offline analysis, not for updating
+the equilibrium distributions themselves.

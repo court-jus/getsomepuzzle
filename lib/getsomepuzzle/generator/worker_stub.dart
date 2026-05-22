@@ -12,6 +12,9 @@ class GeneratorWorker {
     int jobsCount = 1,
     int workerIndex = 0,
     String? logFilePath,
+    List<String> seedBlacklist = const <String>[],
+    int adaptiveK = 20,
+    int skipSafety = 100,
   }) => const Stream.empty();
 
   void cancel() {}
