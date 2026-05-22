@@ -598,6 +598,32 @@ class Puzzle {
     return null;
   }
 
+  /// Like [apply], but instead of returning the first move found, returns
+  /// the complete list of moves produced by every constraint and every
+  /// complicity at the current state. Used to detect puzzle steps where
+  /// the next deduction is unambiguous (exactly one move).
+  ///
+  /// Notes:
+  /// - No deduplication: two constraints pointing at the same (idx, value)
+  ///   contribute two entries.
+  /// - No force fallback: callers that need the force layer must invoke
+  ///   [findAMove] separately.
+  /// - A Move with `isImpossible != null` is still included.
+  /// - Each `apply()` only ever yields one move per source, so this does
+  ///   not enumerate every cell a single constraint could force at once.
+  List<Move> findAllMoves() {
+    final moves = <Move>[];
+    for (final c in constraints) {
+      final m = c.apply(this);
+      if (m != null) moves.add(m);
+    }
+    for (final c in complicities) {
+      final m = c.apply(this);
+      if (m != null) moves.add(m);
+    }
+    return moves;
+  }
+
   /// Next deducible move, or null if stuck. Does not mutate `this`.
   /// [checkErrors] returns a corrective move for invalid constraints (UI-only).
   /// [tryForce] enables the force fallback when propagation is stuck.
