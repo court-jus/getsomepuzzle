@@ -56,7 +56,7 @@ class SyPrefillResult {
   final int numIslands;
   final int seedRevealedCount;
   final int islandCellRevealedCount;
-  final int gardeFouCount;
+  final int guardRailCount;
 
   SyPrefillResult({
     required this.puzzle,
@@ -64,7 +64,7 @@ class SyPrefillResult {
     required this.numIslands,
     required this.seedRevealedCount,
     required this.islandCellRevealedCount,
-    required this.gardeFouCount,
+    required this.guardRailCount,
   });
 
   int get revealedCount => seedRevealedCount + islandCellRevealedCount;
@@ -182,7 +182,13 @@ SyPrefillResult? preFillSy(
 
     // Solved puzzle used to validate guardrail candidates.
     final solved = _buildSolvedPuzzle(width, height, solution);
-    final candidates = _enumerateGardeFou(width, height, solved, islandOf, rng);
+    final candidates = _enumerateGuardRail(
+      width,
+      height,
+      solved,
+      islandOf,
+      rng,
+    );
 
     // Bipartite reveal pools.
     final seedPool = <int>[for (final isl in islands) isl.seed]..shuffle(rng);
@@ -208,7 +214,7 @@ SyPrefillResult? preFillSy(
       numIslands: islands.length,
       seedRevealedCount: result.$1,
       islandCellRevealedCount: result.$2,
-      gardeFouCount: result.$3,
+      guardRailCount: result.$3,
     );
   }
   return null;
@@ -410,7 +416,7 @@ Puzzle _buildSolvedPuzzle(int width, int height, List<int> solution) {
 /// candidates whose anchors span more than one region (one specific
 /// island OR ocean) are filtered out — they would force an
 /// island-merging route that breaks SY.
-List<Constraint> _enumerateGardeFou(
+List<Constraint> _enumerateGuardRail(
   int width,
   int height,
   Puzzle solved,
@@ -451,7 +457,7 @@ List<Constraint> _enumerateGardeFou(
 }) {
   int seedReveals = 0;
   int islandCellReveals = 0;
-  int gardeFou = 0;
+  int guardRail = 0;
 
   const maxIterations = 200;
   // Hard cap on guardrails. Empirically, a 6×6 SY puzzle that hasn't
@@ -476,7 +482,7 @@ List<Constraint> _enumerateGardeFou(
   while (iter < maxIterations) {
     iter++;
     if (puzzle.isDeductivelyUnique()) {
-      return (seedReveals, islandCellReveals, gardeFou);
+      return (seedReveals, islandCellReveals, guardRail);
     }
 
     final revealedTotal = seedReveals + islandCellReveals;
@@ -490,9 +496,9 @@ List<Constraint> _enumerateGardeFou(
     // visible propagation gain). Reveals (phase 1/2) are never rolled
     // back: they materialise actual cell values from the solution and
     // cannot regress propagation by construction.
-    if (prevFree >= 0 && freeRemaining > prevFree && gardeFou > 0) {
+    if (prevFree >= 0 && freeRemaining > prevFree && guardRail > 0) {
       puzzle.removeConstraintAt(puzzle.constraints.length - 1);
-      gardeFou--;
+      guardRail--;
       final reProbe = puzzle.clone();
       reProbe.solve();
       freeRemaining = reProbe.freeCells().length;
@@ -504,7 +510,7 @@ List<Constraint> _enumerateGardeFou(
       bestFree = freeRemaining;
       consecutiveRollbacks = 0;
     }
-    if (gardeFou >= maxGuardrails) return null;
+    if (guardRail >= maxGuardrails) return null;
 
     bool advanced = false;
     if (revealedTotal < maxReveals &&
@@ -516,10 +522,10 @@ List<Constraint> _enumerateGardeFou(
       islandCellReveals++;
       advanced = true;
     } else if (_tryAddGcOrQa(puzzle, candidates, rng)) {
-      gardeFou++;
+      guardRail++;
       advanced = true;
     } else if (_tryAddOtherGuardrail(puzzle, candidates)) {
-      gardeFou++;
+      guardRail++;
       advanced = true;
     }
     prevFree = freeRemaining;

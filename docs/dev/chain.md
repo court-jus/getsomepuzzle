@@ -45,11 +45,6 @@ top:    [0, 1, 2, ..., width-1]
 bottom: [(height-1)*width, ..., height*width-1]
 ```
 
-### `_hasPath(Puzzle)` → `bool`
-
-Flood-fill (DFS) from all `color`-colored cells on `fromSide`. If any cell on `toSide` is
-reached, a path exists. Only traverses cells whose value equals `color`.
-
 ### `_isBlocked(Puzzle)` → `bool`
 
 Checks whether an opposite-color barrier permanently separates the two sides.
@@ -62,21 +57,25 @@ permanently blocked.
 Returns `true` immediately if no non-opposite cell exists on `fromSide` (all border cells are
 already filled with the wrong color).
 
+When the puzzle is complete (no free cells), "not opposite" reduces to "target color", so
+`_isBlocked` doubles as a final-state path check.
+
 ### `verify(Puzzle)` → `bool`
 
 ```
-if _isBlocked(puzzle)  → false  (opposite-color barrier)
-if puzzle.complete      → _hasPath(puzzle)
-otherwise               → true   (incomplete, still reachable)
+return !_isBlocked(puzzle)
 ```
+
+`_isBlocked` already handles both the unreachable-but-incomplete case and the complete-but-no-
+path case (see the note above), so `verify` collapses to a single negated call.
 
 ### `apply(Puzzle)` → `Move?`
 
 Three deduction branches, checked in order:
 
-1. **Impossible** — `_isBlocked(puzzle)` → `Move(isImpossible: this)`.
-   Also checks whether every cell on `fromSide` or `toSide` is the opposite color.
-   Both catch the same class of unrecoverable states.
+1. **Impossible** — `_isBlocked(puzzle)` → `Move(isImpossible: this)`. Covers both the
+   opposite-color-barrier case and the case where every cell on `fromSide` or `toSide` is
+   already the opposite color.
 
 2. **Border saturation** (complexity 1) — if exactly one free cell remains on `fromSide` (or
    `toSide`) and all other cells on that side are opposite, that cell must be the target color
@@ -106,7 +105,10 @@ Parameter space: O(|domain| × 2) — 4 entries for a binary domain.
 
 ### Rotation
 
-90° clockwise rotation maps sides as: `top→right→bottom→left→top`.
+90° clockwise rotation maps sides as: `top→right→bottom→left→top`. After mapping, the
+resulting pair is canonicalized to `top.bottom` / `left.right` (i.e. swapped when the raw
+output would be `bottom.top` or `right.left`) so rotated constraints match the forms produced
+by `generateAllParameters`.
 
 ## Display
 
@@ -120,15 +122,18 @@ with a predefined path drawn without internal borders.
     indices `{1, 7, 8, 14, 15, 21, 22, 28, 34}` (row-col: `(0,1)→(1,1)→(1,2)→(2,2)→...`)
   - Horizontal chains (left↔right, right↔left via `_chainPathCellsHorizontal`):
     indices `{10, 11, 15, 16, 20, 21, 24, 25, 26}` — the 90° CW rotation of the vertical set.
-- **Path color**: matches the constraint color (black for 1, white for 2).
+- **Path color**: defaults to the constraint color (black for 1, white for 2) via the
+  `_textColors` map, but can be overridden by the optional `fgcolor` parameter passed by
+  `to_flutter._chainWidget`.
 - **Background**: neutral grey for unfilled cells.
 - **State colors**: grey (neutral), green (valid), red (invalid), highlightColor (highlighted).
 
 The specific sides involved (`fromSide`, `toSide`) are **not** encoded in the mini-grid icon.
 They are conveyed through the constraint label and detail view.
 
-When CH is highlighted, the top-bar indicator pulses and the source/target border cells
-receive a subtle tint to help the player identify the relevant sides.
+When CH is highlighted, the top-bar indicator switches to `highlightColor` (both border and
+path). The grid's source/target border cells are **not** tinted — players locate the relevant
+sides via the constraint label only.
 
 ## Gameplay
 

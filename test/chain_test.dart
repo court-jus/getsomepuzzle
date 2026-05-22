@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 
 import 'helpers/make_puzzle.dart';
@@ -9,7 +8,8 @@ void main() {
   group('ChainConstraint.verify', () {
     test('complete grid with a left-right path → valid', () {
       final p = makePuzzle('111\n222\n111');
-      // CH:1.left.right — color-1 strip across the top row
+      // CH:1.left.right — color-1 strips on the top and bottom rows both
+      // connect left to right; either one alone satisfies the constraint.
       expect(ChainConstraint('1.left.right').verify(p), isTrue);
     });
 
@@ -39,8 +39,8 @@ void main() {
       expect(ChainConstraint('1.top.bottom').verify(p), isTrue);
     });
 
-    test('opposite sides (top-bottom) on complete grid → valid', () {
-      // Color-1 column 0 → path from top to bottom exists.
+    test('top-bottom path via a single column → valid', () {
+      // Color-1 column 0 forms a vertical chain top→bottom.
       final p = makePuzzle('100\n100\n100');
       expect(ChainConstraint('1.top.bottom').verify(p), isTrue);
     });
@@ -261,29 +261,12 @@ void main() {
       expect(rotated.serialize(), 'CH:1.top.bottom');
     });
 
-    test('top-bottom rotates to right-left', () {
-      // top→right, bottom→left
+    test('top-bottom rotates to canonical left-right form', () {
+      // Raw 90° CW: top→right, bottom→left. Canonicalization swaps
+      // the (right, left) pair to (left, right) so rotated outputs
+      // match the forms produced by generateAllParameters.
       final rotated = ChainConstraint('1.top.bottom').rotated(3, 3);
-      expect(rotated.serialize(), 'CH:1.right.left');
-    });
-  });
-
-  group('ChainConstraint + GroupSize synergy', () {
-    test('large GS group can serve as the chain', () {
-      // 3x3:
-      //   1 1 0
-      //   1 1 0
-      //   0 0 0
-      // CH:1.left.right: the large color-1 group {0,1,3,4} connects left to
-      // right via the free cells {2,5} (which must become 1 for the path).
-      // GS:0.5 anchors at cell 0 with target 5.
-      // For completeness: not directly testing GS×CH interaction, but
-      // verifying both constraints can coexist on the same grid.
-      final p = makePuzzle('110\n110\n000');
-      expect(ChainConstraint('1.left.right').verify(p), isTrue);
-      final gs = GroupSize('0.5');
-      p.addConstraint(gs);
-      expect(gs.verify(p), isTrue);
+      expect(rotated.serialize(), 'CH:1.left.right');
     });
   });
 }

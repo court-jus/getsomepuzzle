@@ -327,7 +327,7 @@ Four levers, ordered by LT alignment:
   `(slug, color)` pair (max 4 such constraints total). GC is
   topological and naturally complementary to LT; QA is arithmetic but
   color-aligned.
-- **Step 4: any other garde-fou** — PA, GS, CC, RC, NC, DF, SY, EY,
+- **Step 4: any other guardrail** — PA, GS, CC, RC, NC, DF, SY, EY,
   FM. GC and QA excluded here (handled by step 3 with its cap).
 
 **Intended path memory**: after DPLL routing, the connected component
@@ -357,11 +357,11 @@ function bipartite_desambiguate(pu, solution, anchors, intendedPaths,
   unrevealedPathCells := shuffle(flatten(intendedPaths.values))
   anchorReveals := 0
   pathReveals   := 0
-  gardeFou      := 0
+  guardRail      := 0
 
   for iter in 1..maxIterations:
     if pu.isDeductivelyUnique():
-      return (anchorReveals, pathReveals, gardeFou)
+      return (anchorReveals, pathReveals, guardRail)
     revealedTotal := anchorReveals + pathReveals
 
     if revealedTotal < maxReveals
@@ -373,10 +373,10 @@ function bipartite_desambiguate(pu, solution, anchors, intendedPaths,
       pathReveals += 1; continue
 
     if try_add_gc_or_qa(pu, candidates, rng):
-      gardeFou += 1; continue
+      guardRail += 1; continue
 
     if try_add_other_guardrail(pu, candidates):
-      gardeFou += 1; continue
+      guardRail += 1; continue
 
     return null                              // exhausted
   return null
@@ -464,7 +464,7 @@ class PathPrefillResult {
   final List<int> solution;          // complete values, index-ordered
   final int anchorRevealedCount;     // anchors revealed via bipartite (step 1)
   final int pathRevealedCount;       // path cells revealed via bipartite (step 2)
-  final int gardeFouCount;           // non-LT constraints added (steps 3 + 4)
+  final int guardRailCount;           // non-LT constraints added (steps 3 + 4)
   int get revealedCount => anchorRevealedCount + pathRevealedCount;
 }
 ```

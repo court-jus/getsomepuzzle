@@ -48,24 +48,22 @@ class ChainConstraint extends Constraint {
 
   @override
   Constraint rotated(int origWidth, int origHeight) {
-    String rotateSide(String side) {
-      switch (side) {
-        case 'top':
-          return 'right';
-        case 'right':
-          return 'bottom';
-        case 'bottom':
-          return 'left';
-        case 'left':
-          return 'top';
-        default:
-          return side;
-      }
+    const next = {
+      'top': 'right',
+      'right': 'bottom',
+      'bottom': 'left',
+      'left': 'top',
+    };
+    String newFrom = next[fromSide] ?? fromSide;
+    String newTo = next[toSide] ?? toSide;
+    // Canonicalize opposite-side pairs to (top, bottom) / (left, right) order
+    // so rotated outputs match the forms produced by generateAllParameters.
+    if (newFrom == 'bottom' || newFrom == 'right') {
+      final tmp = newFrom;
+      newFrom = newTo;
+      newTo = tmp;
     }
-
-    return ChainConstraint(
-      '$color.${rotateSide(fromSide)}.${rotateSide(toSide)}',
-    );
+    return ChainConstraint('$color.$newFrom.$newTo');
   }
 
   static List<String> generateAllParameters(
@@ -96,36 +94,6 @@ class ChainConstraint extends Constraint {
       default:
         return [];
     }
-  }
-
-  bool _hasPath(Puzzle puzzle) {
-    final fromCells = _borderCells(
-      fromSide,
-      puzzle.width,
-      puzzle.height,
-    ).where((i) => puzzle.cellValues[i] == color);
-    if (fromCells.isEmpty) return false;
-
-    final visited = <int>{};
-    final queue = List<int>.from(fromCells);
-    for (final c in fromCells) {
-      visited.add(c);
-    }
-
-    final toCellSet = _borderCells(toSide, puzzle.width, puzzle.height).toSet();
-
-    while (queue.isNotEmpty) {
-      final current = queue.removeLast();
-      if (toCellSet.contains(current)) return true;
-
-      for (final nei in puzzle.getNeighbors(current)) {
-        if (!visited.contains(nei) && puzzle.cellValues[nei] == color) {
-          visited.add(nei);
-          queue.add(nei);
-        }
-      }
-    }
-    return false;
   }
 
   bool _isBlocked(Puzzle puzzle) {
@@ -160,11 +128,7 @@ class ChainConstraint extends Constraint {
   }
 
   @override
-  bool verify(Puzzle puzzle) {
-    if (_isBlocked(puzzle)) return false;
-    if (puzzle.complete) return _hasPath(puzzle);
-    return true;
-  }
+  bool verify(Puzzle puzzle) => !_isBlocked(puzzle);
 
   @override
   Move? apply(Puzzle puzzle) {
@@ -173,16 +137,8 @@ class ChainConstraint extends Constraint {
     }
 
     final oppositeColor = puzzle.domain.whereNot((v) => v == color).first;
-
-    // Source/target side completely opposite-coloured → impossible
     final fromCells = _borderCells(fromSide, puzzle.width, puzzle.height);
     final toCells = _borderCells(toSide, puzzle.width, puzzle.height);
-    if (fromCells.every((i) => puzzle.cellValues[i] == oppositeColor)) {
-      return Move(0, 0, this, isImpossible: this);
-    }
-    if (toCells.every((i) => puzzle.cellValues[i] == oppositeColor)) {
-      return Move(0, 0, this, isImpossible: this);
-    }
 
     // Border saturation (weight 1): only one free cell remains on a side
     // and all other cells on that side are opposite colour.

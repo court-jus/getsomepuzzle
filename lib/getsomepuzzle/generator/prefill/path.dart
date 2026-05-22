@@ -55,13 +55,13 @@ class PathPrefillResult {
   final List<int> solution; // full solution values, index-ordered
   final int anchorRevealedCount; // anchors revealed during bipartite
   final int pathRevealedCount; // path cells revealed during bipartite
-  final int gardeFouCount; // non-LT constraints added during bipartite
+  final int guardRailCount; // non-LT constraints added during bipartite
   PathPrefillResult({
     required this.puzzle,
     required this.solution,
     required this.anchorRevealedCount,
     required this.pathRevealedCount,
-    required this.gardeFouCount,
+    required this.guardRailCount,
   });
 
   int get revealedCount => anchorRevealedCount + pathRevealedCount;
@@ -142,7 +142,7 @@ PathPrefillResult? preFillPath(
 
     // Enumerate garde-fou candidates valid against our solution.
     final solved = _buildSolvedPuzzle(width, height, solution);
-    final candidates = _enumerateGardeFou(width, height, solved, rng);
+    final candidates = _enumerateGuardRail(width, height, solved, rng);
 
     // Flatten anchors for bipartite reveal pool.
     final anchors = <_Anchor>[
@@ -179,7 +179,7 @@ PathPrefillResult? preFillPath(
       solution: solution,
       anchorRevealedCount: result.anchorRevealedCount,
       pathRevealedCount: result.pathRevealedCount,
-      gardeFouCount: result.gardeFouCount,
+      guardRailCount: result.guardRailCount,
     );
   }
   return null;
@@ -232,11 +232,11 @@ Map<String, Set<int>> _computeIntendedPaths(
 class _BipartiteResult {
   final int anchorRevealedCount;
   final int pathRevealedCount;
-  final int gardeFouCount;
+  final int guardRailCount;
   _BipartiteResult(
     this.anchorRevealedCount,
     this.pathRevealedCount,
-    this.gardeFouCount,
+    this.guardRailCount,
   );
 }
 
@@ -259,7 +259,7 @@ _BipartiteResult? _bipartiteDesambiguate({
 
   int anchorReveals = 0;
   int pathReveals = 0;
-  int gardeFou = 0;
+  int guardRail = 0;
 
   // Safety: cap total iterations to prevent infinite loops if a bug
   // makes neither action progressive but isDeductivelyUnique never
@@ -270,7 +270,7 @@ _BipartiteResult? _bipartiteDesambiguate({
   while (iter < maxIterations) {
     iter++;
     if (puzzle.isDeductivelyUnique()) {
-      return _BipartiteResult(anchorReveals, pathReveals, gardeFou);
+      return _BipartiteResult(anchorReveals, pathReveals, guardRail);
     }
 
     final revealedTotal = anchorReveals + pathReveals;
@@ -299,13 +299,13 @@ _BipartiteResult? _bipartiteDesambiguate({
 
     // Step 3: GC or QA (50/50), capped at one per (slug, color).
     if (_tryAddGcOrQa(puzzle, candidates, rng)) {
-      gardeFou++;
+      guardRail++;
       continue;
     }
 
     // Step 4: any other garde-fou (GC and QA already handled).
     if (_tryAddOtherGuardrail(puzzle, candidates)) {
-      gardeFou++;
+      guardRail++;
       continue;
     }
 
@@ -556,7 +556,7 @@ Map<String, int> _assignColors(
   return colors;
 }
 
-List<Constraint> _enumerateGardeFou(
+List<Constraint> _enumerateGuardRail(
   int width,
   int height,
   Puzzle solved,

@@ -303,7 +303,7 @@ loop in `generator.dart`. Rationale: with 4 000+ candidates enumerated
 on a 6×6 grid, keeping non-helpers in the pool causes O(N × iterations)
 re-tests at the worst possible moment — when `puzzle.constraints` is
 fattest and each `clone().solve()` is most expensive. Measured: at
-gardeFou=21, a single iteration dropped from 14 700 ms to ~50 ms after
+guardRail=21, a single iteration dropped from 14 700 ms to ~50 ms after
 switching to consume-on-test. The downside (a candidate that would have
 helped *after* further reveals is lost) is acceptable because the
 candidate pool is huge and the diversity easily covers the loss.
@@ -328,7 +328,7 @@ materialising a cell value cannot regress propagation by construction.
 
 Two hard bailouts complete the safety net:
 
-- `gardeFou ≥ 8` — empirically, a 6×6 puzzle that hasn't converged
+- `guardRail ≥ 8` — empirically, a 6×6 puzzle that hasn't converged
   after 8 guardrails almost never does in the current attempt; better
   to retry with a fresh seed.
 - `consecutiveRollbacks ≥ 5` — the cascade is consuming candidates
@@ -346,7 +346,7 @@ class SyPrefillResult {
   final List<int> solution;         // full solution values
   final int seedRevealedCount;
   final int islandCellRevealedCount;
-  final int gardeFouCount;
+  final int guardRailCount;
   int get revealedCount => seedRevealedCount + islandCellRevealedCount;
 }
 ```
@@ -544,7 +544,7 @@ identity isn't really carried by the final trace.
   roughly 6 seeds out of 10 finish the bipartite cascade in under 10 s
   after the readonly-prefill + rollback-on-regression additions. The
   remaining ~40 % exhaust the retry budget (`maxRetries = 30`) or
-  trigger the `gardeFou ≥ 8` / `consecutiveRollbacks ≥ 5` bailouts.
+  trigger the `guardRail ≥ 8` / `consecutiveRollbacks ≥ 5` bailouts.
   Hypothesis: some island topologies are structurally ambiguous
   (multiple SY-valid completions distinguishable only by reasoning the
   solver cannot do with propagation alone). Next levers to try:
