@@ -20,6 +20,10 @@ keep_local/*
 assets/liked
 assets/disliked
 assets/played
+# Generator diagnostic outputs (rejected puzzles) — not consumed by the app
+assets/cancelled.txt
+assets/notUnique.txt
+assets/ratioTooHigh.txt
 /stats/
 generator_stats.csv
 
