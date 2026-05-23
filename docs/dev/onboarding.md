@@ -287,6 +287,12 @@ longer consulted at runtime.
 | 4     | 5      | `RC`        | `{FM, PA, NC, CC, RC}`      |
 | 5     | 5      | `GS`        | `{FM, PA, NC, CC, RC, GS}`  |
 
+Filters are kept in sync automatically: `notePuzzleCompleted` syncs
+`currentFilters` with `recommendedOnboardingFilters` after every
+completed puzzle, so the playlist never uses stale phase presets when
+the phase transitions. A cross-session guard in `loadPuzzlesFile`
+handles the edge case where the app is closed at a phase boundary.
+
 Past P5 the player enters the soft-filter mode described below.
 
 ### Empty-playlist surfacing
@@ -333,6 +339,21 @@ Adopted model — also expressed as a filter preset, via
   `_softFilterActive` is false, `recommendedOnboardingFilters`
   returns `null`, and `isInOnboarding` flips to false → onboarding is
   implicitly over.
+- An `OnboardingCompleteDialog` fires the next time a new-rule modal
+  is dismissed after `isInOnboarding` becomes false (i.e. the last
+  unseen slug was just marked seen). The dialog congratulates the
+  player and mentions that future game updates may add new rules.
+- **New-rule detection in future updates** — The existing
+  infrastructure naturally handles new constraints added to the
+  registry: when a slug unknown to the player appears in a game
+  update, `_softFilterActive` automatically flips back to true
+  (`firstSeen.length < allKnownSlugs.length`), the player re-enters
+  discovery mode, the `NewConstraintDialog` fires for the new slug,
+  and the `OnboardingCompleteDialog` fires again once all slugs are
+  re-seen. If the update adds a new `OnboardingPhase` entry,
+  `phaseForCompletions` returns that phase (completions for the new
+  slug are 0 < `phaseLength`), placing the returning player in a
+  strict phase for the new constraint.
 
 For up-to-date corpus coverage figures per phase, run
 `bin/check_phase_coverage.dart` (and `--soft` for the post-strict
@@ -386,6 +407,10 @@ Onboarding is implicitly complete once
   runs without onboarding-specific gating.
 - The EOP shows the standard message ("continue / switch
   collection"), without the "you haven't met every rule yet" note.
+- The `OnboardingCompleteDialog` fires the first time a new-rule
+  modal is dismissed after `isInOnboarding` becomes false. If future
+  updates add new constraints, the player re-enters discovery and
+  the dialog fires again after the new slugs are seen.
 
 ## 6. Implementation: code impact
 
@@ -407,6 +432,11 @@ The implementation reached a stable shape in v1.6.x. Key landing zones:
     `phaseForCompletions(onboardingCompletions)`.
   - `notePuzzleCompleted` increments every slug in `puz.rules`
     when `currentPhase != null` and persists fire-and-forget.
+    It also syncs `currentFilters` with
+    `recommendedOnboardingFilters` whenever they diverge after the
+    increment, keeping the playlist in step with the current phase
+    (covers both strict-phase advances and soft-filter changes from
+    `progress.noteSeen` in the previous dialog dismissal).
   - `skipOnboarding` and `resetOnboardingProgress` both persist
     immediately to avoid the
     "loadPuzzlesFile-rebuilds-from-prefs-and-drops-the-update"
@@ -422,6 +452,12 @@ The implementation reached a stable shape in v1.6.x. Key landing zones:
     — once the preset is applied to `currentFilters`, the standard
     `getPuzzlesByLevel(playerLevel)` pipeline (which consults
     `filter()`) does the gating for free.
+  - `loadPuzzlesFile` runs an unconditional sync of `currentFilters`
+    with `recommendedOnboardingFilters` after
+    `maybeApplyOnboardingFilterDefaults`. This covers the
+    cross-session edge case where the previous session exited at a
+    phase boundary and the fire-and-forget filter-save from
+    `notePuzzleCompleted` may not have completed.
   - `EmptyPlaylistReason` enum + `emptyPlaylistReason` getter
     surface a localised reason under the Play button when the
     playlist is empty. As of 2026-05 the enum carries the residual
@@ -439,15 +475,21 @@ The implementation reached a stable shape in v1.6.x. Key landing zones:
 - **`widgets/new_constraint_dialog.dart`** modal fires from
   `_MyHomePageState` when a puzzle introduces a slug with
   `firstSeen[slug] == null`.
+- **`widgets/onboarding_complete_dialog.dart`** modal fires once
+  from the same post-dialog-dismissal path in `_MyHomePageState`
+  when `isInOnboarding` becomes false after the last unseen slug
+  is marked seen. Congratulates the player and signals that future
+  updates may bring new rules.
 - **`widgets/learning_page.dart`** page reachable from the main menu
   next to Help: list of `OnboardingPhase.allKnownSlugs` (14 today)
   with `firstSeen` status, play count, and a refresh button that
   re-opens the explanation modal — no refresher playlist.
 - **ARB entries**: `constraintExplain<Slug>` (title + body) per
   constraint, the `learningPage*` labels, the `bannerOnboardingFilters*`
-  banner strings for OpenPage, and the residual `emptyPlaylist*`
-  reasons (`customEmpty`, `userAllPlayed`, `noPuzzlesLoaded`,
-  `filtersTooStrict`, `generic`).
+  banner strings for OpenPage, the `onboardingCompleteTitle` /
+  `onboardingCompleteBody` dialog strings, and the residual
+  `emptyPlaylist*` reasons (`customEmpty`, `userAllPlayed`,
+  `noPuzzlesLoaded`, `filtersTooStrict`, `generic`).
 
 ## 7. Decisions and still open
 

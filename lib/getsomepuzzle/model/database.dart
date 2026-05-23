@@ -483,12 +483,13 @@ class Database {
   /// puzzles appear in their tally without waiting for a stats
   /// reload.
   void notePuzzleCompleted(PuzzleData puz) {
+    final oldPhase = currentPhase;
     _globalUsablePlays++;
     for (final slug in puz.rules.toSet()) {
       if (slug.isEmpty || slug == 'TX') continue;
       _playCountBySlug.update(slug, (v) => v + 1, ifAbsent: () => 1);
     }
-    final wasOnboarding = currentPhase != null;
+    final wasOnboarding = oldPhase != null;
     if (wasOnboarding) {
       for (var slug in puz.rules) {
         onboardingCompletions[slug] = onboardingCompletions[slug] == null
@@ -499,6 +500,19 @@ class Database {
       // resets on next launch, which the player will perceive as a
       // benign delay (one extra puzzle in the same phase).
       _persistOnboardingCompletions();
+    }
+    // Keep currentFilters aligned with the onboarding recommendation.
+    // Without this, the player keeps playing puzzles from the previous
+    // phase even after notePuzzleCompleted advanced currentPhase, and
+    // during the soft-filter phase the banned-rules set stays stale
+    // after progress.noteSeen grows firstSeen.
+    final reco = recommendedOnboardingFilters;
+    if (reco != null &&
+        (!setEquals(currentFilters.wantedRules, reco.wantedRules) ||
+            !setEquals(currentFilters.bannedRules, reco.bannedRules))) {
+      currentFilters.wantedRules = reco.wantedRules;
+      currentFilters.bannedRules = reco.bannedRules;
+      currentFilters.save();
     }
   }
 
@@ -767,6 +781,15 @@ class Database {
     // After `loadStats` because it populates `progress.firstSeen` from
     // the play history, which the soft-filter recommendation reads.
     await maybeApplyOnboardingFilterDefaults(prefs);
+    // Cross-session guard: keep filters aligned when the phase advanced
+    // between sessions (e.g. the player closed the app at a phase
+    // boundary). Covers both strict-phase and soft-filter modes.
+    final reco = recommendedOnboardingFilters;
+    if (reco != null) {
+      currentFilters.wantedRules = reco.wantedRules;
+      currentFilters.bannedRules = reco.bannedRules;
+      await currentFilters.save();
+    }
     preparePlaylist();
   }
 

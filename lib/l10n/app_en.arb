@@ -864,5 +864,13 @@
     "browse": "Browse",
     "@browse": {
         "description": "Drawer entry that opens the puzzle selection page (filters, collections)"
+    },
+    "onboardingCompleteTitle": "Onboarding complete!",
+    "@onboardingCompleteTitle": {
+        "description": "Title of the dialog shown when the player has completed all onboarding steps (every rule encountered)."
+    },
+    "onboardingCompleteBody": "You've learned all the rules currently available! You can now play freely. When new rules are added to the game, you'll be notified.",
+    "@onboardingCompleteBody": {
+        "description": "Body of the onboarding-complete dialog — congratulates the player and mentions future rule additions."
     }
 }

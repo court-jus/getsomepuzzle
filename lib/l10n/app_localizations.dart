@@ -1485,6 +1485,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Browse'**
   String get browse;
+
+  /// Title of the dialog shown when the player has completed all onboarding steps (every rule encountered).
+  ///
+  /// In en, this message translates to:
+  /// **'Onboarding complete!'**
+  String get onboardingCompleteTitle;
+
+  /// Body of the onboarding-complete dialog — congratulates the player and mentions future rule additions.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve learned all the rules currently available! You can now play freely. When new rules are added to the game, you\'ll be notified.'**
+  String get onboardingCompleteBody;
 }
 
 class _AppLocalizationsDelegate

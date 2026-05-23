@@ -23,6 +23,7 @@ import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
 import 'package:getsomepuzzle/widgets/learning_page.dart';
 import 'package:getsomepuzzle/widgets/main_drawer.dart';
 import 'package:getsomepuzzle/widgets/new_constraint_dialog.dart';
+import 'package:getsomepuzzle/widgets/onboarding_complete_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/create_page.dart';
 import 'package:getsomepuzzle/widgets/generate_page.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
@@ -41,7 +42,7 @@ import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.6.14";
+const versionText = "Version 1.6.15";
 
 /// Where the GitHub Pages web build lives. Share links target this URL with
 /// a `?puzzle=<line>` query — works as a browser fallback everywhere, and
@@ -418,6 +419,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       // here only means the player will see the modal again next
       // launch (no game-state corruption).
       await progress.save();
+      // The last unseen slug just got marked as seen. If the player is
+      // no longer in onboarding (both strict phases and soft filter
+      // satisfied), congratulate them once.
+      if (!skipped &&
+          database != null &&
+          !database!.isInOnboarding &&
+          mounted) {
+        await OnboardingCompleteDialog.show(context);
+      }
       _modalInFlight = false;
       if (skipped && mounted) setState(() {});
     });

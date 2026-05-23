@@ -312,5 +312,13 @@
     "emptyPlaylistFiltersTooStrict": "Tus filtros excluyen todos los puzzles de esta colección. Prueba a relajar dimensiones, reglas o marcadores.",
     "emptyPlaylistGeneric": "No hay ningún puzzle disponible por ahora.",
     "bannerOnboardingFiltersDefault": "Estos filtros reflejan tu progresión de aprendizaje. Puedes modificarlos — pulsa el icono de reinicio para volver a la recomendación.",
-    "bannerOnboardingFiltersOverridden": "Estás usando tus propios filtros. Pulsa reinicio para volver a la recomendación de la ruta de aprendizaje."
+    "bannerOnboardingFiltersOverridden": "Estás usando tus propios filtros. Pulsa reinicio para volver a la recomendación de la ruta de aprendizaje.",
+    "onboardingCompleteTitle": "¡Aprendizaje completado!",
+    "@onboardingCompleteTitle": {
+        "description": "Title of the dialog shown when the player has completed all onboarding steps (every rule encountered)."
+    },
+    "onboardingCompleteBody": "¡Has aprendido todas las reglas disponibles! Ahora puedes jugar libremente. Cuando se añadan nuevas reglas al juego, serás notificado.",
+    "@onboardingCompleteBody": {
+        "description": "Body of the onboarding-complete dialog — congratulates the player and mentions future rule additions."
+    }
 }

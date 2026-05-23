@@ -781,4 +781,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get browse => 'Explorar';
+
+  @override
+  String get onboardingCompleteTitle => '¡Aprendizaje completado!';
+
+  @override
+  String get onboardingCompleteBody =>
+      '¡Has aprendido todas las reglas disponibles! Ahora puedes jugar libremente. Cuando se añadan nuevas reglas al juego, serás notificado.';
 }
