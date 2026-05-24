@@ -176,12 +176,17 @@ jobs:
           # Strip the Flutter build-number suffix to match the tag form
           # produced by the auto-tag job (vX.Y.Z, no +N).
           echo "VERSION=${version%+*}" >> $GITHUB_ENV
+      - name: Rename assets
+        run: |
+          mv artifacts/apk/app-release.apk "artifacts/apk/getsomepuzzle-v${{ env.VERSION }}.apk"
+          mv artifacts/windows/windows-build.tgz "artifacts/windows/getsomepuzzle-v${{ env.VERSION }}-windows.tgz"
+          mv artifacts/web/web-build.tgz "artifacts/web/getsomepuzzle-v${{ env.VERSION }}-web.tgz"
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
           tag: v${{ env.VERSION }}
           name: v${{ env.VERSION }}
-          artifacts: "artifacts/apk/app-release.apk,artifacts/windows/windows-build.tgz,artifacts/web/web-build.tgz"
+          artifacts: "artifacts/apk/getsomepuzzle-v${{ env.VERSION }}.apk,artifacts/windows/getsomepuzzle-v${{ env.VERSION }}-windows.tgz,artifacts/web/getsomepuzzle-v${{ env.VERSION }}-web.tgz"
   deploy-pages:
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
