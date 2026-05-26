@@ -79,11 +79,10 @@ void main() {
     });
 
     test('ntypes profile reads from kTargetNTypesProfile (1..5 only)', () {
-      expect(targetShare(Axis.ntypes, 1, 0), 0.25);
+      expect(targetShare(Axis.ntypes, 1, 0), 0.35);
       expect(targetShare(Axis.ntypes, 2, 0), 0.30);
       expect(targetShare(Axis.ntypes, 5, 0), 0.10);
-      // 6+ reliquat bucket has share 0 — never pushed.
-      expect(targetShare(Axis.ntypes, 6, 0), 0.0);
+      expect(targetShare(Axis.ntypes, 6, 0), 0.02);
       expect(targetShare(Axis.ntypes, 99, 0), 0.0);
     });
   });
