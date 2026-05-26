@@ -47,11 +47,26 @@ grid, then collects the constraints that characterise it best.
    `allow.difference(ban)`, or every registered slug minus `ban` when
    `--allow` is unset.
 
-4. **Sort the candidates.** Random shuffle, then a stable sort that pushes
-   `prioritySlugs` (= `requiredRules ∪ preferredSlugs`) to the front and
-   breaks ties by a global usage counter (rare slugs first). `requiredRules`
-   is what the user demanded; `preferredSlugs` is what the equilibrium /
-   warm-up targeting *would like* to see, but never strictly enforces.
+4. **Sort the candidates.** Random shuffle, then a stable three-level sort:
+   - **Level 1 — priority**: `prioritySlugs` (= `requiredRules ∪
+     preferredSlugs`) bubble to the front. `requiredRules` is what the user
+     demanded via `--require`; `preferredSlugs` is what the equilibrium /
+     warm-up target *would like* to see, but never strictly enforces.
+   - **Level 2 — corpus deficit** (descending): among non-priority candidates,
+     slugs whose share in the corpus falls furthest below their target
+     (`deficitScore = expected_share − observed_share`, clamped to ≥ 0)
+     come next. This soft secondary bias pulls in other globally
+     under-represented slugs alongside the one pinned by the target — not
+     just the target slug alone.
+   - **Level 3 — local usage** (ascending): tie-breaker. Slugs already present
+     fewer times in the puzzle-under-construction come first, promoting
+     intra-puzzle diversity.
+
+   The deficit snapshot (`GeneratorConfig.slugDeficitScores`) is computed
+   once per attempt in `worker_io.dart` via `slugDeficits(equiStats,
+   universe)` before the call to `generateOne`. It is `null` during warm-up
+   and when equilibrium is disabled, which collapses the sort back to the
+   original two-level ordering (priority + local usage).
 
 5. **Greedy cherry-picking.** While the puzzle is not fully determined:
    - Pop the next candidate.
@@ -62,8 +77,10 @@ grid, then collects the constraints that characterise it best.
    - If `ratio_after < ratio_before`, the constraint is "useful" and is
      kept.
    - After each accepted constraint, the remaining candidates are
-     reshuffled and re-sorted by *local* usage (favouring diversity
-     within the puzzle).
+     reshuffled and re-sorted by corpus deficit (descending) then *local*
+     usage (ascending). The priority layer is absent from the re-sort
+     because the priority candidate was consumed at the very start of the
+     loop.
 
 6. **Finalisation.**
    - If the residual ratio reaches 0: the puzzle is fully determined by
@@ -144,7 +161,7 @@ When a `generateOne` attempt returns `null`, the generator now reports
 | `targetOutOfCascade`  | `--target-collection` set and the puzzle classified into `overfilled`, `overfilledEasy`, or `undetermined`. |
 | `targetTooEasy`       | `--target-collection` set and the puzzle classified strictly easier than the target (can't be made harder by adding constraints). |
 | `targetEasingFailed`  | `--target-collection` set and `Puzzle.simplify` couldn't reach the target within `--easing-budget`. |
-| `cancelled`           | The caller's `shouldStop` callback fired mid-loop.                                   |
+| `cancelled`           | The caller's `shouldStop` callback fired between candidates, mid-`solve()`, or during the finalisation `solveExplained()`. |
 | `pathPrefillFailed`   | `preFillPath` exhausted its retry budget without producing a deductively-unique puzzle. |
 | `syPrefillFailed`     | `preFillSy` exhausted its retry budget without producing a deductively-unique puzzle.  |
 

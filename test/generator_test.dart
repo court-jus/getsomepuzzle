@@ -198,6 +198,54 @@ void main() {
     }
   });
 
+  test('generateOne accepts a slugDeficitScores map without crashing', () {
+    // Câblage smoke-test: passing the new deficit map must not break the
+    // sort path even when the map references slugs not in the candidate
+    // pool — generateOne treats unknown entries as zero via `?? 0.0`.
+    final result = PuzzleGenerator.generateOne(
+      GeneratorConfig(
+        width: 4,
+        height: 4,
+        count: 1,
+        maxTime: Duration(seconds: 10),
+        slugDeficitScores: const {'GS': 0.5, 'XX_NOT_A_SLUG': 0.9},
+      ),
+    );
+    if (result == null) return;
+    final p = Puzzle(result.line);
+    expect(p.width, 4);
+    expect(p.constraints.isNotEmpty, isTrue);
+  });
+
+  test('generateOne honours shouldStop quickly (under 2 s)', () {
+    // Regression for the "worker overruns maxAttemptTime" bug: before the
+    // fix, shouldStop was only checked between two passes of the outer
+    // loop, so a single inner pass could chew through 50+ candidates
+    // before re-asking the deadline. With shouldStop now propagated to
+    // the inner loop, to `Puzzle.solve()`, and to `solveExplained`,
+    // an immediate-stop callback must return in well under a second on
+    // a 6x8 grid — versus 20+ s of overshoot in the bug report.
+    //
+    // The bound is loose (2 s) because some prep work happens before the
+    // first shouldStop check: random pre-fill, `generateAllParameters`
+    // for every allowed slug, and `verify()` on each generated candidate.
+    // On cold-start machines this is ~300 ms; we leave a generous margin
+    // to keep the regression test robust without losing the signal.
+    final sw = Stopwatch()..start();
+    final result = PuzzleGenerator.generateOne(
+      GeneratorConfig(
+        width: 6,
+        height: 8,
+        count: 1,
+        maxTime: Duration(seconds: 60),
+      ),
+      shouldStop: () => true,
+    );
+    sw.stop();
+    expect(result, isNull);
+    expect(sw.elapsedMilliseconds, lessThan(2000));
+  });
+
   test('generateOne stamps a non-null generationScenario', () {
     // Every puzzle produced by the regular flow must carry an explicit
     // scenario tag — either `classic` or `sh` depending on whether

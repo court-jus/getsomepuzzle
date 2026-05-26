@@ -876,7 +876,13 @@ class Puzzle {
   /// Step-by-step solving trace, returning each deduction made.
   /// Does not modify the puzzle — works on a clone.
   /// If [timeoutMs] is provided, stops after that many milliseconds.
-  List<SolveStep> solveExplained({int? timeoutMs}) {
+  /// If [shouldStop] is provided, it is invoked between iterations;
+  /// returning `true` aborts the trace (callers receive the empty list,
+  /// same convention as a timeout).
+  List<SolveStep> solveExplained({
+    int? timeoutMs,
+    bool Function()? shouldStop,
+  }) {
     final steps = <SolveStep>[];
     final test = clone();
     final stopwatch = timeoutMs != null ? (Stopwatch()..start()) : null;
@@ -884,7 +890,7 @@ class Puzzle {
         stopwatch != null && stopwatch.elapsedMilliseconds > timeoutMs!;
 
     for (int step = 0; step < 1000; step++) {
-      if (timedOut()) return [];
+      if (timedOut() || shouldStop?.call() == true) return [];
       final m = test.findAMove(checkErrors: false);
       if (m == null || m.isImpossible != null) break;
       test.setValue(m.idx, m.value);
@@ -907,8 +913,15 @@ class Puzzle {
 
   /// Unified solving: loop `findAMove` until stuck, contradiction, or complete.
   /// Returns true if fully solved.
-  bool solve({int maxSteps = 200}) {
+  ///
+  /// When [shouldStop] is provided, it is invoked at the start of every
+  /// iteration; returning `true` aborts the loop. Used by the generator's
+  /// candidate-evaluation loop so a long `solve()` (constraints with
+  /// expensive `apply()` like CH on large grids) can still honour the
+  /// `maxAttemptTime` deadline.
+  bool solve({int maxSteps = 200, bool Function()? shouldStop}) {
     for (int i = 0; i < maxSteps; i++) {
+      if (shouldStop?.call() == true) break;
       final m = findAMove(checkErrors: false);
       if (m == null || m.isImpossible != null) break;
       setValue(m.idx, m.value);

@@ -37,11 +37,20 @@ const Map<ProfileCategory, double> kTargetProfile = {
 /// dashboard surfaces them as a single "6+" bucket so we can monitor
 /// drift, not as a generation goal.
 const Map<int, double> kTargetNTypesProfile = {
-  1: 0.25,
+  1: 0.35,
   2: 0.30,
   3: 0.12,
   4: 0.12,
   5: 0.10,
+  6: 0.02,
+  7: 0.01,
+  8: 0.01,
+  9: 0.005,
+  10: 0.005,
+  11: 0.002,
+  12: 0.002,
+  13: 0.001,
+  14: 0.001,
 };
 
 /// Inclusive bounds for the "size" axis. Sizes outside the range are still
@@ -585,6 +594,30 @@ double _gap(double observedShare, double expectedShare) {
 
 double _share(int count, int total) => total > 0 ? count / total : 0.0;
 
+/// Per-slug deficit (positive = under-represented vs. the balanced expected
+/// share, zero = at-or-above target). Same arithmetic as the slug axis of
+/// [_scoreAll], exposed so the generator's secondary sort key shares a single
+/// notion of "sous-représenté" with [pickTarget].
+///
+/// Returned map covers every slug in [universe.allowedSlugs]; slugs with zero
+/// gap are kept (caller can use `?? 0.0` interchangeably).
+Map<String, double> slugDeficits(
+  EquilibriumStats stats,
+  TargetUniverse universe,
+) {
+  final total = stats.totalPuzzles;
+  final nSlugs = universe.allowedSlugs.length;
+  final totalSlugUses = stats.slugCounts.values.fold<int>(0, (a, b) => a + b);
+  final avgSlugsPerPuzzle = total > 0 ? totalSlugUses / total : 0.0;
+  final expSlug = nSlugs > 0 ? avgSlugsPerPuzzle / nSlugs : 0.0;
+  final out = <String, double>{};
+  for (final slug in universe.allowedSlugs) {
+    final c = stats.slugCounts[slug] ?? 0;
+    out[slug] = _gap(_share(c, total), expSlug);
+  }
+  return out;
+}
+
 List<_ScoredTarget> _scoreAll(EquilibriumStats stats, TargetUniverse universe) {
   final out = <_ScoredTarget>[];
   final total = stats.totalPuzzles;
@@ -596,13 +629,9 @@ List<_ScoredTarget> _scoreAll(EquilibriumStats stats, TargetUniverse universe) {
   // not `1/nSlugs`. Using `1/nSlugs` made the slug axis effectively silent
   // (all gaps clamped to 0 once the corpus had any breadth) which biased the
   // picker toward ntypes/pair targets exclusively.
-  final nSlugs = universe.allowedSlugs.length;
-  final totalSlugUses = stats.slugCounts.values.fold<int>(0, (a, b) => a + b);
-  final avgSlugsPerPuzzle = total > 0 ? totalSlugUses / total : 0.0;
-  final expSlug = nSlugs > 0 ? avgSlugsPerPuzzle / nSlugs : 0.0;
-  for (final slug in universe.allowedSlugs) {
-    final c = stats.slugCounts[slug] ?? 0;
-    out.add(_ScoredTarget(SlugTarget(slug), _gap(_share(c, total), expSlug)));
+  final slugGaps = slugDeficits(stats, universe);
+  for (final entry in slugGaps.entries) {
+    out.add(_ScoredTarget(SlugTarget(entry.key), entry.value));
   }
 
   // --- N-types ---

@@ -126,6 +126,10 @@ class GeneratorWorker {
         } else if (type == 'attempt') {
           final preferred = (message['preferredSlugs'] as List).cast<String>();
           final allowed = (message['allowedSlugs'] as List?)?.cast<String>();
+          final rawDeficits = message['slugDeficits'] as Map?;
+          final Map<String, double>? deficits = rawDeficits?.map(
+            (k, v) => MapEntry(k as String, (v as num).toDouble()),
+          );
           _controller?.add(
             GeneratorAttemptMessage(
               workerIndex: message['worker'] as int,
@@ -142,6 +146,7 @@ class GeneratorWorker {
               durationMs: message['durationMs'] as int,
               puzzleLevelIndex: message['puzzleLevel'] as int?,
               puzzleLine: message['puzzleLine'] as String?,
+              slugDeficitScores: deficits,
             ),
           );
         } else if (type == 'done') {
@@ -429,6 +434,18 @@ void _isolateEntryPoint(_IsolateParams params) {
 
     params.sendPort.send({'type': 'target', 'label': targetLabel});
 
+    // Snapshot the per-slug deficit map for this attempt. Equilibrium-only
+    // (skipped during warm-up: corpus too sparse for meaningful gaps). The
+    // map drives the generator's secondary candidate-sort key so under-
+    // represented slugs are pulled into the puzzle alongside the target.
+    final Map<String, double>? slugDeficitMap =
+        (params.equilibriumRequested &&
+            !inWarmup &&
+            equiStats != null &&
+            universe != null)
+        ? slugDeficits(equiStats, universe)
+        : null;
+
     final config = GeneratorConfig(
       width: w,
       height: h,
@@ -446,6 +463,7 @@ void _isolateEntryPoint(_IsolateParams params) {
       pathBasedScenario: params.pathBasedScenario || attemptPathBased,
       // Same OR pattern for the SY-based scenario.
       syBasedScenario: params.syBasedScenario || attemptSyBased,
+      slugDeficitScores: slugDeficitMap,
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;
@@ -579,6 +597,14 @@ void _isolateEntryPoint(_IsolateParams params) {
     // Emit one attempt event per loop iteration so the CLI can append a row
     // to `generator_stats.csv` — both on success and on abandon. All values
     // are primitives so the Map passes cleanly through the SendPort.
+    // Only forward slugs whose deficit was strictly positive — zero entries
+    // would just inflate the payload and the downstream CSV column.
+    final Map<String, double>? deficitsToReport = slugDeficitMap == null
+        ? null
+        : {
+            for (final e in slugDeficitMap.entries)
+              if (e.value > 0) e.key: e.value,
+          };
     params.sendPort.send({
       'type': 'attempt',
       'worker': params.workerIndex,
@@ -595,6 +621,7 @@ void _isolateEntryPoint(_IsolateParams params) {
       'durationMs': attemptDurationMs,
       'puzzleLevel': result?.level.index,
       'puzzleLine': result?.line,
+      'slugDeficits': deficitsToReport,
     });
 
     // Feed the in-session tracker so a combo with K failures and zero

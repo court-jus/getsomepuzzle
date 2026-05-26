@@ -65,6 +65,15 @@ class GeneratorConfig {
   /// are added via the internal bipartite cascade.
   final bool syBasedScenario;
 
+  /// Per-slug deficit derived from the corpus equilibrium stats (the same
+  /// gap that `pickTarget` uses on the slug axis). Higher = more
+  /// under-represented in the corpus. Used as a soft secondary sort key
+  /// between `prioritySlugs` and local-usage in `generateOne`, so puzzles
+  /// pull in other under-represented slugs alongside the one forced by the
+  /// target — not just the target itself. `null` or empty = no bias
+  /// (warm-up, equilibrium disabled, or balanced corpus).
+  final Map<String, double>? slugDeficitScores;
+
   const GeneratorConfig({
     required this.width,
     required this.height,
@@ -82,6 +91,7 @@ class GeneratorConfig {
     this.easingBudget = const Duration(seconds: 30),
     this.pathBasedScenario = false,
     this.syBasedScenario = false,
+    this.slugDeficitScores,
   });
 }
 
@@ -315,16 +325,24 @@ class PuzzleGenerator {
 
     final total = allConstraints.length;
     allConstraints.shuffle(_rng);
-    // Sort by priority then usage. Required + preferred slugs bubble up so
-    // they are tried first — this is the only mechanism by which a target
-    // is "pushed" into the puzzle now that exactNTypes rejection is gone.
+    // Sort by priority, then by corpus-level deficit, then by local usage.
+    // - Required + preferred slugs bubble up first (the target push).
+    // - Among the rest, slugs that are under-represented in the corpus
+    //   (highest deficit) come next, so a puzzle doesn't just satisfy its
+    //   target slug but also pulls in other slugs lagging behind globally.
+    // - Local-usage tie-break keeps a single puzzle from over-loading the
+    //   same slug repeatedly.
     final usage = usageStats ?? <String, int>{};
+    final deficits = config.slugDeficitScores ?? const <String, double>{};
     allConstraints.sort((a, b) {
       final sa = a.slug;
       final sb = b.slug;
       final aPriority = prioritySlugs.contains(sa) ? -1 : 0;
       final bPriority = prioritySlugs.contains(sb) ? -1 : 0;
       if (aPriority != bPriority) return aPriority.compareTo(bPriority);
+      final aDeficit = deficits[sa] ?? 0.0;
+      final bDeficit = deficits[sb] ?? 0.0;
+      if (aDeficit != bDeficit) return bDeficit.compareTo(aDeficit);
       return (usage[sa] ?? 0).compareTo(usage[sb] ?? 0);
     });
 
@@ -346,6 +364,15 @@ class PuzzleGenerator {
 
       bool found = false;
       while (allConstraints.isNotEmpty) {
+        // Each candidate triggers two `solve()` calls which can be expensive
+        // (CH especially: BFS on every free cell, multiplied across solve
+        // iterations). Without this check the worker can chew through 50+
+        // candidates without ever re-asking the deadline, blowing past
+        // `maxAttemptTime` by tens of seconds.
+        if (shouldStop?.call() == true) {
+          onReject?.call(GenerationRejectReason.cancelled, pu);
+          return null;
+        }
         tried++;
         onProgress?.call(
           GeneratorProgress(
@@ -359,12 +386,14 @@ class PuzzleGenerator {
 
         final constraint = allConstraints.removeAt(0);
         final cloned = pu.clone();
-        // Solve with existing constraints
-        cloned.solve();
+        // Solve with existing constraints. `shouldStop` propagated so a
+        // single expensive `solve()` (CH-heavy puzzles in particular) can
+        // be cut short the moment the per-attempt deadline is hit.
+        cloned.solve(shouldStop: shouldStop);
         final ratioBefore = cloned.computeRatio();
-        // Add candidate and solve again
+        // Add candidate and solve again.
         cloned.addConstraint(constraint);
-        cloned.solve();
+        cloned.solve(shouldStop: shouldStop);
         final ratioAfter = cloned.computeRatio();
 
         if (ratioAfter < ratioBefore) {
@@ -377,7 +406,9 @@ class PuzzleGenerator {
 
       if (!found) break;
 
-      // Reshuffle and resort remaining constraints
+      // Reshuffle and resort remaining constraints. Same deficit-then-usage
+      // ordering as the initial sort, minus the priority layer (the priority
+      // candidate was already consumed before the loop started).
       allConstraints.shuffle(_rng);
       final Map<String, int> localUsage = {};
       for (final c in pu.constraints) {
@@ -387,6 +418,9 @@ class PuzzleGenerator {
       allConstraints.sort((a, b) {
         final sa = a.slug;
         final sb = b.slug;
+        final aDeficit = deficits[sa] ?? 0.0;
+        final bDeficit = deficits[sb] ?? 0.0;
+        if (aDeficit != bDeficit) return bDeficit.compareTo(aDeficit);
         return (localUsage[sa] ?? 0).compareTo(localUsage[sb] ?? 0);
       });
     }
@@ -451,7 +485,14 @@ class PuzzleGenerator {
     // We use `solveExplained` rather than `isDeductivelyUnique`/`solve`
     // because the trace it produces is also what the level classifier
     // needs — running both would mean two solves for the same answer.
-    final steps = pu.solveExplained();
+    // `shouldStop` is propagated so the finalisation trace can be cut
+    // short on a budget hit instead of letting one pathological trace
+    // burn through the per-attempt deadline.
+    final steps = pu.solveExplained(shouldStop: shouldStop);
+    if (steps.isEmpty && shouldStop?.call() == true) {
+      onReject?.call(GenerationRejectReason.cancelled, pu);
+      return null;
+    }
     final replay = pu.clone();
     for (final s in steps) {
       replay.setValue(s.cellIdx, s.value);

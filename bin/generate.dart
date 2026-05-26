@@ -426,6 +426,10 @@ const _statsColumns = [
   'duration_ms',
   'level',
   'puzzle_line',
+  // `slug:gap` pairs that biased the secondary candidate sort, joined with
+  // `|`. Empty during warm-up and when equilibrium is off; zero-gap slugs
+  // are not serialized.
+  'slug_deficits',
 ];
 
 String _statsHeader() => _statsColumns.join(',');
@@ -440,6 +444,15 @@ String _statsRow(GeneratorAttemptMessage m, String commitHash) {
   // Slugs joined with `|` (not `,`) so the column stays single-field even
   // without CSV-quoting; the escaper still kicks in for `puzzle_line`
   // (which contains commas via the constraint suffix).
+  final deficits = m.slugDeficitScores;
+  String deficitField = '';
+  if (deficits != null && deficits.isNotEmpty) {
+    final entries = deficits.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    deficitField = entries
+        .map((e) => '${e.key}:${e.value.toStringAsFixed(4)}')
+        .join('|');
+  }
   final fields = <String>[
     _csvField(DateTime.now().toUtc().toIso8601String()),
     _csvField(commitHash),
@@ -457,6 +470,7 @@ String _statsRow(GeneratorAttemptMessage m, String commitHash) {
     '${m.durationMs}',
     _csvField(level),
     _csvField(m.puzzleLine ?? ''),
+    _csvField(deficitField),
   ];
   return fields.join(',');
 }
@@ -474,8 +488,9 @@ class _CollectionStats {
   final Map<String, int> slugs;
   // Bucket counts in fixed display order: ≤20, 21-40, 41-80, >80.
   final List<int> sizeBuckets;
-  // n=1..5 mapped to '1'..'5'; n>=6 collapsed into '6+' (reliquat bucket,
-  // never targeted by equilibrium).
+  // n=1..5 mapped to '1'..'5'; n>=6 collapsed into '6+' so the display order
+  // stays stable. The '6+' bin's target follows whatever the equilibrium
+  // profile declares for keys ≥ 6 (0 when none — historical behaviour).
   final Map<String, int> nTypes;
   // Profile axis: classic / sh / pathBased / syBased (read off the
   // authoritative `scenario:` v2 suffix via `detectPuzzleProfile` in
@@ -742,14 +757,22 @@ _AxisTargets _computeAxisTargets({
         (size[bucket] ?? 0) + totalCorpus * sizeTargetShare(w, h, universe);
   }
 
-  // Ntypes axis: explicit profile from kTargetNTypesProfile (1..5). The 6+
-  // reliquat bucket has target 0 — surfaced so the dashboard can show
-  // drift without the picker ever pushing those puzzles.
+  // Ntypes axis: explicit profile from kTargetNTypesProfile. Keys 1..5 each
+  // get their own dashboard row; any key ≥ 6 (when the profile defines one)
+  // is collapsed into the '6+' bin so the display order stays stable
+  // (1, 2, ..., 5, 6+) regardless of how many high-n targets the profile
+  // declares. The bin still reads 0 when the profile has no ≥6 entry —
+  // same as before the high-n targets were introduced.
   final ntypes = <String, double>{};
+  double sixPlusTargetShare = 0;
   for (final entry in kTargetNTypesProfile.entries) {
-    ntypes['${entry.key}'] = totalCorpus * entry.value;
+    if (entry.key <= 5) {
+      ntypes['${entry.key}'] = totalCorpus * entry.value;
+    } else {
+      sixPlusTargetShare += entry.value;
+    }
   }
-  ntypes['6+'] = 0;
+  ntypes['6+'] = totalCorpus * sixPlusTargetShare;
 
   // Profile axis: three buckets (classic / sh / pathBased) with explicit
   // targets in kTargetProfile.
@@ -762,8 +785,9 @@ _AxisTargets _computeAxisTargets({
 }
 
 /// Largest `target - observed` across all rows of one histogram, clamped to 0.
-/// Rows whose target is missing or 0 contribute 0 (the 6+ reliquat bucket
-/// must never be flagged as "to push" since its objective is 0 by design).
+/// Rows whose target is missing or 0 contribute 0 — so a bin with an
+/// undeclared objective (e.g. the '6+' bucket when no ≥6 key is set in
+/// `kTargetNTypesProfile`) is never flagged as "to push".
 double _maxGap(Map<String, int> stats, Map<String, double> targets) {
   double m = 0.0;
   for (final entry in stats.entries) {
@@ -807,9 +831,19 @@ void _writeHistogram(
     final bar = globalMaxGap > 0
         ? '█' * ((gap / globalMaxGap * barWidth).round())
         : '';
-    final suffix = target == null
-        ? '${entry.value}'
-        : '${'${entry.value}'.padLeft(valWidth)} / ${target.round()}';
+    String suffix;
+    if (target == null) {
+      suffix = '${entry.value}';
+    } else {
+      suffix = '${'${entry.value}'.padLeft(valWidth)} / ${target.round()}';
+      // Show the observed/target ratio in percent next to the absolute
+      // counts. Skip when target == 0 (e.g. the ntypes 6+ reliquat bin)
+      // to avoid division by zero.
+      if (target > 0) {
+        final pct = (entry.value / target * 100).toStringAsFixed(1);
+        suffix = '$suffix ($pct%)';
+      }
+    }
     stderr.writeln('  ${entry.key.padRight(keyWidth)} $bar $suffix');
   }
 }

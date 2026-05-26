@@ -38,6 +38,7 @@ declared slugs. See `levels.md` for the cascade.
 | `bin/aggregate_player_stats.dart`     | Merge per-player stats files, dedup, refresh cplx            |
 | `bin/analyze_stats.dart`              | OLS regression on log(duration), per-bucket stats            |
 | `bin/remark_scenarios.dart`           | Tag legacy v2 lines with `_scenario:<name>` (one-shot fix)   |
+| `bin/query_corpus.dart`               | Ad-hoc filtered queries over `assets/*.txt` (read-only)      |
 | `bin/plot_vectors.py`                 | 2-D PCA projection of the vectors (matplotlib + numpy)       |
 
 ## Generation
@@ -208,6 +209,53 @@ the remaining slugs (LT, QA, SY, DF, SH, GC, EY) with
 eligible puzzles from 1-easy.txt and farthest-point-samples N of
 them so the player sees varied examples of each freshly-introduced
 constraint.
+
+## Querying the corpus
+
+`bin/query_corpus.dart` is a read-only ad-hoc query tool over the on-disk
+`assets/*.txt` files. It parses every v2 line, applies cumulative filters,
+and prints an aggregate table grouped by the axis of your choice. Useful
+when you want a quick answer like *« how many mono-slug puzzles are
+there, and which slugs dominate? »* without writing one-off `awk`.
+
+```bash
+# Mono-slug puzzles per slug across the six difficulty files.
+dart run bin/query_corpus.dart --ntypes 1
+
+# Distribution of ntypes among puzzles that contain CH but not SH.
+dart run bin/query_corpus.dart --include-slug CH --exclude-slug SH \
+    --group-by ntypes
+
+# Where does mono-FM thrive? Group by grid size, sort by key.
+dart run bin/query_corpus.dart --ntypes 1 --include-slug FM \
+    --group-by size --sort key
+```
+
+Filters compose with **AND** (e.g. `--include-slug FM --exclude-slug PA`
+keeps puzzles that have FM but no PA). `--include-slug` is repeatable
+(all must be present); `--exclude-slug` is repeatable (none may be
+present). `--width`, `--height`, `--min-area`, `--max-area` constrain
+the grid dimensions.
+
+`--in` selects the collections to scan. Three keywords are recognised:
+
+| Keyword       | Meaning                                                         |
+|---------------|-----------------------------------------------------------------|
+| `published`   | The six difficulty files (default).                             |
+| `rejects`     | `cancelled`, `noCandidates`, `notUnique`, `overfilled[-easy]`, `ratioTooHigh`. |
+| `all`         | Both groups concatenated.                                       |
+
+Explicit file paths also work and can be mixed with keywords:
+`--in published --in path/to/extra.txt`.
+
+`--group-by` accepts `slug` (default), `ntypes`, `size`, `scenario`,
+`collection`. Note that `slug` grouping counts puzzle coverage — a
+multi-slug puzzle contributes once per slug — so the per-row share can
+sum to more than 100 % (the script prints a reminder when this happens).
+Other axes are exclusive: one puzzle, one row.
+
+The script never writes to disk and emits nothing to `stdout` other than
+the table; warnings (missing files, parse errors) go to `stderr`.
 
 ## Visual diagnostics
 

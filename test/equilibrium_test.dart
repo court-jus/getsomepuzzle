@@ -523,4 +523,61 @@ void main() {
       );
     });
   });
+
+  group('slugDeficits', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'PA', 'GS', 'SY'],
+      minWidth: 4,
+      maxWidth: 4,
+      minHeight: 4,
+      maxHeight: 4,
+    );
+
+    test('empty corpus → every slug has zero deficit', () {
+      // The generator iterates the map without null-checking, so we need a
+      // full entry per slug even when nothing has been seen yet.
+      final deficits = slugDeficits(EquilibriumStats.empty(), universe);
+      expect(deficits.keys, unorderedEquals(universe.allowedSlugs));
+      expect(deficits.values.every((v) => v == 0.0), isTrue);
+    });
+
+    test('saturated slugs at zero, missing slugs strictly positive', () {
+      // 100 puzzles using only FM + PA: GS and SY were never sampled, so
+      // they must be flagged as under-represented while FM/PA stay at 0.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 100; i++) {
+        stats = stats.withPuzzle(slugs: {'FM', 'PA'}, width: 4, height: 4);
+      }
+      final deficits = slugDeficits(stats, universe);
+      expect(deficits['FM'], 0.0);
+      expect(deficits['PA'], 0.0);
+      expect(deficits['GS']!, greaterThan(0.0));
+      expect(deficits['SY']!, greaterThan(0.0));
+      // Two symmetrically-missing slugs share the same gap value.
+      expect(deficits['GS'], deficits['SY']);
+    });
+
+    test('argmax matches the slug pickTarget would prefer', () {
+      // The generator's secondary sort must use the same notion of
+      // "under-represented" as the picker — otherwise we could push slugs
+      // the picker considers already balanced. We check that the highest-
+      // deficit slug here is the same one pickTarget surfaces on a
+      // slug-only universe.
+      var stats = EquilibriumStats.empty();
+      // FM heavily over-represented.
+      for (int i = 0; i < 50; i++) {
+        stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
+      }
+      // PA and SY get a small seed each → GS is the most starved.
+      for (int i = 0; i < 5; i++) {
+        stats = stats.withPuzzle(slugs: {'PA'}, width: 4, height: 4);
+        stats = stats.withPuzzle(slugs: {'SY'}, width: 4, height: 4);
+      }
+      final deficits = slugDeficits(stats, universe);
+      final argmax = deficits.entries
+          .reduce((a, b) => a.value >= b.value ? a : b)
+          .key;
+      expect(argmax, 'GS');
+    });
+  });
 }

@@ -80,6 +80,14 @@ class GeneratorAttemptMessage extends GeneratorMessage {
   /// `puzzle_vectors.csv`), `null` on abandon.
   final String? puzzleLine;
 
+  /// Snapshot of the per-slug deficit map passed to `GeneratorConfig` for
+  /// this attempt. Lets offline analysis audit which slugs were under-
+  /// represented at attempt time without having to rebuild the corpus
+  /// stats at that exact instant. `null` during warm-up or when equilibrium
+  /// is off; slugs with zero deficit are omitted to keep the CSV column
+  /// compact.
+  final Map<String, double>? slugDeficitScores;
+
   GeneratorAttemptMessage({
     required this.workerIndex,
     required this.inWarmup,
@@ -95,5 +103,6 @@ class GeneratorAttemptMessage extends GeneratorMessage {
     required this.durationMs,
     required this.puzzleLevelIndex,
     required this.puzzleLine,
+    this.slugDeficitScores,
   });
 }

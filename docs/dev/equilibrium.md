@@ -25,10 +25,13 @@ except as noted on axis 3):
 
 1. **Slug** — every constraint type (FM, SH, GC, …), counted at most once
    per puzzle.
-2. **Number of types per puzzle** — 1, 2, 3, … (no upper bound). Pushed
-   toward an inversely-proportional shape: most puzzles use 1 or 2 types,
-   a sizable share use 3 or 4, fewer use 5 or 6, and 7+ is residual. See
-   the profile table below.
+2. **Number of types per puzzle** — every value declared in the profile is
+   an explicit target, with weights decreasing sharply: the bulk on n=1
+   and n=2, an intermediate tail on n=3..5, and a long low-weight tail for
+   higher-n puzzles so they keep being produced without ever becoming a
+   common target. The CLI dashboard collapses n≥6 into a single "6+" bin
+   for display; that aggregation is presentational only. See the profile
+   table below.
 3. **Pair of types** — unordered pair `{slug_a, slug_b}` present in the
    puzzle. Only puzzles with **exactly 2 types** contribute to this axis;
    a 3-type puzzle `{A, B, C}` does **not** count toward `{A,B}`,
@@ -80,9 +83,9 @@ The iteration's target is the `(axis, category)` with the highest gap
 across all axes — a single ranking, not a per-axis aggregation.
 
 **Why absolute over relative**: a relative metric `(exp − obs) / exp`
-explodes when `exp` is small (the `7+ types` bucket at 2 % would amplify
-trivial fluctuations into huge "deficits"). Absolute differences stay in
-`[0, 1]` and are directly comparable across axes.
+explodes when `exp` is small (the low-weight n-types tail — e.g. n=14 at
+0.1 % — would amplify trivial fluctuations into huge "deficits"). Absolute
+differences stay in `[0, 1]` and are directly comparable across axes.
 
 **Empty-axis bootstrap**: if `axis_total == 0` (e.g. the corpus contains
 no 2-type puzzles, so the pair axis is empty), `observed_share(c) = 0`
@@ -91,21 +94,29 @@ algorithm into populating the empty axis.
 
 ### Number-of-types profile
 
-Only `n ∈ {1, 2, 3, 4, 5}` are explicitly pushed by the picker. The
-remaining ~11 % budget is left for the residual `6+` bucket, which the
-dashboard surfaces as a single bin so we can monitor drift but never
-target.
+Every `n` listed in `kTargetNTypesProfile` is its own ranking target.
+`_scoreAll` iterates over `kTargetNTypesProfile.keys` and emits one
+`_ScoredTarget` per entry, so a high-n bin can be the iteration's chosen
+target whenever its observed share drifts below its (small) expected
+share. The profile assigns the bulk of the mass to n=1 and n=2, an
+intermediate share to n=3..5, and a long low-weight tail to higher-n
+puzzles — sufficient to keep them from disappearing, low enough to
+never become a frequent target.
 
-| Number of types | Target share |
-| --------------- | ------------ |
-| 1               | 25 %         |
-| 2               | 30 %         |
-| 3               | 12 %         |
-| 4               | 12 %         |
-| 5               | 10 %         |
-| 6+              | 0 % (reliquat, never targeted) |
+| Number of types | Target share                                            |
+| --------------- | ------------------------------------------------------- |
+| 1               | ≈ 35 %                                                  |
+| 2               | ≈ 30 %                                                  |
+| 3               | ≈ 12 %                                                  |
+| 4               | ≈ 12 %                                                  |
+| 5               | ≈ 10 %                                                  |
+| 6+              | small (~5 % cumulative, decreasing per n in the tail)   |
 
-Tunable via `kTargetNTypesProfile`.
+The dashboard CLI collapses every n≥6 into a single "6+" bin to keep
+the display order stable (1, 2, 3, 4, 5, 6+) regardless of how far the
+tail stretches; the picker itself still treats each n individually.
+Tunable via `kTargetNTypesProfile` — see `equilibrium.dart` for the
+exact per-n weights.
 
 ### Profile axis distribution
 
@@ -127,13 +138,16 @@ The general principle: **filter at the candidate-selection step** rather
 than reject after the fact.
 
 - **Slug**: when the chosen target is a slug, that slug is added to
-  `requiredRules`; the rest of the slug pool stays available.
+  `preferredSlugs` (soft push, not strict — cross-axis recycling still
+  accepts the puzzle if the iterative loop ends up not picking it). The
+  rest of the slug pool stays available.
 - **Size**: when the target is a size, `worker_io.dart` overrides the
   random `(w, h)` draw with the target dimensions.
 - **Number of types**: hard restriction. The candidate-constraint pool is
-  reduced to a random subset of `n` slugs (with `n` = target count, or 7
-  for the `7+` bucket). The puzzle is rejected if the final number of
-  distinct slugs differs from `n`.
+  reduced to a random subset of `target.n` slugs (each `n` declared in
+  `kTargetNTypesProfile` is its own target — no special "bucket" case).
+  The puzzle is rejected if the final number of distinct slugs differs
+  from `target.n`.
 - **Pair**: same approach with `n = 2` and the two specific slugs of the
   target pair. The iteration is rejected if both slugs are not actually
   used in the final puzzle (otherwise the puzzle would land in a
@@ -145,6 +159,81 @@ than reject after the fact.
 
 The post-solve free-cell ratio cap of `kMaxAcceptableRatio` (= 0.25)
 applies to every size, including 10x10.
+
+### Secondary slug bias via `slugDeficits`
+
+In addition to the primary target push, the generator applies a **soft
+secondary bias** that favours other under-represented slugs during
+constraint candidate selection. The bias does not add new hard
+restrictions; it adjusts the sort order inside `generateOne`.
+
+**Mechanism.** Before calling `generateOne`, `worker_io.dart` calls
+`slugDeficits(equiStats, universe)` to produce a `Map<String, double>`
+whose values are the per-slug gap:
+
+```
+deficitScore(slug) = max(0, avgK/nSlugs − observedShare(slug))
+```
+
+where `avgK = totalSlugUses / totalPuzzles` and `nSlugs` is the number
+of allowed slugs — the same arithmetic used by `_scoreAll` on the slug
+axis and by `pickWeightedSlugs`. A positive value means the slug is
+under-represented relative to the balanced expected share.
+
+This map is stored in `GeneratorConfig.slugDeficitScores` and consumed by
+`generateOne`'s candidate sort, which uses a **three-level key**:
+
+1. `prioritySlugs` (`requiredSlugs ∪ preferredSlugs`) — primary target push,
+   unchanged from the earlier design.
+2. `deficitScore` descending — secondary bias toward corpus-level
+   under-representation.
+3. Local usage ascending — tie-breaker, promoting intra-puzzle diversity.
+
+The same three-level key is also applied when the remaining pool is
+re-sorted after each accepted constraint, except that the priority layer
+is dropped at that point (the priority candidate has already been
+consumed).
+
+**Snapshot semantics.** The deficit map is computed once per attempt,
+outside the `generateOne` call, and does not change during the iterative
+constraint-addition loop. This is deliberate: if the snapshot were updated
+after each accepted constraint, the target slug (whose corpus share has not
+yet increased — the puzzle is not emitted yet) would accumulate a growing
+artificial deficit and dominate every re-sort step, defeating the
+diversity intent. The single-snapshot approach keeps the bias stable
+throughout the attempt.
+
+**Warm-up and disabled equilibrium.** `slugDeficitScores` is `null` when
+the corpus is below `kEquilibriumWarmupSize` or when `--no-equilibrium` is
+active. A `null` or empty map collapses the sort back to the original
+two-level ordering (priority + local usage), preserving the legacy
+behaviour exactly.
+
+**Interaction with `NTypesTarget` and `PairTarget`.** Those targets already
+populate `preferredSlugs` with multiple under-represented slugs chosen via
+`pickWeightedSlugs`. The deficit-score layer is additive: it applies to the
+full candidate pool beyond the 2–3 slugs carried by the target, nudging
+the remaining slots toward slugs that are also lagging globally.
+
+**Dashboard visibility.** The `slugs={…}` label on the worker dashboard
+reflects `preferredSlugs` (the primary target). The secondary deficit bias
+acts after that and is deliberately invisible there — its effect surfaces
+over time in the per-slug histogram of the dashboard's "Constraints" view.
+For per-attempt audit, `worker_io.dart` serialises the deficit snapshot
+(slugs with strictly positive gap only) into the `slug_deficits` column of
+`generator_stats.csv`, as a `slug:gap|slug:gap|…` string. Slugs at zero
+gap are omitted to keep the column compact; the column is empty during
+warm-up.
+
+**Worked example.** Suppose the corpus has 500 puzzles, `NC` appears in
+40 of them (`observedShare = 0.08`), and with 11 allowed slugs and
+`avgK = 2.2` the expected share is `2.2/11 = 0.20`. Then
+`deficitScore(NC) = 0.20 − 0.08 = 0.12`. A candidate `NC` constraint
+will sort above a `GC` candidate with `deficitScore(GC) = 0.03`, even
+though neither is in `prioritySlugs` for this iteration. If the iterative
+loop can keep both — i.e. each reduces the free-cell ratio — the emitted
+puzzle contributes to both the `NC` and `GC` bins without the target for
+this iteration being either of them.
 
 ### Infeasibility blacklist
 
@@ -201,15 +290,18 @@ to one of four pre-fill functions inside `generateOne`:
 | Pre-fill           | Trigger                                                           | Stamped `scenario:` suffix |
 | ------------------ | ----------------------------------------------------------------- | -------------------------- |
 | `preFillRegular`   | default — random grid                                             | *(none, read as `classic`)* |
-| `preFillSh`        | `requiredRules` contains `"SH"` (SH allowed by `allowedSlugs`)    | `sh`                       |
+| `preFillSh`        | `prioritySlugs` contains `"SH"` (via `requiredRules` or `preferredSlugs`, SH allowed by `allowedSlugs`) | `sh`           |
 | `preFillPath`      | `pathBasedScenario == true`                                       | `pathBased`                |
 | `preFillSy`        | `syBasedScenario == true`                                         | `syBased`                  |
 
 Sources of each trigger:
 
-- **SH**: the user passing `--require SH`, or equilibrium picking a target
-  that involves SH (slug, pair, or n-types with SH in the chosen subset)
-  — the resolver adds `"SH"` to `requiredRules` for that iteration.
+- **SH**: the user passing `--require SH` (which fills `requiredRules`), or
+  equilibrium picking a target that involves SH (slug, pair, or n-types
+  with SH in the chosen subset) — the resolver adds `"SH"` to
+  `preferredSlugs` for that iteration. In both cases SH lands in
+  `prioritySlugs = requiredRules ∪ preferredSlugs`, which is what
+  `generateOne` checks to enable the SH pre-fill.
 - **Path-based / SY-based**: only equilibrium can set these flags, via
   the profile axis (`ProfileCategory.pathBased`, `ProfileCategory.syBased`).
   See `path_based.md` and `prefill_sy.md` for the algorithms.
@@ -286,9 +378,12 @@ All tunable knobs are declared at the top of
 functions, so the behavior can be retuned without touching the
 algorithm:
 
-- `kTargetNTypesProfile` — map for axis 2 (`{1: 0.25, 2: 0.30, 3: 0.12,
-  4: 0.12, 5: 0.10}`). Anything outside the map (the `6+` reliquat
-  bucket) maps to share 0 and is never targeted.
+- `kTargetNTypesProfile` — map for axis 2. Declares an explicit target
+  share for every `n` it covers (currently n=1..14, with the bulk on
+  n=1/n=2, intermediate weights on n=3..5, and a decreasing low-weight
+  tail through n=14). Any `n` absent from the map has an implicit target
+  of 0 and is never pushed. Refer to `equilibrium.dart` for the exact
+  per-key percentages — the constant is the source of truth.
 - `kTargetProfile` — map for the profile axis (`{classic: 0.85, sh: 0.05,
   pathBased: 0.05, syBased: 0.05}`).
 - `kMinSide`, `kMaxSide` — size axis bounds (3, 10).
@@ -307,10 +402,18 @@ algorithm:
 - `sizeTargetShare(width, height, universe)` — non-uniform per-size
   weighting derived from the Gaussian on area, normalised over
   `universe.allowedSizes`.
+- `slugDeficits(stats, universe)` — returns a `Map<String, double>` of
+  per-slug deficit values (= `max(0, avgK/nSlugs − observedShare(slug))`)
+  covering every slug in `universe.allowedSlugs`. Exposes the slug-axis
+  gap computed internally by `_scoreAll` as a standalone pure function so
+  the generator's secondary sort key shares a single definition of
+  "under-represented" with `pickTarget`. Consumed by `worker_io.dart` to
+  populate `GeneratorConfig.slugDeficitScores` before each `generateOne`
+  call (see "Secondary slug bias via `slugDeficits`" above).
 
-The gap computation, target ranking (`rankTargets`), and target
-selection (`pickTarget`) are pure functions covered by
-`test/equilibrium_test.dart`.
+The gap computation, target ranking (`rankTargets`), target selection
+(`pickTarget`), and deficit snapshot (`slugDeficits`) are pure functions
+covered by `test/equilibrium_test.dart`.
 
 ## Out of scope
 

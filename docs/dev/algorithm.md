@@ -95,10 +95,29 @@ For each constraint type (FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC, RC), gener
 
 ### Step 4: Iterative Constraint Selection
 
-Starting with one constraint, iteratively try adding each candidate:
+Before the iterative loop begins, the full candidate pool is shuffled then
+sorted by a three-level key:
+
+1. **Priority** — `prioritySlugs` (= `requiredRules ∪ preferredSlugs`) are
+   placed first. These are the slugs the equilibrium engine or the user
+   explicitly wants in the puzzle.
+2. **Corpus-level deficit** (descending) — slugs that are globally
+   under-represented in the corpus (highest `deficitScore` first). This
+   soft secondary bias encourages the puzzle to pull in other slugs lagging
+   behind in the corpus, not just the one forced by the target.
+3. **Local usage** (ascending) — tie-breaker among candidates of equal
+   deficit; less-used slugs within the puzzle-under-construction come first,
+   promoting diversity.
+
+The `deficitScore` for each slug is computed once per attempt by
+`slugDeficits()` in `equilibrium.dart` (the same gap metric used by
+`pickTarget` on the slug axis: `expected_share − observed_share`, clamped
+to ≥ 0). The snapshot is taken before the loop starts and does not change
+during the attempt, so the target slug's position in the priority layer is
+never undermined by deficit updates.
 
 ```
-for each candidate constraint:
+for each candidate constraint (in priority-then-deficit-then-usage order):
   1. Clone the puzzle (with all constraints added so far)
   2. Solve the clone → compute ratio of free cells (ratio_before)
   3. Add the candidate constraint to the clone
@@ -106,7 +125,10 @@ for each candidate constraint:
   5. If ratio_after < ratio_before: keep the constraint
 ```
 
-After each successful addition, remaining candidates are reshuffled with priority given to less-used constraint types (to encourage diversity).
+After each accepted constraint the remaining pool is reshuffled and
+re-sorted. The re-sort uses only the deficit and local-usage levels — the
+priority layer is omitted because the priority candidate was consumed before
+the loop started.
 
 ### Step 5: Finalization
 
