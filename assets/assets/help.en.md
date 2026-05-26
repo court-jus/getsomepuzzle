@@ -10,11 +10,13 @@ Some cells can be already filled and you won't be able to change them, they are 
 
 You will not be shown when you make a mistake but when the grid is filled, your solution is checked. If you won, another puzzle will start immediately. If you made a mistake, the corresponding constraint will be highlighted and you will be able to change your solution.
 
-If you are stuck, the "restart" icon resets the puzzle to its initial state.
+If you are stuck, several buttons are available in the top bar: **Hint** (the lightbulb icon, see the Hints section below), **Undo** (reverts your last move), **Restart** (resets the grid to its initial state) and **Pause**. In manual validation mode, a **Validate** button on a green background also appears once the grid is filled.
 
 While playing, your timing is recorded (see the Stats section below). If needed, the game can be paused and resumed.
 
-There are about 25,000 puzzles bundled within the app. Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see your progress below the puzzle.
+There are about 25,000 puzzles bundled within the app. The puzzles you already solved won't show up anymore, and you'll see your progress below the puzzle.
+
+The main menu (icon in the top-left) also offers, while a puzzle is in progress: **Next puzzle** (skip to the next one), **Save progress** (set this one aside in a dedicated playlist to resume later) and **Share puzzle** (send the current puzzle to someone).
 
 ## Learning
 
@@ -100,7 +102,7 @@ Open the menu and tap "Generate" to make new puzzles on the fly. Pick the grid d
 
 ### Creating puzzles
 
-Open the menu and tap "Create" to design your own puzzle by hand. Pick the grid dimensions and tap "Start" to enter the editor. Tap cells to fix them black or white, and use the top bar to add constraints; cells with a green border can be found by direct reasoning, those with an orange border by elimination. The bottom bar shows the current dimensions, the number of constraints, and a rough difficulty score. "Test" lets you play through the puzzle to check it works, and "Save" stores it in the chosen playlist.
+Open the menu and tap "Create" to design your own puzzle by hand. Pick the grid dimensions and tap "Start" to enter the editor. Tap a cell to open a menu that lets you fix it black or white, or attach a constraint centered on that cell; the added constraint appears, and you can tap it to remove it. The app tries to solve the puzzle as you make changes. Cells with a green border can be found by direct reasoning, those with an orange border by elimination. The bottom bar shows the current dimensions, the number of constraints, and a rough difficulty score. "Test" lets you play through the puzzle to check it works, and "Save" stores it in the chosen playlist.
 
 ### Playlists
 
@@ -143,7 +145,7 @@ The settings page tunes how the game checks your work and asks for help.
 
 **Live check**: how errors are surfaced while you play — show every wrong cell, just an error count, or wait until the grid is complete.
 
-**Show rating**: whether the rating screen appears between puzzles so you can like or dislike what you just played.
+**Show rating**: whether the rating screen appears between puzzles so you can rate what you just played on a five-level scale (very negative → very positive).
 
 **Hint type**: how the hint button helps — by pointing at a cell you can deduce ("Deducible cell"), or by adding a fresh constraint that simplifies the puzzle ("Add constraint"). See the Hints section above for details.
 
@@ -161,6 +163,6 @@ The settings page tunes how the game checks your work and asks for help.
 
 The game records how much time has passed before a puzzle is solved and how many failures were made. This data stays on your device — nothing is collected automatically. If you solve a bunch of puzzles I'd love it if you sent your stats over: I use them to sort the puzzles by difficulty, and that helps a lot.
 
-To send the stats, click the "Journal" icon on the main page, to the left of the help icon, copy the content and send it to me.
+The Stats page is reachable from the main menu, under the **Progress** section. At the top, a selector lets you switch between the current collection and all collections. The **Share** button (or **Open** on desktop) exports the stats to send them over, and the **Import** button lets you re-inject a previously exported stats file.
 
 > Thank you very much.
