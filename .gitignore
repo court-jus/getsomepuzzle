@@ -67,3 +67,4 @@ scripts
 backup
 .claude/agent-memory
 .claude/settings.local.json
+docs/dev/devdocs.pdf

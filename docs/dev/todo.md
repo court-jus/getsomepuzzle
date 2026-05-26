@@ -41,6 +41,44 @@ next-deepest gap. Reset on successful generation or on warm-up.
 
 * When showing that a cell can be deduced thanks to a constraint and that constraint is DF, the name of the constraint is not shown.
 
+## Dev docs to be created
+
+Subsystems complex enough to deserve their own page in `docs/dev/`
+but currently without one (or only mentioned in passing in other
+docs):
+
+- **`verification_gate.md`** — The central invariant "a puzzle is
+  valid iff `solveExplained()` completes from its readonly cells"
+  deserves its own page: consequences for `verify` vs `apply`, why
+  no backtracking, how the replay protects against bogus traces.
+  Currently scattered across `algorithm.md`, `generator.md`, and
+  `CLAUDE.md`.
+- **`stats_persistence.md`** — `stats/stats.txt` format, aggregation
+  by `bin/aggregate_player_stats.dart`, full lifecycle (in-app
+  Stats → write → `stats.zip` backup → telemetry re-ingestion). No
+  dedicated doc today.
+- **`database_lifecycle.md`** — The `Database` class (loading
+  `default.txt`/`tutorial.txt`/`custom.txt`, `Filters`, stats
+  persistence) is central but undocumented. Could be folded into
+  `playlist.md` depending on volume.
+- **`post_processing.md`** — `bin/trace_score.dart`,
+  `bin/filter_score.dart`, `bin/polish.dart` are mentioned in
+  `generator.md` § 3 but without detail on `polish`'s mutations, the
+  budgets, or the thresholds. Given their complexity they deserve
+  their own page — `generator.md` would just point to it.
+- **`in_app_generator.md`** — The `generate_page.dart` widget (the
+  in-game generator UI) and its dedicated worker are described
+  nowhere. Not to be confused with the `bin/generate.dart` CLI.
+- **`workers_isolate.md`** — The native worker architecture (Isolate)
+  vs web (chunked async) is mentioned in passing across several docs
+  but never explained end to end. Small doc, big clarity win for
+  anyone touching progress callbacks.
+- **`i18n_workflow.md`** — ARB → `flutter gen-l10n` → adding a
+  locale. Half a page would suffice, but it would spare every new
+  contributor from rediscovering the pipeline.
+- **`in_app_editor.md`** — `lib/widgets/create_page/` (the integrated
+  puzzle editor) is entirely undocumented.
+
 ## Stats persistence
 
 - [ ] **Explore Android Auto Backup** to survive APK uninstall/reinstall

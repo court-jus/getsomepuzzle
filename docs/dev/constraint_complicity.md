@@ -9,8 +9,8 @@ constraints**. These cross-constraint deductions are called
 **complicities**.
 
 Example: a `LetterGroup` (LT) requiring connectivity across rows + a
-`ForbiddenMotif` (FM) blocking vertical adjacency of a color → forces
-the LT group's color. Neither constraint alone can deduce this.
+`ForbiddenMotif` (FM) blocking vertical adjacency of a colour → forces
+the LT group's colour. Neither constraint alone can deduce this.
 
 ## Architecture
 
@@ -52,36 +52,28 @@ and constraints get another chance with the freshly placed cell.
 
 ### Auto-detection (lazy cache)
 
-The `Puzzle.complicities` getter is backed by a nullable `_complicitiesCache`
-field. On first access after any constraint mutation, it instantiates every
-entry in `complicities/registry.dart`, filters to the ones whose
-`isPresent(this)` returns `true`, and stores the result. Subsequent accesses
-in the same state reuse the cached list at zero cost.
+The `Puzzle.complicities` getter is backed by a nullable
+`_complicitiesCache` field. On first access after any constraint
+mutation, it instantiates every entry in `complicities/registry.dart`,
+filters to those whose `isPresent(this)` returns `true`, and stores
+the result. Subsequent accesses in the same state reuse the cached
+list at zero cost.
 
-Cache invalidation happens automatically in every constraint-mutation helper
-(`addConstraint`, `addAllConstraints`, `removeConstraint`, `removeConstraintAt`,
-`insertConstraintAt`, `replaceConstraints`): each sets `_complicitiesCache = null`.
-Because `Puzzle.clone()` copies `_constraints` but not the cache, the first
-`apply()` call on a clone transparently recomputes the list — no explicit
-re-detection step is needed.
+Cache invalidation happens automatically in every constraint-mutation
+helper (`addConstraint`, `addAllConstraints`, `removeConstraint`,
+`removeConstraintAt`, `insertConstraintAt`, `replaceConstraints`):
+each sets `_complicitiesCache = null`. Because `Puzzle.clone()` copies
+`_constraints` but not the cache, the first `apply()` call on a clone
+transparently recomputes the list — no explicit re-detection step
+needed.
 
 ### Complexity weight
 
 A complicity move carries a `Move.complexity` weight on the same 0–5
 scale as constraint moves (see `docs/dev/complexity.md`). Combination
-deductions are tier 3 by default — they require the player to hold
-two rules in mind at once, which is heavier than any single-constraint
-deduction except articulation/enumeration.
-
-> **TODO — revisit per-complicity weights.** Both LT+FM and PA+FM
-> currently use weight 3 for consistency, but they are almost certainly
-> not equivalent in practice. PA+FM requires the player to derive
-> monotonicity from a 2-cell FM and combine it with a parity count, a
-> two-step argument; LT+FM is closer to a one-step "this colour can't
-> bridge". Once 3-4 complicities ship, calibrate weights against
-> playtesting data (or the human-rating session described in
-> `docs/dev/todo.md`) — the relative ordering matters more than the
-> absolute number.
+deductions default to tier 3 — the player must hold two rules in mind
+at once, heavier than any single-constraint deduction except
+articulation/enumeration.
 
 ### UI hooks — constraint names
 
@@ -89,36 +81,35 @@ deduction except articulation/enumeration.
 The hint system (`game_model.dart`) type-checks before assigning
 `isHighlighted` or `isValid`.
 
-Each `Complicity` subclass exposes a `(String, String) get slugs` getter
-returning the constraint-registry slugs of the two constraint types
-whose combined reasoning produced the move (e.g. `('LT', 'FM')`). The
-hint callback in `main.dart::_buildHintTexts` detects
+Each `Complicity` subclass exposes a `(String, String) get slugs`
+getter returning the constraint-registry slugs of the two constraint
+types whose combined reasoning produced the move (e.g. `('LT', 'FM')`).
+The hint callback in `main.dart::_buildHintTexts` detects
 `givenBy is Complicity`, destructures the pair, and routes to one of
-three localized templates depending on the slugs:
+three localized templates:
 
-- `hintComplicity(c1, c2)` — two **different** named constraints. EN
-  `"This cell can be deduced by combining the {c1} and {c2} constraints"`.
+- `hintComplicity(c1, c2)` — two **different** named constraints. EN:
+  *"This cell can be deduced by combining the {c1} and {c2}
+  constraints"*.
 - `hintComplicityTwin(c)` — the **same** slug twice (`FMFMComplicity`,
-  `GSGSComplicity`). EN `"This cell can be deduced by combining two {c}
-  constraints"` — avoids the awkward "the X and X constraints" rendering.
-- `hintComplicityWithAny(c)` — the secondary slug is the wildcard `'*'`,
-  meaning the helper saw multiple distinct rejecting constraint types
-  (currently only `GSAllComplicity` can produce this). EN `"This cell
-  can be deduced by combining the {c} constraint with another"`.
+  `GSGSComplicity`). EN: *"This cell can be deduced by combining two
+  {c} constraints"* — avoids the awkward "the X and X constraints"
+  rendering.
+- `hintComplicityWithAny(c)` — the secondary slug is the wildcard
+  `'*'`, meaning the helper saw multiple distinct rejecting
+  constraint types (currently only `GSAllComplicity`). EN: *"This
+  cell can be deduced by combining the {c} constraint with another"*.
 
-`_constraintNameBySlug(slug)` in `main.dart` is the **single** source of
-truth for the constraint → l10n mapping. `_constraintName(givenBy)` for
-constraint instances simply forwards through `givenBy.slug` — there is
-no longer a parallel `is`-based table to keep in sync. The switch
-asserts in debug if it ever sees an unmapped slug.
+`_constraintNameBySlug(slug)` in `main.dart` is the **single** source
+of truth for the constraint → l10n mapping. The switch asserts in
+debug if it ever sees an unmapped slug.
 
-`GSAllComplicity` records the slug of every constraint that rejected at
-least one candidate sealing during `apply`. When all rejections come
-from the same constraint type, the move's `givenBy` is a
-`GSAllComplicity` instance whose `slugs` are `('GS', <thatSlug>)`,
-producing a precise hint (e.g. "Group Size and Forbidden Pattern"). Only
-when blockers are heterogeneous does it fall back to `('GS', '*')` and
-render via `hintComplicityWithAny`.
+`GSAllComplicity` records the slug of every constraint that rejected
+at least one candidate sealing during `apply`. When all rejections
+come from the same constraint type, the move's `slugs` are
+`('GS', <thatSlug>)`, producing a precise hint (e.g. "Group Size and
+Forbidden Pattern"). Only when blockers are heterogeneous does it
+fall back to `('GS', '*')` and render via `hintComplicityWithAny`.
 
 ## Complicity: LT + FM (Connectivity × Motif)
 
@@ -129,13 +120,12 @@ render via `hintComplicityWithAny`.
 - If the cells are on **different rows**, any connecting path must
   include at least one **vertical step** (two same-colour cells
   stacked vertically).
-- If FM forbids vertical adjacency of colour X (e.g. `FM:2.2` forbids
-  two vertical 2s), then colour X **cannot form a vertical step**.
+- If FM forbids vertical adjacency of colour X (e.g. `FM:2.2`), then
+  colour X **cannot form a vertical step**.
 - Therefore the LT group **cannot be colour X** → it must be the
   other colour.
 
-Same logic applies horizontally: if LT cells are on different
-columns, the path needs a horizontal step.
+Same logic applies horizontally for LTs on different columns.
 
 ### Implementation
 
@@ -149,21 +139,6 @@ pattern. Wider motifs (e.g. `[[C,C],[C,C]]`) don't qualify either: a
 vertical step in one column doesn't require the adjacent column to
 also be C. `_blocksHorizontal` is the same logic rotated 90°.
 
-### Impact analysis (2026-04-15, on the complicities branch)
-
-Out of 709 unsolved puzzles (`0:0_100` in `assets/default.txt`):
-
-- **27** match the LT+FM complicity pattern (LT spanning rows/cols +
-  `FM:CC` or `FM:C.C` blocking that direction for a colour).
-- Of those 27, **9** are fully solved once the complicity forces the
-  LT colour (all 9 still need the force phase after the complicity
-  unlocks the first cells).
-- **18** remain stuck — the complicity alone isn't enough; they
-  likely need additional complicities or deeper reasoning.
-
-Numbers should be re-measured against current `assets/default.txt`
-once more complicities ship.
-
 ## Complicity: PA + (FM | LT) — PA balanced-side enumeration
 
 ### Reasoning
@@ -172,32 +147,31 @@ A `ParityConstraint` on a side of length `n` fixes the side's
 composition: when the domain is `{1, 2}`, exactly `n/2` cells are
 coloured 1 and `n/2` coloured 2.
 
-For each PA side we **enumerate every balanced colouring** of the
-free cells and **drop those that would violate any
-`ForbiddenMotif` or `LetterGroup`** anywhere on the grid (in
+For each PA side the complicity **enumerates every balanced
+colouring** of the free cells and **drops those that would violate
+any `ForbiddenMotif` or `LetterGroup`** anywhere on the grid (in
 interaction with the already-coloured cells, including the side's
 free cells filled by the simulation). Any free cell that takes the
 same value across *every* surviving configuration is forced.
 
 The complicity is called `PABalancedSideComplicity` — generic in the
 constraint type that does the filtering. Two filter families are
-currently wired:
+wired:
 
-- **`ForbiddenMotif`** — the classical PA + FM case. Any FM whose
-  motif binds against the side (directly or through wildcards
-  touching off-side coloured cells) prunes configurations.
+- **`ForbiddenMotif`** — any FM whose motif binds against the side
+  (directly or through wildcards touching off-side coloured cells)
+  prunes configurations.
 - **`LetterGroup`** — when ≥ 2 LT cells lie on the same PA side, the
   "same-colour" contract rejects configurations that assign different
   colours to those cells. Off-side LT cells with an existing colour
   anchor the LT colour for the side enumeration. Detection uses
   `LetterGroup.verify`, which returns `false` immediately when any
-  two LT cells carry different colours — even on partial states.
+  two LT cells carry different colours.
 
 Notable patterns the enumeration handles:
 
 - **2-cell mixed FM** (`FM:12`, `FM:21`, `FM:1.2`, `FM:2.1`) — only
-  the monotone configuration survives, so every empty cell is
-  forced.
+  the monotone configuration survives, so every empty cell is forced.
 - **3+ cell FMs** (`FM:1.2.2`, `FM:11.21.11`, …) — partial filtering;
   the force fires only on cells where every survivor agrees.
 - **FMs with wildcards** (`0` cells in the motif) — the pattern can
@@ -210,23 +184,21 @@ Notable patterns the enumeration handles:
 - **LT alignment** — 5×2 grid, row 0 = `0 0 0 2 0`, `LT:B.0.1`,
   `PA:4.left` (side `{0, 1, 2, 3}`, cell 3 = 2 white). The three
   balanced configs over the free cells `{0, 1, 2}` reduce to a
-  single survivor (0 = 1 = black, 2 = white) because the two
-  "split colour" configs violate the LT contract. Every free cell
-  is forced.
+  single survivor (0 = 1, 2 = 2) because the two split-colour
+  configs violate the LT contract. Every free cell is forced.
 - **Multiple FMs / LTs** participate jointly in the filter, so
   combinations no single constraint catches alone are still pruned.
 
 ### Slug tagging for hints
 
 The complicity tracks which constraint *type* contributed each
-rejection. When all rejections came from a single type the move's
+rejection. When all rejections come from a single type the move's
 `givenBy` carries a tagged instance with the precise pair (e.g.
 `('PA', 'FM')` or `('PA', 'LT')`), so the hint UI renders
 "deducible by combining PA and FM" rather than the generic "PA and
-other". When rejections come from multiple types — typical of
-chained reasoning — the second slug falls back to the `'*'`
-wildcard and the UI renders the "combined with another constraint"
-template.
+other". When rejections come from multiple types, the second slug
+falls back to the `'*'` wildcard and the UI renders the "combined
+with another constraint" template.
 
 ### Implementation
 
@@ -242,19 +214,19 @@ move.
 ### Domain and side-length bounds
 
 - Domain must be exactly `{1, 2}` (parity-as-colour-counter).
-- Side length is capped at 10 cells (`C(10, 5) = 252`
-  configurations). Longer sides are skipped — they don't appear on
-  grids up to 10×10 anyway, since a side of length `n` requires
-  `n + 1 ≤ width` (or height).
+- Side length is capped at 10 cells (`C(10, 5) = 252` configurations).
+  Longer sides are skipped — they don't appear on grids up to 10×10
+  anyway, since a side of length `n` requires `n + 1 ≤ width` (or
+  height).
 
 ## Complicity: SH + GS (Shape ↔ Group size)
 
 ### Reasoning
 
 A `ShapeConstraint` mandates a specific shape for every group of its
-colour, which fixes that colour's group size to `shapeSize`. A
-`GroupSize` constraint (`GS:idx.N`) says "the group containing cell
-`idx` has exactly `N` cells".
+colour, fixing that colour's group size to `shapeSize`. A `GroupSize`
+constraint (`GS:idx.N`) says "the group containing cell `idx` has
+exactly `N` cells".
 
 If `shapeSize ≠ N`, the cell at `idx` cannot be the SH's colour — its
 group would never satisfy the shape. The opposite colour is forced.
@@ -266,8 +238,8 @@ impossibility.
 ### Implementation
 
 See `lib/getsomepuzzle/constraints/complicities/shgs.dart`. For each
-GS we look up `shapeSizeByColor` and exclude every colour whose
-shape size disagrees with `gs.size`. One excluded colour → force the
+GS we look up `shapeSizeByColor` and exclude every colour whose shape
+size disagrees with `gs.size`. One excluded colour → force the
 remaining one; all colours excluded → return an `isImpossible` move.
 
 The complicity skips GS anchors that are already coloured: if the
@@ -279,10 +251,10 @@ existing colour disagrees with both SH and GS, the regular
 ### Reasoning
 
 `SymmetryConstraint` requires that the anchor's connected group be
-symmetric under a given axis (rotated, mirrored, or central). When a
-free cell A joins the anchor's group by being coloured the anchor
-colour `C`, `SY.apply` then forces A's symmetric A' to also be `C`.
-That second placement is what creates leverage with FM.
+symmetric under a given axis. When a free cell A joins the anchor's
+group by being coloured the anchor colour `C`, `SY.apply` then forces
+A's symmetric A' to also be `C`. That second placement is what
+creates leverage with FM.
 
 If hypothesising `A = C` (and consequently `A' = C`) introduces a
 forbidden motif anywhere on the grid, the hypothesis is invalid: A
@@ -306,8 +278,8 @@ SY constraint with a coloured anchor:
 
 The SY-driven mirror force binds only when A actually joins the
 anchor's group: a far-away `A = C` would form a separate group and
-the SY argument would not apply. Restricting to cells adjacent to
-the current group keeps the hypothesis tight.
+the SY argument would not apply. Restricting to cells adjacent to the
+current group keeps the hypothesis tight.
 
 ### Concrete example
 
@@ -325,24 +297,23 @@ Therefore cell 1 must be 2.
 ### Reasoning
 
 A `LetterGroup` requires every listed cell to end up in the same
-connected group when the puzzle is solved. The group must therefore
-include every LT cell *plus* enough path cells to connect them — at
-least `max_pairwise_manhattan(LT cells) + 1` cells. That bound is
-tight for any **collinear** LT (all cells on a single row or column);
-it's a conservative lower bound otherwise.
+connected group. The group must therefore include every LT cell
+*plus* enough path cells to connect them — at least
+`max_pairwise_manhattan(LT cells) + 1` cells. That bound is tight
+for any **collinear** LT (all cells on a single row or column); it's
+a conservative lower bound otherwise.
 
 When a `GroupSize` constraint is anchored on a cell that's also part
 of an LT, the group's size is fixed at `gs.size`. Two consequences:
 
 1. **Impossibility** — `gs.size < lower_bound` makes the puzzle
    unsatisfiable.
-2. **Path force** — for a *collinear* LT (any number of cells on the
-   same row or column) with `gs.size == lower_bound`, the connecting
-   path is the unique straight line from the smallest to the largest
-   LT cell along the alignment axis. Every cell on that line must
-   take the LT colour. Requires the LT colour to be known (any line
-   cell already coloured); without it we only know the line cells
-   share a colour but not which one.
+2. **Path force** — for a *collinear* LT with `gs.size == lower_bound`,
+   the connecting path is the unique straight line from the smallest
+   to the largest LT cell along the alignment axis. Every cell on
+   that line must take the LT colour. Requires the LT colour to be
+   known (any line cell already coloured); without it we only know
+   the line cells share a colour but not which one.
 
 ### Implementation
 
@@ -353,19 +324,8 @@ segment from the smallest to the largest LT cell, finds the LT
 colour from any already-coloured cell on the line, and forces the
 next empty one to that colour. Cells that already belong to
 `lt.indices` are skipped — `LetterGroup.apply` handles them as soon
-as the LT colour is known, so the complicity strictly adds value
-on the *path* cells between the LT cells.
-
-### Known limitation: non-collinear LTs with aligned subsets
-
-When the LT cells are *not* all collinear but a subset is — or when
-`LetterGroup.apply` has already forced an articulation cell `X` that
-ends up aligned with an LT cell `P` — the segment `X..P` could in
-principle be forced too. The current implementation does not handle
-this case: it would need to compute the "effective LT cell set" from
-the current connected group and reason about every minimum Steiner
-tree. Left as a future improvement; in many puzzles propagation
-chains pick up the missing cells anyway.
+as the LT colour is known, so the complicity strictly adds value on
+the *path* cells between the LT cells.
 
 ### Interaction with `LetterGroup.apply`
 
@@ -374,9 +334,18 @@ removal would disconnect the LT cells) and forces them to the LT
 colour. That deduction does **not** know about size limits, so it
 treats long detour paths as valid alternatives — meaning a "must
 pass through cell X" inference only fires when X is structurally
-unique. LT+GS together restricts the path length to `gs.size`,
-which is what makes the line force kick in even when looser paths
-exist on the grid.
+unique. LT+GS together restricts the path length to `gs.size`, which
+is what makes the line force kick in even when looser paths exist on
+the grid.
+
+### Known limitation: non-collinear LTs with aligned subsets
+
+When the LT cells are *not* all collinear but a subset is, the
+segment between aligned cells could in principle be forced too. The
+current implementation does not handle this case: it would need the
+"effective LT cell set" from the current connected group plus
+reasoning about every minimum Steiner tree. In practice propagation
+chains usually pick up the missing cells anyway.
 
 ## Complicity: GS + GS (Group sizes competing)
 
@@ -418,10 +387,11 @@ coloured, the other coloured, both coloured).
 - **Direct adjacency only.** Two GSs at distance 2 (or beyond) with
   mismatched sizes also constrain the cells between them, but the
   reasoning needs to consider how a path of same-colour cells could
-  bridge them. Not yet implemented.
+  bridge them. Not currently implemented.
 - **No transitive chaining.** Three or more GSs forming a clique of
   pairwise mismatches on a 2-colour grid would be jointly
-  unsatisfiable; the current code only handles pairwise contradictions.
+  unsatisfiable; the current code only handles pairwise
+  contradictions.
 
 ## Complicity: GS + QA (Group size vs quantity cap)
 
@@ -435,19 +405,17 @@ colour c already placed outside the group)` cells of `c`. When that
 lower bound exceeds `n`, colour `c` is **infeasible** for the anchor.
 
 On a 2-colour grid, ruling out one colour forces the other.
-Concretely, `GS:15.9` + `QA:1.8` on the puzzle from
-`docs/dev/complicities_to_explore.md` § "GS-size vs QA" reads "a
-9-cell group can't be colour 1 because only 8 colour-1 cells fit in
-the grid" → cell 15 = 2.
+Concretely, `GS:15.9` + `QA:1.8` reads "a 9-cell group can't be
+colour 1 because only 8 colour-1 cells fit in the grid" → cell 15 = 2.
 
 ### Why GSAllComplicity does not catch it
 
-`GSAllComplicity` enumerates sealings around the anchor, but is gated
-by `_maxGap = 6` (gsall.dart:26) — when `gs.size - |currentGroup| > 6`
-it bails out (`return null`, gsall.dart:136) without checking
-feasibility. Large groups against tight QA caps fall straight through.
-The arithmetic check in `GSQAComplicity` does the same deduction in
-O(constraints × colors) without enumeration.
+`GSAllComplicity` enumerates sealings around the anchor, but is
+gated by `_maxGap = 6` (`gsall.dart:26`) — when
+`gs.size - |currentGroup| > 6` it bails out without checking
+feasibility. Large groups against tight QA caps fall straight
+through. The arithmetic check in `GSQAComplicity` does the same
+deduction in O(constraints × colors) without enumeration.
 
 ### Implementation
 
@@ -456,24 +424,23 @@ See `lib/getsomepuzzle/constraints/complicities/gsqa.dart`. For each
 
 1. Computes the hypothetical merged cluster size if the anchor were
    `colour` (flood-fill over already-coloured `colour` neighbours).
-2. Subtracts that from the total `colour` cells already placed to get
-   the count *outside* the would-be group.
+2. Subtracts that from the total `colour` cells already placed to
+   get the count *outside* the would-be group.
 3. Compares `gs.size + outside` against `qa.count` for the matching
    `QA:colour.*` constraint.
 
 When only one colour survives the check, the anchor is forced to it
-(or flagged impossible if already on the rejected colour). Tier 3 per
-the default complicity weight.
+(or flagged impossible if already on the rejected colour).
 
 ### Limitations
 
-- **Same-colour merges across the grid.** The cluster absorption only
-  looks at cells reachable from the anchor; same-colour cells *not*
-  yet connected but inevitably joining via narrow corridors are
-  counted as "outside" (conservative — never produces a false force,
-  but may miss tighter deductions).
+- **Same-colour merges across the grid.** The cluster absorption
+  only looks at cells reachable from the anchor; same-colour cells
+  *not* yet connected but inevitably joining via narrow corridors
+  are counted as "outside" (conservative — never produces a false
+  force, but may miss tighter deductions).
 - **Single QA per colour.** Assumes at most one `QA:c.*` constraint
-  per colour value (the puzzle format does not generate duplicates).
+  per colour (the puzzle format does not generate duplicates).
 - **No interaction with other GS constraints.** A second `GS` on the
   same anchor colour would tighten the cap further; not modelled.
 
@@ -500,22 +467,21 @@ exactly `gs.size` cells around the anchor:
   beyond the target).
 
 Every "sealing" survivor is a pair `(group, sealed)`. We drop the
-ones whose simulated state violates **any** constraint of the
-puzzle (FMs, other GSs, parity, …) — full constraint-set
-verification keeps the survivor set sound when the seal accidentally
-overgrows another constraint's group.
+ones whose simulated state violates **any** constraint of the puzzle
+(FMs, other GSs, parity, …) — full constraint-set verification keeps
+the survivor set sound when the seal accidentally overgrows another
+constraint's group.
 
 A free cell is forced to `c` when it lies in **every** survivor's
 `group`, and to opposite when it lies in **every** survivor's
 `sealed`. Otherwise it stays undetermined.
 
-Why this works where neither `GroupSize.apply` nor the FMs alone do:
-the apply side of GS only seals borders once the current group has
+The apply side of GS only seals borders once the current group has
 already reached the target size, so it can't anticipate which cells
-must take the colour during growth. By exploring every way to
-finish the group **and** filtering by the motifs as if the seal
-were already in place, the complicity catches the configurations
-that would later collapse to a single force chain.
+must take the colour during growth. By exploring every way to finish
+the group **and** filtering by the motifs as if the seal were
+already in place, the complicity catches the configurations that
+would later collapse to a single force chain.
 
 ### Concrete examples
 
@@ -550,8 +516,8 @@ GS:9.2 — group of cell 9 must have size 2.
 
 Trying to expand the group via cell 8 makes cell 8 = 2; together
 with the pre-coloured cell 6 = 2 the right side has three 2s,
-breaking PA. Only the {4, 9} expansion survives → cell 4 forced
-to 2 (sealed border 8 cascades from GS.apply afterwards).
+breaking PA. Only the {4, 9} expansion survives → cell 4 forced to 2
+(sealed border 8 cascades from GS.apply afterwards).
 ```
 
 **Empty anchor — try-each-colour**:
@@ -560,18 +526,18 @@ to 2 (sealed border 8 cascades from GS.apply afterwards).
 3×3 grid with cells 2=1, 4=1, 6=1.
 GS:8.2 — cell 8 empty, group must have size 2.
 
-If cell 8 = 1, every connected expansion of size 2 merges with
-the existing 1-clusters and overshoots the target → no surviving
+If cell 8 = 1, every connected expansion of size 2 merges with the
+existing 1-clusters and overshoots the target → no surviving
 sealing. If cell 8 = 2, two expansions ({5, 8} and {7, 8}) survive.
 Therefore cell 8 must be 2.
 ```
 
 ### Implementation
 
-See `lib/getsomepuzzle/constraints/complicities/gsall.dart`. The
-gap `gs.size - |currentGroup|` is bounded at 6 to keep the
-recursion tractable; with merges the actual number of decisions is
-often much smaller.
+See `lib/getsomepuzzle/constraints/complicities/gsall.dart`. The gap
+`gs.size - |currentGroup|` is bounded at 6 to keep the recursion
+tractable; with merges the actual number of decisions is often much
+smaller.
 
 ### Soundness checks
 
@@ -597,30 +563,29 @@ and `1` at the bottom, is forbidden — anywhere a 3-cell vertical
 window fits".
 
 The synthesized motif **keeps its original dimensions**. It is not
-equivalent to a smaller motif (e.g. it is *not* `FM:2.1`, which
-would also fire on rows where the original FMs could not have:
-the synthesized FM still requires the full pattern window to fit
-inside the grid).
+equivalent to a smaller motif (e.g. it is *not* `FM:2.1`, which would
+also fire on rows where the original FMs could not have: the
+synthesized FM still requires the full pattern window to fit inside
+the grid).
 
 ### Why a complicity (not a constraint)
 
-The synthesized motifs are not added to `puzzle.constraints` —
-they would clutter the player's view of the puzzle, and the
-deduction itself is what the player is meant to make. By routing
-the deduction through a complicity, future hint-UI work can label
-the move "deduced by combining two forbidden motifs" without
-exposing a synthetic constraint.
+The synthesized motifs are not added to `puzzle.constraints` — they
+would clutter the player's view, and the deduction itself is what
+the player is meant to make. Routing the deduction through a
+complicity lets the hint UI label the move "deduced by combining two
+forbidden motifs" without exposing a synthetic constraint.
 
 ### Implementation
 
 See `lib/getsomepuzzle/constraints/complicities/fmfm.dart`. At
 `isPresent` time the complicity scans pairs of FMs and synthesizes
 all combined motifs (iterated to a fixed point — a synthesized FM
-can in turn combine with another existing FM). The pool is capped
-at 50 entries to guard against blow-up. At apply time each
-synthesized FM is run through `ForbiddenMotif.apply`; on a hit, the
-move is re-attributed to the complicity itself (tier 4 weight) so
-the synthetic FM stays internal.
+can in turn combine with another existing FM). The pool is capped at
+50 entries to guard against blow-up. At apply time each synthesized
+FM is run through `ForbiddenMotif.apply`; on a hit, the move is
+re-attributed to the complicity itself so the synthetic FM stays
+internal.
 
 ### Concrete example
 
@@ -633,65 +598,3 @@ Pre-colour cell 6 = 1 (row 2, col 0). The synthesized FM finds the
 window at column 0, rows 0–2: any (?, 2, 1) below the top cell.
 The middle of that window (cell 3, row 1) cannot be 2 → forced to 1.
 ```
-
-## Future complicities
-
-The following patterns surface real deductions in puzzles that
-`solve_no_force.dart` cannot make today, and are documented here as
-candidates. None are implemented yet.
-
-> **Note on the source puzzle below.** The same puzzle is now fully
-> solved without `force` by the empty-anchor branch of
-> `SymmetryConstraint.apply` (a `SY` whose anchor is still empty
-> propagates from a coloured direct neighbour to its mirror). The
-> `CC + DF` pattern documented here is still a valid general
-> candidate — it fires on configurations that don't depend on a SY
-> being present, and the example just happens to also be reachable
-> via SY on this particular grid.
-
-### Complicity: CC + DF (Column count × Different from)
-
-#### Reasoning
-
-A `CC:col.color.count` pins exactly `count` cells of `color` in a
-column. On a 2-colour grid the slack on the opposite colour is
-`S = height - count - |cells_already_color|`. When `S` collapses to a
-small number (often 1), most free cells in the column are already
-forced — but `CC.apply` only fires when `S = 0` or when the free-cell
-count exactly matches the missing `color` count, missing the
-intermediate cases.
-
-A `DF:idx.dir` lying entirely inside the column splits the free cells
-into a 2-cell pair `{a, b}` that must take opposite colours. If
-`S = 1` and the unique opposite-colour cell falls *outside* `{a, b}`,
-both `a` and `b` end up the same colour, violating DF. Therefore the
-unique opposite-colour cell must be one of `{a, b}`, and **every other
-free cell in the column is forced to `color`**.
-
-The same reasoning applies row-wise once a `RowCount` constraint
-exists, and to any future "fixed-count along an axis" constraint.
-
-#### Concrete example
-
-```
-5×6 grid, col 4 = cells {4, 9, 14, 19, 24, 29}.
-CC:4.1.4 → 4 cells of colour 1 in col 4 (slack on colour 2 = 2).
-Cell 14 = 2 already placed → remaining slack on colour 2 = 1.
-DF:19.down → cells 19 and 24 (both in col 4) take opposite colours.
-
-If the unique colour-2 cell were any of {4, 9, 29}, then 19 = 24 = 1,
-violating DF. So the unique colour-2 cell is in {19, 24}, and cells
-4, 9, 29 are all forced to colour 1.
-```
-
-Source puzzle:
-`v2_12_5x6_000000000000000000200000000000_SH:11.10;DF:8.right;DF:19.down;SY:28.5;GS:22.1;CC:4.1.4;PA:20.top;GS:14.8_1:112111222121122221222121121121_100`.
-
-> **Update.** PA + LT was originally listed here as a future
-> complicity. It is now part of `PABalancedSideComplicity` (the PA
-> enumerator filters by both FM and LT — see the section above).
-> The fix that unlocked the LT path was tightening
-> `LetterGroup.verify` so that it returns `false` immediately when
-> two LT cells already carry different colours, instead of waiting
-> for the puzzle to be complete. Same-colour extensions to SY
-> anchors and similar constraints are still open.
