@@ -10,11 +10,13 @@ Algunas celdas ya pueden estar rellenas y no podrás cambiarlas, están indicada
 
 No se te mostrará cuando cometas un error, pero cuando la cuadrícula esté llena, tu solución será verificada. Si ganaste, otro rompecabezas comenzará inmediatamente. Si cometiste un error, se resaltará la restricción correspondiente y podrás cambiar tu solución.
 
-Si estás atascado, el ícono de la papelera restablece el rompecabezas a su estado inicial.
+Si estás atascado, varios botones están disponibles en la barra superior: **Pista** (el icono de bombilla, ver la sección Pistas más abajo), **Deshacer** (revierte tu último movimiento), **Reiniciar** (restablece la cuadrícula a su estado inicial) y **Pausa**. En modo de validación manual, también aparece un botón **Validar** sobre fondo verde cuando la cuadrícula está completa.
 
 Mientras juegas, tu tiempo se registra (ver la sección de Estadísticas más abajo). Si lo necesitas, el juego se puede pausar y reanudar.
 
-Hay unos 25.000 rompecabezas incluidos en la aplicación. Cada vez que abras la aplicación, la colección se baraja y obtendrás rompecabezas aleatorios. Los rompecabezas que ya resolviste no volverán a aparecer, y verás tu progreso debajo del rompecabezas.
+Hay unos 25.000 rompecabezas incluidos en la aplicación. Los rompecabezas que ya resolviste no volverán a aparecer, y verás tu progreso debajo del rompecabezas.
+
+Desde el menú principal (icono arriba a la izquierda), cuando un puzzle está en curso, también puedes elegir **Próximo puzzle** para saltar al siguiente, **Guardar progreso** para apartarlo en una playlist dedicada y retomarlo más tarde, o **Compartir puzzle** para enviárselo a alguien.
 
 ## Aprendizaje
 
@@ -46,7 +48,7 @@ Las celdas que contengan la misma letra deben formar parte del mismo grupo. Un g
 
 ### Color mayoritario
 
-Un rectángulo punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad). El color del borde le indica qué color debe dominar.
+Un rectángulo punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad). El color del borde te indica qué color debe dominar.
 
 ### Cantidad
 
@@ -100,7 +102,7 @@ Abre el menú y toca "Generar" para fabricar nuevos puzzles al vuelo. Elige las 
 
 ### Crear puzzles
 
-Abre el menú y toca "Crear" para diseñar tu propio puzzle a mano. Elige las dimensiones y toca "Comenzar" para entrar en el editor. Toca las celdas para fijarlas en negro o blanco, y usa la barra superior para añadir restricciones; las celdas con borde verde se encuentran por razonamiento directo, las de borde naranja por eliminación. La barra inferior muestra las dimensiones, el número de restricciones y una puntuación aproximada de dificultad. "Probar" te permite jugar el puzzle para comprobar que funciona, y "Guardar" lo guarda en la playlist elegida.
+Abre el menú y toca "Crear" para diseñar tu propio puzzle a mano. Elige las dimensiones y toca "Comenzar" para entrar en el editor. Toca una celda para abrir un menú que permite fijarla en negro o blanco, o asociarle una restricción centrada en esa celda; la restricción añadida aparece, y basta con tocarla para eliminarla. La aplicación intenta resolver el puzzle a medida que realizas las modificaciones. Las celdas con borde verde se encuentran por razonamiento directo, las de borde naranja por eliminación. La barra inferior muestra las dimensiones, el número de restricciones y una puntuación aproximada de dificultad. "Probar" te permite jugar el puzzle para comprobar que funciona, y "Guardar" lo guarda en la playlist elegida.
 
 ### Playlists
 
@@ -143,7 +145,7 @@ La página de ajustes configura cómo el juego comprueba tu trabajo y te ayuda.
 
 **Comprobación en vivo**: cómo se muestran los errores mientras juegas — todas las celdas incorrectas, solo el número de errores, o ninguna indicación hasta que la cuadrícula esté completa.
 
-**Mostrar puntuación**: si la pantalla de puntuación aparece entre puzzles para que puedas dar like o dislike a lo que acabas de jugar.
+**Mostrar puntuación**: si la pantalla de puntuación aparece entre puzzles para que puedas valorar lo que acabas de jugar en una escala de cinco niveles (de muy negativo a muy positivo).
 
 **Tipo de pista**: cómo te ayuda el botón de pista — señalando una celda deducible ("Celda deducible") o añadiendo una nueva restricción que simplifica el puzzle ("Añadir restricción"). Mira la sección Pistas más arriba para los detalles.
 
@@ -161,6 +163,6 @@ La página de ajustes configura cómo el juego comprueba tu trabajo y te ayuda.
 
 El juego registra cuánto tiempo ha pasado antes de que un rompecabezas se resuelva y cuántos fallos se cometieron. Estos datos permanecen en tu dispositivo — no se recopila nada automáticamente. Si resuelves muchos rompecabezas, me encantaría que me enviaras tus estadísticas: las uso para ordenar los rompecabezas por dificultad, y eso ayuda mucho.
 
-Para enviar las estadísticas, haz clic en el ícono de "Journal" en la página principal, a la izquierda del ícono de ayuda, copia el contenido y envíamelo.
+La página de estadísticas es accesible desde el menú principal, sección **Progreso**. Arriba, un selector permite cambiar entre la colección actual y todas las colecciones. El botón **Compartir** (o **Abrir** en ordenador) exporta las estadísticas para enviármelas, y el botón **Importar** permite reinyectar un archivo de estadísticas previamente exportado.
 
 > Muchas gracias.

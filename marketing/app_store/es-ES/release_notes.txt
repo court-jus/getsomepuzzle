@@ -1,1 +1,3 @@
 Primera versión pública.
+
+Get Some Puzzle es un juego de puzles lógicos en cuadrícula que combina quince familias de restricciones. Gratuito, de código abierto, sin anuncios, sin rastreo, sin recolección de datos.

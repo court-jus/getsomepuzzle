@@ -1,1 +1,3 @@
 First public release.
+
+Get Some Puzzle is a grid-based logic puzzle game with fifteen constraint families to mix and match. Free, open source, no ads, no tracking, no data collection.

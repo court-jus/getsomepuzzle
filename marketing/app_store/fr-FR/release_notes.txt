@@ -1,1 +1,3 @@
 Première version publique.
+
+Get Some Puzzle est un jeu de puzzles logiques sur grille qui combine quinze familles de contraintes. Gratuit, open source, sans publicité, sans pistage, sans collecte de données.

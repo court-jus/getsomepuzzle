@@ -12,12 +12,27 @@ localised under
 
 ## [Unreleased]
 
-- **New constraint**: Majority color inside a zone
-- **Editor** fixes
-
 ## [1.7.0] — TBD
 
 First public release on Google Play and the App Store.
+
+## [1.6.16] — 2026-05-26
+
+- **Privacy policy** authored in en/fr/es and reachable from the help page; deployed under gh-pages so the store privacy URL fields can point to it.
+- **No more outbound network calls**: stats are never sent automatically. The `ShareData` setting was removed (it had become meaningless), and the Android `INTERNET` permission is stripped from the release manifest. Help pages scrubbed of obsolete telemetry mentions.
+- User help refreshed.
+
+## [1.6.15] — 2026-05-23
+
+- **Onboarding filter fix**: the playlist no longer surfaces puzzles that conflict with the filters configured for the active onboarding phase.
+
+## [1.6.14] — 2026-05-22
+
+- **New constraint: Chain** (CH) — a marked cell must belong to a group whose cells form a single chain (no T-junction, no 2×2 block).
+- **New constraint: Majority** (MJ) — inside a bounded zone, the indicated color must hold the majority of cells.
+- **Smarter hint suggestions**: a new GS/QA complicity is detected, so hints can surface cells that only fall when GroupSize and Quantity are reasoned about together.
+- **Onboarding scenarios** for path-based puzzles and the Symmetry prefill, smoother phase transitions, and onboarding/OpenPage filters now stay in sync.
+- Fixes for manual validation, undo, puzzle rotation, Android display glitches and the onboarding message in the Open page.
 
 ## [1.6.13] — 2026-05-18
 
@@ -33,7 +48,6 @@ First public release on Google Play and the App Store.
 - **Onboarding reset** now actually resets onboarding progress instead of leaving stale state behind.
 - **Open page UX** improvements.
 - Corpus cleanup: bad puzzles dropped, additional onboarding puzzles added.
-- 26,475 puzzles available.
 
 ## [1.6.11] — 2026-05-14
 
@@ -41,7 +55,7 @@ First public release on Google Play and the App Store.
 - **Reset buttons** added in the Open page so filters can be brought back to defaults in one click.
 - **Constraint hint bug fixes** so suggestions no longer flicker or duplicate.
 - New launcher icons.
-- 28,111 puzzles available.
+- ~10K new puzzles added since 1.6.6.
 
 ## [1.6.10] — 2026-05-11
 
@@ -67,15 +81,14 @@ First public release on Google Play and the App Store.
 ## [1.6.6] — 2026-05-04
 
 - **New constraint: Row Count** (RC) — restricts how many cells of a given color appear in each row, complementing Column Count.
-- Many new puzzles added to the catalog.
-- 18,375 puzzles available.
+- ~3K new puzzles added.
 
 ## [1.6.5] — 2026-05-02
 
 - **Onboarding redesigned**: new players follow a guided sequence of phases that introduces one constraint at a time.
 - **Drag-end fix**: phantom drag-end events that left cells half-painted no longer fire.
 - **Stability**: concurrent stats writes are now serialized; level / skill tracking corrected.
-- 15,659 puzzles available.
+- ~3K new puzzles added.
 
 ## [1.6.4] — 2026-05-02
 
@@ -83,7 +96,6 @@ First public release on Google Play and the App Store.
 - **Letter Group fix**: a constraint-mutation gap that broke LT aggregation in some grids was closed.
 - **Stats sharing on Linux** now works.
 - **Stable layout**: the puzzle no longer shifts down when a hint is displayed.
-- 12,182 puzzles available.
 
 ## [1.6.3] — 2026-05-01
 
@@ -92,13 +104,11 @@ First public release on Google Play and the App Store.
 - **Combined-constraint hints**: hints can now point to *pairs of constraints* that together force a cell, not only single constraints.
 - **Auto-pause on menu** so the timer doesn't run while you're navigating settings.
 - Smarter Symmetry and GroupSize solvers.
-- 12,194 puzzles available.
 
 ## [1.6.2] — 2026-04-29
 
 - **Smarter Eyes and Groups** deductions: live-check spots Eyes-driven implications and inter-group path constraints it used to miss.
 - **Adapt-to-player recalibrated** so the inferred level anchors around 50 instead of drifting toward extremes.
-- 12,047 puzzles available.
 
 ## [1.6.1] — 2026-04-28
 
@@ -106,7 +116,6 @@ First public release on Google Play and the App Store.
 - **Improved adapt-to-player**: the level-tracking algorithm now reacts more reliably to your completion times.
 - **Hint system improvements** including a race-condition fix in hint cancellation.
 - New puzzles added to the catalog.
-- 12,278 puzzles available.
 
 ## [1.6.0] — 2026-04-24
 
@@ -115,7 +124,7 @@ First public release on Google Play and the App Store.
 - **Adaptive level**: the puzzle sampler tracks your completion times and gradually shifts toward puzzles matched to your inferred level.
 - **Auto-pause** when the app loses focus or after a stretch of inactivity, so the timer doesn't keep running while you're away.
 - **Quality-of-life UI**: completed constraints are grayed out, right-click drag-and-drop works on desktop / web, and the Symmetry widget got a clearer redesign.
-- 11,627 puzzles available.
+- ~2K new puzzles added.
 
 ## [1.5.0] — 2026-04-10
 
@@ -124,7 +133,6 @@ First public release on Google Play and the App Store.
 - **Smarter live-check**: improvements to the Symmetry and Groups solvers mean live-check spots more deductions and stops flagging false errors.
 - **Less spoilery hints**: hints that would require deep reasoning are deliberately less precise, so the helper guides rather than solves for you.
 - Many small fixes around hint interaction, menu navigation, and symmetry edge cases.
-- 9,615 puzzles available.
 
 ## [1.4.0] — 2025-12-14
 
@@ -133,7 +141,6 @@ First public release on Google Play and the App Store.
 - **Drag and drop** to paint multiple cells in one gesture.
 - **5-level rating** (replacing binary like/dislike), and the ability to undo or restart even after completing a puzzle.
 - **Single difficulty filter**: the old easy / medium / hard / harder / evil collections were merged into one collection with a complexity slider in the Open page. A "no-network" opt-out was added and stats sharing was simplified.
-- 9,669 puzzles available.
 
 ## [1.3.0] — 2025-11-14
 
@@ -150,14 +157,13 @@ First public release on Google Play and the App Store.
 - **Open page redesign**: the long puzzle list became a single "play next" button; filter sliders were replaced by plus/minus widgets that also show how many puzzles match.
 - **Secondary-tap support**: right-click now marks the opposite color on desktop and web.
 - Playlist shuffle is applied whenever a playlist is prepared, not just on explicit request.
-- 12,881 puzzles available.
+- ~3K new puzzles added.
 
 ## [1.1.0] — 2025-11-02
 
 - **Playlist shuffle**: an opt-in switch to randomize the order in which puzzles are surfaced.
 - **Cleaner corpus**: duplicates and puzzles that consistently get disliked were dropped from the shipped collection.
 - **More robust loading**: imported puzzles that came without their stored solution now import cleanly, and the puzzle database reloads correctly after settings changes.
-- 10,033 puzzles available.
 
 ## [1.0.2] — 2025-09-06
 
@@ -170,6 +176,3 @@ First public release on Google Play and the App Store.
 ## [0.0.1] — 2025-08-13
 
 - First commits.
-
-[Unreleased]: https://github.com/court-jus/getsomepuzzle/compare/v1.7.0...HEAD
-[1.7.0]: https://github.com/court-jus/getsomepuzzle/releases/tag/v1.7.0

@@ -10,11 +10,13 @@ Certaines cases sont déjà remplies et vous ne pouvez pas les modifier. Elles s
 
 Il n'y aura pas d'indication si vous faites une erreur mais une fois la grille complète, votre solution sera vérifiée. En cas de victoire, un autre puzzle sera automatiquement sélectionné. En cas d'erreur, la contrainte correspondante sera mise en évidence et vous pourrez modifier votre solution.
 
-Si vous êtes bloqué, un bouton en haut à droite vous permet de recommencer.
+Si vous êtes bloqué, plusieurs boutons sont à votre disposition en haut de l'écran : **Indice** (icône en forme d'ampoule, voir la section Astuces ci-dessous), **Annuler** (revient sur votre dernier coup), **Redémarrer** (remet la grille à son état initial) et **Pause**. En mode validation manuelle, un bouton **Valider** sur fond vert apparaît également quand la grille est complète.
 
 Pendant que vous jouez, votre temps est enregistré (voir la section Stats ci-dessous). Le jeu peut être mis en pause si besoin.
 
 Il y a environ 25000 puzzles fournis avec l'application. Ceux que vous avez déjà résolu n'apparaîtront plus. Vous pouvez voir votre progression sous le puzzle.
+
+Depuis le menu principal (icône en haut à gauche), quand un puzzle est en cours, vous pouvez aussi choisir **Puzzle suivant** pour passer au prochain, **Enregistrer la progression** pour mettre le puzzle de côté dans une playlist dédiée et le reprendre plus tard, ou **Partager le puzzle** pour l'envoyer à quelqu'un.
 
 ## Apprentissage
 
@@ -100,7 +102,7 @@ Ouvrez le menu et appuyez sur "Générer" pour fabriquer de nouveaux puzzles à 
 
 ### Créer des puzzles
 
-Ouvrez le menu et appuyez sur "Créer" pour concevoir votre propre puzzle. Choisissez les dimensions et appuyez sur "Démarrer" pour entrer dans l'éditeur. Touchez les cases pour les fixer en noir ou en blanc, et utilisez la barre supérieure pour ajouter des contraintes ; les cases à bordure verte se trouvent par raisonnement direct, celles à bordure orange par élimination. La barre inférieure affiche les dimensions, le nombre de contraintes et un score indicatif de difficulté. "Tester" vous laisse jouer le puzzle pour vérifier qu'il fonctionne, "Sauvegarder" l'enregistre dans la playlist choisie.
+Ouvrez le menu et appuyez sur "Créer" pour concevoir votre propre puzzle. Choisissez les dimensions et appuyez sur "Démarrer" pour entrer dans l'éditeur. Touchez une case pour ouvrir un menu qui permet de la fixer en noir ou en blanc, ou d'attacher une contrainte centrée sur cette case ; la contrainte ajoutée apparaît, et il suffit de la toucher pour la supprimer. L'application tente de résoudre le puzzle au fur et à mesure de vos modifications. Les cases à bordure verte se trouvent par raisonnement direct, celles à bordure orange par élimination. La barre inférieure affiche les dimensions, le nombre de contraintes et un score indicatif de difficulté. "Tester" vous laisse jouer le puzzle pour vérifier qu'il fonctionne, "Sauvegarder" l'enregistre dans la playlist choisie.
 
 ### Playlists
 
@@ -143,7 +145,7 @@ La page Paramètres règle la façon dont le jeu vérifie votre travail et vous 
 
 **Vérification en direct** : comment les erreurs sont signalées pendant que vous jouez — toutes les cases fausses, juste le nombre d'erreurs, ou aucune indication jusqu'à ce que la grille soit complète.
 
-**Afficher la notation** : si l'écran de notation apparaît entre les puzzles pour que vous puissiez aimer ou ne pas aimer ce que vous venez de jouer.
+**Afficher la notation** : si l'écran de notation apparaît entre les puzzles pour que vous puissiez exprimer votre appréciation sur une échelle à cinq niveaux (de très négatif à très positif).
 
 **Type d'astuce** : comment le bouton astuce vous aide — en pointant une case déductible ("Cellule déductible") ou en ajoutant une nouvelle contrainte qui simplifie le puzzle ("Ajout de contrainte"). Voir la section Astuces ci-dessus pour les détails.
 
@@ -161,6 +163,6 @@ La page Paramètres règle la façon dont le jeu vérifie votre travail et vous 
 
 Le jeu enregistre le temps passé à résoudre un puzzle ainsi que le nombre d'erreurs. Ces données restent sur votre appareil — rien n'est collecté automatiquement. Si vous résolvez beaucoup de puzzles, je serai ravi que vous me les envoyiez : je m'en sers pour calculer la difficulté des puzzles.
 
-Pour m'envoyer les stats, cliquez sur le choix correspondant dans le menu puis sur le bouton "Partager".
+La page Stats est accessible depuis le menu principal, section **Progression**. En haut, un sélecteur permet de basculer entre la collection courante et l'ensemble des collections. Le bouton **Partager** (ou **Ouvrir** sur ordinateur) exporte les stats pour me les envoyer, et le bouton **Importer** permet de réinjecter un fichier de stats précédemment exporté.
 
 > Merci beaucoup.
