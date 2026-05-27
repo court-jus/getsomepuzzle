@@ -34,6 +34,12 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  // Transient slider value while the player is dragging the level
+  // slider. Showing it locally keeps the label following the thumb
+  // without notifying the parent on every tick — `onSettingsChange`
+  // (and its costly playlist recompute) only fires once, on release.
+  int? _pendingPlayerLevel;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -178,20 +184,39 @@ class _SettingsPageState extends State<SettingsPage> {
                           SizedBox(
                             width: 150,
                             child: Slider(
-                              value: widget.settings.playerLevel.toDouble(),
+                              value:
+                                  (_pendingPlayerLevel ??
+                                          widget.settings.playerLevel)
+                                      .toDouble(),
                               min: 0,
                               max: 100,
                               divisions: 100,
-                              label: widget.settings.playerLevel.toString(),
+                              label:
+                                  (_pendingPlayerLevel ??
+                                          widget.settings.playerLevel)
+                                      .toString(),
+                              // Track the drag locally so the label/thumb
+                              // follow the finger, but do not notify the
+                              // parent on every tick.
                               onChanged: widget.settings.autoLevel
                                   ? null
                                   : (newValue) {
                                       setState(() {
-                                        widget.onSettingsChange(
-                                          ChangeableSettings(
-                                            playerLevel: newValue.toInt(),
-                                          ),
-                                        );
+                                        _pendingPlayerLevel = newValue.toInt();
+                                      });
+                                    },
+                              // Commit once, on release: this is the only
+                              // event that triggers the playlist recompute.
+                              onChangeEnd: widget.settings.autoLevel
+                                  ? null
+                                  : (newValue) {
+                                      widget.onSettingsChange(
+                                        ChangeableSettings(
+                                          playerLevel: newValue.toInt(),
+                                        ),
+                                      );
+                                      setState(() {
+                                        _pendingPlayerLevel = null;
                                       });
                                     },
                             ),
