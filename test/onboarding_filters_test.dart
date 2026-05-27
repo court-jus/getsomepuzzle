@@ -228,6 +228,27 @@ void main() {
       expect(prefs.getBool('onboardingFiltersApplied'), isNull);
     });
 
+    test(
+      'resetRuleFilters clears wanted/banned rules but keeps sizes',
+      () async {
+        // Leaving onboarding must drop the onboarding-imposed slug
+        // envelope (otherwise the player stays pinned to the closing
+        // onboarding slug). Size/flag filters are unrelated to onboarding
+        // and must survive the reset.
+        SharedPreferences.setMockInitialValues({});
+        final db = Database(playerLevel: 50, progress: ConstraintProgress());
+        db.currentFilters.wantedRules = {'EY'};
+        db.currentFilters.bannedRules = {'FM', 'PA'};
+        db.currentFilters.minWidth = 5;
+        db.currentFilters.maxWidth = 8;
+        await db.resetRuleFilters();
+        expect(db.currentFilters.wantedRules, isEmpty);
+        expect(db.currentFilters.bannedRules, isEmpty);
+        expect(db.currentFilters.minWidth, 5);
+        expect(db.currentFilters.maxWidth, 8);
+      },
+    );
+
     test('graduated player sets the flag without touching filters', () async {
       // recommendedOnboardingFilters is null once every slug has been
       // seen. We still set the flag so subsequent boots stop probing —

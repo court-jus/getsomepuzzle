@@ -400,6 +400,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         );
       }
       final now = DateTime.now();
+      // Snapshot before noting slugs / skipping so we can detect the
+      // moment the player crosses out of onboarding below.
+      final wasInOnboarding = database?.isInOnboarding ?? false;
       if (skipped) {
         // Mark every known slug as seen so the modal never fires
         // again, then push the phase counter past every strict phase
@@ -421,6 +424,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       // here only means the player will see the modal again next
       // launch (no game-state corruption).
       await progress.save();
+      // Just left onboarding (skipped, or noted the final unseen slug):
+      // the open-page rule filters still carry the last onboarding
+      // recommendation. Reset them to default so the player isn't stuck
+      // wanting/banning the closing onboarding slug.
+      if (wasInOnboarding && database != null && !database!.isInOnboarding) {
+        await database!.resetRuleFilters();
+      }
       // The last unseen slug just got marked as seen. If the player is
       // no longer in onboarding (both strict phases and soft filter
       // satisfied), congratulate them once.

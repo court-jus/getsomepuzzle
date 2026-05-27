@@ -565,6 +565,22 @@ class Database {
     await _persistOnboardingCompletions();
   }
 
+  /// Drop the rule filters (`wantedRules`/`bannedRules`) back to their
+  /// empty default and persist. Called when the player leaves
+  /// onboarding so the open page no longer carries the
+  /// onboarding-imposed slug envelope (the last
+  /// [recommendedOnboardingFilters] would otherwise stay pinned —
+  /// nothing re-applies it once `reco` is null, so without this the
+  /// player stays stuck wanting/banning the final onboarding slug).
+  /// Size/flag filters are left untouched. Rebuilds the playlist so the
+  /// widened catalog takes effect immediately.
+  Future<void> resetRuleFilters() async {
+    currentFilters.wantedRules = {};
+    currentFilters.bannedRules = {};
+    await currentFilters.save();
+    preparePlaylist();
+  }
+
   /// Mix in puzzles from `assets/overfilled-easy.txt` into the catalog
   /// while the player is in onboarding on the entry-level collection.
   ///
