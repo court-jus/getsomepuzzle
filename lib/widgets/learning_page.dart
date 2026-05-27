@@ -85,8 +85,12 @@ class LearningPage extends StatelessWidget {
               trailing: TextButton.icon(
                 icon: const Icon(Icons.refresh),
                 label: Text(l.learningRefreshButton),
-                onPressed: () =>
-                    NewConstraintDialog.show(context, <String>{slug}),
+                // Disabled until the player has actually encountered the
+                // constraint in play (same `firstSeen` gate as the lock
+                // icon), so the explanation modal can't spoil a rule early.
+                onPressed: firstSeen == null
+                    ? null
+                    : () => NewConstraintDialog.show(context, <String>{slug}),
               ),
             );
           },
