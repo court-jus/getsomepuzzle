@@ -1070,6 +1070,9 @@ class Puzzle {
         if (c == null) continue;
         if (existing.contains(c.serialize())) continue;
         if (!c.verify(solved)) continue;
+        // Don't reintroduce a constraint that visually conflicts with one
+        // already on the puzzle (mirrors the generator's rejection rule).
+        if (constraints.any((x) => c.conflictsWith(x))) continue;
         candidates.add(c);
       }
     }

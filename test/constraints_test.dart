@@ -10,6 +10,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 import 'helpers/make_puzzle.dart';
@@ -1356,6 +1357,46 @@ void main() {
       final sy = SymmetryConstraint('7.2');
       p.addConstraint(sy);
       expect(sy.apply(p), isNull);
+    });
+  });
+
+  group('MajorityConstraint.conflictsWith', () {
+    // Params are 'r0.c0.r1.c1.targetColor'. Only the rectangle corners matter
+    // for conflictsWith; targetColor is irrelevant to border geometry.
+    MajorityConstraint mj(String corners) => MajorityConstraint('$corners.1');
+
+    test('shared top/bottom edge with overlapping columns conflicts', () {
+      // Top-left 2x2 (rows0-1,cols0-1) and top-right 2x2 (rows0-1,cols1-2):
+      // both share top row 0 and bottom row 1 over overlapping column 1, so
+      // their horizontal borders inset to the same place -> overlap.
+      expect(mj('0.0.1.1').conflictsWith(mj('0.1.1.2')), isTrue);
+    });
+
+    test('corner-only touch (no shared edge) does not conflict', () {
+      // Top-left 2x2 (rows0-1,cols0-1) and bottom-right 2x2 (rows1-2,cols1-2)
+      // share a single cell at their corner but no rectangle edge is
+      // collinear, so the borders merely cross — readable, not a conflict.
+      expect(mj('0.0.1.1').conflictsWith(mj('1.1.2.2')), isFalse);
+    });
+
+    test(
+      'side-by-side zones (shared grid line, no overlap) do not conflict',
+      () {
+        // Top-left 2x2 (rows0-1,cols0-1) and the right column (rows0-2,col2):
+        // they share the grid line x=2 but sit on opposite sides, so the inset
+        // pushes their borders apart into distinct cells — not a conflict.
+        expect(mj('0.0.1.1').conflictsWith(mj('0.2.2.2')), isFalse);
+      },
+    );
+
+    test('conflict relation is symmetric', () {
+      final a = mj('0.0.1.1');
+      final b = mj('0.1.1.2');
+      expect(a.conflictsWith(b), b.conflictsWith(a));
+    });
+
+    test('a non-MJ constraint never conflicts', () {
+      expect(mj('0.0.1.1').conflictsWith(SymmetryConstraint('7.2')), isFalse);
     });
   });
 }

@@ -385,6 +385,13 @@ class PuzzleGenerator {
         );
 
         final constraint = allConstraints.removeAt(0);
+        // Reject candidates that visually conflict with an already-placed
+        // constraint (e.g. two MJ zones with overlapping borders). Placed
+        // constraints never leave this loop, so the conflict is monotone and
+        // the candidate can be dropped permanently.
+        if (pu.constraints.any((c) => constraint.conflictsWith(c))) {
+          continue;
+        }
         final cloned = pu.clone();
         // Solve with existing constraints. `shouldStop` propagated so a
         // single expensive `solve()` (CH-heavy puzzles in particular) can

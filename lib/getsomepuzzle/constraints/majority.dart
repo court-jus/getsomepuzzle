@@ -149,4 +149,20 @@ class MajorityConstraint extends Constraint {
     final indices = indicesFor(puzzle.width);
     return indices.every((i) => puzzle.cellValues[i] != 0);
   }
+
+  /// Two MJ zones conflict when their dashed borders would overlap visually:
+  /// they share a flush edge on the same side (same top/bottom row, or same
+  /// left/right column) with overlapping perpendicular extent, so both borders
+  /// inset to the same place. Mere adjacency (a shared grid line with the zones
+  /// on opposite sides) or a corner-only touch produces distinct borders and is
+  /// not a conflict.
+  @override
+  bool conflictsWith(Constraint other) {
+    if (other is! MajorityConstraint) return false;
+    final colsOverlap = c0 <= other.c1 && other.c0 <= c1;
+    final rowsOverlap = r0 <= other.r1 && other.r0 <= r1;
+    if ((r0 == other.r0 || r1 == other.r1) && colsOverlap) return true;
+    if ((c0 == other.c0 || c1 == other.c1) && rowsOverlap) return true;
+    return false;
+  }
 }

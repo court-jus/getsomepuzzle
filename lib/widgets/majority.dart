@@ -26,10 +26,34 @@ class MajorityZonePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const inset = 6.0;
+    const baseInset = 6.0;
+    final step = (cellSize * 0.12).clamp(3.0, 5.0);
+    // Cap so a nested inset never collapses a zone (MJ zones are >= 2 cells
+    // per side, so 2 * maxInset stays below one cell).
+    final maxInset = cellSize * 0.45;
     final borderWidth = (cellSize * 0.09).clamp(2.0, 4.0);
 
-    for (final constraint in constraints) {
+    // Assign each zone a nesting level via greedy graph coloring of the
+    // conflict graph (zones whose borders would overlap — see
+    // MajorityConstraint.conflictsWith). Conflicting zones get distinct levels
+    // so their borders nest at different insets instead of coinciding.
+    final levels = List<int>.filled(constraints.length, 0);
+    for (int i = 0; i < constraints.length; i++) {
+      final used = <int>{};
+      for (int j = 0; j < i; j++) {
+        if (constraints[i].conflictsWith(constraints[j])) used.add(levels[j]);
+      }
+      int lvl = 0;
+      while (used.contains(lvl)) {
+        lvl++;
+      }
+      levels[i] = lvl;
+    }
+
+    for (int idx = 0; idx < constraints.length; idx++) {
+      final constraint = constraints[idx];
+      final inset = (baseInset + levels[idx] * step).clamp(baseInset, maxInset);
+
       final left = constraint.c0 * cellSize + inset;
       final top = constraint.r0 * cellSize + inset;
       final width = (constraint.c1 - constraint.c0 + 1) * cellSize - 2 * inset;

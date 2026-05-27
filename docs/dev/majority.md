@@ -27,8 +27,11 @@ the zone's bounding box. No icon or digit — the dotted border alone
 identifies the constrained zone.
 
 - **Style**: dotted, same stroke thickness as the readonly cell border.
-- **Position**: inset by 6 px from the zone's outer edge so the border
-  sits inside the zone rather than overlapping cell grid lines.
+- **Position**: inset from the zone's outer edge (base 6 px) so the
+  border sits inside the zone rather than overlapping cell grid lines.
+  When two zones would draw **overlapping borders** (see Conflicts
+  below), the inset is increased per zone so their borders nest at
+  distinct depths instead of coinciding.
 - **Corners**: square (matches the grid's rectilinear aesthetic and
   distinguishes MJ from readonly cell highlights, which use rounded
   borders).
@@ -54,6 +57,31 @@ The editor's constraint-type picker previews MJ as a single cell with a
 dotted border (a size-1 majority zone) — see
 `_MajorityPreviewPainter` in
 `lib/widgets/create_page/dialogs/constraint_type_picker.dart`.
+
+## Border conflicts
+
+Two MJ zones whose dashed borders would be drawn **on top of each
+other** are hard to read. This happens only when the rectangles share a
+**flush edge on the same side** — same top row (`r0 == r0`), same bottom
+row (`r1 == r1`), same left column (`c0 == c0`) or same right column
+(`c1 == c1`) — **and** overlap along that edge (perpendicular extent
+overlaps). Both borders then inset to the same place. By contrast, mere
+adjacency (a shared grid line with the zones on opposite sides) insets
+the borders into distinct cells, and a corner-only touch makes the
+borders simply cross; neither is a conflict.
+
+`MajorityConstraint.conflictsWith(other)` encodes exactly this predicate
+and is the single source of truth, reused three ways:
+
+- **Rendering** (`MajorityZonePainter`) — nests conflicting borders at
+  distinct insets so they stay readable (acceptable for user-authored
+  puzzles, which can still contain conflicts).
+- **Generation** — the generator (`generator.dart`) and `Puzzle.simplify`
+  reject a candidate MJ that conflicts with any already-placed
+  constraint, so newly generated puzzles never contain a conflict.
+- **Corpus cleanup** — `bin/cleanup_collections.dart --mj-conflict`
+  (part of the default passes) drops existing corpus puzzles that carry
+  a conflicting MJ pair.
 
 ## Gameplay deductions
 
@@ -122,6 +150,10 @@ Two common states produce no deduction:
   cell of the zone is non-free (monotone: once the zone is filled, no
   future move can change it).
 
+  `conflictsWith(other)` returns `true` (overriding the base `false`)
+  when `other` is another `MajorityConstraint` whose borders would draw
+  on top of this one — see **Border conflicts** below.
+
 - **`generateAllParameters(width, height, domain, excludedIndices)`** —
   enumerates every axis-aligned rectangle with three upfront filters:
   - `zoneSize < 3` excluded (no strict majority on 1 or 2 cells);
@@ -136,11 +168,16 @@ Two common states produce no deduction:
   between GC and NC.
 
 - **`lib/widgets/majority.dart`** — `MajorityZonePainter` (a
-  `CustomPainter`) renders the dotted rectangle. Inset 6 px,
+  `CustomPainter`) renders the dotted rectangle. Base inset 6 px,
   `strokeWidth` matching the readonly cell border, dashed path effect.
   MJ widgets live in the grid's `Stack` layer on top of the grid but
-  below cell tap targets; overlapping zones keep independent borders
-  that simply cross visually.
+  below cell tap targets. Before drawing, the painter computes a
+  **nesting level** per zone by greedy graph-colouring of the conflict
+  graph (`conflictsWith`): conflicting zones get distinct levels and
+  their inset grows by a `cellSize`-scaled step per level (capped at
+  `cellSize * 0.45`), so overlapping borders nest at different depths
+  instead of coinciding. Non-conflicting zones keep the base 6 px inset
+  and simply cross visually.
 
 - **`lib/widgets/create_page/create_page.dart`** — MJ zones are
   authored via a **two-tap mode** (analogous to LetterGroup): first

@@ -30,7 +30,7 @@ declared slugs. See `levels.md` for the cascade.
 | `bin/maintain.dart`                   | Full periodic-maintenance pipeline (6 steps, apply mode)     |
 | `bin/recompute.dart`                  | Re-sort constraints, refresh stored cplx, re-route by level  |
 | `bin/dedup_puzzles.dart`              | Drop puzzles that are exact duplicates (canonical key match) |
-| `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated puzzles                 |
+| `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated / MJ-border-conflict puzzles |
 | `bin/vectorize_puzzles.dart`          | Produce per-puzzle feature vector CSV                        |
 | `bin/cluster_puzzles.dart`            | Find near-duplicate pairs/clusters (report or --apply mode)  |
 | `bin/extract_onboarding.dart`         | Build a diverse onboarding bank from 1-easy                  |
@@ -137,10 +137,10 @@ identity.
 dart run bin/dedup_puzzles.dart -o deduped.txt assets/1-easy.txt
 ```
 
-### 2. Drop disliked or trivial-FM-dominated puzzles
+### 2. Drop disliked, trivial-FM-dominated, or MJ-border-conflict puzzles
 
-`bin/cleanup_collections.dart` runs two passes (both gated by
-their own flag, both run when neither is passed):
+`bin/cleanup_collections.dart` runs three passes (each gated by
+its own flag, all run when none is passed):
 
 * `--disliked` — cross-reference `stats_aggregated/*.txt` and flag
   puzzles that appear with a `__D` (disliked) marker.
@@ -148,6 +148,12 @@ their own flag, both run when neither is passed):
   are deduced by 1×2 / 2×1 FM constraints (the trivial-saturation
   variants, weight 0 in `complexity.md`). 1-easy and overfilled-easy
   are exempt — the trivial saturation is *the lesson* there.
+* `--mj-conflict` — flag puzzles with two Majority (MJ) zones whose
+  dashed borders would overlap visually (a shared flush edge with
+  overlapping perpendicular extent — see `MajorityConstraint.conflictsWith`
+  and `majority.md`). Cheap pre-filter (≥ 2 `MJ:` tokens) gates the parse.
+  The generator already refuses such pairs, so this only catches legacy
+  corpus puzzles.
 
 ```bash
 # Dry-run report
@@ -394,8 +400,8 @@ Pipeline (each step applies directly; the next step sees the updated
 2. **`dedup_puzzles`** — drop exact duplicates per file
    (defence-in-depth: `--route` already enforces canonical-key
    uniqueness, but this catches anything that slipped through).
-3. **`cleanup_collections --apply`** — drop disliked and boring
-   (≥ 90 % trivial-FM) puzzles.
+3. **`cleanup_collections --apply`** — drop disliked, boring
+   (≥ 90 % trivial-FM), and overlapping-MJ-border puzzles.
 4. **`vectorize_puzzles`** — refresh `puzzle_vectors.csv` from the
    cleaned corpus.
 5. **`cluster_puzzles --apply`** — drop near-duplicates

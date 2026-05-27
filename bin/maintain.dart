@@ -345,8 +345,8 @@ Pipeline:
                             re-route each puzzle to its classified level.
   2. dedup_puzzles          Drop exact-duplicate puzzles per file
                             (defence-in-depth — --route already enforces).
-  3. cleanup_collections    Drop disliked + boring (≥90 % trivial-FM)
-                            puzzles (--apply mode).
+  3. cleanup_collections    Drop disliked + boring (≥90 % trivial-FM) +
+                            overlapping-MJ-border puzzles (--apply mode).
   4. vectorize_puzzles      Refresh puzzle_vectors.csv from the cleaned
                             corpus.
   5. cluster_puzzles        --apply with --max-distance 0.15 and

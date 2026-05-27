@@ -14,12 +14,18 @@
 //                are exempt by default — beginners need those puzzles
 //                — toggle with --no-exempt-easiest.
 //
+//   --mj-conflict Drop puzzles with two Majority (MJ) zones whose dashed
+//                borders would overlap visually (a shared flush edge with
+//                overlapping perpendicular extent — see
+//                MajorityConstraint.conflictsWith).
+//
 // Without --apply the script just prints what *would* be removed. With
 // --apply each modified collection is rewritten to `<path>.cleanup`;
 // the user mv's it into place after reviewing the diff.
 //
 // Usage:
 //   dart run bin/cleanup_collections.dart [--disliked] [--boring]
+//                                          [--mj-conflict]
 //                                          [--apply]
 //                                          [--min-dislikes N]
 //                                          [--boring-threshold X]
@@ -30,10 +36,11 @@
 //                                          [--stats-dir DIR]
 //                                          [--verbose]
 //
-// If neither --disliked nor --boring is passed, both run.
+// If none of --disliked / --boring / --mj-conflict is passed, all run.
 
 import 'dart:io';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
@@ -73,6 +80,7 @@ class _PuzzleLoc {
 class _Args {
   bool runDisliked = false;
   bool runBoring = false;
+  bool runMJConflict = false;
   bool apply = false;
   bool verbose = false;
   bool exemptEasiest = true;
@@ -93,6 +101,8 @@ void main(List<String> args) {
         a.runDisliked = true;
       case '--boring':
         a.runBoring = true;
+      case '--mj-conflict':
+        a.runMJConflict = true;
       case '--apply':
         a.apply = true;
       case '-v':
@@ -124,9 +134,10 @@ void main(List<String> args) {
   }
 
   // Default: run all passes.
-  if (!a.runDisliked && !a.runBoring) {
+  if (!a.runDisliked && !a.runBoring && !a.runMJConflict) {
     a.runDisliked = true;
     a.runBoring = true;
+    a.runMJConflict = true;
   }
 
   stderr.writeln('Loading collections...');
@@ -156,6 +167,12 @@ void main(List<String> args) {
     stderr.writeln('');
     stderr.writeln('=== PASS 2: trivial-FM-dominated puzzles ===');
     _reportAndCollectBoring(byKey, a, toRemove, reasons);
+  }
+
+  if (a.runMJConflict) {
+    stderr.writeln('');
+    stderr.writeln('=== PASS 3: overlapping MJ borders ===');
+    _reportAndCollectMJConflict(byKey, a, toRemove, reasons);
   }
 
   stderr.writeln('');
@@ -362,6 +379,68 @@ void _reportAndCollectBoring(
   }
 }
 
+void _reportAndCollectMJConflict(
+  Map<String, _PuzzleLoc> byKey,
+  _Args args,
+  Set<String> toRemove,
+  Map<String, String> reasons,
+) {
+  // Pre-filter cheaply: a conflict needs at least two MJ constraints, so a
+  // line with fewer than two `MJ:` tokens can't be affected — skip the parse.
+  int flagged = 0;
+  final perFile = <String, int>{};
+  for (final entry in byKey.entries) {
+    final loc = entry.value;
+    if (!_hasTwoMJ(loc.line)) continue;
+    if (!_hasMJConflict(loc.line)) continue;
+    toRemove.add(entry.key);
+    reasons[entry.key] = 'MJ border overlap';
+    perFile.update(loc.file, (v) => v + 1, ifAbsent: () => 1);
+    flagged++;
+    if (args.verbose) {
+      stderr.writeln(
+        '    ${loc.file}: MJ border overlap  ${_preview(loc.line)}',
+      );
+    }
+  }
+  stderr.writeln('  $flagged puzzles with overlapping MJ borders');
+  for (final path in _collections) {
+    final n = perFile[path] ?? 0;
+    if (n > 0) stderr.writeln('    $path: $n');
+  }
+}
+
+/// Cheap check: does the constraints field carry at least two `MJ` slugs?
+/// Avoids a full Puzzle parse on lines that can't have an MJ-MJ conflict.
+bool _hasTwoMJ(String line) {
+  final parts = line.split('_');
+  if (parts.length < 5) return false;
+  int count = 0;
+  for (final c in parts[4].split(';')) {
+    if (c.startsWith('MJ:')) count++;
+    if (count >= 2) return true;
+  }
+  return false;
+}
+
+/// Parse the puzzle and return true if any pair of MJ zones would draw
+/// overlapping borders (see MajorityConstraint.conflictsWith).
+bool _hasMJConflict(String line) {
+  try {
+    final mjs = Puzzle(
+      line,
+    ).constraints.whereType<MajorityConstraint>().toList();
+    for (int i = 0; i < mjs.length; i++) {
+      for (int j = i + 1; j < mjs.length; j++) {
+        if (mjs[i].conflictsWith(mjs[j])) return true;
+      }
+    }
+  } catch (_) {
+    return false;
+  }
+  return false;
+}
+
 /// Cheap check: does the constraints field carry any trivial-FM slug?
 /// Avoids a full Puzzle parse + solve on the bulk of the corpus.
 bool _hasTrivialFM(String line) {
@@ -445,10 +524,12 @@ void _printUsage() {
   stderr.writeln('''
 Usage: dart run bin/cleanup_collections.dart [options]
 
-Passes (run both by default):
+Passes (all run by default):
   --disliked              Flag puzzles disliked in stats_aggregated/*.txt
   --boring                Flag puzzles where >threshold of propagation
                           moves come from trivial-FM constraints
+  --mj-conflict           Flag puzzles with two MJ zones whose dashed
+                          borders would overlap visually
 
 Options:
   --apply                 Write <path>.cleanup files. Without it, only

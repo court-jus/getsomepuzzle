@@ -46,6 +46,11 @@ class Constraint extends CanApply {
 
   bool isCompleteFor(Puzzle puzzle) => false;
 
+  /// True when this constraint cannot coexist with [other] (an unresolvable
+  /// conflict, e.g. visually overlapping borders). Default: no conflict.
+  /// Only [MajorityConstraint] overrides this.
+  bool conflictsWith(Constraint other) => false;
+
   /// Return a fresh constraint instance equivalent to this one applied to a
   /// puzzle rotated 90° clockwise. The arguments are the dimensions of the
   /// **original** puzzle (before rotation). All positional data — cell
