@@ -103,6 +103,13 @@ class GameModel extends ChangeNotifier {
   /// sync with the settings; defaults to `deducibleCell` (cheap mode).
   HintType hintType = HintType.deducibleCell;
 
+  /// Constraint slugs the player has already learned (the owner's
+  /// `ConstraintProgress.firstSeen` keys). Passed to the hint worker so an
+  /// `addConstraint` hint never offers a type the player has not yet seen
+  /// explained. Owners must keep this in sync; empty means "only reinforce
+  /// types already on the puzzle".
+  Set<String> learnedHintSlugs = const <String>{};
+
   // --- Drag state ---
   int? firstDragValue;
   int? lastDragIdx;
@@ -838,7 +845,7 @@ class GameModel extends ChangeNotifier {
     final worker = HintWorker();
     _hintWorker = worker;
     worker
-        .compute(puzzle: puzzle)
+        .compute(puzzle: puzzle, learnedSlugs: learnedHintSlugs)
         .then((result) {
           // Drop stale results: the worker we awaited is no longer the
           // active one (cancelled or replaced by a newer call).

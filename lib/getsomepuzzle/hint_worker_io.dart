@@ -10,13 +10,20 @@ class HintWorker {
 
   /// Returns the constraint (serialized `SLUG:params`) to offer as a hint, or
   /// null when none is available. Runs the search in a background isolate.
-  Future<String?> compute({required Puzzle puzzle}) async {
+  Future<String?> compute({
+    required Puzzle puzzle,
+    required Set<String> learnedSlugs,
+  }) async {
     final port = ReceivePort();
     _receivePort = port;
 
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
-      _HintParams(sendPort: port.sendPort, puzzle: puzzle),
+      _HintParams(
+        sendPort: port.sendPort,
+        puzzle: puzzle,
+        learnedSlugs: learnedSlugs,
+      ),
     );
 
     try {
@@ -44,12 +51,20 @@ class HintWorker {
 class _HintParams {
   final SendPort sendPort;
   final Puzzle puzzle;
+  final Set<String> learnedSlugs;
 
-  _HintParams({required this.sendPort, required this.puzzle});
+  _HintParams({
+    required this.sendPort,
+    required this.puzzle,
+    required this.learnedSlugs,
+  });
 }
 
 Future<void> _isolateEntryPoint(_HintParams params) async {
-  final ctx = HintContext.forPuzzle(params.puzzle);
+  final ctx = HintContext.forPuzzle(
+    params.puzzle,
+    learnedSlugs: params.learnedSlugs,
+  );
   // No yielding: the isolate has the whole core to itself.
   final result = await pickHintConstraint(ctx);
   params.sendPort.send(result);

@@ -213,6 +213,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     await progress.load();
     game.idleTimeoutDuration = settings.idleTimeoutDuration;
     game.hintType = settings.hintType;
+    game.learnedHintSlugs = progress.firstSeen.keys.toSet();
     futures.add(initializeDatabase(settings.playerLevel));
     futures.add(initializeLocale());
     await Future.wait(futures);
@@ -705,8 +706,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     game.resetHintCycle();
     // Keep GameModel's mirror in sync before kicking the worker — the gate
     // inside `startHintConstraintComputation` reads it to decide whether
-    // to actually run.
+    // to actually run. Refresh the learned slugs too, so the worker never
+    // offers a constraint type the player has not yet learned.
     game.hintType = settings.hintType;
+    game.learnedHintSlugs = progress.firstSeen.keys.toSet();
     // Switching to addConstraint no longer pre-computes here — the search
     // runs on demand at the first hint tap. Switching away cancels any
     // in-flight pass.

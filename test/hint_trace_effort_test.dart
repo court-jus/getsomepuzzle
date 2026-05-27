@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_worker_core.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 /// 6x7 puzzle fully solvable by propagation (shared with hint_flow_test). Its
@@ -58,7 +59,12 @@ void main() {
         'constraint', () {
       final puzzle = Puzzle(bugLine);
       puzzle.computeComplexity(force: true); // populate cachedSolution
-      final ctx = HintContext.forPuzzle(puzzle);
+      // No type restriction here: this test is about inter-constraint
+      // compatibility, so allow every known slug.
+      final ctx = HintContext.forPuzzle(
+        puzzle,
+        learnedSlugs: OnboardingPhase.allKnownSlugs,
+      );
 
       // Constraint-free solved grid — what the old filter verified against,
       // and what hid the LT-vs-LT conflict (no `cellConstraints` to read).
@@ -121,7 +127,10 @@ void main() {
       // claim "constraint added", so it must be rejected outright.
       final puzzle = Puzzle(bugLine);
       puzzle.computeComplexity(force: true);
-      final ctx = HintContext.forPuzzle(puzzle);
+      final ctx = HintContext.forPuzzle(
+        puzzle,
+        learnedSlugs: OnboardingPhase.allKnownSlugs,
+      );
 
       expect(validHintCandidate(ctx, 'LT', 'B.15.14'), isNull);
     });
@@ -138,7 +147,12 @@ void main() {
       final existing = puzzle.constraints.map((c) => c.serialize()).toSet();
       final solved = _solvedGrid(puzzle);
 
-      final result = await pickHintConstraint(HintContext.forPuzzle(puzzle));
+      final result = await pickHintConstraint(
+        HintContext.forPuzzle(
+          puzzle,
+          learnedSlugs: OnboardingPhase.allKnownSlugs,
+        ),
+      );
 
       if (result != null) {
         final colon = result.indexOf(':');
@@ -158,6 +172,43 @@ void main() {
           reason: 'offered constraint must hold on the canonical solution',
         );
       }
+    });
+  });
+
+  group('pickHintConstraint — restricts to learned constraint types', () {
+    // `_line` carries FM and PA. With nothing learned, the allowed set is just
+    // those on-screen types, so the hint may only ever reinforce FM or PA —
+    // never a type the player has not yet seen explained.
+    test('never offers a type outside the learned ∪ present set', () async {
+      final puzzle = Puzzle(_line);
+      puzzle.computeComplexity(force: true);
+
+      // Run several passes: the early effort-reducing return is deterministic,
+      // but the fallback picks at random — repeat so a leaked unlearned type
+      // would eventually surface.
+      for (var i = 0; i < 20; i++) {
+        final result = await pickHintConstraint(
+          HintContext.forPuzzle(puzzle, learnedSlugs: const <String>{}),
+        );
+        if (result == null) continue;
+        final slug = result.substring(0, result.indexOf(':'));
+        expect(
+          slug,
+          anyOf('FM', 'PA'),
+          reason: 'offered "$result" must be a learned or already-present type',
+        );
+      }
+    });
+
+    test('allowedSlugs is the learned set unioned with the present types', () {
+      // Learned {GS} plus the puzzle's own FM/PA must all be allowed; a type
+      // that is neither learned nor present (EY) must be excluded.
+      final puzzle = Puzzle(_line);
+      puzzle.computeComplexity(force: true);
+      final ctx = HintContext.forPuzzle(puzzle, learnedSlugs: const {'GS'});
+
+      expect(ctx.allowedSlugs, containsAll(<String>{'GS', 'FM', 'PA'}));
+      expect(ctx.allowedSlugs, isNot(contains('EY')));
     });
   });
 }

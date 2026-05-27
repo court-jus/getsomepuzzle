@@ -9,9 +9,12 @@ class HintWorker {
   /// Returns the constraint (serialized `SLUG:params`) to offer as a hint, or
   /// null when none is available. Web has no isolate, so the search runs on
   /// the main thread, yielding periodically to keep the UI responsive.
-  Future<String?> compute({required Puzzle puzzle}) async {
+  Future<String?> compute({
+    required Puzzle puzzle,
+    required Set<String> learnedSlugs,
+  }) async {
     _cancelled = false;
-    final ctx = HintContext.forPuzzle(puzzle);
+    final ctx = HintContext.forPuzzle(puzzle, learnedSlugs: learnedSlugs);
     return pickHintConstraint(
       ctx,
       shouldStop: () => _cancelled,

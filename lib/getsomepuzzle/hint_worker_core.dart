@@ -23,6 +23,14 @@ class HintContext {
   /// targeting cells the player cannot reason about.
   final Set<int> readonlyIndices;
 
+  /// Constraint slugs an offered hint may use. A candidate of any other
+  /// type is skipped outright, so the hint never introduces a constraint
+  /// the player has not yet learned via onboarding. Built as the learned
+  /// slugs (the caller's `firstSeen` set) unioned with the slugs already
+  /// present on the puzzle — those are on screen and being used, so
+  /// reinforcing them introduces nothing unknown.
+  final Set<String> allowedSlugs;
+
   /// A pre-solved instance used to verify candidate constraints
   /// against the canonical solution — we never offer a constraint that
   /// the puzzle's own solution would violate.
@@ -38,16 +46,31 @@ class HintContext {
     this.puzzle,
     this.existingSerialized,
     this.readonlyIndices,
+    this.allowedSlugs,
     this.solved,
     this.baselineEffort,
   );
 
-  factory HintContext.forPuzzle(Puzzle puzzle) {
+  /// [learnedSlugs] is the set of constraint types the player has already
+  /// learned (the caller's `ConstraintProgress.firstSeen` keys). The hint
+  /// search is restricted to these plus whatever types are already on the
+  /// puzzle — see [allowedSlugs].
+  factory HintContext.forPuzzle(
+    Puzzle puzzle, {
+    required Set<String> learnedSlugs,
+  }) {
     final existing = puzzle.constraints.map((c) => c.serialize()).toSet();
     final readonly = <int>{};
     for (int i = 0; i < puzzle.cells.length; i++) {
       if (puzzle.cells[i].readonly) readonly.add(i);
     }
+    // Allowed types: learned ∪ types already present (derived from the
+    // serialized `SLUG:params` prefix). The latter are visible to the player,
+    // so reinforcing them never introduces an unlearned type.
+    final allowedSlugs = <String>{
+      ...learnedSlugs,
+      for (final s in existing) s.substring(0, s.indexOf(':')),
+    };
     // Clone the puzzle (so its constraints are attached, hence
     // `cellConstraints` is populated) and force every cell to the canonical
     // solution. The constraints are needed so a candidate's compatibility with
@@ -61,6 +84,7 @@ class HintContext {
       puzzle,
       existing,
       readonly,
+      allowedSlugs,
       solved,
       puzzle.traceEffort(),
     );
@@ -123,6 +147,10 @@ Future<String?> pickHintConstraint(
   final valid = <String>[];
   int evaluated = 0;
   for (final entry in constraintRegistry) {
+    // Never offer a constraint type the player has not learned. This gates
+    // both the early effort-reducing return and the random fallback below
+    // (only allowed-type candidates ever reach `valid`).
+    if (!ctx.allowedSlugs.contains(entry.slug)) continue;
     final params = entry.generateAllParameters(
       ctx.puzzle.width,
       ctx.puzzle.height,
