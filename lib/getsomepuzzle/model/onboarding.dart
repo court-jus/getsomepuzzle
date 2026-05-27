@@ -48,8 +48,28 @@ class OnboardingPhase {
       introducing: 'GS',
       allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS'},
     ),
-    // Phases for the remaining slugs (LT, QA, SY, DF, SH, CC, GC, EY)
-    // are not figés as strict envelopes any more. After phase 3
+    OnboardingPhase(
+      index: 6,
+      introducing: 'EY',
+      allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY'},
+    ),
+    OnboardingPhase(
+      index: 7,
+      introducing: 'DF',
+      allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF'},
+    ),
+    OnboardingPhase(
+      index: 8,
+      introducing: 'LT',
+      allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF', 'LT'},
+    ),
+    OnboardingPhase(
+      index: 9,
+      introducing: 'QA',
+      allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF', 'LT', 'QA'},
+    ),
+    // Phases for the remaining slugs (SY, SH, GC)
+    // are not fixed as strict envelopes any more. After phase 9
     // the player enters [softFilter] mode: any level collection opens
     // up but the playlist filters out puzzles introducing more than
     // one new constraint at a time. The modal still fires per first
