@@ -41,6 +41,12 @@ class PuzzleData {
   int filled = 0;
   int cplx = 0;
   List<String> rules = [];
+  // True when at least one GS (group size) constraint targets size 1 — an
+  // isolated cell. Such instances are trivial and not very instructive, so
+  // the selection sampler demotes them while GS is being introduced during
+  // onboarding (see Database.selectionTrivialGsPenalty). Computed once here
+  // to avoid re-parsing the line on every filter/sampling pass.
+  bool hasTrivialGroupSize = false;
   bool played = false;
   int duration = 0;
   int failures = 0;
@@ -73,7 +79,15 @@ class PuzzleData {
             .toInt();
     final strConstraints = attributesStr[4].split(";");
     for (var strConstraint in strConstraints) {
-      rules.add(strConstraint.split(":")[0]);
+      final parts = strConstraint.split(":");
+      rules.add(parts[0]);
+      // GS params are `idx.size`; the target size is the part after the
+      // last dot. Size 1 means an isolated cell (trivial instance).
+      if (parts[0] == 'GS' && parts.length > 1) {
+        if (int.tryParse(parts[1].split(".").last) == 1) {
+          hasTrivialGroupSize = true;
+        }
+      }
     }
     // Solution + complexity are optional trailing fields. Bare canonical
     // lines (no `v2_` prefix, no tail — see `normalizeToV2Line`) stop at
@@ -1335,6 +1349,15 @@ class Database {
   /// boost). Set to 0 to disable the variety bias entirely.
   static const double selectionVarietyAlpha = 1.5;
 
+  /// Multiplier applied to the selection weight of a puzzle holding a GS of
+  /// size 1 (an isolated cell), but only while the onboarding phase that
+  /// introduces GS is active (`currentPhase.introducing == 'GS'`). These
+  /// trivial instances teach the rule poorly, so we strongly demote them
+  /// during discovery. Kept small but non-zero: they stay drawable as a last
+  /// resort if no non-trivial GS puzzle is available, so the playlist never
+  /// empties. Once GS is past its phase, the demotion lifts (factor 1).
+  static const double selectionTrivialGsPenalty = 0.05;
+
   // Random source for puzzle sampling. Exposed as a package-private setter
   // so tests can pin it to a seeded Random for reproducibility.
   math.Random _samplingRandom = math.Random();
@@ -1372,6 +1395,8 @@ class Database {
     final twoSigmaSq = 2 * selectionSigma * selectionSigma;
     final filtered = filter().toList();
     final varietyStats = _buildRecencyWeightedStats(filtered);
+    // Only demote trivial GS puzzles while GS is the rule being introduced.
+    final demoteTrivialGs = currentPhase?.introducing == 'GS';
     final keyed = filtered.map((p) {
       final d = p.cplx - mu;
       // Clamp the exponent to avoid `exp` underflow producing key = +∞ for
@@ -1379,7 +1404,10 @@ class Database {
       final wCplx = math.exp(-math.min(d * d / twoSigmaSq, 700));
       final gap = _varietyGapForPuzzle(p, varietyStats);
       final wVariety = 1 + selectionVarietyAlpha * gap;
-      final w = wCplx * wVariety;
+      var w = wCplx * wVariety;
+      if (demoteTrivialGs && p.hasTrivialGroupSize) {
+        w *= selectionTrivialGsPenalty;
+      }
       // The +1e-300 below guards against `nextDouble() == 0`, which would
       // make `−ln(u)` infinite and corrupt the sort.
       final u = _samplingRandom.nextDouble() + 1e-300;

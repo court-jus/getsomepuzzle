@@ -169,6 +169,61 @@ void main() {
       expect(got, hasLength(1));
       expect(got.first, same(unplayed));
     });
+
+    /// Single-GS 5×5 puzzle with an explicit `idx.size` parameter — the
+    /// `_puz` helper only emits a bare `:1` dummy, which can't express a real
+    /// group size. `size == 1` is the trivial isolated-cell instance.
+    PuzzleData gsPuz(int size, {int cplx = 16}) =>
+        PuzzleData('v2_12_5x5_${'0' * 25}_GS:0.${size}_0:0_$cplx');
+
+    test('demotes trivial size-1 GS while GS is being introduced', () {
+      // During the strict phase that introduces GS, a GS:.1 (isolated cell)
+      // is a poor teaching instance and must be strongly deprioritised vs an
+      // equivalent non-trivial GS:.3 of the same cplx. Both stay in the
+      // catalog (last-resort drawable), but the non-trivial one should top
+      // the sampled order far more often.
+      final db = Database(playerLevel: 0)..samplingRandom = math.Random(42);
+      // Reach phase P5 (introducing GS): every earlier phase's slug cleared,
+      // GS still below the threshold.
+      db.onboardingCompletions = {'FM': 5, 'NC': 5, 'PA': 5, 'CC': 5, 'RC': 5};
+      expect(db.currentPhase?.introducing, 'GS');
+      final trivial = gsPuz(1);
+      final nonTrivial = gsPuz(3);
+      db.puzzles = [trivial, nonTrivial];
+      var nonTrivialFirst = 0;
+      var trivialFirst = 0;
+      for (var i = 0; i < 200; i++) {
+        final first = db.getPuzzlesByLevel(16).first;
+        if (identical(first, nonTrivial)) nonTrivialFirst++;
+        if (identical(first, trivial)) trivialFirst++;
+      }
+      // With a ×0.05 penalty the trivial puzzle wins the head ~5 % of the
+      // time; require the non-trivial to dominate by a wide margin.
+      expect(nonTrivialFirst, greaterThan(trivialFirst * 3));
+    });
+
+    test('no GS demotion outside the GS introduction phase', () {
+      // Gating check: when GS is not the rule being introduced (here phase
+      // P0/FM, completions empty), trivial and non-trivial GS puzzles of the
+      // same cplx carry the same weight and top the order at comparable
+      // rates. Guards against the penalty leaking into normal play.
+      final db = Database(playerLevel: 0)..samplingRandom = math.Random(42);
+      expect(db.currentPhase?.introducing, isNot('GS'));
+      final trivial = gsPuz(1);
+      final nonTrivial = gsPuz(3);
+      db.puzzles = [trivial, nonTrivial];
+      var nonTrivialFirst = 0;
+      var trivialFirst = 0;
+      for (var i = 0; i < 200; i++) {
+        final first = db.getPuzzlesByLevel(16).first;
+        if (identical(first, nonTrivial)) nonTrivialFirst++;
+        if (identical(first, trivial)) trivialFirst++;
+      }
+      // Neither side should dominate: a ~50/50 split, so each stays well
+      // within 3× of the other (the bound the demotion test relies on).
+      expect(nonTrivialFirst, lessThan(trivialFirst * 3));
+      expect(trivialFirst, lessThan(nonTrivialFirst * 3));
+    });
   });
 
   group('Database.getPuzzlesByLevel — variety bias', () {

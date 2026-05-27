@@ -137,6 +137,15 @@ few elements of the returned list are very likely to be near `μ`; later
 elements drift toward the tails. With σ=5 the practical reach is
 roughly ±15 cplx (`exp(−4.5) ≈ 0.011`, so ~1 % of the central weight).
 
+The Gaussian weight is further multiplied by the variety bias and, in
+one onboarding case, a demotion factor: while the strict phase that
+introduces `GS` is active (`currentPhase?.introducing == 'GS'`), a
+puzzle flagged `PuzzleData.hasTrivialGroupSize` (a size-1 `GS` —
+isolated cell) is multiplied by `selectionTrivialGsPenalty` (0.05).
+This strongly deprioritises poorly-instructive instances during GS
+discovery while keeping them drawable as a last resort. See
+`docs/dev/onboarding.md`.
+
 `preparePlaylist` uses this when `shouldShuffle` is `false`. When
 `shouldShuffle` is `true`, the player has explicitly asked for the full
 filtered catalog in random order — the Gaussian bias is bypassed

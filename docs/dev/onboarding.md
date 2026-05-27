@@ -96,11 +96,19 @@ dedicated onboarding sampler. The player can inspect the preset in
 OpenPage and override it via the standard chip UI; the original
 contract holds exactly while the preset is in effect.
 
-The sampler does no extra phase weighting: once `filter()` passes,
-puzzles compete on Gaussian-cplx + variety score. No refresh share,
-no anti-forgetting sprinkle. `puzzleEligibleForPhase` is still
-exported for `bin/` tools (e.g. `bin/check_phase_coverage.dart`) but
-is no longer consulted at runtime.
+Once `filter()` passes, puzzles compete on Gaussian-cplx + variety
+score. The one phase-specific weighting is in phase 5: while `GS` is
+the introducing slug, a puzzle holding a size-1 `GS` (an isolated
+cell — a trivial, poorly instructive instance) has its selection
+weight multiplied by `Database.selectionTrivialGsPenalty` (0.05).
+`PuzzleData.hasTrivialGroupSize`, parsed once at load from the `GS`
+`idx.size` parameter, flags it; `getPuzzlesByLevel` applies the
+penalty only when `currentPhase?.introducing == 'GS'`. The factor is
+non-zero so such puzzles stay drawable as a last resort and the
+playlist never empties. Otherwise no refresh share, no anti-forgetting
+sprinkle. `puzzleEligibleForPhase` is still exported for `bin/` tools
+(e.g. `bin/check_phase_coverage.dart`) but is no longer consulted at
+runtime.
 
 Filters are kept in sync automatically: `notePuzzleCompleted` syncs
 `currentFilters` with `recommendedOnboardingFilters` after every
