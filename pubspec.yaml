@@ -63,6 +63,7 @@ dev_dependencies:
   path_provider_platform_interface: ^2.1.2
   plugin_platform_interface: ^2.1.8
   markdown: ^7.3.0
+  msix: ^3.16.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -89,6 +90,15 @@ flutter_launcher_icons:
     generate: true
     image_path: "marketing/app_icon_1024.png"
     icon_size: 256
+
+msix_config:
+  display_name: getsomepuzzle
+  publisher_display_name: Ghislain Lévêque
+  publisher: CN=94724FA2-2A2F-41B9-B8F2-54A77C292530
+  identity_name: GhislainLvque.getsomepuzzle
+  logo_path: marketing\app_icon_1024.png
+  languages: en-us, fr-fr, es-es
+  store: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
