@@ -2,16 +2,30 @@
 
 ## Solver improvements
 
-### Hint constraint: weight by constraint type simplicity
+### Hint constraint: selection strategy refinements
 
-Candidates are now ranked by descending propagation delta — the
-constraint that immediately unlocks the most cells is offered first,
-then the rest of the useful ones by decreasing impact, then the
-non-useful tail (`scoreCandidate` in
-`lib/getsomepuzzle/hint_rank_worker_core.dart`). Remaining refinement:
-weight by constraint type simplicity (FM/PA easier to understand than
-SY/LT for most players), either as a tie-breaker when deltas are
-close, or as a multiplicative factor on the raw delta.
+The `addConstraint` hint runs on demand (first hint tap) and returns the
+first candidate whose addition lowers `Puzzle.traceEffort()` — enumerated
+in registry order (roughly simplest type first, FM/PA before SY/LT), with
+each type's parameter list shuffled. If none reduces the effort, a random
+valid candidate is offered as a fallback (`pickHintConstraint` in
+`lib/getsomepuzzle/hint_worker_core.dart`).
+
+Refinements to explore:
+
+- **Targeting.** We have no way today to know *which constraint touches
+  which cell*. With it, the search could enumerate only candidates whose
+  zone overlaps the player's actual blockage (the next force/complicity
+  step) instead of scanning every type — cheaper and more relevant.
+- **Cheaper candidate enumeration for hints.** A `forHint` flag on
+  `generateAllParameters` returning a smaller, representative parameter
+  set (without changing the constraints' own semantics) would bound the
+  worst case (when no candidate reduces the effort and everything is
+  enumerated). E.g. `MajorityConstraint.generateAllParameters` is
+  O(width²·height²·|domain|) today.
+- **Constraint-type simplicity.** Beyond registry order, weight by type
+  simplicity so the offered constraint is the easiest to understand among
+  those that reduce the effort.
 
 ### Planned: human calibration session
 

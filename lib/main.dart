@@ -345,9 +345,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       progressRestoredText: AppLocalizations.of(context)!.progressRestored,
       screenIsLandscape: size.width > size.height,
     );
-    if (settings.hintType == HintType.addConstraint) {
-      game.startHintConstraintComputation();
-    }
+    // The `addConstraint` hint search is deferred to the first hint tap
+    // (`GameModel.onHintTap`), not run eagerly on open — it is expensive and,
+    // on web, runs on the main thread.
     _surfaceNewConstraintsIfAny(puz);
   }
 
@@ -707,9 +707,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     // inside `startHintConstraintComputation` reads it to decide whether
     // to actually run.
     game.hintType = settings.hintType;
-    if (settings.hintType == HintType.addConstraint) {
-      game.startHintConstraintComputation();
-    } else {
+    // Switching to addConstraint no longer pre-computes here — the search
+    // runs on demand at the first hint tap. Switching away cancels any
+    // in-flight pass.
+    if (settings.hintType != HintType.addConstraint) {
       game.cancelHintConstraintComputation();
     }
   }
@@ -775,7 +776,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             game.cancelHintConstraintComputation();
             game.availableHintConstraints = [];
             game.rotateCurrentPuzzle();
-            game.startHintConstraintComputation();
+            // Rotation invalidates prior candidates (cell indices shift); the
+            // next hint tap recomputes from the rotated state.
           });
         }
       }

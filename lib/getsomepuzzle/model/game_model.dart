@@ -4,7 +4,6 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/hint_rank_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
@@ -86,11 +85,15 @@ class GameModel extends ChangeNotifier {
 
   // --- Hint constraint state ---
   HintWorker? _hintWorker;
-  HintRankWorker? _hintRankWorker;
-  Timer? _hintRankDebounce;
   List<String> availableHintConstraints = [];
   HintConstraintStatus hintConstraintsReady = HintConstraintStatus.inprogress;
-  int _usefulHintCount = 0;
+
+  /// Set when the player taps to reveal an `addConstraint` hint while the
+  /// search is still [HintConstraintStatus.inprogress]: we then show the
+  /// "computing…" message and stash the l10n strings here so the worker's
+  /// completion callback can reveal the result on its own, without making the
+  /// player tap again. Cleared once consumed (or on cancel / cycle reset).
+  HintTexts? _pendingRevealTexts;
 
   /// Mirrors `settings.hintType` so [startHintConstraintComputation] can
   /// short-circuit when the player is not in `addConstraint` mode. The
@@ -160,14 +163,13 @@ class GameModel extends ChangeNotifier {
   }
 
   /// Called once a mutation settles into a stable state. Clears hints,
-  /// schedules help/ranking recomputation, notifies listeners, and re-arms
-  /// the idle watchdog. Not called during drag steps — the drag commits
-  /// via [handleDragEnd].
+  /// schedules the help recomputation, notifies listeners, and re-arms the
+  /// idle watchdog. The `addConstraint` hint search is *not* fired here — it
+  /// runs on demand from [onHintTap] (tap 1). Not called during drag steps —
+  /// the drag commits via [handleDragEnd].
   void _afterMutation() {
     _clearHint();
     _scheduleHelpMe();
-    _scheduleHintRanking();
-    startHintConstraintComputation();
     notifyListeners();
     rearmIdleTimer();
   }
@@ -645,6 +647,19 @@ class GameModel extends ChangeNotifier {
     if (hintStage == 0) {
       _revealErrors(texts);
       hintStage = 1;
+      // On-demand: in `addConstraint` mode, kick off the (expensive) search
+      // for a simplifying constraint now — while the player reads the "all
+      // correct" pass — so tap 2 can consume it. Skip when:
+      //  - the error pass surfaced a mistake (`hintIsError`): the player must
+      //    fix it first, and a contradictory state has no useful candidate;
+      //  - a pass is already ready or in flight (e.g. fields pre-populated, or
+      //    a slow web pass still running) → don't wipe a usable result.
+      if (mode == HintType.addConstraint &&
+          !hintIsError &&
+          hintConstraintsReady != HintConstraintStatus.ready &&
+          hintConstraintsReady != HintConstraintStatus.inprogress) {
+        startHintConstraintComputation();
+      }
       notifyListeners();
       return;
     }
@@ -680,6 +695,7 @@ class GameModel extends ChangeNotifier {
     hintText = "";
     hintIsError = false;
     hintStage = 0;
+    _pendingRevealTexts = null;
     notifyListeners();
   }
 
@@ -772,6 +788,9 @@ class GameModel extends ChangeNotifier {
     if (hintConstraintsReady == HintConstraintStatus.inprogress) {
       hintText = texts.hintConstraintInprogress;
       hintIsError = false;
+      // Remember we're waiting on this pass: its completion callback will
+      // reveal the constraint for us (no extra tap needed).
+      _pendingRevealTexts = texts;
     } else if (addHintConstraint()) {
       hintText = texts.hintConstraintAdded;
       hintIsError = false;
@@ -815,7 +834,6 @@ class GameModel extends ChangeNotifier {
 
     hintConstraintsReady = HintConstraintStatus.inprogress;
     availableHintConstraints = [];
-    _usefulHintCount = 0;
 
     final worker = HintWorker();
     _hintWorker = worker;
@@ -825,13 +843,7 @@ class GameModel extends ChangeNotifier {
           // Drop stale results: the worker we awaited is no longer the
           // active one (cancelled or replaced by a newer call).
           if (!identical(worker, _hintWorker)) return;
-          result.shuffle();
-          availableHintConstraints = result;
-          hintConstraintsReady = availableHintConstraints.isEmpty
-              ? HintConstraintStatus.nohint
-              : HintConstraintStatus.ready;
-          _hintWorker = null;
-          _computeHintRanking();
+          onHintConstraintComputed(result);
         })
         .catchError((Object _) {
           // Cancellation closes the receive port → first throws StateError.
@@ -839,77 +851,39 @@ class GameModel extends ChangeNotifier {
         });
   }
 
+  /// Settle the state once a constraint search returns [result] (the
+  /// serialized constraint, or null when none was found). Visible for testing
+  /// — production code reaches it only through the worker's completion
+  /// callback in [startHintConstraintComputation].
+  void onHintConstraintComputed(String? result) {
+    availableHintConstraints = result == null ? [] : [result];
+    hintConstraintsReady = result == null
+        ? HintConstraintStatus.nohint
+        : HintConstraintStatus.ready;
+    _hintWorker = null;
+    // If the player is parked on the "computing…" message, reveal the
+    // freshly-computed constraint immediately instead of waiting for another
+    // tap. `_revealAddedConstraint` now sees a settled status (ready/nohint),
+    // so it adds the constraint or shows "none".
+    final pending = _pendingRevealTexts;
+    if (pending != null) {
+      _pendingRevealTexts = null;
+      _revealAddedConstraint(pending);
+    }
+    notifyListeners();
+  }
+
   void cancelHintConstraintComputation() {
-    _cancelHintRanking();
     _hintWorker?.dispose();
     _hintWorker = null;
     hintConstraintsReady = HintConstraintStatus.canceled;
     availableHintConstraints = [];
-    _usefulHintCount = 0;
+    // Drop any pending auto-reveal: the pass it was waiting on is gone.
+    _pendingRevealTexts = null;
   }
 
-  // ---------------------------------------------------------------------------
-  // Hint constraint ranking
-  // ---------------------------------------------------------------------------
-
-  void _scheduleHintRanking() {
-    if (hintConstraintsReady != HintConstraintStatus.ready ||
-        availableHintConstraints.isEmpty) {
-      return;
-    }
-    _hintRankDebounce?.cancel();
-    _hintRankDebounce = Timer(
-      const Duration(milliseconds: 300),
-      _computeHintRanking,
-    );
-  }
-
-  void _computeHintRanking() {
-    _hintRankWorker?.dispose();
-    _hintRankWorker = null;
-    final puzzle = currentPuzzle;
-    if (puzzle == null || availableHintConstraints.isEmpty) return;
-
-    final worker = HintRankWorker();
-    _hintRankWorker = worker;
-    worker
-        .rank(
-          width: puzzle.width,
-          height: puzzle.height,
-          domain: puzzle.domain,
-          cellValues: puzzle.cellValues,
-          existingConstraints: puzzle.constraints
-              .map((c) => c.serialize())
-              .toList(),
-          candidateConstraints: availableHintConstraints,
-        )
-        .then((result) {
-          // Drop stale results: this worker may have been cancelled and
-          // replaced by a newer one mid-flight (rapid cell changes).
-          if (!identical(worker, _hintRankWorker)) return;
-          availableHintConstraints = result.ranked;
-          _usefulHintCount = result.usefulCount;
-          _hintRankWorker = null;
-          notifyListeners();
-        })
-        .catchError((Object _) {
-          // Cancellation closes the receive port → first throws StateError.
-          // A newer ranker has already taken over (or none is needed).
-        });
-  }
-
-  void _cancelHintRanking() {
-    _hintRankDebounce?.cancel();
-    _hintRankWorker?.dispose();
-    _hintRankWorker = null;
-  }
-
-  /// Pick the front candidate and add it to the puzzle. Useful candidates
-  /// (those that unlock new propagation) come first; once they're exhausted
-  /// the player can still request a constraint and gets one from the
-  /// non-useful tail — adding redundant constraints is harmless and lets a
-  /// player who asks for help past the propagation horizon receive
-  /// something rather than a blank "none available" message.
+  /// Add the offered hint constraint to the puzzle, then reset the hint state
+  /// so the next tap-1 recomputes a fresh suggestion against the new state.
   /// Returns true if a constraint was added.
   bool addHintConstraint() {
     if (currentPuzzle == null || availableHintConstraints.isEmpty) {
@@ -919,9 +893,7 @@ class GameModel extends ChangeNotifier {
     // Clear previous highlights before adding a new one
     currentPuzzle!.clearHighlights();
 
-    // Front of the list: useful first, then non-useful tail.
     final serialized = availableHintConstraints.removeAt(0);
-    if (_usefulHintCount > 0) _usefulHintCount--;
 
     // Parse "SLUG:params" and create the constraint
     final colonIdx = serialized.indexOf(':');
@@ -931,19 +903,34 @@ class GameModel extends ChangeNotifier {
     if (constraint == null) return false;
 
     constraint.isHighlighted = true;
+    final before = currentPuzzle!.constraints
+        .map((c) => c.serialize())
+        .join('|');
     currentPuzzle!.addConstraint(constraint);
+    final after = currentPuzzle!.constraints
+        .map((c) => c.serialize())
+        .join('|');
+    if (before == after) {
+      // The add changed nothing (e.g. an LT merge with no new cell). Don't
+      // claim a constraint was added and don't bill the hint; reset so the
+      // next tap-1 recomputes a fresh suggestion against the current state.
+      hintConstraintsReady = HintConstraintStatus.canceled;
+      notifyListeners();
+      return false;
+    }
     if (currentMeta != null) {
       currentMeta!.hints += 1;
       currentMeta!.stats?.hints += 1;
     }
-    _scheduleHintRanking();
+    // The suggestion is consumed and the puzzle changed; force the next
+    // tap-1 to recompute from scratch rather than reuse a stale state.
+    hintConstraintsReady = HintConstraintStatus.canceled;
     notifyListeners();
     return true;
   }
 
   /// Whether the "add constraint" hint button should be enabled.
-  /// True as long as any candidate remains, regardless of whether it's
-  /// "useful" — the player can opt to add a redundant constraint anyway.
+  /// True as long as a computed candidate is available.
   bool get canAddHintConstraint =>
       hintConstraintsReady == HintConstraintStatus.ready &&
       availableHintConstraints.isNotEmpty;
@@ -971,7 +958,6 @@ class GameModel extends ChangeNotifier {
     _cancelCheckDebounce();
     _cancelIdleTimer();
     _hintWorker?.dispose();
-    _cancelHintRanking();
     super.dispose();
   }
 }

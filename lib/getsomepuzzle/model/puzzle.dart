@@ -841,36 +841,52 @@ class Puzzle {
     // Emptiness: ratio of free cells, scaled to 0-6
     final emptiness = (totalFree / size * 6).round();
 
-    // Effort: run findAMove to fixpoint, accumulating each move's player-
-    // effort weight. Propagation moves carry a 0-5 weight set by the
-    // constraint's apply(); force moves carry `5 + 5 * forceDepth`. Any
-    // contradiction → puzzle isn't deductively solvable → complexity 100.
+    // Effort: weight of the deduction trace. A contradiction or a state that
+    // can't be finished by deduction → puzzle isn't deductively solvable →
+    // complexity 100.
+    final trace = _solveEffort();
+    if (trace.solved == null) {
+      cachedComplexity = 100;
+      return 100;
+    }
+
+    cachedSolution = trace.solved;
+    final forceScore = trace.effort.clamp(0, 90);
+    cachedComplexity = (forceScore + ruleDiversity + emptiness).clamp(0, 100);
+    return cachedComplexity!;
+  }
+
+  /// Solve a clone with `findAMove` (propagation + force) and accumulate the
+  /// player-effort weight of every step: propagation moves carry the 0-5
+  /// weight set by the constraint's `apply()`, force moves carry
+  /// `5 + 5 * forceDepth`. Returns the total `effort` and the solved cell
+  /// values; `solved` is null when the puzzle hits a contradiction or can't
+  /// be finished by deduction. Shared by [computeComplexity] and
+  /// [traceEffort].
+  ({int effort, List<int>? solved}) _solveEffort() {
     final test = clone();
     int effort = 0;
     for (int step = 0; step < 1000; step++) {
       final m = test.findAMove(checkErrors: false);
       if (m == null) break;
-      if (m.isImpossible != null) {
-        cachedComplexity = 100;
-        return 100;
-      }
+      if (m.isImpossible != null) return (effort: effort, solved: null);
       test.setValue(m.idx, m.value);
-      if (m.isForce) {
-        effort += 5 + 5 * m.forceDepth;
-      } else {
-        effort += m.complexity;
-      }
+      effort += m.isForce ? (5 + 5 * m.forceDepth) : m.complexity;
       if (test.complete) break;
     }
-    if (test.freeCells().isNotEmpty) {
-      cachedComplexity = 100;
-      return 100;
-    }
+    if (test.freeCells().isNotEmpty) return (effort: effort, solved: null);
+    return (effort: effort, solved: test.cellValues);
+  }
 
-    cachedSolution = test.cellValues;
-    final forceScore = effort.clamp(0, 90);
-    cachedComplexity = (forceScore + ruleDiversity + emptiness).clamp(0, 100);
-    return cachedComplexity!;
+  /// Player-effort weight of the deduction trace that solves this puzzle from
+  /// its **current** state (see [_solveEffort] for the per-step weights). Used
+  /// by the `addConstraint` hint search to compare states: a candidate
+  /// constraint is helpful when adding it lowers this value. Returns a large
+  /// sentinel when the state isn't deductively solvable (should not happen on
+  /// corpus puzzles, which are solvable by construction).
+  int traceEffort() {
+    final trace = _solveEffort();
+    return trace.solved == null ? (1 << 30) : trace.effort;
   }
 
   /// Step-by-step solving trace, returning each deduction made.

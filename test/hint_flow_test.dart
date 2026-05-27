@@ -1,6 +1,7 @@
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
@@ -143,44 +144,201 @@ void main() {
       },
     );
 
-    test(
-      'non-useful candidate is delivered when player asks past usefulCount',
-      () {
-        // When the puzzle is already solvable by propagation, the ranker
-        // pushes every candidate to the non-useful tail (usefulCount == 0).
-        // The button must stay enabled and a tap must still attach a
-        // constraint — the player explicitly asked for help, even if the
-        // extra constraint is redundant.
-        final game = GameModel();
-        final settings = Settings(hintType: HintType.addConstraint);
-        game.openPuzzle(_emptyFixture(), 1);
+    test('an already-ready candidate is attached on tap 2', () {
+      // Simulate a completed search: one candidate ready. Tap 1 must NOT
+      // re-trigger the search (it would wipe the ready result); tap 2 must
+      // attach the candidate. We bypass the Isolate path by writing the
+      // public fields directly.
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.openPuzzle(_emptyFixture(), 1);
 
-        // Simulate a completed ranker pass: list populated, but every
-        // candidate landed in the non-useful tail (usefulCount stays 0).
-        // We bypass the Isolate path by writing the public fields directly.
-        game.availableHintConstraints = ['FM:11', 'FM:22'];
-        game.hintConstraintsReady = HintConstraintStatus.ready;
+      game.availableHintConstraints = ['FM:11', 'FM:22'];
+      game.hintConstraintsReady = HintConstraintStatus.ready;
 
-        expect(
-          game.canAddHintConstraint,
-          isTrue,
-          reason: 'button must stay enabled while any candidate remains',
-        );
+      expect(
+        game.canAddHintConstraint,
+        isTrue,
+        reason: 'button must stay enabled while a candidate is ready',
+      );
 
-        final constraintsBefore = game.currentPuzzle!.constraints.length;
-        game.onHintTap(settings, _texts); // stage 0 → 1 (errors pass)
-        game.onHintTap(settings, _texts); // stage 1 → terminal
+      final constraintsBefore = game.currentPuzzle!.constraints.length;
+      game.onHintTap(settings, _texts); // stage 0 → 1 (errors pass)
 
-        expect(
-          game.currentPuzzle!.constraints.length,
-          constraintsBefore + 1,
-          reason: 'a non-useful candidate must still be attached on demand',
-        );
-        expect(game.hintText, 'constraint added');
+      expect(
+        game.hintConstraintsReady,
+        HintConstraintStatus.ready,
+        reason: 'tap 1 must not re-trigger and clobber a ready result',
+      );
 
-        game.dispose();
-      },
-    );
+      game.onHintTap(settings, _texts); // stage 1 → terminal
+
+      expect(
+        game.currentPuzzle!.constraints.length,
+        constraintsBefore + 1,
+        reason: 'the ready candidate must be attached on demand',
+      );
+      expect(game.hintText, 'constraint added');
+
+      game.dispose();
+    });
+
+    test('openPuzzle in addConstraint mode does not start a search', () {
+      // The expensive search is on-demand (first hint tap), never eager on
+      // open — this is what fixes the URL-open freeze on web.
+      final game = GameModel();
+      game.hintType = HintType.addConstraint;
+      game.openPuzzle(_deducibleFixture(), 1);
+
+      expect(
+        game.hintConstraintsReady,
+        isNot(HintConstraintStatus.inprogress),
+        reason: 'no constraint search must run just from opening the puzzle',
+      );
+
+      game.dispose();
+    });
+
+    test('tap 1 in addConstraint mode starts the search', () {
+      // With a cached solution available, tap 1 kicks the search (status
+      // flips to inprogress synchronously, before the isolate completes).
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.hintType = HintType.addConstraint;
+      game.openPuzzle(_deducibleFixture(), 1);
+      // forPuzzle needs a cached solution; computeComplexity populates it.
+      game.currentPuzzle!.computeComplexity(force: true);
+
+      game.onHintTap(settings, _texts); // stage 0 → 1, triggers the search
+      expect(game.hintStage, 1);
+      expect(
+        game.hintConstraintsReady,
+        HintConstraintStatus.inprogress,
+        reason: 'tap 1 must start the constraint search on demand',
+      );
+
+      game.dispose();
+    });
+
+    test('a no-op candidate shows "none", not "added", and is not billed', () {
+      // Regression: `addHintConstraint` used to return true (→ "added") even
+      // when `Puzzle.addConstraint` changed nothing — e.g. an LT permutation
+      // merging into an existing same-letter group. Such a candidate must be
+      // reported as "none" and must not bill a hint.
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.openPuzzle(_emptyFixture(), 1);
+
+      // Existing LT on cells 0,1; the offered candidate is its permutation
+      // (cells 1,0) → merges with no new cell → no-op.
+      game.currentPuzzle!.addConstraint(createConstraint('LT', 'A.0.1')!);
+      final constraintsBefore = game.currentPuzzle!.constraints.length;
+      final hintsBefore = game.currentMeta!.hints;
+
+      game.availableHintConstraints = ['LT:A.1.0'];
+      game.hintConstraintsReady = HintConstraintStatus.ready;
+
+      game.onHintTap(settings, _texts); // stage 0 → 1
+      game.onHintTap(settings, _texts); // stage 1 → terminal
+
+      expect(
+        game.currentPuzzle!.constraints.length,
+        constraintsBefore,
+        reason: 'a no-op merge must not change the constraint set',
+      );
+      expect(
+        game.hintText,
+        'no more constraints',
+        reason: 'nothing was added → show the "none" message, not "added"',
+      );
+      expect(
+        game.currentMeta!.hints,
+        hintsBefore,
+        reason: 'a no-op add must not bill the player a hint',
+      );
+      expect(game.hintConstraintsReady, HintConstraintStatus.canceled);
+
+      game.dispose();
+    });
+
+    test('a constraint computed while waiting is revealed automatically', () {
+      // The player taps to reveal before the (slow) search finishes, so they
+      // see the "computing…" message. When the worker reports a candidate, it
+      // must be attached on its own — no extra tap required.
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.openPuzzle(_emptyFixture(), 1);
+
+      // Simulate a search already running (worker spawned, not yet done) so
+      // tap 1 won't start a real isolate.
+      game.hintConstraintsReady = HintConstraintStatus.inprogress;
+
+      game.onHintTap(settings, _texts); // stage 0 → 1, errors pass
+      game.onHintTap(settings, _texts); // stage 1 → terminal, still computing
+      expect(
+        game.hintText,
+        'in progress',
+        reason: 'with the search unfinished, tap 2 shows the waiting message',
+      );
+
+      final constraintsBefore = game.currentPuzzle!.constraints.length;
+
+      // Worker reports back: the pending reveal must fire automatically.
+      game.onHintConstraintComputed('FM:11');
+      expect(
+        game.currentPuzzle!.constraints.length,
+        constraintsBefore + 1,
+        reason: 'completion must auto-attach the pending constraint',
+      );
+      expect(game.hintText, 'constraint added');
+
+      game.dispose();
+    });
+
+    test('an empty result while waiting auto-shows the "none" message', () {
+      // Same waiting scenario, but the search finds no helpful constraint.
+      // The waiting message must resolve to the terminal "none" feedback
+      // rather than stay stuck on "computing…".
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.openPuzzle(_emptyFixture(), 1);
+      game.hintConstraintsReady = HintConstraintStatus.inprogress;
+
+      game.onHintTap(settings, _texts); // stage 0 → 1
+      game.onHintTap(settings, _texts); // stage 1 → terminal, still computing
+      expect(game.hintText, 'in progress');
+
+      game.onHintConstraintComputed(null); // search found nothing
+      expect(game.hintText, 'no more constraints');
+
+      game.dispose();
+    });
+
+    test('tap 1 does not start the search when the grid has an error', () {
+      // If the error pass surfaces a mistake, the player must fix it first —
+      // launching the (expensive) constraint search on a contradictory state
+      // would be wasted work.
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.hintType = HintType.addConstraint;
+      game.openPuzzle(_deducibleFixture(), 1);
+      game.currentPuzzle!.computeComplexity(force: true);
+
+      // Fill a free cell with the wrong colour so tap 1 reports an error.
+      final cell = game.currentPuzzle!.cells.firstWhere((c) => !c.readonly);
+      final correct = game.currentPuzzle!.cachedSolution![cell.idx];
+      game.currentPuzzle!.setValue(cell.idx, correct == 1 ? 2 : 1);
+
+      game.onHintTap(settings, _texts); // stage 0 → 1, error pass
+      expect(game.hintIsError, isTrue, reason: 'tap 1 must flag the mistake');
+      expect(
+        game.hintConstraintsReady,
+        isNot(HintConstraintStatus.inprogress),
+        reason: 'no search must start while an error is on the grid',
+      );
+
+      game.dispose();
+    });
   });
 
   group('Hint cycle reset', () {

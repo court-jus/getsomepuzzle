@@ -75,6 +75,14 @@ deductions default to tier 3 — the player must hold two rules in mind
 at once, heavier than any single-constraint deduction except
 articulation/enumeration.
 
+The `addConstraint` hint search ranks candidates by how much they lower
+`Puzzle.traceEffort()` (the sum of per-step weights). A complicity step
+contributes only its ordinary `Move.complexity` there — the `isComplicity`
+flag is not given extra weight. **To explore:** over-weight complicity
+steps in `traceEffort` so the hint search prioritises constraints that
+remove a complicity the player likely did not spot, not just any
+difficulty.
+
 ### UI hooks — constraint names
 
 `Move.givenBy.isHighlighted` is only valid when `givenBy is Constraint`.

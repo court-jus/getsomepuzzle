@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_worker_core.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
@@ -9,7 +8,9 @@ class HintWorker {
   Isolate? _isolate;
   ReceivePort? _receivePort;
 
-  Future<List<String>> compute({required Puzzle puzzle}) async {
+  /// Returns the constraint (serialized `SLUG:params`) to offer as a hint, or
+  /// null when none is available. Runs the search in a background isolate.
+  Future<String?> compute({required Puzzle puzzle}) async {
     final port = ReceivePort();
     _receivePort = port;
 
@@ -20,7 +21,7 @@ class HintWorker {
 
     try {
       final result = await port.first;
-      return (result as List).cast<String>();
+      return result as String?;
     } finally {
       port.close();
       if (identical(_receivePort, port)) _receivePort = null;
@@ -47,22 +48,9 @@ class _HintParams {
   _HintParams({required this.sendPort, required this.puzzle});
 }
 
-void _isolateEntryPoint(_HintParams params) {
+Future<void> _isolateEntryPoint(_HintParams params) async {
   final ctx = HintContext.forPuzzle(params.puzzle);
-  final validConstraints = <String>[];
-
-  for (final entry in constraintRegistry) {
-    final allParameters = entry.generateAllParameters(
-      ctx.puzzle.width,
-      ctx.puzzle.height,
-      ctx.puzzle.domain,
-      ctx.readonlyIndices,
-    );
-    for (final param in allParameters) {
-      final serialized = classifyHintCandidate(ctx, entry.slug, param);
-      if (serialized != null) validConstraints.add(serialized);
-    }
-  }
-
-  params.sendPort.send(validConstraints);
+  // No yielding: the isolate has the whole core to itself.
+  final result = await pickHintConstraint(ctx);
+  params.sendPort.send(result);
 }
