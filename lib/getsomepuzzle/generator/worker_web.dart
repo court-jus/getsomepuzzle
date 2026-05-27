@@ -18,6 +18,7 @@ class GeneratorWorker {
     List<String> seedBlacklist = const <String>[],
     int adaptiveK = 20,
     int skipSafety = 100,
+    String? Function(int workerIndex)? assignTarget,
   }) {
     // Equilibrium, warm-up and the infeasibility blacklist are CLI-only for
     // now; the web/in-app generator keeps the legacy slug-only bias and

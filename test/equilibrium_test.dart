@@ -579,4 +579,129 @@ void main() {
       expect(argmax, 'GS');
     });
   });
+
+  group('parseTargetKey', () {
+    // Round-trip: every concrete Target must reconstruct from its own `key`,
+    // since that key is what crosses the isolate boundary to the worker.
+    test('round-trips every Target subtype through its key', () {
+      // Target subclasses don't override ==, so assert on the reconstructed
+      // key (the stable identity the coordinator and blacklist rely on) and
+      // on the runtime type.
+      final targets = <Target>[
+        const SlugTarget('CH'),
+        const NTypesTarget(3),
+        const SizeTarget(4, 7),
+        const ProfileTarget(ProfileCategory.syBased),
+        // PairTarget.from normalizes order — key is sorted FM+PA.
+        PairTarget.from('PA', 'FM'),
+      ];
+      for (final t in targets) {
+        final parsed = parseTargetKey(t.key);
+        expect(parsed, isNotNull, reason: t.key);
+        expect(parsed!.key, equals(t.key));
+        expect(parsed.runtimeType, equals(t.runtimeType));
+      }
+    });
+
+    test('returns null for unknown or malformed keys', () {
+      expect(parseTargetKey('bogus:CH'), isNull); // unknown kind
+      expect(parseTargetKey('CH'), isNull); // no colon
+      expect(parseTargetKey('ntypes:abc'), isNull); // non-numeric n
+      expect(parseTargetKey('size:4xZ'), isNull); // bad height
+      expect(parseTargetKey('pair:FM'), isNull); // missing second slug
+      expect(parseTargetKey('profile:nope'), isNull); // unknown profile
+    });
+  });
+
+  group('weightedPickTarget', () {
+    test('never returns a non-positive-gap candidate', () {
+      // Only the middle candidate has a positive gap → it must always win,
+      // regardless of the rng draw.
+      final candidates = <({Target target, double gap})>[
+        (target: const SlugTarget('A'), gap: 0.0),
+        (target: const SlugTarget('B'), gap: 0.5),
+        (target: const SlugTarget('C'), gap: -1.0),
+      ];
+      final rng = Random(1);
+      for (int i = 0; i < 20; i++) {
+        expect(weightedPickTarget(candidates, rng), const SlugTarget('B'));
+      }
+    });
+
+    test('returns null when no candidate has a positive gap', () {
+      final candidates = <({Target target, double gap})>[
+        (target: const SlugTarget('A'), gap: 0.0),
+        (target: const SlugTarget('B'), gap: -0.2),
+      ];
+      expect(weightedPickTarget(candidates, Random(0)), isNull);
+      expect(weightedPickTarget(const [], Random(0)), isNull);
+    });
+  });
+
+  group('BucketRotation', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'CH'],
+      minWidth: 4,
+      maxWidth: 4,
+      minHeight: 4,
+      maxHeight: 4,
+    );
+
+    test('hands out every deficient bucket once before any repeat', () {
+      // Seed 20 single-FM 4x4 puzzles. This makes avgK > 0 (the slug axis is
+      // silent on an empty corpus), leaving CH under-represented on the slug
+      // axis while syBased stays under-represented on the profile axis —
+      // exactly the cross-axis mix we want to exercise.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 20; i++) {
+        stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
+      }
+      final positive = rankTargets(
+        stats,
+        universe,
+      ).where((c) => c.gap > 0).map((c) => c.target.key).toSet();
+      // Sanity: the deficit spans several buckets across axes (slugs, pairs,
+      // profiles, …) — otherwise the coverage property would be vacuous.
+      expect(positive.length, greaterThan(3));
+
+      final rot = BucketRotation(Random(7));
+      final firstCycle = [
+        for (int i = 0; i < positive.length; i++)
+          rot.next(stats, universe)!.key,
+      ];
+      // One full cycle covers exactly the positive-gap set, with no repeats.
+      expect(firstCycle.toSet(), equals(positive));
+      expect(firstCycle.length, equals(firstCycle.toSet().length));
+
+      // Core fix: the small-target syBased profile bucket is served in the
+      // SAME cycle as the much larger slug deficits — never starved behind
+      // them the way the raw-argmax picker starved it.
+      expect(firstCycle, contains('profile:syBased'));
+      expect(firstCycle.any((k) => k.startsWith('slug:')), isTrue);
+
+      // The next draw opens a fresh cycle: the claim ledger was reset, so it
+      // now holds just the one bucket we just claimed.
+      final afterReset = rot.next(stats, universe)!;
+      expect(rot.claimedThisCycle, equals({afterReset.key}));
+    });
+
+    test('never hands out a bucket whose gap is already non-positive', () {
+      // Saturate FM so its slug gap clamps to 0 — it must never be assigned,
+      // not even after the cycle resets.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 200; i++) {
+        stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
+      }
+      final rot = BucketRotation(Random(3));
+      final seen = <String>{};
+      for (int i = 0; i < 200; i++) {
+        final t = rot.next(stats, universe);
+        if (t != null) seen.add(t.key);
+      }
+      expect(seen, isNot(contains('slug:FM')));
+      // But the under-represented CH slug and syBased profile still surface.
+      expect(seen, contains('slug:CH'));
+      expect(seen, contains('profile:syBased'));
+    });
+  });
 }

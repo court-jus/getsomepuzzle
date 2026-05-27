@@ -572,6 +572,113 @@ T _weightedPick<T>(List<(T, double)> items, Random rng) {
   return items.last.$1;
 }
 
+/// Sample one [Target] from `(target, gap)` pairs, weighted by gap. Public
+/// wrapper over [_weightedPick] used by the CLI's cross-worker bucket
+/// rotation (the coordinator picks among the unclaimed buckets). Returns
+/// `null` when [candidates] is empty or every gap is ≤ 0.
+Target? weightedPickTarget(
+  List<({Target target, double gap})> candidates,
+  Random rng,
+) {
+  final positive = [
+    for (final c in candidates)
+      if (c.gap > 0) (c.target, c.gap),
+  ];
+  if (positive.isEmpty) return null;
+  return _weightedPick(positive, rng);
+}
+
+/// Cross-worker bucket rotation used by the CLI coordinator (main isolate).
+///
+/// Hands out the next deficient bucket to a requesting worker so the parallel
+/// workers chase *distinct* under-represented buckets instead of all piling on
+/// the single biggest gap. The guarantee: every positive-gap bucket is claimed
+/// once per cycle before any bucket repeats. Only when the whole deficient set
+/// has been handed out does the cycle reset and the sweep starts over — so we
+/// don't come back to (say) the most-deficient slug until every other
+/// deficient bucket, including the small-target profile buckets like
+/// `profile:syBased`, has been served at least once.
+///
+/// This per-cycle coverage is what neutralizes the cross-axis scale imbalance
+/// (a slug expected ~30 % vs a profile expected 5 %): rotation gives each
+/// deficient bucket one turn per cycle regardless of the raw magnitude of its
+/// gap. Selection *within* the not-yet-claimed set is weighted-random by gap
+/// (via [weightedPickTarget]) so bigger deficits still tend to go first.
+///
+/// Single-threaded by construction: the coordinator lives in the main isolate
+/// whose event loop serializes every worker's `requestTarget`, so the mutable
+/// [claimedThisCycle] set needs no locking.
+class BucketRotation {
+  final Random _rng;
+  final Set<String> _claimedThisCycle = <String>{};
+
+  BucketRotation([Random? rng]) : _rng = rng ?? Random();
+
+  /// Bucket keys already handed out in the current cycle. Exposed for
+  /// diagnostics and tests.
+  Set<String> get claimedThisCycle => Set.unmodifiable(_claimedThisCycle);
+
+  /// Returns the next bucket to push, or `null` when no bucket has a positive
+  /// gap (corpus perfectly balanced — extremely rare). Marks the returned
+  /// bucket as claimed for this cycle.
+  Target? next(EquilibriumStats stats, TargetUniverse universe) {
+    final ranked = rankTargets(stats, universe);
+    var pool = [
+      for (final c in ranked)
+        if (c.gap > 0 && !_claimedThisCycle.contains(c.target.key)) c,
+    ];
+    if (pool.isEmpty) {
+      // Every deficient bucket has had its turn — start a fresh cycle.
+      _claimedThisCycle.clear();
+      pool = [
+        for (final c in ranked)
+          if (c.gap > 0) c,
+      ];
+      if (pool.isEmpty) return null;
+    }
+    final picked = weightedPickTarget(pool, _rng);
+    if (picked == null) return null;
+    _claimedThisCycle.add(picked.key);
+    return picked;
+  }
+}
+
+/// Rebuild a [Target] from its stable [Target.key]. Inverse of the `key`
+/// getters on the concrete subclasses — used to ferry a target across the
+/// isolate boundary (the coordinator picks it in the main isolate, the
+/// worker reconstructs it). Returns `null` for an unrecognized or malformed
+/// key so callers can fall back gracefully.
+Target? parseTargetKey(String key) {
+  final colon = key.indexOf(':');
+  if (colon <= 0) return null;
+  final kind = key.substring(0, colon);
+  final rest = key.substring(colon + 1);
+  switch (kind) {
+    case 'slug':
+      return rest.isEmpty ? null : SlugTarget(rest);
+    case 'ntypes':
+      final n = int.tryParse(rest);
+      return n == null ? null : NTypesTarget(n);
+    case 'pair':
+      final plus = rest.indexOf('+');
+      if (plus <= 0 || plus >= rest.length - 1) return null;
+      return PairTarget.from(rest.substring(0, plus), rest.substring(plus + 1));
+    case 'size':
+      final x = rest.indexOf('x');
+      if (x <= 0 || x >= rest.length - 1) return null;
+      final w = int.tryParse(rest.substring(0, x));
+      final h = int.tryParse(rest.substring(x + 1));
+      return (w == null || h == null) ? null : SizeTarget(w, h);
+    case 'profile':
+      for (final p in ProfileCategory.values) {
+        if (p.name == rest) return ProfileTarget(p);
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
 /// All scored candidates, sorted by descending gap. Useful for diagnostics
 /// (top-N, histograms).
 List<({Target target, double gap})> rankTargets(

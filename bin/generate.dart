@@ -172,6 +172,26 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   }
   final universeSlugs = allowedSlugs ?? constraintSlugs.toSet();
 
+  // Coordinator for the cross-worker bucket rotation. Lives here in the main
+  // isolate because it needs (a) the *global* corpus stats — workers only see
+  // their own output — and (b) a shared claim ledger so each worker chases a
+  // distinct deficient bucket. `globalEquiStats` is rebuilt whenever a puzzle
+  // lands (same cadence as `cachedStats`), so the rotation always ranks gaps
+  // against the live corpus. Only active in equilibrium mode.
+  var globalEquiStats = EquilibriumStats.fromLines(currentLines);
+  final coordinatorUniverse = TargetUniverse(
+    allowedSlugs: universeSlugs,
+    minWidth: minWidth,
+    maxWidth: maxWidth,
+    minHeight: minHeight,
+    maxHeight: maxHeight,
+  );
+  final bucketRotation = BucketRotation();
+  // Answers a worker's `requestTarget`: hands out the next deficient bucket
+  // key, or null to let the worker decide locally (no positive-gap bucket).
+  String? assignBucket(int workerIndex) =>
+      bucketRotation.next(globalEquiStats, coordinatorUniverse)?.key;
+
   void render() {
     final liveCount = currentLines.where((l) => l.trim().isNotEmpty).length;
     _renderDashboard(
@@ -311,6 +331,9 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       seedBlacklist: seedBlacklistList,
       adaptiveK: blacklistAdaptiveK,
       skipSafety: blacklistSkipSafety,
+      // Cross-worker rotation: only wire the coordinator in equilibrium mode.
+      // Off → workers keep the legacy local random/argmax path.
+      assignTarget: equilibriumRequested ? assignBucket : null,
     );
 
     consumers.add(() async {
@@ -363,6 +386,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
               currentLines = [...currentLines, puzzleLine];
             }
             cachedStats = _CollectionStats.fromLines(currentLines);
+            globalEquiStats = EquilibriumStats.fromLines(currentLines);
             render();
           case GeneratorAttemptMessage():
             // One row per attempt — both successes and abandons. Chained

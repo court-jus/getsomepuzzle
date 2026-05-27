@@ -25,6 +25,7 @@ class GeneratorWorker {
     List<String> seedBlacklist = const <String>[],
     int adaptiveK = 20,
     int skipSafety = 100,
+    String? Function(int workerIndex)? assignTarget,
   }) {
     _controller = StreamController<GeneratorMessage>();
 
@@ -39,6 +40,7 @@ class GeneratorWorker {
       seedBlacklist,
       adaptiveK,
       skipSafety,
+      assignTarget,
     );
 
     return _controller!.stream;
@@ -65,8 +67,12 @@ class GeneratorWorker {
     List<String> seedBlacklist,
     int adaptiveK,
     int skipSafety,
+    String? Function(int workerIndex)? assignTarget,
   ) async {
     final receivePort = ReceivePort();
+    // Reply port to this worker, captured from its `ready` handshake. The
+    // worker awaits an `assignTarget` answer for every `requestTarget`.
+    SendPort? workerReplyPort;
 
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
@@ -102,7 +108,14 @@ class GeneratorWorker {
     receivePort.listen((message) {
       if (message is Map<String, dynamic>) {
         final type = message['type'] as String;
-        if (type == 'progress') {
+        if (type == 'ready') {
+          workerReplyPort = message['port'] as SendPort;
+        } else if (type == 'requestTarget') {
+          // Hand the worker its next bucket. The coordinator (when wired) owns
+          // the cross-worker rotation; a null answer means "decide locally".
+          final key = assignTarget?.call(message['worker'] as int);
+          workerReplyPort?.send({'type': 'assignTarget', 'targetKey': key});
+        } else if (type == 'progress') {
           _controller?.add(
             GeneratorProgressMessage(
               GeneratorProgress(
@@ -227,7 +240,7 @@ class _IsolateParams {
   });
 }
 
-void _isolateEntryPoint(_IsolateParams params) {
+Future<void> _isolateEntryPoint(_IsolateParams params) async {
   // Each log line is written and flushed synchronously: this is the explicit
   // tradeoff for diagnosing hangs. If a worker is stuck inside `solve()` or
   // its inner constraint propagation, every line emitted before the hang
@@ -295,6 +308,39 @@ void _isolateEntryPoint(_IsolateParams params) {
     log('seed blacklist: ${seedSet.length} combo(s) loaded');
   }
 
+  // Bidirectional channel to the coordinator (main isolate). The worker asks
+  // for its next equilibrium bucket and awaits the assignment so the main can
+  // hand out distinct deficient buckets to each worker (cross-worker
+  // rotation). Requests are strictly sequential — one outstanding at a time —
+  // so a single pending completer suffices. The `ready` handshake hands the
+  // main our reply port; closing `replyPort` at the end lets the isolate exit.
+  final replyPort = ReceivePort();
+  Completer<String?>? pendingAssign;
+  replyPort.listen((msg) {
+    if (msg is Map && msg['type'] == 'assignTarget') {
+      pendingAssign?.complete(msg['targetKey'] as String?);
+      pendingAssign = null;
+    }
+  });
+  params.sendPort.send({
+    'type': 'ready',
+    'worker': params.workerIndex,
+    'port': replyPort.sendPort,
+  });
+
+  // Ask the coordinator for the next bucket key. Returns the assigned
+  // `Target.key`, or `null` when the coordinator declines (no positive-gap
+  // bucket, or no coordinator wired — the caller then falls back locally).
+  Future<String?> requestAssignedTargetKey() {
+    final c = Completer<String?>();
+    pendingAssign = c;
+    params.sendPort.send({
+      'type': 'requestTarget',
+      'worker': params.workerIndex,
+    });
+    return c.future;
+  }
+
   int generated = 0;
   final stopwatch = Stopwatch()..start();
 
@@ -332,7 +378,13 @@ void _isolateEntryPoint(_IsolateParams params) {
     } else if (params.equilibriumRequested &&
         universe != null &&
         equiStats != null) {
-      target = pickTarget(equiStats, universe);
+      // The coordinator (main isolate) owns the cross-worker bucket rotation
+      // and global stats. When it declines (null), fall back to this worker's
+      // local argmax so a missing coordinator degrades gracefully.
+      final assignedKey = await requestAssignedTargetKey();
+      target = assignedKey != null
+          ? parseTargetKey(assignedKey)
+          : pickTarget(equiStats, universe);
       if (target != null) {
         final resolved = _resolveTarget(
           target,
@@ -668,6 +720,7 @@ void _isolateEntryPoint(_IsolateParams params) {
     'worker done: generated=$generated/${params.count}, '
     'elapsed=${stopwatch.elapsed.inMilliseconds}ms',
   );
+  replyPort.close();
   params.sendPort.send({'type': 'done', 'generated': generated});
 }
 

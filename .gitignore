@@ -68,3 +68,5 @@ backup
 .claude/agent-memory
 .claude/settings.local.json
 docs/dev/devdocs.pdf
+tmp
+puzzle_vectors.csv

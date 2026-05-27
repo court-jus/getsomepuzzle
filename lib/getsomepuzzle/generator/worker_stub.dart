@@ -15,6 +15,7 @@ class GeneratorWorker {
     List<String> seedBlacklist = const <String>[],
     int adaptiveK = 20,
     int skipSafety = 100,
+    String? Function(int workerIndex)? assignTarget,
   }) => const Stream.empty();
 
   void cancel() {}
