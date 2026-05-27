@@ -47,6 +47,10 @@ failures (5 is the value used in early sketches) add the target's `key` to
 a session blacklist passed to `pickTarget` so the loop falls back to the
 next-deepest gap. Reset on successful generation or on warm-up.
 
+## Quality of the gameplay
+
+* I noticed that puzzles with only PA constraints are fun
+
 ## QOL
 
 * Allow opening the app directly with a puzzle on Android (custom URL scheme intent-filter for `getsomepuzzle://`). Web (query string) and Linux desktop (system handler) are already wired.
@@ -54,6 +58,7 @@ next-deepest gap. Reset on successful generation or on warm-up.
 ## UI
 
 * When showing that a cell can be deduced thanks to a constraint and that constraint is DF, the name of the constraint is not shown.
+* Users should be able to disable grayout
 
 ## Dev docs to be created
 
