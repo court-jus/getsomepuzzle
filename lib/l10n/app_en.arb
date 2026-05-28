@@ -580,6 +580,14 @@
     "@constraintRowCount": {
         "description": "Name of the row count constraint"
     },
+    "constraintRowTransition": "row transition",
+    "@constraintRowTransition": {
+        "description": "Name of the row transition constraint"
+    },
+    "constraintColumnTransition": "column transition",
+    "@constraintColumnTransition": {
+        "description": "Name of the column transition constraint"
+    },
     "constraintShape": "shape",
     "@constraintShape": {
         "description": "Name of the shape constraint"
@@ -689,6 +697,14 @@
     "constraintExplainRC": "A circled number to the left of a row tells how many cells of that color must appear in this specific row.",
     "@constraintExplainRC": {
         "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
+    },
+    "constraintExplainRT": "A square with a tilde and number beside a row tells how many color changes (transitions) must appear in that row.",
+    "@constraintExplainRT": {
+        "description": "Body of the new-constraint explanation modal for the Row Transition (RT) constraint"
+    },
+    "constraintExplainCT": "A square with a tilde and number above a column tells how many color changes (transitions) must appear in that column.",
+    "@constraintExplainCT": {
+        "description": "Body of the new-constraint explanation modal for the Column Transition (CT) constraint"
     },
     "constraintExplainGC": "A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.",
     "@constraintExplainGC": {

@@ -167,6 +167,14 @@
     "@constraintExplainRC": {
         "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
     },
+    "constraintExplainRT": "Un cuadrado con una tilde y un número al lado de una fila indica cuántos cambios de color deben aparecer en esa fila.",
+    "@constraintExplainRT": {
+        "description": "Body of the new-constraint explanation modal for the Row Transition (RT) constraint"
+    },
+    "constraintExplainCT": "Un cuadrado con una tilde y un número sobre una columna indica cuántos cambios de color deben aparecer en esa columna.",
+    "@constraintExplainCT": {
+        "description": "Body of the new-constraint explanation modal for the Column Transition (CT) constraint"
+    },
     "constraintExplainNC": "Una casilla mostrada como una cruz que contiene un número debe tener exactamente ese número de vecinos ortogonales del color indicado.",
     "@constraintExplainNC": {
         "description": "Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint"
@@ -240,6 +248,14 @@
     "constraintRowCount": "células por fila",
     "@constraintRowCount": {
         "description": "Name of the row count constraint"
+    },
+    "constraintRowTransition": "transición por fila",
+    "@constraintRowTransition": {
+        "description": "Name of the row transition constraint"
+    },
+    "constraintColumnTransition": "transición por columna",
+    "@constraintColumnTransition": {
+        "description": "Name of the column transition constraint"
     },
     "complicityOtherConstraint": "otra restricción",
     "settingReplayOnboarding": "Repetir la introducción",

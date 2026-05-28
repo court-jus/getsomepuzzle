@@ -185,6 +185,19 @@ Trivial constraint by design.
 | 1 | `colorCount == count` → free cells in the column become opposite      |      0 |
 | 2 | `count - colorCount == freeCells` → free cells become the target color |      0 |
 
+### RT / CT — Row / Column Transition (`constraints/transition_utils.dart`)
+
+See [`transition.md`](transition.md) for the full deduction walkthrough.
+
+| # | Deduction                                             | Weight |
+| - | ----------------------------------------------------- | -----: |
+| 1 | Saturated (`t == count`): free cell forced to match neighbour | 1 |
+| 2 | Full need (`t + fp == count`): free cell forced to differ  | 2 |
+
+Zero-transition and maximum-transition cases use the same branches
+(saturated / full need) and carry the same weights — the boundary
+extremes are not special-cased in the scoring.
+
 ### GC — Group Count (`constraints/group_count.dart`)
 
 | # | Deduction                                                                                | Weight |

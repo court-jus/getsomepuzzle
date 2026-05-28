@@ -59,6 +59,13 @@ The shape mirrors `QuantityConstraint`, restricted to a single column.
 `ColumnCountConstraint.generateAllParameters` like every other registered
 constraint type.
 
+### Mutual exclusion with CT
+
+`ColumnCountConstraint` overrides `conflictsWith` to reject same-column
+`ColumnTransitionConstraint` instances. The reverse is also declared in
+`transition_column.dart`. The generator respects this and will never produce
+a puzzle with both CC and CT on the same column.
+
 ### Widget
 
 **Location**: `lib/widgets/column_count.dart`

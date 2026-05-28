@@ -545,6 +545,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintRowCount => 'cellules par ligne';
 
   @override
+  String get constraintRowTransition => 'transition par ligne';
+
+  @override
+  String get constraintColumnTransition => 'transition par colonne';
+
+  @override
   String get constraintShape => 'forme';
 
   @override
@@ -641,6 +647,14 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get constraintExplainRC =>
       'Un nombre dans un cercle à gauche d\'une ligne indique combien de cellules de cette couleur doivent apparaître dans cette ligne précise.';
+
+  @override
+  String get constraintExplainRT =>
+      'Un carré avec un tilde et un nombre à côté d\'une ligne indique combien de changements de couleur doivent apparaître dans cette ligne.';
+
+  @override
+  String get constraintExplainCT =>
+      'Un carré avec un tilde et un nombre au-dessus d\'une colonne indique combien de changements de couleur doivent apparaître dans cette colonne.';
 
   @override
   String get constraintExplainGC =>

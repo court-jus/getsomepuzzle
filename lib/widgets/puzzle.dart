@@ -11,6 +11,8 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
@@ -22,6 +24,7 @@ import 'package:getsomepuzzle/widgets/group_count.dart';
 import 'package:getsomepuzzle/widgets/majority.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
+import 'package:getsomepuzzle/widgets/transition.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
 
 class PuzzleWidget extends StatefulWidget {
@@ -201,6 +204,14 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       }
     }
 
+    // Build a map of column index → ColumnTransitionConstraint for CT in column header
+    final ctByCol = <int, ColumnTransitionConstraint>{};
+    for (final c in widget.currentPuzzle.constraints) {
+      if (c is ColumnTransitionConstraint) {
+        ctByCol[c.columnIdx] = c;
+      }
+    }
+
     // Build a map of row index → RowCountConstraint for the left-side bar
     final rcByRow = <int, RowCountConstraint>{};
     for (final c in widget.currentPuzzle.constraints) {
@@ -209,12 +220,21 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       }
     }
 
+    // Build a map of row index → RowTransitionConstraint for RT in left bar
+    final rtByRow = <int, RowTransitionConstraint>{};
+    for (final c in widget.currentPuzzle.constraints) {
+      if (c is RowTransitionConstraint) {
+        rtByRow[c.rowIdx] = c;
+      }
+    }
+
     // A constraint is "in the top bar" if it's displayed there.
-    // RC is shown on the left side, not in the top bar.
+    // RC and RT are shown on the left side, not in the top bar.
     final bool constraintIsInTopBar =
         highlightedConstraint is Motif ||
         highlightedConstraint is QuantityConstraint ||
         highlightedConstraint is ColumnCountConstraint ||
+        highlightedConstraint is ColumnTransitionConstraint ||
         highlightedConstraint is GroupCountConstraint ||
         highlightedConstraint is ChainConstraint;
 
@@ -358,8 +378,8 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Left side: RC indicators (only if any RC constraints exist)
-                    if (rcByRow.isNotEmpty)
+                    // Left side: RC and RT indicators
+                    if (rcByRow.isNotEmpty || rtByRow.isNotEmpty)
                       Column(
                         children: [
                           for (
@@ -367,15 +387,31 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                             row < widget.currentPuzzle.height;
                             row++
                           )
-                            if (rcByRow.containsKey(row))
-                              RowCountWidget(
-                                key:
-                                    (rcByRow[row]!.isHighlighted &&
-                                        !constraintIsInTopBar)
-                                    ? _constraintKey
-                                    : null,
-                                constraint: rcByRow[row]!,
-                                cellSize: adjustedCellSize,
+                            if (rcByRow.containsKey(row) ||
+                                rtByRow.containsKey(row))
+                              Column(
+                                children: [
+                                  if (rcByRow.containsKey(row))
+                                    RowCountWidget(
+                                      key:
+                                          (rcByRow[row]!.isHighlighted &&
+                                              !constraintIsInTopBar)
+                                          ? _constraintKey
+                                          : null,
+                                      constraint: rcByRow[row]!,
+                                      cellSize: adjustedCellSize,
+                                    ),
+                                  if (rtByRow.containsKey(row))
+                                    TransitionWidget(
+                                      key:
+                                          (rtByRow[row]!.isHighlighted &&
+                                              !constraintIsInTopBar)
+                                          ? _constraintKey
+                                          : null,
+                                      constraint: rtByRow[row]!,
+                                      cellSize: adjustedCellSize,
+                                    ),
+                                ],
                               )
                             else
                               SizedBox(
@@ -387,7 +423,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                     // Right side: CC row + Grid
                     Column(
                       children: [
-                        if (ccByColumn.isNotEmpty)
+                        if (ccByColumn.isNotEmpty || ctByCol.isNotEmpty)
                           SizedBox(
                             width: gridWidth,
                             child: Row(
@@ -397,15 +433,36 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                   col < widget.currentPuzzle.width;
                                   col++
                                 )
-                                  if (ccByColumn.containsKey(col))
-                                    ColumnCountWidget(
-                                      key:
-                                          (ccByColumn[col]!.isHighlighted &&
-                                              constraintIsInTopBar)
-                                          ? _constraintKey
-                                          : null,
-                                      constraint: ccByColumn[col]!,
-                                      cellSize: adjustedCellSize,
+                                  if (ccByColumn.containsKey(col) ||
+                                      ctByCol.containsKey(col))
+                                    SizedBox(
+                                      width: adjustedCellSize,
+                                      child: Column(
+                                        children: [
+                                          if (ctByCol.containsKey(col))
+                                            TransitionWidget(
+                                              key:
+                                                  (ctByCol[col]!
+                                                          .isHighlighted &&
+                                                      constraintIsInTopBar)
+                                                  ? _constraintKey
+                                                  : null,
+                                              constraint: ctByCol[col]!,
+                                              cellSize: adjustedCellSize,
+                                            ),
+                                          if (ccByColumn.containsKey(col))
+                                            ColumnCountWidget(
+                                              key:
+                                                  (ccByColumn[col]!
+                                                          .isHighlighted &&
+                                                      constraintIsInTopBar)
+                                                  ? _constraintKey
+                                                  : null,
+                                              constraint: ccByColumn[col]!,
+                                              cellSize: adjustedCellSize,
+                                            ),
+                                        ],
+                                      ),
                                     )
                                   else
                                     SizedBox(width: adjustedCellSize),

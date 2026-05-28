@@ -545,6 +545,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintRowCount => 'células por fila';
 
   @override
+  String get constraintRowTransition => 'transición por fila';
+
+  @override
+  String get constraintColumnTransition => 'transición por columna';
+
+  @override
   String get constraintShape => 'forma';
 
   @override
@@ -641,6 +647,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get constraintExplainRC =>
       'Un número dentro de un círculo a la izquierda de una fila indica cuántas celdas de ese color deben aparecer en esa fila específica.';
+
+  @override
+  String get constraintExplainRT =>
+      'Un cuadrado con una tilde y un número al lado de una fila indica cuántos cambios de color deben aparecer en esa fila.';
+
+  @override
+  String get constraintExplainCT =>
+      'Un cuadrado con una tilde y un número sobre una columna indica cuántos cambios de color deben aparecer en esa columna.';
 
   @override
   String get constraintExplainGC =>

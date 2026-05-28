@@ -3,6 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
+
+import 'helpers/onboarding_completions.dart';
 
 /// Minimal-but-valid `PuzzleData` line. The constraint section repeats
 /// `FM:12` `nCons` times by default so `PuzzleData.rules.length == nCons`,
@@ -185,7 +188,7 @@ void main() {
       final db = Database(playerLevel: 0)..samplingRandom = math.Random(42);
       // Reach phase P5 (introducing GS): every earlier phase's slug cleared,
       // GS still below the threshold.
-      db.onboardingCompletions = {'FM': 5, 'NC': 5, 'PA': 5, 'CC': 5, 'RC': 5};
+      db.onboardingCompletions = strictCompletionsUpTo(5);
       expect(db.currentPhase?.introducing, 'GS');
       final trivial = gsPuz(1);
       final nonTrivial = gsPuz(3);
@@ -527,18 +530,7 @@ void main() {
       // playerLevel 80 → mad ('6-mad'). Player is in '2-player'.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
-      db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
-        "RC": 5,
-        "GS": 5,
-        "EY": 5,
-        "DF": 5,
-        "LT": 5,
-        "QA": 5,
-      }; // past strict phases
+      db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
       db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, '6-mad');
     });
@@ -551,18 +543,7 @@ void main() {
       // fresh plays in the current bucket.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
-      db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
-        "RC": 5,
-        "GS": 5,
-        "EY": 5,
-        "DF": 5,
-        "LT": 5,
-        "QA": 5,
-      }; // past strict phases
+      db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
       db.puzzles = []; // nothing loaded in memory
       db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, '6-mad');
@@ -581,15 +562,7 @@ void main() {
       db.loadStats(const []); // fresh stats, 0 plays
       expect(db.recommendedCollectionKey, isNull);
       db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
-        "RC": 5,
-        "EY": 5,
-        "DF": 5,
-        "LT": 5,
-        "QA": 5,
+        ...OnboardingPhase.strictCompletionTargets,
         "GS": 4,
       };
       expect(db.recommendedCollectionKey, null);
@@ -614,27 +587,13 @@ void main() {
       db.loadStats(nFinishedStatLines(enough));
       // When the onboarding is not done, even though player level says 6-mad.
       db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
+        ...strictCompletionsUpTo(5),
         "RC": 4,
         "GS": 2,
       };
       expect(db.recommendedCollectionKey, isNull);
       // Once across the strict boundary, recommendation resumes.
-      db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
-        "RC": 5,
-        "GS": 5,
-        "EY": 5,
-        "DF": 5,
-        "LT": 5,
-        "QA": 5,
-      };
+      db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
       expect(db.recommendedCollectionKey, '6-mad');
     });
   });

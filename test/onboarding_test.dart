@@ -22,18 +22,7 @@ void main() {
 
     test('returns null once the player has graduated past the last phase', () {
       expect(
-        phaseForCompletions({
-          "FM": 5,
-          "NC": 5,
-          "PA": 5,
-          "CC": 5,
-          "RC": 5,
-          "GS": 5,
-          "EY": 5,
-          "DF": 5,
-          "LT": 5,
-          "QA": 5,
-        }),
+        phaseForCompletions(OnboardingPhase.strictCompletionTargets),
         isNull,
       );
     });
@@ -93,9 +82,11 @@ void main() {
       // predictable and reviewable; if someone reorders the registry,
       // the order test fails and we revisit it intentionally.
       expect(OnboardingPhase.postStrictDiscoveryOrder, [
+        'RT',
         'SY',
         'SH',
         'CH',
+        'CT',
         'GC',
         'MJ',
       ]);

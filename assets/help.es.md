@@ -68,9 +68,17 @@ Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores dif
 
 Un número en un círculo encima de una columna indica cuántas celdas de ese color deben estar en esa columna específica.
 
+### Transición de columna
+
+Una tilde (~) con un número dentro de un cuadrado encima de una columna indica cuántos cambios de color (transiciones) deben aparecer en esa columna. Se cuenta una transición cada vez que dos celdas adyacentes están rellenas de colores diferentes.
+
 ### Número por fila
 
 Un número en un círculo a la izquierda de una fila indica cuántas celdas de ese color deben estar en esa fila. Es el equivalente horizontal de Número por columna.
+
+### Transición de fila
+
+Una tilde (~) con un número dentro de un cuadrado a la izquierda de una fila indica cuántos cambios de color (transiciones) deben aparecer en esa fila. Se cuenta una transición cada vez que dos celdas adyacentes están rellenas de colores diferentes.
 
 ### Número de grupos
 

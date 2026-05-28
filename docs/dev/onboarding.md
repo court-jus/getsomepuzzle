@@ -119,8 +119,8 @@ handles the edge case where the app is closed at a phase boundary.
 ### Soft-filter mode (post-P5)
 
 The corpus doesn't easily sustain strict phases for the remaining
-slugs (the eight in `OnboardingPhase.postStrictDiscoveryOrder` —
-currently `LT, QA, SY, DF, SH, GC, MJ, EY`, derived from
+slugs (the seven in `OnboardingPhase.postStrictDiscoveryOrder` —
+currently `RT, SY, SH, CH, CT, GC, MJ`, derived from
 `constraintRegistry`): too few puzzles whose declared rules sit
 cleanly inside a narrow envelope.
 

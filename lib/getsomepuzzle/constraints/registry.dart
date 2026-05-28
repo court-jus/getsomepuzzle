@@ -14,6 +14,8 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 
 /// Registry of all player-facing constraint types.
 /// Centralizes slug, label, and factory for each constraint type.
@@ -49,6 +51,12 @@ final constraintRegistry =
         label: 'Row count',
         fromParams: RowCountConstraint.new,
         generateAllParameters: RowCountConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'RT',
+        label: 'Row transition',
+        fromParams: RowTransitionConstraint.new,
+        generateAllParameters: RowTransitionConstraint.generateAllParameters,
       ),
       (
         slug: 'GS',
@@ -97,6 +105,12 @@ final constraintRegistry =
         label: 'Chain',
         fromParams: ChainConstraint.new,
         generateAllParameters: ChainConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'CT',
+        label: 'Column transition',
+        fromParams: ColumnTransitionConstraint.new,
+        generateAllParameters: ColumnTransitionConstraint.generateAllParameters,
       ),
       (
         slug: 'GC',

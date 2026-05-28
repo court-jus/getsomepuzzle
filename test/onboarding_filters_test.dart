@@ -4,6 +4,8 @@ import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'helpers/onboarding_completions.dart';
+
 /// Mark each strict-phase introducing slug as fully completed so the
 /// player is past every strict phase. Mirrors what `phaseForCompletions`
 /// expects (≥ `phaseLength` for every entry in `OnboardingPhase.phases`).
@@ -37,11 +39,7 @@ void main() {
       // envelope, and the puzzle must contain CC (wantedRules).
       final db = Database(playerLevel: 50, progress: ConstraintProgress());
       // Mark P0..P2 introducers complete so phaseForCompletions lands on P3.
-      db.onboardingCompletions = {
-        'FM': OnboardingPhase.phaseLength,
-        'NC': OnboardingPhase.phaseLength,
-        'PA': OnboardingPhase.phaseLength,
-      };
+      db.onboardingCompletions = strictCompletionsUpTo(3);
       final phase = db.currentPhase!;
       expect(phase.introducing, 'CC');
       final reco = db.recommendedOnboardingFilters!;
@@ -57,17 +55,7 @@ void main() {
       // set narrows to the post-strict tail (SY, SH, GC, MJ)
       // — exactly what postStrictDiscoveryOrder will manage next.
       final db = Database(playerLevel: 50, progress: ConstraintProgress());
-      db.onboardingCompletions = {
-        'FM': OnboardingPhase.phaseLength,
-        'NC': OnboardingPhase.phaseLength,
-        'PA': OnboardingPhase.phaseLength,
-        'CC': OnboardingPhase.phaseLength,
-        'RC': OnboardingPhase.phaseLength,
-        'GS': OnboardingPhase.phaseLength,
-        'EY': OnboardingPhase.phaseLength,
-        'DF': OnboardingPhase.phaseLength,
-        'LT': OnboardingPhase.phaseLength,
-      };
+      db.onboardingCompletions = strictCompletionsUpTo(9);
       final phase = db.currentPhase!;
       expect(phase.introducing, 'QA');
       final reco = db.recommendedOnboardingFilters!;
@@ -81,23 +69,21 @@ void main() {
 
   group('Database.recommendedOnboardingFilters — soft filter', () {
     test('elects the first unseen post-strict slug, bans the rest', () {
-      // Player has graduated every strict phase. They have seen LT
-      // already (e.g. from a stray puzzle). The next slug in
-      // postStrictDiscoveryOrder that is still unseen is QA — that's
-      // the elected slug. Every OTHER unseen post-strict slug must be
-      // in bannedRules; wantedRules stays empty so puzzles with 0 new
-      // slugs (pure refresh) still pass.
+      // Player has graduated every strict phase. Every post-strict slug
+      // is unseen. The first in postStrictDiscoveryOrder (RT) is
+      // elected, the rest are banned. wantedRules stays empty so puzzles
+      // with 0 new slugs (pure refresh) still pass.
       final progress = ConstraintProgress();
       final now = DateTime(2026, 5, 19);
       for (final s in OnboardingPhase.phases.map((p) => p.introducing)) {
         progress.noteSeen(s, now);
       }
-      progress.noteSeen('LT', now);
       final db = Database(playerLevel: 50, progress: progress);
       db.onboardingCompletions = _allStrictPhasesCompleted();
       final reco = db.recommendedOnboardingFilters!;
       expect(reco.wantedRules, isEmpty);
-      expect(reco.bannedRules, {'SH', 'CH', 'GC', 'MJ'});
+      final postStrict = OnboardingPhase.postStrictDiscoveryOrder;
+      expect(reco.bannedRules, postStrict.sublist(1).toSet());
     });
 
     test('forces the last unseen post-strict slug into wantedRules', () {
@@ -168,11 +154,7 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       final db = Database(playerLevel: 50, progress: ConstraintProgress());
-      db.onboardingCompletions = {
-        'FM': OnboardingPhase.phaseLength,
-        'NC': OnboardingPhase.phaseLength,
-        'PA': OnboardingPhase.phaseLength,
-      };
+      db.onboardingCompletions = strictCompletionsUpTo(3);
       await db.maybeApplyOnboardingFilterDefaults(prefs);
       expect(db.currentFilters.wantedRules, {'CC'});
       expect(

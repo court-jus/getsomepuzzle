@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
@@ -10,12 +11,15 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/widgets/chain.dart';
 import 'package:getsomepuzzle/widgets/eyes.dart';
 import 'package:getsomepuzzle/widgets/neighbor_count.dart';
 import 'package:getsomepuzzle/widgets/row_count.dart';
 import 'package:getsomepuzzle/widgets/symmetry.dart';
 import 'package:getsomepuzzle/widgets/group_size.dart';
+import 'package:getsomepuzzle/widgets/transition.dart';
 
 // Arrows for the parity constraint appear smaller so we add a zoom factor
 const _parityFontSizeRatio = 40.0 / 36.0;
@@ -66,6 +70,12 @@ Widget constraintToFlutter(
   }
   if (constraint is ChainConstraint) {
     return _chainWidget(constraint, fgcolor, cellSize, count);
+  }
+  if (constraint is RowTransitionConstraint) {
+    return _transitionWidget(constraint, cellSize, count);
+  }
+  if (constraint is ColumnTransitionConstraint) {
+    return _transitionWidget(constraint, cellSize, count);
   }
 
   // Default: use toString()
@@ -206,5 +216,18 @@ Widget _chainWidget(
       fgcolor: fgcolor,
       cellSize: widgetSize,
     ),
+  );
+}
+
+Widget _transitionWidget(
+  LineCentricConstraint constraint,
+  double cellSize,
+  int count,
+) {
+  final double widgetSize = cellSize / count;
+  return SizedBox(
+    width: widgetSize,
+    height: widgetSize,
+    child: TransitionWidget(constraint: constraint, cellSize: widgetSize),
   );
 }

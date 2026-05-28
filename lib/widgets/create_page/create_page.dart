@@ -13,6 +13,8 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/chain.dart';
 import 'package:getsomepuzzle/widgets/majority.dart';
@@ -42,7 +44,9 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/playlist_name_dialog.d
 import 'package:getsomepuzzle/widgets/create_page/dialogs/quantity_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/row_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/symmetry_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/transition_dialog.dart';
 import 'package:getsomepuzzle/widgets/row_count.dart';
+import 'package:getsomepuzzle/widgets/transition.dart';
 
 export 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
 
@@ -426,6 +430,20 @@ class _CreatePageState extends State<CreatePage> {
         );
       case ConstraintType.rowCount:
         added = await showRowCountDialog(
+          context,
+          cellIdx: cellIdx,
+          width: _width,
+          height: _height,
+        );
+      case ConstraintType.rowTransition:
+        added = await showRowTransitionDialog(
+          context,
+          cellIdx: cellIdx,
+          width: _width,
+          height: _height,
+        );
+      case ConstraintType.columnTransition:
+        added = await showColumnTransitionDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
@@ -927,11 +945,18 @@ class _CreatePageState extends State<CreatePage> {
 
   Widget _buildColumnCountRow() {
     final ccConstraints = _constraints.whereType<ColumnCountConstraint>();
-    if (ccConstraints.isEmpty) return const SizedBox.shrink();
+    final ctConstraints = _constraints.whereType<ColumnTransitionConstraint>();
+    if (ccConstraints.isEmpty && ctConstraints.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final ccByColumn = <int, ColumnCountConstraint>{};
     for (final c in ccConstraints) {
       ccByColumn[c.columnIdx] = c;
+    }
+    final ctByCol = <int, ColumnTransitionConstraint>{};
+    for (final c in ctConstraints) {
+      ctByCol[c.columnIdx] = c;
     }
 
     return LayoutBuilder(
@@ -945,12 +970,28 @@ class _CreatePageState extends State<CreatePage> {
           child: Row(
             children: [
               for (int col = 0; col < _width; col++)
-                if (ccByColumn.containsKey(col))
-                  GestureDetector(
-                    onTap: () => _confirmDeleteTopBar(ccByColumn[col]!),
-                    child: ColumnCountWidget(
-                      constraint: ccByColumn[col]!,
-                      cellSize: cellSize,
+                if (ccByColumn.containsKey(col) || ctByCol.containsKey(col))
+                  SizedBox(
+                    width: cellSize,
+                    child: Column(
+                      children: [
+                        if (ctByCol.containsKey(col))
+                          GestureDetector(
+                            onTap: () => _confirmDeleteTopBar(ctByCol[col]!),
+                            child: TransitionWidget(
+                              constraint: ctByCol[col]!,
+                              cellSize: cellSize,
+                            ),
+                          ),
+                        if (ccByColumn.containsKey(col))
+                          GestureDetector(
+                            onTap: () => _confirmDeleteTopBar(ccByColumn[col]!),
+                            child: ColumnCountWidget(
+                              constraint: ccByColumn[col]!,
+                              cellSize: cellSize,
+                            ),
+                          ),
+                      ],
                     ),
                   )
                 else
@@ -972,6 +1013,11 @@ class _CreatePageState extends State<CreatePage> {
     final rcByRow = <int, RowCountConstraint>{};
     for (final c in rcConstraints) {
       rcByRow[c.rowIdx] = c;
+    }
+    final rtConstraints = _constraints.whereType<RowTransitionConstraint>();
+    final rtByRow = <int, RowTransitionConstraint>{};
+    for (final c in rtConstraints) {
+      rtByRow[c.rowIdx] = c;
     }
 
     return LayoutBuilder(
@@ -1029,7 +1075,7 @@ class _CreatePageState extends State<CreatePage> {
           ],
         );
 
-        if (rcByRow.isEmpty) return grid;
+        if (rcByRow.isEmpty && rtByRow.isEmpty) return grid;
 
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1038,13 +1084,26 @@ class _CreatePageState extends State<CreatePage> {
             Column(
               children: [
                 for (int row = 0; row < _height; row++)
-                  if (rcByRow.containsKey(row))
-                    GestureDetector(
-                      onTap: () => _confirmDeleteTopBar(rcByRow[row]!),
-                      child: RowCountWidget(
-                        constraint: rcByRow[row]!,
-                        cellSize: cellSize,
-                      ),
+                  if (rcByRow.containsKey(row) || rtByRow.containsKey(row))
+                    Column(
+                      children: [
+                        if (rcByRow.containsKey(row))
+                          GestureDetector(
+                            onTap: () => _confirmDeleteTopBar(rcByRow[row]!),
+                            child: RowCountWidget(
+                              constraint: rcByRow[row]!,
+                              cellSize: cellSize,
+                            ),
+                          ),
+                        if (rtByRow.containsKey(row))
+                          GestureDetector(
+                            onTap: () => _confirmDeleteTopBar(rtByRow[row]!),
+                            child: TransitionWidget(
+                              constraint: rtByRow[row]!,
+                              cellSize: cellSize,
+                            ),
+                          ),
+                      ],
                     )
                   else
                     SizedBox(width: cellSize * 0.7, height: cellSize),

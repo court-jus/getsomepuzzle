@@ -46,6 +46,7 @@ directly in the code):
 - [`column_count.md`](column_count.md) — `CC`: N cells of one colour
   in a given column.
 - [`row_count.md`](row_count.md) — `RC`: row equivalent.
+- [`transition.md`](transition.md) — `RT`/`CT`: row and column transition counts.
 - [`neighbor_count.md`](neighbor_count.md) — `NC`: exact number of
   orthogonal neighbours of one colour.
 - [`group_count.md`](group_count.md) — `GC`: number of connected

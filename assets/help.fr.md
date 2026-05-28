@@ -68,9 +68,17 @@ Lorsque deux cellules sont séparées par le symbole ≠, elles doivent être de
 
 Un nombre dans un cercle au dessus d'une colonne indique combien de cellules de cette couleur doivent être dans cette colonne spécifique.
 
+### Transition de colonne
+
+Un tilde (~) avec un nombre dans un carré au-dessus d'une colonne indique combien de changements de couleur (transitions) doivent apparaître dans cette colonne. Une transition est comptée chaque fois que deux cases adjacentes sont remplies de couleurs différentes.
+
 ### Nombre par ligne
 
 Un nombre dans un cercle à gauche d'une ligne indique combien de cellules de cette couleur doivent se trouver dans cette ligne. C'est le pendant horizontal du Nombre par colonne.
+
+### Transition de ligne
+
+Un tilde (~) avec un nombre dans un carré à gauche d'une ligne indique combien de changements de couleur (transitions) doivent apparaître dans cette ligne. Une transition est comptée chaque fois que deux cases adjacentes sont remplies de couleurs différentes.
 
 ### Nombre de groupes
 

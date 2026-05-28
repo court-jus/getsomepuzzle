@@ -68,9 +68,17 @@ When two cells are separated by the ≠ symbol, they must be different colors.
 
 A number in a circle above a column indicates how many cells of that color must be in that specific column.
 
+### Column transition
+
+A tilde (~) with a number in a square above a column indicates how many color changes (transitions) must appear in that column. A transition is counted each time two adjacent cells are filled with different colors.
+
 ### Row count
 
 A number in a circle to the left of a row indicates how many cells of that color must be in that specific row. This is the horizontal counterpart of Column count.
+
+### Row transition
+
+A tilde (~) with a number in a square beside a row indicates how many color changes (transitions) must appear in that row. A transition is counted each time two adjacent cells are filled with different colors.
 
 ### Group count
 

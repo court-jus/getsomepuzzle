@@ -114,7 +114,16 @@ Spanish:
 
 Regenerated with `flutter gen-l10n`.
 
-### ✅ 7. Tests
+### ✅ 7. Mutual exclusion with RT
+
+**File**: `lib/getsomepuzzle/constraints/row_count.dart`
+
+`RowCountConstraint` overrides `conflictsWith` to reject same-row
+`RowTransitionConstraint` instances. The reverse is also declared in
+`transition_row.dart`. The generator respects this and will never produce
+a puzzle with both RC and RT on the same row.
+
+### ✅ 8. Tests
 
 **File**: `test/row_count_test.dart` (new)
 

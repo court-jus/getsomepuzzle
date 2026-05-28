@@ -12,6 +12,8 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/to_flutter.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/chain.dart';
 import 'package:getsomepuzzle/widgets/column_count.dart';
@@ -23,6 +25,7 @@ import 'package:getsomepuzzle/widgets/group_count.dart';
 import 'package:getsomepuzzle/widgets/motif.dart';
 import 'package:getsomepuzzle/widgets/neighbor_count.dart';
 import 'package:getsomepuzzle/widgets/quantity.dart';
+import 'package:getsomepuzzle/widgets/transition.dart';
 
 enum ConstraintType {
   forbiddenPattern,
@@ -33,6 +36,8 @@ enum ConstraintType {
   quantity,
   columnCount,
   rowCount,
+  rowTransition,
+  columnTransition,
   groupCount,
   neighborCount,
   shape,
@@ -92,6 +97,16 @@ Widget _previewFor(ConstraintType type, Color fgcolor) {
         constraint: RowCountConstraint('0.1.3'),
         cellSize: _previewSize,
       );
+    case ConstraintType.rowTransition:
+      return TransitionWidget(
+        constraint: RowTransitionConstraint('0.3'),
+        cellSize: _previewSize,
+      );
+    case ConstraintType.columnTransition:
+      return TransitionWidget(
+        constraint: ColumnTransitionConstraint('0.3'),
+        cellSize: _previewSize,
+      );
     case ConstraintType.groupCount:
       return GroupCountWidget(
         constraint: GroupCountConstraint('1.2'),
@@ -149,6 +164,8 @@ const _entries = <_TypeEntry>[
   _TypeEntry(ConstraintType.quantity, _labelQuantity),
   _TypeEntry(ConstraintType.columnCount, _labelColumnCount),
   _TypeEntry(ConstraintType.rowCount, _labelRowCount),
+  _TypeEntry(ConstraintType.rowTransition, _labelRowTransition),
+  _TypeEntry(ConstraintType.columnTransition, _labelColumnTransition),
   _TypeEntry(ConstraintType.groupCount, _labelGroupCount),
   _TypeEntry(ConstraintType.neighborCount, _labelNeighborCount),
   _TypeEntry(ConstraintType.shape, _labelShape),
@@ -167,6 +184,9 @@ String _labelMajority(AppLocalizations l) => l.constraintMajority;
 String _labelQuantity(AppLocalizations l) => l.constraintQuantity;
 String _labelColumnCount(AppLocalizations l) => l.constraintColumnCount;
 String _labelRowCount(AppLocalizations l) => l.constraintRowCount;
+String _labelRowTransition(AppLocalizations l) => l.constraintRowTransition;
+String _labelColumnTransition(AppLocalizations l) =>
+    l.constraintColumnTransition;
 String _labelGroupCount(AppLocalizations l) => l.constraintGroupCount;
 String _labelNeighborCount(AppLocalizations l) => l.constraintNeighborCount;
 String _labelShape(AppLocalizations l) => l.constraintShape;

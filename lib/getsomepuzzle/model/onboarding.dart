@@ -82,6 +82,16 @@ class OnboardingPhase {
   /// end-of-batch boundary.
   static const int phaseLength = 5;
 
+  /// All slugs introduced by strict onboarding phases.
+  static Set<String> get strictSlugs =>
+      phases.map((p) => p.introducing).toSet();
+
+  /// Map from every strict-phase introducing slug to the number of
+  /// completions required to pass that phase ([phaseLength]).
+  static Map<String, int> get strictCompletionTargets => {
+    for (final p in phases) p.introducing: phaseLength,
+  };
+
   /// All constraint slugs the onboarding system recognises. Mirrors
   /// the registry in `lib/getsomepuzzle/constraints/registry.dart`
   /// (minus the legacy `TX` HelpText slug). Hardcoded here rather than
