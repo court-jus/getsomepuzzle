@@ -27,6 +27,7 @@ import 'package:unicons/unicons.dart';
 /// puzzles already in flight, etc.
 enum EmptyPlaylistReason {
   customEmpty,
+  userEmpty,
   userAllPlayed,
   noPuzzlesLoaded,
   filtersTooStrict,
@@ -1589,6 +1590,7 @@ class Database {
       return EmptyPlaylistReason.customEmpty;
     }
     if (collection.startsWith('user_')) {
+      if (puzzles.isEmpty) return EmptyPlaylistReason.userEmpty;
       return EmptyPlaylistReason.userAllPlayed;
     }
     if (puzzles.isEmpty) {

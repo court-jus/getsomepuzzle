@@ -324,6 +324,7 @@
     "generatePlay": "Jouer",
     "generateMore": "Plus",
     "noCustomPuzzles": "Pas encore de puzzles personnalisés. Utilise la page Générer pour en créer !",
+    "emptyPlaylistUserEmpty": "Cette playlist est vide. Ajoute des puzzles avant d'appuyer sur Jouer.",
     "emptyPlaylistUserAllPlayed": "Tous les puzzles de cette playlist ont été joués. Choisis une autre collection ou crée une nouvelle playlist.",
     "emptyPlaylistNoPuzzlesLoaded": "Aucun puzzle chargé pour cette collection.",
     "emptyPlaylistFiltersTooStrict": "Tes filtres excluent tous les puzzles de cette collection. Essaie d'élargir les dimensions, les règles ou les marqueurs.",

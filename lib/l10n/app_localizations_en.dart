@@ -812,6 +812,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nextPuzzle => 'Next puzzle';
 
   @override
+  String get emptyPlaylistUserEmpty =>
+      'This playlist is empty. Add puzzles before pressing Play.';
+
+  @override
   String get emptyPlaylistUserAllPlayed =>
       'All puzzles in this playlist have been played. Pick another collection or create a new playlist.';
 

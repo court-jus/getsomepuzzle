@@ -139,6 +139,35 @@ void main() {
     });
   });
 
+  group('Database.emptyPlaylistReason', () {
+    test(
+      'returns userEmpty (not userAllPlayed) on a fresh empty user playlist',
+      () {
+        // Regression: a player who just creates `user_foo` and hits Play
+        // before adding any puzzle used to see the "all played" copy
+        // because the user_ branch returned userAllPlayed unconditionally.
+        // Now the branch probes `puzzles.isEmpty` first.
+        final db = Database(playerLevel: 50);
+        db.collection = 'user_foo';
+        db.puzzles = [];
+        db.preparePlaylist();
+        expect(db.emptyPlaylistReason, EmptyPlaylistReason.userEmpty);
+      },
+    );
+
+    test('returns userAllPlayed when puzzles are loaded but all consumed', () {
+      // Once at least one puzzle exists in the user_ collection but the
+      // playlist is empty (e.g. all bannedFlags-filtered out), the
+      // "all played" copy is the honest answer.
+      final db = Database(playerLevel: 50);
+      db.collection = 'user_foo';
+      db.puzzles = [_puz(cplx: 20)];
+      db.currentFilters.bannedRules = {'FM'}; // filters every puzzle out
+      db.preparePlaylist();
+      expect(db.emptyPlaylistReason, EmptyPlaylistReason.userAllPlayed);
+    });
+  });
+
   group('Database.hasMoreCandidatesInCurrentCollection', () {
     test('true when filtered catalog exceeds the active batch', () {
       // batchSize+10 unplayed → batch holds batchSize, 10 left over.

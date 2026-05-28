@@ -1546,6 +1546,12 @@ abstract class AppLocalizations {
   /// **'Next puzzle'**
   String get nextPuzzle;
 
+  /// Reason shown under the disabled Play button when a freshly-created user_ playlist has no puzzles yet
+  ///
+  /// In en, this message translates to:
+  /// **'This playlist is empty. Add puzzles before pressing Play.'**
+  String get emptyPlaylistUserEmpty;
+
   /// Reason shown under the disabled Play button when the current user_ playlist has no unplayed puzzles left
   ///
   /// In en, this message translates to:

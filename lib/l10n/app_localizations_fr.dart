@@ -819,6 +819,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get nextPuzzle => 'Puzzle suivant';
 
   @override
+  String get emptyPlaylistUserEmpty =>
+      'Cette playlist est vide. Ajoute des puzzles avant d\'appuyer sur Jouer.';
+
+  @override
   String get emptyPlaylistUserAllPlayed =>
       'Tous les puzzles de cette playlist ont été joués. Choisis une autre collection ou crée une nouvelle playlist.';
 

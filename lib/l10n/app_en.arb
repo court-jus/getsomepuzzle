@@ -921,6 +921,10 @@
     "@nextPuzzle": {
         "description": "Drawer entry that skips the current puzzle and loads the next one in the playlist"
     },
+    "emptyPlaylistUserEmpty": "This playlist is empty. Add puzzles before pressing Play.",
+    "@emptyPlaylistUserEmpty": {
+        "description": "Reason shown under the disabled Play button when a freshly-created user_ playlist has no puzzles yet"
+    },
     "emptyPlaylistUserAllPlayed": "All puzzles in this playlist have been played. Pick another collection or create a new playlist.",
     "@emptyPlaylistUserAllPlayed": {
         "description": "Reason shown under the disabled Play button when the current user_ playlist has no unplayed puzzles left"

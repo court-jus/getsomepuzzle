@@ -10,7 +10,7 @@ The reference implementation lives in
 `Database.preparePlaylist` (≈ line 862 today); every other entry point
 that mutates the playlist ultimately routes through it (with the lone
 exception of the generator's "play just-generated puzzles" shortcut —
-see §5.3).
+see §3.6).
 
 ---
 
@@ -218,7 +218,8 @@ classification:
 playlist.isEmpty?
   no  → null
   yes → if (custom AND puzzles.isEmpty)            → customEmpty
-        else if (collection startsWith 'user_')    → userAllPlayed   (always!)
+        else if (user_ AND puzzles.isEmpty)        → userEmpty
+        else if (user_)                            → userAllPlayed
         else if (puzzles.isEmpty)                  → noPuzzlesLoaded
         else if (filter().isEmpty)                 → filtersTooStrict
         else                                       → generic
@@ -229,9 +230,6 @@ Onboarding-specific reasons used to live here (`onboardingPhase`,
 through the visible `currentFilters`, any empty playlist driven by
 onboarding shows up as `filtersTooStrict` and the OpenPage banner
 gives the contextual explanation.
-
-The order matters: §6.4 below explains how this misclassifies an
-empty user playlist that was just freshly created.
 
 ---
 
@@ -272,17 +270,6 @@ Regression covered by `shuffle reorders the playlist on custom` and
 matches the playable count (modulo the in-game batch cap on built-in
 collections, which is intentional pacing).
 
-### 6.4 — `userAllPlayed` reason returned even for a freshly created, empty user playlist
-
-`emptyPlaylistReason` has no `customEmpty` equivalent for the
-`user_<slug>` case: any time `playlist.isEmpty` on a user playlist,
-`userAllPlayed` is returned regardless of cause. A user who just
-created `user_foo` and hit Play before adding any puzzle gets the
-"you played them all" copy — wrong and frustrating.
-
-Fix: probe `puzzles.isEmpty` first for `user_*` too, with a dedicated
-`userEmpty` reason and its own copy.
-
 ### 6.5 — *(fixed indirectly)* `skipped` / `disliked` puzzles re-surface in custom / user playlists
 
 **Status: fixed by 6.1.** The `bannedFlags` (defaulting to `played`,
@@ -313,30 +300,14 @@ set (so `emptyPlaylistReason → filtersTooStrict` + the OpenPage
 banner explain the situation and offer reset + collection switch as
 visible affordances).
 
-### 6.8 — Generator shortcut bypasses `preparePlaylist`
-
-`generate_page.dart:160`:
-
-```dart
-widget.database.playlist = generatedPuzzles.sublist(1);
-```
-
-This direct assignment is the only place in the codebase that
-mutates `playlist` without going through `preparePlaylist`. The
-freshly-generated puzzles are not flagged in any filter pass, so the
-moment the user navigates away and back through Open, the in-memory
-list is rebuilt from `custom.txt` and the chosen ordering is lost.
-Probably acceptable for a one-off "play what I just generated" gesture
-but worth a comment.
-
 ---
 
 ## 7. Recommended invariants going forward
 
 1. **Single source of truth** — every code path that wants to mutate
-   `Database.playlist` should go through `preparePlaylist`. The lone
-   exception (`generate_page.dart`) should at least add an inline
-   reason.
+   `Database.playlist` goes through `preparePlaylist`. The lone
+   exception (`generate_page.dart::_playGenerated`) carries an inline
+   comment explaining why it's intentional.
 2. **Filters apply uniformly** — every branch routes through
    `filter()`; only the *batch cap* differs between built-in and
    user/custom collections.
@@ -345,9 +316,9 @@ but worth a comment.
    batch (top-N stays the same); on custom/user_*, it shuffles the
    full filtered catalog.
 4. **UI mirrors the engine** — `matchingCount` reflects what
-   `preparePlaylist` will produce. `emptyPlaylistReason` still needs
-   the §6.4 fix to fully match the engine's reasoning for user_*
-   playlists.
+   `preparePlaylist` will produce. `emptyPlaylistReason` distinguishes
+   `userEmpty` (no puzzles yet) from `userAllPlayed` (all consumed)
+   so the disabled-Play copy is honest in both cases.
 
 ---
 

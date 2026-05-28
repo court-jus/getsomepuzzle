@@ -177,7 +177,10 @@ class _GeneratePageState extends State<GeneratePage> {
 
   void _playGenerated() {
     if (_generatedLines.isEmpty || widget.onPuzzleSelected == null) return;
-    // Set the database playlist to only the generated puzzles
+    // Direct playlist assignment: the player asked to play exactly these
+    // freshly-generated puzzles in generation order, so we deliberately
+    // skip preparePlaylist (which would re-filter and re-sort them). The
+    // ordering is transient; the next loadPuzzlesFile rebuilds normally.
     final generatedPuzzles = _generatedLines.map((l) => PuzzleData(l)).toList();
     widget.database.playlist = generatedPuzzles.sublist(1);
     Navigator.pop(context);

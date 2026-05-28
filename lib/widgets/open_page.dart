@@ -190,6 +190,8 @@ class _OpenPageState extends State<OpenPage> {
     switch (reason) {
       case EmptyPlaylistReason.customEmpty:
         return null;
+      case EmptyPlaylistReason.userEmpty:
+        return loc.emptyPlaylistUserEmpty;
       case EmptyPlaylistReason.userAllPlayed:
         return loc.emptyPlaylistUserAllPlayed;
       case EmptyPlaylistReason.noPuzzlesLoaded:
