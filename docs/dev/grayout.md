@@ -19,7 +19,8 @@ target on the next move and fire again).
 
 Under this semantics, two classes of constraints emerge:
 
-- **Monotone** constraints (`FM`, `GS`, `LT`, `SY`, `DF`, `CC`, `PA`, `CH`):
+- **Monotone** constraints (`FM`, `GS`, `LT`, `SY`, `DF`, `CC`, `PA`, `RC`,
+  `NC`, `MJ`, `EY`, `CH`):
   their completion criterion is preserved by any future move. Once complete,
   they stay complete. They gray out meaningfully mid-game.
 - **Non-monotone** constraints (`QA`, `GC`, `SH`): future play can revive
@@ -152,7 +153,46 @@ Complete when column is fully filled.
 
 Complete when BOTH cells are filled (can verify difference).
 
-#### 2.11 `ChainConstraint`
+#### 2.11 `RowCountConstraint` / `ColumnCountConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/base_line_constraint.dart`
+(shared `LineCentricConstraint.isCompleteFor`)
+
+Complete when the constrained line (row or column) has no free cell
+remaining and `verify(puzzle)` holds — i.e. `count` cells of `color`
+are present in the line. Future play cannot disturb a fully filled
+line.
+
+#### 2.12 `NeighborCountConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/neighbor_count.dart`
+
+Complete when the cell carrying the constraint has no free neighbour
+that can still become `color` (options-aware) and `verify(puzzle)`
+holds. The neighbour-counting target cannot change after every
+neighbour is coloured or has lost the option, so the constraint
+can gray out as soon as the local neighbourhood is saturated.
+
+#### 2.13 `MajorityConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/majority.dart`
+
+Complete when every free cell in the majority zone has lost the
+`targetColor` option and `verify(puzzle)` holds. Once no free cell
+can still become the target colour, no future move can flip the
+majority.
+
+#### 2.14 `EyesConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/eyes_constraint.dart`
+
+Complete when the eye sees exactly `count` cells of the target colour
+**and** no empty cell remains in any line of sight. The "view" computed
+by `whatDoIsee` can only shed empties as cells get coloured, never
+gain new ones, so a `(totalSeen == count) ∧ ¬hasEmpty` snapshot is
+stable for the rest of the puzzle.
+
+#### 2.15 `ChainConstraint`
 
 **File:** `lib/getsomepuzzle/constraints/chain.dart`
 

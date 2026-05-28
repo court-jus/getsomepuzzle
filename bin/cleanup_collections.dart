@@ -82,6 +82,16 @@ const _exemptedFromBoring = {
   'assets/1-easy-overfilled.txt',
 };
 
+const _overfilledFiles = {
+  'assets/1-easy-overfilled.txt',
+  'assets/overfilled.txt',
+  'assets/2-player-overfilled.txt',
+  'assets/3-advanced-overfilled.txt',
+  'assets/4-strong-overfilled.txt',
+  'assets/5-expert-overfilled.txt',
+  'assets/6-mad-overfilled.txt',
+};
+
 // Trivial-FM serializations: every 1×2 and 2×1 forbidden motif (two
 // cells side-by-side or stacked). Weight 0 in the complexity scale —
 // the player reads the deduction off without reasoning. Stored as the
@@ -103,6 +113,7 @@ class _Args {
   bool runBoring = false;
   bool runMJConflict = false;
   bool runRegularPatterns = false;
+  bool runOverfilledExtreme = false;
   bool apply = false;
   bool verbose = false;
   bool exemptEasiest = true;
@@ -110,6 +121,7 @@ class _Args {
   double boringThreshold = 0.9;
   int boringMinMoves = 5;
   double keepRatio = 0.1;
+  double maxPrefillRatio = 0.80;
   int? randomSeed;
   int? sample;
   int timeoutMs = 15000;
@@ -130,6 +142,10 @@ void main(List<String> args) {
         a.runMJConflict = true;
       case '--regular-patterns':
         a.runRegularPatterns = true;
+      case '--overfilled-extreme':
+        a.runOverfilledExtreme = true;
+      case '--max-prefill-ratio':
+        a.maxPrefillRatio = double.parse(args[++i]);
       case '--apply':
         a.apply = true;
       case '-v':
@@ -170,11 +186,13 @@ void main(List<String> args) {
   if (!a.runDisliked &&
       !a.runBoring &&
       !a.runMJConflict &&
-      !a.runRegularPatterns) {
+      !a.runRegularPatterns &&
+      !a.runOverfilledExtreme) {
     a.runDisliked = true;
     a.runBoring = true;
     a.runMJConflict = true;
     a.runRegularPatterns = true;
+    a.runOverfilledExtreme = true;
   }
 
   stderr.writeln('Loading collections...');
@@ -226,6 +244,12 @@ void main(List<String> args) {
     stderr.writeln('');
     stderr.writeln('=== PASS 4: regular patterns (checkerboard/stripes) ===');
     _reportAndCollectRegularPatterns(byKey, a, toRemove, reasons);
+  }
+
+  if (a.runOverfilledExtreme) {
+    stderr.writeln('');
+    stderr.writeln('=== PASS 5: pathologically overfilled puzzles ===');
+    _reportAndCollectOverfilledExtreme(byKey, a, toRemove, reasons);
   }
 
   stderr.writeln('');
@@ -661,6 +685,54 @@ void _reportAndCollectRegularPatterns(
   }
 }
 
+void _reportAndCollectOverfilledExtreme(
+  Map<String, _PuzzleLoc> byKey,
+  _Args args,
+  Set<String> toRemove,
+  Map<String, String> reasons,
+) {
+  int flagged = 0;
+  final perFile = <String, int>{};
+  for (final entry in byKey.entries) {
+    final loc = entry.value;
+    if (!_overfilledFiles.contains(loc.file)) continue;
+    final ratio = _prefillRatio(loc.line);
+    if (ratio == null) continue;
+    if (ratio < args.maxPrefillRatio) continue;
+    toRemove.add(entry.key);
+    reasons[entry.key] = 'prefill ${(ratio * 100).toStringAsFixed(0)}%';
+    perFile.update(loc.file, (v) => v + 1, ifAbsent: () => 1);
+    flagged++;
+    if (args.verbose) {
+      stderr.writeln(
+        '    ${loc.file}: prefill ${(ratio * 100).toStringAsFixed(0)}%  '
+        '${_preview(loc.line)}',
+      );
+    }
+  }
+  stderr.writeln(
+    '  $flagged puzzles with prefill >= '
+    '${(args.maxPrefillRatio * 100).toStringAsFixed(0)}% '
+    '(across ${_overfilledFiles.length} overfilled collections)',
+  );
+  for (final path in _collections) {
+    final n = perFile[path] ?? 0;
+    if (n > 0) stderr.writeln('    $path: $n');
+  }
+}
+
+double? _prefillRatio(String line) {
+  final parts = line.split('_');
+  if (parts.length < 4) return null;
+  final cells = parts[3];
+  if (cells.isEmpty) return null;
+  int filled = 0;
+  for (int i = 0; i < cells.length; i++) {
+    if (cells.codeUnitAt(i) != 0x30 /* '0' */ ) filled++;
+  }
+  return filled / cells.length;
+}
+
 void _writeCleanupFiles(
   Map<String, List<String>> byFile,
   Set<String> toRemove,
@@ -720,6 +792,8 @@ Passes (all run by default):
                           (checker_block_k > 0) or colour bars (period_x or
                           period_y == 1), read from puzzle_vectors.csv, and
                           keep a small fraction (--keep-ratio, default 0.1)
+  --overfilled-extreme    Flag puzzles in *-overfilled.txt whose prefill ratio
+                          exceeds --max-prefill-ratio
 
 Options:
   --apply                 Overwrite each modified collection in-place.
@@ -736,6 +810,8 @@ Options:
                           (0.0-1.0, default 0.1 = 10%)
   --random-seed N         Seed for reproducible random selection
   --vectors-file FILE     Path to puzzle_vectors.csv (default puzzle_vectors.csv)
+  --max-prefill-ratio X   Drop overfilled puzzles whose prefill ratio
+                          is >= X (default 0.80)
   --sample N              Cap the boring pass to N candidates (dev aid)
   --timeout-ms MS         Per-puzzle solver timeout (default 15000)
   --stats-dir DIR         Stats directory (default stats_aggregated)

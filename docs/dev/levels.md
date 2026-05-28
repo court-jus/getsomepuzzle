@@ -99,15 +99,10 @@ Cumulative at round thresholds:
 **Unimodal distribution**, mode at `[0.15-0.20)`. The distribution is
 continuous; neither 0.20 nor 0.25 is a natural breakpoint. To retain
 more legacy puzzles we keep **0.30** as the practical threshold: 8 502
-puzzles pass (69.6 %) versus 7 367 at 0.25 (60.3 %). Beyond 0.50 the
-tail (~11 %, 1 396 puzzles) groups pathological cases like `LT:A.8.23`
-at 88 % prefill — clearly to be pruned.
-
-### Pathological case
-
-`v2_12_5x5_1222121202211112210121202_LT:A.8.23_..._11` has 22 readonly
-cells out of 25 = **88 %** prefill. Not a recently generated puzzle; to
-be removed from the corpus.
+puzzles pass (69.6 %) versus 7 367 at 0.25 (60.3 %). The 0.50+ tail
+(~11 %, 1 396 puzzles) is dominated by pathological prefills that
+leave the player essentially no deduction; `cleanup_collections.dart
+--overfilled-extreme` (default cap 0.80) prunes the worst of them.
 
 ### Tutorial
 

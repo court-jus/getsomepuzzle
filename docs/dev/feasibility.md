@@ -252,13 +252,55 @@ If a combo was marked infeasible in the CSV and the user later fixes the solver,
 the CSV still holds the old failure rows. The combo will continue to be seeded
 into the blacklist until enough successes accumulate to bring `successes > 0`.
 
-Two workarounds:
+### Why the safety brake doesn't rescue stale-positives
 
-1. Run once with `--no-blacklist` — the adaptive tracker starts fresh, and on
-   success the new rows will have `outcome=success`. On the *next* run the CSV
-   seed re-reads all rows including the successes and the combo will no longer
-   be in the seed set.
-2. Delete `generator_stats.csv` to reset all persistent learning.
+The safety brake described above (`skipSafety = 100`) is sometimes misread as
+an auto-recovery mechanism: "if a combo is wrongly blacklisted, the brake will
+eventually re-test it". This is **not what happens in normal operation**.
+
+`consecutiveSkips` is reset to zero on every non-skip attempt
+(`worker_io.dart:485`). So 100 consecutive skips require 100 equilibrium
+targets in a row that *all* resolve to blacklisted combos. If the blacklist
+covers a fraction `p` of the reachable parameter space, the per-cycle
+probability of triggering the brake is roughly `p^100`:
+
+| Coverage `p` | `p^100` | Triggering frequency |
+|---|---|---|
+| 5 %   | 1e-130    | never |
+| 50 %  | 8e-31     | never |
+| 90 %  | 3e-5      | once per ~33 000 cycles |
+| 95 %  | 6e-3      | once per ~170 cycles |
+
+In other words: the safety brake is an **anti-deadlock** that fires only
+when the equilibrium is starved (nearly every accessible target is
+blacklisted). It is not designed to re-test individual stale-positives in a
+healthy parameter space, and in practice it never does.
+
+### Workarounds
+
+Until an explicit recovery lever exists, the two manual options remain the
+canonical fix after a solver change that should have unlocked a previously-
+blacklisted combo:
+
+1. **Run once with `--no-blacklist`.** The adaptive tracker starts fresh and
+   the CSV seed is bypassed. If the formerly-impossible combo now succeeds,
+   a row with `outcome=success` is appended to the CSV. On the *next* run
+   (without `--no-blacklist`) `readPersistentBlacklist` re-aggregates and
+   the combo is no longer seeded (`successes > 0`). Targeted, non-
+   destructive — preferred when the user knows which combo to revive.
+2. **Delete `generator_stats.csv`.** Resets all persistent learning. Use
+   only when the CSV is clearly stale across many combos (e.g. after a
+   sweeping solver overhaul) and the cost of re-discovering the legitimate
+   blacklist is acceptable.
+
+### Potential future lever
+
+The CSV already records the source commit on every row (column `commit`,
+populated from `git rev-parse --short HEAD`). `readPersistentBlacklist`
+currently aggregates across all rows regardless of commit. A future flag
+`--blacklist-since-commit <hash>` could restrict the aggregation to rows
+from a given commit range, letting the user say "trust only the evidence
+from `<hash>..HEAD`" after a known solver fix. Not implemented today.
 
 ## In-App Generator
 
