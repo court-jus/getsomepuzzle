@@ -29,6 +29,10 @@ void main() {
           "CC": 5,
           "RC": 5,
           "GS": 5,
+          "EY": 5,
+          "DF": 5,
+          "LT": 5,
+          "QA": 5,
         }),
         isNull,
       );
@@ -89,15 +93,11 @@ void main() {
       // predictable and reviewable; if someone reorders the registry,
       // the order test fails and we revisit it intentionally.
       expect(OnboardingPhase.postStrictDiscoveryOrder, [
-        'LT',
-        'QA',
         'SY',
-        'DF',
         'SH',
         'CH',
         'GC',
         'MJ',
-        'EY',
       ]);
     });
   });

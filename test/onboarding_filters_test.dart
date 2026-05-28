@@ -52,10 +52,10 @@ void main() {
       );
     });
 
-    test('P5 (last strict phase) wants GS, bans only post-strict slugs', () {
-      // P5 introduces GS and allows {FM, PA, NC, CC, RC, GS}. The banned
-      // set narrows to the post-strict tail (LT, QA, SY, DF, SH, GC, MJ,
-      // EY) — exactly what postStrictDiscoveryOrder will manage next.
+    test('P9 (last strict phase) wants QA, bans only post-strict slugs', () {
+      // P9 introduces QA and allows {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF', 'LT', 'QA'}. The banned
+      // set narrows to the post-strict tail (SY, SH, GC, MJ)
+      // — exactly what postStrictDiscoveryOrder will manage next.
       final db = Database(playerLevel: 50, progress: ConstraintProgress());
       db.onboardingCompletions = {
         'FM': OnboardingPhase.phaseLength,
@@ -63,11 +63,15 @@ void main() {
         'PA': OnboardingPhase.phaseLength,
         'CC': OnboardingPhase.phaseLength,
         'RC': OnboardingPhase.phaseLength,
+        'GS': OnboardingPhase.phaseLength,
+        'EY': OnboardingPhase.phaseLength,
+        'DF': OnboardingPhase.phaseLength,
+        'LT': OnboardingPhase.phaseLength,
       };
       final phase = db.currentPhase!;
-      expect(phase.introducing, 'GS');
+      expect(phase.introducing, 'QA');
       final reco = db.recommendedOnboardingFilters!;
-      expect(reco.wantedRules, {'GS'});
+      expect(reco.wantedRules, {'QA'});
       expect(
         reco.bannedRules,
         OnboardingPhase.postStrictDiscoveryOrder.toSet(),
@@ -93,9 +97,7 @@ void main() {
       db.onboardingCompletions = _allStrictPhasesCompleted();
       final reco = db.recommendedOnboardingFilters!;
       expect(reco.wantedRules, isEmpty);
-      // elected = QA (first unseen in postStrictDiscoveryOrder after LT).
-      // banned = postStrict \ {seen-LT, elected-QA} = {SY, DF, SH, GC, MJ, EY}.
-      expect(reco.bannedRules, {'SY', 'DF', 'SH', 'CH', 'GC', 'MJ', 'EY'});
+      expect(reco.bannedRules, {'SH', 'CH', 'GC', 'MJ'});
     });
 
     test('forces the last unseen post-strict slug into wantedRules', () {

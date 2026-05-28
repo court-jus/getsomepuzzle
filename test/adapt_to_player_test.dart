@@ -534,6 +534,10 @@ void main() {
         "CC": 5,
         "RC": 5,
         "GS": 5,
+        "EY": 5,
+        "DF": 5,
+        "LT": 5,
+        "QA": 5,
       }; // past strict phases
       db.loadStats(nFinishedStatLines(enough));
       expect(db.recommendedCollectionKey, '6-mad');
@@ -554,6 +558,10 @@ void main() {
         "CC": 5,
         "RC": 5,
         "GS": 5,
+        "EY": 5,
+        "DF": 5,
+        "LT": 5,
+        "QA": 5,
       }; // past strict phases
       db.puzzles = []; // nothing loaded in memory
       db.loadStats(nFinishedStatLines(enough));
@@ -578,6 +586,10 @@ void main() {
         "PA": 5,
         "CC": 5,
         "RC": 5,
+        "EY": 5,
+        "DF": 5,
+        "LT": 5,
+        "QA": 5,
         "GS": 4,
       };
       expect(db.recommendedCollectionKey, null);
@@ -618,6 +630,10 @@ void main() {
         "CC": 5,
         "RC": 5,
         "GS": 5,
+        "EY": 5,
+        "DF": 5,
+        "LT": 5,
+        "QA": 5,
       };
       expect(db.recommendedCollectionKey, '6-mad');
     });
