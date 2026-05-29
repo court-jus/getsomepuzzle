@@ -147,6 +147,13 @@ jobs:
         with:
           name: WindowsRelease
           path: build/windows-build.tgz
+      - name: Build MSIX
+        run: dart run msix:create --publisher "${{ secrets.MSIX_PUBLISHER }}"
+      - name: Upload MSIX Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WindowsMsixRelease
+          path: windows/x64/runner/Release/getsomepuzzle.msix
   build-web:
     needs: [auto-tag]
     if: |
@@ -207,6 +214,11 @@ jobs:
         with:
           name: WebRelease
           path: artifacts/web
+      - name: Download Windows MSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WindowsMsixRelease
+          path: artifacts/msix
       - name: Extract version from pubspec.yaml
         run: |
           version=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
@@ -219,12 +231,13 @@ jobs:
           mv artifacts/aab/app-release.aab "artifacts/aab/getsomepuzzle-v${{ env.VERSION }}.aab"
           mv artifacts/windows/windows-build.tgz "artifacts/windows/getsomepuzzle-v${{ env.VERSION }}-windows.tgz"
           mv artifacts/web/web-build.tgz "artifacts/web/getsomepuzzle-v${{ env.VERSION }}-web.tgz"
+          mv artifacts/msix/getsomepuzzle.msix "artifacts/msix/getsomepuzzle-v${{ env.VERSION }}.msix"
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
           tag: v${{ env.VERSION }}
           name: v${{ env.VERSION }}
-          artifacts: "artifacts/apk/getsomepuzzle-v${{ env.VERSION }}.apk,artifacts/aab/getsomepuzzle-v${{ env.VERSION }}.aab,artifacts/windows/getsomepuzzle-v${{ env.VERSION }}-windows.tgz,artifacts/web/getsomepuzzle-v${{ env.VERSION }}-web.tgz"
+          artifacts: "artifacts/apk/getsomepuzzle-v${{ env.VERSION }}.apk,artifacts/aab/getsomepuzzle-v${{ env.VERSION }}.aab,artifacts/windows/getsomepuzzle-v${{ env.VERSION }}-windows.tgz,artifacts/web/getsomepuzzle-v${{ env.VERSION }}-web.tgz,artifacts/msix/getsomepuzzle-v${{ env.VERSION }}.msix"
   deploy-pages:
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest

@@ -94,7 +94,6 @@ flutter_launcher_icons:
 msix_config:
   display_name: getsomepuzzle
   publisher_display_name: Ghislain Lévêque
-  publisher: CN=94724FA2-2A2F-41B9-B8F2-54A77C292530
   identity_name: GhislainLvque.getsomepuzzle
   logo_path: marketing\app_icon_1024.png
   languages: en-us, fr-fr, es-es
