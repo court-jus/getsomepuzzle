@@ -1261,13 +1261,13 @@ abstract class AppLocalizations {
   /// Body of the new-constraint explanation modal for the Row Transition (RT) constraint
   ///
   /// In en, this message translates to:
-  /// **'A square with a tilde and number beside a row tells how many color changes (transitions) must appear in that row.'**
+  /// **'A square wave with a number beside a row tells how many color changes (transitions) must appear in that row. Each step of the wave is one change; a flat wave with 0 means the whole row is a single color.'**
   String get constraintExplainRT;
 
   /// Body of the new-constraint explanation modal for the Column Transition (CT) constraint
   ///
   /// In en, this message translates to:
-  /// **'A square with a tilde and number above a column tells how many color changes (transitions) must appear in that column.'**
+  /// **'A square wave with a number above a column tells how many color changes (transitions) must appear in that column. Each step of the wave is one change; a flat wave with 0 means the whole column is a single color.'**
   String get constraintExplainCT;
 
   /// Body of the new-constraint explanation modal for the Group Count (GC) constraint

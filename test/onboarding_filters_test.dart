@@ -86,6 +86,33 @@ void main() {
       expect(reco.bannedRules, postStrict.sublist(1).toSet());
     });
 
+    test('skips already-seen post-strict slugs when electing', () {
+      // Player has graduated every strict phase AND has already met the
+      // first post-strict slug ad hoc (e.g. a stray puzzle from a hand-
+      // edited playlist surfaced it). The election must skip that slug
+      // and pick the next unseen one in postStrictDiscoveryOrder — the
+      // skipped slug is *not* banned (no need, the player already knows
+      // it), and *not* wanted (we don't want to refocus on something
+      // already learned).
+      final progress = ConstraintProgress();
+      final now = DateTime(2026, 5, 19);
+      for (final s in OnboardingPhase.phases.map((p) => p.introducing)) {
+        progress.noteSeen(s, now);
+      }
+      final postStrict = OnboardingPhase.postStrictDiscoveryOrder;
+      progress.noteSeen(postStrict.first, now);
+      final db = Database(playerLevel: 50, progress: progress);
+      db.onboardingCompletions = _allStrictPhasesCompleted();
+      final reco = db.recommendedOnboardingFilters!;
+      // wantedRules stays empty (refresh-friendly soft filter).
+      expect(reco.wantedRules, isEmpty);
+      // Elected = postStrict[1] (next unseen). Banned = everything still
+      // unseen and not elected, i.e. postStrict[2..]. The already-seen
+      // postStrict.first never enters either set.
+      expect(reco.bannedRules, postStrict.sublist(2).toSet());
+      expect(reco.bannedRules.contains(postStrict.first), isFalse);
+    });
+
     test('forces the last unseen post-strict slug into wantedRules', () {
       // Terminal soft-filter case: every post-strict slug has been seen
       // except one. The default soft-filter shape ({}, unseen \ elected)

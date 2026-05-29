@@ -101,11 +101,13 @@ Widget _previewFor(ConstraintType type, Color fgcolor) {
       return TransitionWidget(
         constraint: RowTransitionConstraint('0.3'),
         cellSize: _previewSize,
+        axis: Axis.horizontal,
       );
     case ConstraintType.columnTransition:
       return TransitionWidget(
         constraint: ColumnTransitionConstraint('0.3'),
         cellSize: _previewSize,
+        axis: Axis.vertical,
       );
     case ConstraintType.groupCount:
       return GroupCountWidget(

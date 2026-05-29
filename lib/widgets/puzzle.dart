@@ -410,6 +410,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                           : null,
                                       constraint: rtByRow[row]!,
                                       cellSize: adjustedCellSize,
+                                      axis: Axis.horizontal,
                                     ),
                                 ],
                               )
@@ -449,6 +450,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                                   : null,
                                               constraint: ctByCol[col]!,
                                               cellSize: adjustedCellSize,
+                                              axis: Axis.vertical,
                                             ),
                                           if (ccByColumn.containsKey(col))
                                             ColumnCountWidget(

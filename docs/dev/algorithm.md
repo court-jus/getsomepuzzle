@@ -24,6 +24,8 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 |------|------|-------------|
 | FM | Forbidden Motif | A 2D pattern that must NOT appear in the grid |
 | PA | Parity | Equal count of black/white cells on one side of a cell |
+| RC | Row Count | A given row must contain exactly N cells of a color |
+| RT | Row Transition | A given row must contain exactly N adjacent colour changes (transitions between differently-coloured cells) |
 | GS | Group Size | Connected same-color group must have exact size |
 | LT | Letter Group | Cells with same letter must be in one connected group |
 | QA | Quantity | Total count of a color in the entire grid |
@@ -31,9 +33,12 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 | DF | Different From | Two adjacent cells must have different colors |
 | SH | Shape | One color's group(s) must match a mandatory 2D shape |
 | CC | Column Count | A given column must contain exactly N cells of a color |
+| CH | Chain | A continuous orthogonal path of one colour must connect two specified grid sides |
+| CT | Column Transition | A given column must contain exactly N adjacent colour changes |
 | GC | Group Count | The grid must contain exactly N connected groups of a color |
+| MJ | Majority | A rectangular zone must contain a strict majority of a given colour |
 | NC | Neighbor Count | A given cell must have exactly N orthogonal neighbors of a color |
-| RC | Row Count | A given row must contain exactly N cells of a color |
+| EY | Eyes | A given cell must "see" exactly N cells of a colour through straight lines of same-colour cells |
 
 ## Solving Algorithm
 
@@ -91,7 +96,7 @@ Select a random subset of cells (controlled by a ratio parameter, randomly drawn
 
 ### Step 3: Enumerate Valid Constraints
 
-For each constraint type (FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC, RC), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
+For each constraint type (FM, PA, RC, RT, GS, LT, QA, SY, DF, SH, CC, CH, CT, GC, MJ, NC, EY), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
 
 ### Step 4: Iterative Constraint Selection
 

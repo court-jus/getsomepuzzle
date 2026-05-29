@@ -650,11 +650,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get constraintExplainRT =>
-      'Un carré avec un tilde et un nombre à côté d\'une ligne indique combien de changements de couleur doivent apparaître dans cette ligne.';
+      'Une onde carrée avec un nombre à côté d\'une ligne indique combien de changements de couleur doivent apparaître dans cette ligne. Chaque marche de l\'onde est un changement ; une onde plate avec 0 signifie que toute la ligne est d\'une seule couleur.';
 
   @override
   String get constraintExplainCT =>
-      'Un carré avec un tilde et un nombre au-dessus d\'une colonne indique combien de changements de couleur doivent apparaître dans cette colonne.';
+      'Une onde carrée avec un nombre au-dessus d\'une colonne indique combien de changements de couleur doivent apparaître dans cette colonne. Chaque marche de l\'onde est un changement ; une onde plate avec 0 signifie que toute la colonne est d\'une seule couleur.';
 
   @override
   String get constraintExplainGC =>

@@ -981,6 +981,7 @@ class _CreatePageState extends State<CreatePage> {
                             child: TransitionWidget(
                               constraint: ctByCol[col]!,
                               cellSize: cellSize,
+                              axis: Axis.vertical,
                             ),
                           ),
                         if (ccByColumn.containsKey(col))
@@ -1101,6 +1102,7 @@ class _CreatePageState extends State<CreatePage> {
                             child: TransitionWidget(
                               constraint: rtByRow[row]!,
                               cellSize: cellSize,
+                              axis: Axis.horizontal,
                             ),
                           ),
                       ],

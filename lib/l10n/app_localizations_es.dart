@@ -650,11 +650,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get constraintExplainRT =>
-      'Un cuadrado con una tilde y un número al lado de una fila indica cuántos cambios de color deben aparecer en esa fila.';
+      'Una onda cuadrada con un número al lado de una fila indica cuántos cambios de color deben aparecer en esa fila. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la fila es de un solo color.';
 
   @override
   String get constraintExplainCT =>
-      'Un cuadrado con una tilde y un número sobre una columna indica cuántos cambios de color deben aparecer en esa columna.';
+      'Una onda cuadrada con un número sobre una columna indica cuántos cambios de color deben aparecer en esa columna. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la columna es de un solo color.';
 
   @override
   String get constraintExplainGC =>

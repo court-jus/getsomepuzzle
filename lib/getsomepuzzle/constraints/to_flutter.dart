@@ -72,10 +72,10 @@ Widget constraintToFlutter(
     return _chainWidget(constraint, fgcolor, cellSize, count);
   }
   if (constraint is RowTransitionConstraint) {
-    return _transitionWidget(constraint, cellSize, count);
+    return _transitionWidget(constraint, cellSize, count, Axis.horizontal);
   }
   if (constraint is ColumnTransitionConstraint) {
-    return _transitionWidget(constraint, cellSize, count);
+    return _transitionWidget(constraint, cellSize, count, Axis.vertical);
   }
 
   // Default: use toString()
@@ -223,11 +223,16 @@ Widget _transitionWidget(
   LineCentricConstraint constraint,
   double cellSize,
   int count,
+  Axis axis,
 ) {
   final double widgetSize = cellSize / count;
   return SizedBox(
     width: widgetSize,
     height: widgetSize,
-    child: TransitionWidget(constraint: constraint, cellSize: widgetSize),
+    child: TransitionWidget(
+      constraint: constraint,
+      cellSize: widgetSize,
+      axis: axis,
+    ),
   );
 }

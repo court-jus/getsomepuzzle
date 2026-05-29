@@ -645,11 +645,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get constraintExplainRT =>
-      'A square with a tilde and number beside a row tells how many color changes (transitions) must appear in that row.';
+      'A square wave with a number beside a row tells how many color changes (transitions) must appear in that row. Each step of the wave is one change; a flat wave with 0 means the whole row is a single color.';
 
   @override
   String get constraintExplainCT =>
-      'A square with a tilde and number above a column tells how many color changes (transitions) must appear in that column.';
+      'A square wave with a number above a column tells how many color changes (transitions) must appear in that column. Each step of the wave is one change; a flat wave with 0 means the whole column is a single color.';
 
   @override
   String get constraintExplainGC =>

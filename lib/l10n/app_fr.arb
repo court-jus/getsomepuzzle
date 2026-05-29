@@ -167,11 +167,11 @@
     "@constraintExplainRC": {
         "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
     },
-    "constraintExplainRT": "Un carré avec un tilde et un nombre à côté d'une ligne indique combien de changements de couleur doivent apparaître dans cette ligne.",
+    "constraintExplainRT": "Une onde carrée avec un nombre à côté d'une ligne indique combien de changements de couleur doivent apparaître dans cette ligne. Chaque marche de l'onde est un changement ; une onde plate avec 0 signifie que toute la ligne est d'une seule couleur.",
     "@constraintExplainRT": {
         "description": "Body of the new-constraint explanation modal for the Row Transition (RT) constraint"
     },
-    "constraintExplainCT": "Un carré avec un tilde et un nombre au-dessus d'une colonne indique combien de changements de couleur doivent apparaître dans cette colonne.",
+    "constraintExplainCT": "Une onde carrée avec un nombre au-dessus d'une colonne indique combien de changements de couleur doivent apparaître dans cette colonne. Chaque marche de l'onde est un changement ; une onde plate avec 0 signifie que toute la colonne est d'une seule couleur.",
     "@constraintExplainCT": {
         "description": "Body of the new-constraint explanation modal for the Column Transition (CT) constraint"
     },

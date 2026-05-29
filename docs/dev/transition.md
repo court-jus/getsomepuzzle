@@ -36,13 +36,23 @@ Equivalently: count adjacent pairs of filled cells that differ.
 
 ## Display
 
-RT/CT is a line-level constraint, displayed in the same peripheral bars as RC and CC:
+RT/CT is a line-level constraint, displayed in the same peripheral bars as RC and CC,
+inside a greyed rounded square. The square shape visually distinguishes RT/CT from RC/CC
+(which use a circle). Inside the square a **square-wave glyph** is drawn together with the
+count digit: the number of vertical edges (steps) of the wave equals the transition count,
+making explicit that the constraint counts colour *changes* between adjacent cells.
 
-- **Row RT**: displayed to the **left** of the row, inside a greyed square, alongside or
-  instead of the RC indicator for that row. The square shape visually distinguishes RT from
-  RC (which uses a circle). Icon: `~` followed by the digit. E.g., `~3` means 3 transitions.
-- **Column CT**: displayed **above** the column, same square style, in the top bar alongside CC.
-- **Color**: neutral black text (no color association).
+- **Row RT**: displayed to the **left** of the row. The wave runs **horizontally** (plateaus
+  along the row), sitting above the digit. `count == 0` collapses to a flat horizontal line
+  (monochrome row); `count == lineLength - 1` is a tight alternation (checkerboard).
+- **Column CT**: displayed **above** the column. The wave runs **vertically** (plateaus along
+  the column), sitting to the left of the digit.
+- **Color**: neutral black glyph and digit (no colour association); greyed out when the
+  constraint is complete, red border when violated.
+
+The wave orientation is supplied by `to_flutter.dart`, which passes `Axis.horizontal` for
+`RowTransitionConstraint` and `Axis.vertical` for `ColumnTransitionConstraint` to
+`TransitionWidget`.
 
 When both RC and RT are present on the same row, stack them vertically in the left bar:
 RT indicator above or below RC, with a smaller font size to fit both.
@@ -145,6 +155,13 @@ Shared `apply`. Four cases, checked in order:
 
 Otherwise `null` (constraint active but not yet forcing).
 
+**Domain handling.** The saturated branch (`t == count`) forces a free cell to match its
+filled neighbour — that deduction is valid for any domain size, since matching the neighbour
+never introduces a transition regardless of how many colours exist. The full-need branch
+(`t + freePairs == count`) forces a free cell to **differ** from its neighbour; the
+replacement value is only unique when the domain has exactly two colours, so this branch
+short-circuits to `null` (no forcing) when `|domain| > 2`.
+
 ```dart
 List<String> generateAllTransitionParams(int numLines, int maxT)
 ```
@@ -171,6 +188,9 @@ meaningful — it forces a monochrome line).
   alone.
 - The `freePairs` count in `verify` is an over-approximation. A tighter bound could
   consider that filling a free cell resolves its pair with both neighbours simultaneously.
+- The full-need branch is binary-only: when `domain.length > 2`, it cannot pick a unique
+  "differ from neighbour" value and returns `null`. The saturated branch remains active
+  for any domain size.
 - RT and RC are natural complicity partners but **cannot share the same line** (conflict).
   The combined deduction "a line with R black cells and T transitions must be arranged as B
   blocks" could be implemented as a future `Complicity` subclass.

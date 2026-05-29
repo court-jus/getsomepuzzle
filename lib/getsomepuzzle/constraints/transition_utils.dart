@@ -56,10 +56,9 @@ Move? applyTransitionLine(
     return Move(0, 0, constraint, isImpossible: constraint);
   }
 
-  final domain = puzzle.domain;
-  if (domain.length != 2) return null;
-
-  // Saturated: no more transitions allowed
+  // Saturated: no more transitions allowed. Valid for any domain size —
+  // forcing a free cell to match its filled neighbour avoids any new
+  // transition regardless of how many colours exist.
   if (t == count) {
     for (int i = 0; i < line.length; i++) {
       if (line[i].value != 0) continue;
@@ -82,8 +81,13 @@ Move? applyTransitionLine(
     return null;
   }
 
-  // Full need: every free pair must produce a transition
+  // Full need: every free pair must produce a transition. Only yields a
+  // unique replacement value when the domain has exactly two colours —
+  // for larger domains, "differ from the neighbour" leaves multiple
+  // candidates and no forcing is possible.
   if (t + fp == count) {
+    final domain = puzzle.domain;
+    if (domain.length != 2) return null;
     for (int i = 0; i < line.length; i++) {
       if (line[i].value != 0) continue;
       int? forced;
