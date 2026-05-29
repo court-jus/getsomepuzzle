@@ -1,8 +1,8 @@
 # Equilibrium
 
 The CLI generator (`bin/generate.dart`) biases generation toward
-under-represented categories across five independent axes (slug, number of
-types, pair of types, size, profile). This document describes how the system works.
+under-represented categories across six independent axes (slug, number of
+types, pair of types, size, profile, composition). This document describes how the system works.
 
 The implementation lives in `lib/getsomepuzzle/generator/equilibrium.dart`
 (pure logic — constants, stats, gap-based picker) and
@@ -20,7 +20,7 @@ the algorithm simply moves on to the next most under-represented bin.
 
 ## Axes
 
-The five axes are counted independently (no conditional distributions,
+The six axes are counted independently (no conditional distributions,
 except as noted on axis 3):
 
 1. **Slug** — every constraint type (FM, SH, GC, …), counted at most once
@@ -51,6 +51,16 @@ except as noted on axis 3):
    suffix written by the generator at emission time (see
    `detectPuzzleProfile` in `equilibrium.dart`); unmarked lines —
    including the legacy corpus — are counted as `classic`.
+6. **Composition** — ordered triple of the puzzle's three principal
+   constraint families (see `families.md`). Each constraint instance
+   contributes to its family's count, so a puzzle with `3×LT, 2×PA, 1×FM`
+   yields `(path, line-centric, local)`. Families with fewer than three real
+   families are padded with the virtual `none` family. The axis is
+   **uniform** over all valid ordered triples — including the focused
+   one-family and two-family tuples — so it pushes both *combination variety*
+   and *thematic focus*. For the full five-family universe `allCompositions`
+   enumerates 85 distinct bins. Implementation: `compositionOf` in
+   `families.dart`, `CompositionTarget` in `equilibrium.dart`.
 
 ## Algorithm
 
@@ -58,7 +68,7 @@ except as noted on axis 3):
 
 Each iteration in `worker_io.dart`:
 
-1. Recompute the five distributions from the existing puzzle corpus
+1. Recompute the six distributions from the existing puzzle corpus
    (absolute counters; recomputed at startup, never persisted). The
    pair-axis distribution aggregates only puzzles with exactly 2 types.
 2. Identify the most-imbalanced `(axis, category)` — the one whose
@@ -163,6 +173,17 @@ than reject after the fact.
   pre-fill function — see the "Pre-fill scenarios" section below. The
   iteration is rejected if the emitted puzzle's `scenario:` suffix does
   not match the targeted profile.
+- **Composition**: when the target is a composition triple, the worker
+  restricts `allowedSlugs` to the union of slugs in the real families
+  of the target (the `none` padding is a placeholder — no slug belongs
+  to it) and biases `preferredSlugs` toward the dominant families.
+  Within each family, slugs are sorted by their secondary deficit score
+  (see "Secondary slug bias" below) to also advance the slug axis. More
+  preferred slugs are drawn from the first family than the second, and
+  even fewer from the third (3:2:1 ratio). This is a bias, not a hard
+  quota — the iterative loop may still produce a puzzle whose realised
+  composition differs, but the `allowedSlugs` restriction prevents
+  cross-family drift.
 
 The post-solve free-cell ratio cap of `kMaxAcceptableRatio` (= 0.25)
 applies to every size, including 10x10.
@@ -241,6 +262,27 @@ though neither is in `prioritySlugs` for this iteration. If the iterative
 loop can keep both — i.e. each reduces the free-cell ratio — the emitted
 puzzle contributes to both the `NC` and `GC` bins without the target for
 this iteration being either of them.
+
+**SH exclusion from slug deficit.** SH is excluded from the `slugDeficits`
+map — its deficit is hard-coded to 0.0 in `equilibrium.dart`. This prevents
+the slug axis from actively pushing SH, which already receives a 5 % target
+via `ProfileTarget(sh)` on the profile axis. Without this exclusion, the slug
+axis would push SH at the corpus-average expected share (~17.6 % with 11
+slugs and `avgK ≈ 1.94`), overwhelming the profile axis's 5 % intent.
+Three points enforce the policy:
+
+1. **`slugDeficits`** — returns 0.0 for SH, so the secondary sort never
+   elevates SH candidates above other deficit-positive slugs.
+2. **`_resolveTarget` (slug axis)** — `SlugTarget('SH')` returns a no-op
+   `_ResolvedTarget()` without adding `'SH'` to `preferredSlugs`.
+   Only `ProfileTarget(sh)` adds SH to `preferredSlugs`.
+3. **Dashboard `_computeAxisTargets`** — the slug target histogram skips
+   SH, so its bar does not appear among the slug-axis deficits.
+
+SH remains fully available for organic inclusion — it stays in `allowedSlugs`
+for all `TargetUniverse` contexts (NTypesTarget, PairTarget, SizeTarget,
+ProfileTarget). The exclusion is *active avoidance of targeted pushing*, not
+a ban.
 
 ### Infeasibility blacklist
 
@@ -334,7 +376,7 @@ override) is applied.
 ### Worker dashboard format
 
 Each line on the live dashboard shows a worker's current attempt context across
-all four resolved axes so any attempt is fully identifiable:
+all five resolved axes so any attempt is fully identifiable:
 
 ```
   #00 [att 12/ok 3] → [slug=SY] 10x8 ntypes≤3 slugs={SY,QA,PA} scenario=classic
@@ -342,6 +384,7 @@ all four resolved axes so any attempt is fully identifiable:
   #02 [att 15/ok 2] → [profile=pathBased] 12x8 ntypes=free slugs={} scenario=pathBased
   #03 [att 21/ok 7] → warmup 4x4 ntypes≤3 slugs={SY,QA,PA} scenario=classic
   #04 [att  3/ok 0] → 8x8 ntypes=free slugs={} scenario=classic
+  #05 [att  9/ok 1] → [comp=path+line-centric+local] 6x4 ntypes≤6 slugs={LT,CH,RC} scenario=classic
 ```
 
 The prefix before the body (`WxH ntypes… slugs=… scenario=…`) encodes the
@@ -349,7 +392,7 @@ equilibrium state for that worker:
 
 | Prefix | Meaning |
 |---|---|
-| `[<target.label>]` | Chasing a specific equilibrium target (e.g. `[slug=SY]`, `[ntypes=3]`) |
+| `[<target.label>]` | Chasing a specific equilibrium target (e.g. `[slug=SY]`, `[ntypes=3]`, `[comp=path+line-centric+local]`) |
 | `warmup` | Corpus below `kEquilibriumWarmupSize`; using `pickWarmupConfig` |
 | `[balanced]` | Equilibrium on, all axes balanced, no target picked |
 | *(none)* | Equilibrium disabled (`--no-equilibrium`) |
@@ -369,7 +412,7 @@ The `ntypes` field distinguishes hard from soft constraints:
 
 Equilibrium is only **actually engaged** if the target file already
 contains at least `kEquilibriumWarmupSize` (= 100) puzzles. Below the
-threshold the five distributions are too sparse to drive meaningful
+threshold the six distributions are too sparse to drive meaningful
 targets — `pickTarget` would chase impossible bins and waste time
 blacklisting them. The CLI silently falls back to the legacy slug-only
 bias and logs:
@@ -411,12 +454,14 @@ algorithm:
   `universe.allowedSizes`.
 - `slugDeficits(stats, universe)` — returns a `Map<String, double>` of
   per-slug deficit values (= `max(0, avgK/nSlugs − observedShare(slug))`)
-  covering every slug in `universe.allowedSlugs`. Exposes the slug-axis
-  gap computed internally by `_scoreAll` as a standalone pure function so
-  the generator's secondary sort key shares a single definition of
-  "under-represented" with `pickTarget`. Consumed by `worker_io.dart` to
-  populate `GeneratorConfig.slugDeficitScores` before each `generateOne`
-  call (see "Secondary slug bias via `slugDeficits`" above).
+  covering every slug in `universe.allowedSlugs` **except SH** (which is
+  hard-coded to 0.0 — see "SH exclusion from slug deficit" above).
+  Exposes the slug-axis gap computed internally by `_scoreAll` as a
+  standalone pure function so the generator's secondary sort key shares a
+  single definition of "under-represented" with `pickTarget`. Consumed by
+  `worker_io.dart` to populate `GeneratorConfig.slugDeficitScores` before
+  each `generateOne` call (see "Secondary slug bias via `slugDeficits`"
+  above).
 
 The gap computation, target ranking (`rankTargets`), target selection
 (`pickTarget`), and deficit snapshot (`slugDeficits`) are pure functions
@@ -426,7 +471,8 @@ covered by `test/equilibrium_test.dart`.
 
 - No persistent equilibrium statistics — distributions are recomputed at
   each run from the output corpus.
-- No equilibration of triplets or larger combinations.
+- No equilibration of arbitrary n-tuples of slugs — the composition axis
+  addresses family-level combination variety, not individual slug combinations.
 - No conditional distributions, with one structural exception: the pair
   axis is by construction conditional on puzzles with exactly 2 types.
 - No quantitative quota — equilibrium is a bias, not a target count.

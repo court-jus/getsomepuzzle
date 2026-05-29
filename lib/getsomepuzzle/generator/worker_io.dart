@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/feasibility.dart';
@@ -818,6 +819,11 @@ _ResolvedTarget _resolveTarget(
       // Slug axis fixed (X). Size axis is filled by the worker loop after
       // resolve. allowedSlugs stays unrestricted so the iterative loop has
       // room to add other slugs naturally.
+      if (slug == 'SH') {
+        // SH is handled by the profile axis (5%). Don't give it preferred
+        // status from the slug axis — only ProfileTarget(sh) should.
+        return const _ResolvedTarget();
+      }
       return _ResolvedTarget(preferredSlugs: {slug});
 
     case NTypesTarget():
@@ -868,6 +874,45 @@ _ResolvedTarget _resolveTarget(
           // ignored.
           return const _ResolvedTarget(syBasedScenario: true);
       }
+    case CompositionTarget(:final families):
+      // Composition axis fixed. Restrict allowed slugs to the union of
+      // slugs in the target's real families (excluding `none` padding),
+      // and bias preferred slugs toward the dominant families.
+      final real = families.where((f) => f != kEmptyFamily).toList();
+      final allInFamilies = universe.allowedSlugs
+          .where((s) => real.contains(kConstraintFamily[s]))
+          .toSet();
+      if (allInFamilies.isEmpty) {
+        // Fallback: no slugs match — let the loop decide.
+        return const _ResolvedTarget();
+      }
+      // Biased preferred slugs: more drawn from the dominant family (1st),
+      // fewer from the 2nd, even fewer from the 3rd. Sort by slug deficit
+      // within each family so the secondary axis also advances.
+      final deficits = slugDeficits(stats, universe);
+      final preferred = <String>{};
+      final weights = [3, 2, 1];
+      for (int i = 0; i < real.length && i < weights.length; i++) {
+        final family = real[i];
+        final familySlugs =
+            universe.allowedSlugs
+                .where((s) => kConstraintFamily[s] == family)
+                .where((s) => !preferred.contains(s))
+                .toList()
+              ..sort(
+                (a, b) => (deficits[b] ?? 0.0).compareTo(deficits[a] ?? 0.0),
+              );
+        final n = weights[i] > familySlugs.length
+            ? familySlugs.length
+            : weights[i];
+        for (int j = 0; j < n; j++) {
+          preferred.add(familySlugs[j]);
+        }
+      }
+      return _ResolvedTarget(
+        allowedSlugs: allInFamilies,
+        preferredSlugs: preferred,
+      );
   }
 }
 

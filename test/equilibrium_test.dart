@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 
 void main() {
@@ -373,10 +374,10 @@ void main() {
   group('pickWarmupConfig', () {
     final allowed = const ['FM', 'PA', 'GS', 'SY', 'QA'];
 
-    test('clamps grid sides to kWarmupMaxWidth/Height', () {
+    test('samples from full user range weighted by Gaussian-on-area', () {
       final rng = Random(0);
-      // User asks for 3..10 / 3..10 — warm-up clamps the upper end.
-      for (int i = 0; i < 50; i++) {
+      bool seenLarge = false; // width > 4 or height > 5 (was impossible before)
+      for (int i = 0; i < 100; i++) {
         final wc = pickWarmupConfig(
           minWidth: 3,
           maxWidth: 10,
@@ -386,30 +387,31 @@ void main() {
           baseRequired: const {},
           rng: rng,
         );
-        expect(wc.width, inInclusiveRange(3, kWarmupMaxWidth));
-        expect(wc.height, inInclusiveRange(3, kWarmupMaxHeight));
+        expect(wc.width, inInclusiveRange(3, 10));
+        expect(wc.height, inInclusiveRange(3, 10));
+        if (wc.width > 4 || wc.height > 5) seenLarge = true;
       }
+      // With the Gaussian-weighted distribution, larger sizes should appear
+      // within 100 draws (the right tail is wide enough).
+      expect(seenLarge, isTrue);
     });
 
-    test(
-      'falls back to user min when it exceeds the cap (still respects --min-width)',
-      () {
-        // User explicitly asked for ≥7 wide grids — we can't honor the warm-up
-        // cap, so the floor wins (8 in this case is locked).
-        final rng = Random(1);
-        final wc = pickWarmupConfig(
-          minWidth: 8,
-          maxWidth: 8,
-          minHeight: 8,
-          maxHeight: 8,
-          baseAllowedSlugs: allowed,
-          baseRequired: const {},
-          rng: rng,
-        );
-        expect(wc.width, 8);
-        expect(wc.height, 8);
-      },
-    );
+    test('respects user-specified exact size when min==max', () {
+      // When the user pins width and height to a single value, warm-up
+      // must use that exact size (the weighted pool has one candidate).
+      final rng = Random(1);
+      final wc = pickWarmupConfig(
+        minWidth: 8,
+        maxWidth: 8,
+        minHeight: 8,
+        maxHeight: 8,
+        baseAllowedSlugs: allowed,
+        baseRequired: const {},
+        rng: rng,
+      );
+      expect(wc.width, 8);
+      expect(wc.height, 8);
+    });
 
     test(
       'pool size is drawn from kWarmupNTypesPool when baseRequired is empty',
@@ -726,6 +728,159 @@ void main() {
       // But the under-represented CH slug and syBased profile still surface.
       expect(seen, contains('slug:CH'));
       expect(seen, contains('profile:syBased'));
+    });
+  });
+
+  group('compositionCounts', () {
+    test('fromLines counts compositions from raw slug instances', () {
+      // 2 puzzles: (3×LT, 2×PA) → path + line-centric, and (1×QA) →
+      // global + none + none.
+      final stats = EquilibriumStats.fromLines([
+        'v2_12_4x4_2210000010000000_LT:A.0.5;LT:B.10.15;LT:C.3.7;PA:0.left;PA:1.right_1:1212121212121212_2',
+        'v2_12_4x4_1000000000000000_QA:10_1:1111111111111111_2',
+      ]);
+      expect(stats.compositionCounts['path+line-centric+none'], 1);
+      expect(stats.compositionCounts['global+none+none'], 1);
+      expect(stats.totalPuzzles, 2);
+    });
+
+    test('withPuzzle uses rawSlugs when provided', () {
+      var stats = EquilibriumStats.empty();
+      // Two LT instances → path with count 2, no other family.
+      stats = stats.withPuzzle(
+        slugs: {'LT'},
+        rawSlugs: ['LT', 'LT'],
+        width: 4,
+        height: 4,
+      );
+      expect(stats.compositionCounts['path+none+none'], 1);
+    });
+
+    test(
+      'withPuzzle falls back to deduplicated slugs when rawSlugs is null',
+      () {
+        var stats = EquilibriumStats.empty();
+        stats = stats.withPuzzle(slugs: {'LT', 'FM'}, width: 4, height: 4);
+        // Deduplicated: path count=1, local count=1 → tie, path wins the
+        // kConstraintFamilies tie-break (path before local in the list).
+        // Actually: path has index 2, local has index 1. So local wins.
+        expect(stats.compositionCounts['local+path+none'], 1);
+      },
+    );
+  });
+
+  group('TargetUniverse.allowedCompositions', () {
+    test('full 5-family universe yields 85 compositions', () {
+      final u = TargetUniverse(
+        allowedSlugs: kConstraintFamily.keys,
+        minWidth: 4,
+        maxWidth: 4,
+        minHeight: 4,
+        maxHeight: 4,
+      );
+      expect(u.allowedCompositions.length, 85);
+      // Every triple has length 3 and starts with a real family.
+      for (final t in u.allowedCompositions) {
+        expect(t.length, 3);
+        expect(t.first, isNot(kEmptyFamily));
+      }
+    });
+
+    test('subset of families yields fewer compositions', () {
+      // Only 'FM' (local) and 'LT' (path) slugs → 2 families.
+      final u = TargetUniverse(
+        allowedSlugs: ['FM', 'LT'],
+        minWidth: 4,
+        maxWidth: 4,
+        minHeight: 4,
+        maxHeight: 4,
+      );
+      // P(2,3)=0 (need 3 distinct families) + P(2,2)=2 + 2 = 4
+      expect(u.allowedCompositions.length, 4);
+    });
+  });
+
+  group('CompositionTarget', () {
+    test('key and label format', () {
+      const t = CompositionTarget(['path', 'line-centric', 'local']);
+      expect(t.key, 'comp:path+line-centric+local');
+      expect(t.label, 'comp=path+line-centric+local');
+      expect(t.axis, Axis.composition);
+    });
+
+    test('round-trips through parseTargetKey', () {
+      const families = ['path', 'local', 'none'];
+      final t = CompositionTarget(families);
+      final parsed = parseTargetKey(t.key);
+      expect(parsed, isA<CompositionTarget>());
+      expect((parsed as CompositionTarget).key, t.key);
+    });
+
+    test('parseTargetKey returns null for malformed comp key', () {
+      expect(parseTargetKey('comp:'), isNull);
+      expect(parseTargetKey('comp:path+'), isNull);
+      expect(parseTargetKey('comp:+local'), isNull);
+    });
+  });
+
+  group('targetShare with composition', () {
+    test('uniform over category count', () {
+      expect(targetShare(Axis.composition, '', 85), closeTo(1 / 85, 1e-9));
+      expect(targetShare(Axis.composition, '', 4), closeTo(0.25, 1e-9));
+      expect(targetShare(Axis.composition, '', 0), 0.0);
+    });
+  });
+
+  group('pickTarget with composition axis', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'PA'],
+      minWidth: 4,
+      maxWidth: 4,
+      minHeight: 4,
+      maxHeight: 4,
+    );
+
+    test('emits CompositionTarget when composition is most under-represented', () {
+      // FM and PA are both local or both line-centric? FM=local, PA=line-centric.
+      // 2 slugs → 2 families (local, line-centric).
+      // allCompositions over 2 families: P(2,3)=0 + P(2,2)=2 + 2 = 4 entries.
+      // Target share per comp = 1/4 = 0.25.
+      //
+      // Start with 100 puzzles balanced across three of the four compositions.
+      // The fourth has 0 → gap should make it the top target.
+      final usedUnion = familiesOf(['FM', 'PA']);
+      final allComps = allCompositions(usedUnion);
+      // 4 comps: [local+none+none], [line-centric+none+none],
+      // [local+line-centric+none], [line-centric+local+none]
+      expect(allComps.length, 4);
+      final three = allComps.take(3).toList();
+      final missing = allComps[3];
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 20; i++) {
+        for (final comp in three) {
+          // Create a puzzle matching this composition. We need slug instances
+          // that produce the desired composition. For comp = [family1, family2, ...]:
+          // pick one slug from each real family.
+          final raw = <String>[];
+          for (final f in comp) {
+            if (f == kEmptyFamily) continue;
+            final slug = universe.allowedSlugs.firstWhere(
+              (s) => kConstraintFamily[s] == f,
+            );
+            raw.add(slug);
+          }
+          stats = stats.withPuzzle(
+            slugs: raw.toSet(),
+            rawSlugs: raw,
+            width: 4,
+            height: 4,
+          );
+        }
+      }
+      // The missing composition should have the largest gap.
+      final t = pickTarget(stats, universe);
+      expect(t, isA<CompositionTarget>());
+      expect((t as CompositionTarget).key, 'comp:${missing.join('+')}');
     });
   });
 }

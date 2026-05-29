@@ -255,13 +255,31 @@ Explicit file paths also work and can be mixed with keywords:
 `--in published --in path/to/extra.txt`.
 
 `--group-by` accepts `slug` (default), `ntypes`, `size`, `scenario`,
-`collection`. Note that `slug` grouping counts puzzle coverage — a
-multi-slug puzzle contributes once per slug — so the per-row share can
-sum to more than 100 % (the script prints a reminder when this happens).
-Other axes are exclusive: one puzzle, one row. The `size` axis is
+`collection`, `composition`. Note that `slug` grouping counts puzzle
+coverage — a multi-slug puzzle contributes once per slug — so the per-row
+share can sum to more than 100 % (the script prints a reminder when this
+happens). Other axes are exclusive: one puzzle, one row. The `size` axis is
 orientation-agnostic (`4x5` and `5x4` collapse to a single `4x5` bin),
 matching the generator's equilibrium size axis (`canonicalSize` in
-`equilibrium.dart`, see `equilibrium.md`).
+`equilibrium.dart`, see `equilibrium.md`). The `composition` axis groups
+by the ordered top-3 family triple (e.g. `path+line-centric+local`), using
+the same instance-count ranking as `compositionOf` in `families.dart` and
+the generator's equilibrium `CompositionTarget`. See `families.md`.
+
+```bash
+# Which composition triples are most/least populated?
+dart run bin/query_corpus.dart --group-by composition --sort count
+dart run bin/query_corpus.dart --group-by composition --reverse --top 20
+
+# Composition vs. difficulty level — where does each triple land?
+dart run bin/query_corpus.dart --cross composition,collection
+
+# Focused puzzles: how many span only one family?
+dart run bin/query_corpus.dart --group-by composition --ntypes 1
+
+# Composition in the buckets view: joint audit with slug-set and size
+dart run bin/query_corpus.dart --buckets size,slugs,composition
+```
 
 ### Cross-tabulation (two axes)
 

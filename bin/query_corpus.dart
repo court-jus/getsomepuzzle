@@ -12,6 +12,8 @@ library;
 
 import 'dart:io';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
+
 // ---------------------------------------------------------------------------
 // Collections (mirrors the filenames in `assets/`)
 // ---------------------------------------------------------------------------
@@ -46,7 +48,20 @@ class _Puzzle {
   final int width;
   final int height;
   final String scenario;
-  _Puzzle(this.collection, this.slugs, this.width, this.height, this.scenario);
+
+  /// The ordered top-3 composition triple joined with '+', e.g.
+  /// "path+line-centric+local". Precomputed from raw slug instances so the
+  /// instance-count ranking matches [compositionOf] exactly.
+  final String compositionKey;
+
+  _Puzzle(
+    this.collection,
+    this.slugs,
+    this.width,
+    this.height,
+    this.scenario,
+    this.compositionKey,
+  );
 }
 
 class _Filters {
@@ -116,12 +131,15 @@ _Puzzle? _parseLine(String line, String collection) {
   final h = int.tryParse(dim[1]);
   if (w == null || h == null) return null;
 
-  final slugs = <String>{};
+  // Collect raw slug instances (with repeats) for composition computation,
+  // then derive the deduplicated set for slug/ntypes tracking.
+  final rawSlugs = <String>[];
   for (final c in parts[4].split(';')) {
     if (c.isEmpty) continue;
     final s = c.split(':').first;
-    if (s.isNotEmpty) slugs.add(s);
+    if (s.isNotEmpty) rawSlugs.add(s);
   }
+  final slugs = rawSlugs.toSet();
   if (slugs.isEmpty) return null;
 
   // Authoritative scenario suffix: `_scenario:xxx` anywhere after the
@@ -134,7 +152,9 @@ _Puzzle? _parseLine(String line, String collection) {
       break;
     }
   }
-  return _Puzzle(collection, slugs, w, h, scenario);
+  final comp = compositionOf(rawSlugs);
+  final compKey = comp.join('+');
+  return _Puzzle(collection, slugs, w, h, scenario, compKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +205,8 @@ Iterable<String> _keysFor(_Puzzle p, String axis) {
       return [p.scenario];
     case 'collection':
       return [p.collection];
+    case 'composition':
+      return [p.compositionKey];
     default:
       throw ArgumentError('Unknown axis: $axis');
   }
@@ -247,14 +269,16 @@ void _printUsage(IOSink out) {
   out.writeln('');
   out.writeln('Output:');
   out.writeln('  --group-by AXIS   slug (default) | ntypes | size | scenario');
-  out.writeln('                    | collection.');
+  out.writeln('                    | collection | composition.');
   out.writeln('  --cross A,B       Two-axis cross-tab: A as rows, B as');
   out.writeln('                    columns (same axis names as --group-by;');
   out.writeln('                    A and B may be equal). Mutually exclusive');
   out.writeln('                    with --group-by. Cells show count (row %).');
   out.writeln('  --buckets [DIMS]  List every distinct joint bucket and its');
   out.writeln('                    population. DIMS is a comma list over');
-  out.writeln('                    {size, ntypes, slugs, scenario}; default');
+  out.writeln(
+    '                    {size, ntypes, slugs, scenario, composition}; default',
+  );
   out.writeln('                    size,slugs,scenario. "slugs" is the whole');
   out.writeln('                    sorted set (one atomic key, not per-slug).');
   out.writeln(
@@ -305,8 +329,21 @@ _Args _parseArgs(List<String> args) {
   var sort = 'count';
   var reverse = false;
 
-  const validAxes = {'slug', 'ntypes', 'size', 'scenario', 'collection'};
-  const validBucketDims = {'size', 'ntypes', 'slugs', 'scenario'};
+  const validAxes = {
+    'slug',
+    'ntypes',
+    'size',
+    'scenario',
+    'collection',
+    'composition',
+  };
+  const validBucketDims = {
+    'size',
+    'ntypes',
+    'slugs',
+    'scenario',
+    'composition',
+  };
   const defaultBucketDims = ['size', 'slugs', 'scenario'];
 
   String need(int i) {
@@ -640,6 +677,8 @@ String _bucketField(_Puzzle p, String dim) {
       return 'slugs=${sorted.join(',')}';
     case 'scenario':
       return 'scenario=${p.scenario}';
+    case 'composition':
+      return 'composition=${p.compositionKey}';
     default:
       throw ArgumentError('Unknown bucket dimension: $dim');
   }

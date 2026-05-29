@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
@@ -130,7 +131,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     if (liveCount >= kEquilibriumWarmupSize) {
       return 'Equilibrium: ON (use --no-equilibrium to disable)';
     }
-    return 'Warmup: small grids (≤$kWarmupMaxWidth×$kWarmupMaxHeight), '
+    return 'Warmup: Gaussian-weighted sizes, '
         '1-2 types — $liveCount/$kEquilibriumWarmupSize';
   }
 
@@ -548,7 +549,18 @@ class _CollectionStats {
   // equilibrium.dart). Keys match the `ProfileCategory.name` values.
   final Map<String, int> profiles;
 
-  _CollectionStats(this.slugs, this.sizeBuckets, this.nTypes, this.profiles);
+  // Composition axis: ordered top-3 families joined with '+'. Keyed by the
+  // joined triple (e.g. "path+line-centric+local"); only observed compositions
+  // are present.
+  final Map<String, int> compositions;
+
+  _CollectionStats(
+    this.slugs,
+    this.sizeBuckets,
+    this.nTypes,
+    this.profiles,
+    this.compositions,
+  );
 
   factory _CollectionStats.fromLines(List<String> lines) {
     final slugs = {for (final s in constraintSlugs) s: 0};
@@ -560,6 +572,7 @@ class _CollectionStats {
       'pathBased': 0,
       'syBased': 0,
     };
+    final compositions = <String, int>{};
 
     for (final line in lines) {
       final trimmed = line.trim();
@@ -575,11 +588,12 @@ class _CollectionStats {
         sizeBuckets[bucket] = (sizeBuckets[bucket] ?? 0) + 1;
       }
 
-      final puzzleSlugs = fields[4]
+      final rawSlugs = fields[4]
           .split(';')
           .map((c) => c.split(':').first)
           .where((s) => s.isNotEmpty)
-          .toSet();
+          .toList();
+      final puzzleSlugs = rawSlugs.toSet();
       for (final s in puzzleSlugs) {
         slugs[s] = (slugs[s] ?? 0) + 1;
       }
@@ -589,9 +603,13 @@ class _CollectionStats {
 
       final profile = detectPuzzleProfile(trimmed);
       profiles[profile.name] = (profiles[profile.name] ?? 0) + 1;
+
+      final comp = compositionOf(rawSlugs);
+      final compKey = comp.join('+');
+      compositions[compKey] = (compositions[compKey] ?? 0) + 1;
     }
 
-    return _CollectionStats(slugs, sizeBuckets, nTypes, profiles);
+    return _CollectionStats(slugs, sizeBuckets, nTypes, profiles, compositions);
   }
 }
 
@@ -694,11 +712,20 @@ void _renderDashboard({
       k: stats.profiles[k] ?? 0,
   };
 
+  // Composition gaps: compute the max gap across all possible compositions.
+  double compMaxGap = 0.0;
+  for (final entry in axisTargets.composition.entries) {
+    final observed = stats.compositions[entry.key] ?? 0;
+    final gap = entry.value - observed;
+    if (gap > compMaxGap) compMaxGap = gap;
+  }
+
   final globalMaxGap = [
     _maxGap(stats.slugs, axisTargets.slug),
     _maxGap(sizeBuckets, axisTargets.size),
     _maxGap(orderedTypes, axisTargets.ntypes),
     _maxGap(orderedProfiles, axisTargets.profile),
+    compMaxGap,
   ].fold<double>(0.0, max);
 
   stderr.writeln('');
@@ -738,6 +765,36 @@ void _renderDashboard({
       globalMaxGap: globalMaxGap,
     ),
   );
+
+  // Composition axis: compact "top deficit" panel — the ~12 largest-gap
+  // buckets, sorted by gap descending. Only shown when the universe defines
+  // composition targets.
+  if (axisTargets.composition.isNotEmpty) {
+    stderr.writeln('');
+    stderr.writeln('Compositions (top deficits):');
+    final compGaps = <MapEntry<String, double>>[];
+    for (final entry in axisTargets.composition.entries) {
+      final observed = stats.compositions[entry.key] ?? 0;
+      final gap = entry.value - observed;
+      if (gap > 0) compGaps.add(MapEntry(entry.key, gap));
+    }
+    compGaps.sort((a, b) => b.value.compareTo(a.value));
+    final top = compGaps.length > 12 ? compGaps.sublist(0, 12) : compGaps;
+    final compStats = {
+      for (final e in top) e.key: stats.compositions[e.key] ?? 0,
+    };
+    _writeHistogram(
+      compStats,
+      sortByValue: false,
+      targets: axisTargets.composition,
+      globalMaxGap: globalMaxGap,
+    );
+    if (compGaps.length > 12) {
+      stderr.writeln(
+        '  … and ${compGaps.length - 12} more compositions with positive deficit',
+      );
+    }
+  }
 }
 
 /// Print two labelled blocks of pre-rendered lines next to each other: the
@@ -767,11 +824,13 @@ class _AxisTargets {
   final Map<String, double> size;
   final Map<String, double> ntypes;
   final Map<String, double> profile;
+  final Map<String, double> composition;
   const _AxisTargets({
     required this.slug,
     required this.size,
     required this.ntypes,
     required this.profile,
+    required this.composition,
   });
 }
 
@@ -796,6 +855,7 @@ _AxisTargets _computeAxisTargets({
     final totalSlugUses = slugCounts.values.fold<int>(0, (a, b) => a + b);
     final perSlug = totalSlugUses / universeSlugs.length;
     for (final s in universeSlugs) {
+      if (s == 'SH') continue; // handled by profile axis
       slug[s] = perSlug;
     }
   }
@@ -841,7 +901,27 @@ _AxisTargets _computeAxisTargets({
     profile[entry.key.name] = totalCorpus * entry.value;
   }
 
-  return _AxisTargets(slug: slug, size: size, ntypes: ntypes, profile: profile);
+  // Composition axis: uniform target over all valid triples derived from
+  // the universe's slug families. Each triple gets `totalCorpus / nCompositions`.
+  final composition = <String, double>{};
+  if (universeSlugs.isNotEmpty) {
+    final fams = familiesOf(universeSlugs);
+    final allComps = allCompositions(fams);
+    if (allComps.isNotEmpty) {
+      final perComp = totalCorpus / allComps.length;
+      for (final comp in allComps) {
+        composition[comp.join('+')] = perComp;
+      }
+    }
+  }
+
+  return _AxisTargets(
+    slug: slug,
+    size: size,
+    ntypes: ntypes,
+    profile: profile,
+    composition: composition,
+  );
 }
 
 /// Largest `target - observed` across all rows of one histogram, clamped to 0.
@@ -1299,13 +1379,13 @@ int _medianMs(List<int> durations) {
 Map<String, dynamic> _parseArgs(List<String> args) {
   final result = <String, dynamic>{
     'mode': 'generate',
-    'count': 10,
-    'minWidth': 4,
-    'maxWidth': 7,
-    'minHeight': 4,
-    'maxHeight': 8,
-    'maxTime': 60,
-    'maxAttemptTime': 120,
+    'count': 1000,
+    'minWidth': 3,
+    'maxWidth': 10,
+    'minHeight': 3,
+    'maxHeight': 10,
+    'maxTime': 3600,
+    'maxAttemptTime': 360,
     'output': null,
     'banned': null,
     'allowed': null,

@@ -1,11 +1,14 @@
 /// Equilibrium: bias puzzle generation toward under-represented categories
-/// across four independent axes (slug, number of types, pair of types, size).
+/// across five independent axes (slug, number of types, pair of types, size,
+/// profile, composition).
 ///
 /// All parameters are exposed as constants / pure functions at the top of the
 /// file so the behavior can be retuned without touching the algorithm.
 library;
 
 import 'dart:math';
+
+import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 
 // ---------------------------------------------------------------------------
 // Tunable parameters
@@ -69,13 +72,6 @@ const int kEquilibriumWarmupSize = 100;
 /// rejected. Mirrors the constant used by the generator.
 const double kMaxAcceptableRatio = 0.25;
 
-/// Maximum side dimensions used when generating warm-up puzzles. The generator
-/// stays within the user-provided `[minWidth..maxWidth] / [minHeight..maxHeight]`
-/// fork; these caps just clamp the upper end so warm-up puzzles remain small
-/// and fast to generate.
-const int kWarmupMaxWidth = 4;
-const int kWarmupMaxHeight = 5;
-
 /// Distribution of #types per puzzle during warm-up. Mono-constraint puzzles
 /// generate fastest; bi-constraint puzzles seed the pair-axis stats so the
 /// equilibrium engine has data on that axis as soon as it kicks in.
@@ -95,7 +91,7 @@ const double kSizeSigmaLeft = 8.0;
 const double kSizeSigmaRight = 15.0;
 
 /// Returns the target share for [category] on [axis].
-/// - `slug` / `pair` axes: uniform over [categoryCount].
+/// - `slug` / `pair` / `composition` axes: uniform over [categoryCount].
 /// - `size` axis: legacy uniform value. The actual size-axis weighting is
 ///   non-uniform (asymmetric Gaussian on area — see `sizeTargetShare`);
 ///   this function keeps returning `1/categoryCount` only for callers that
@@ -108,6 +104,7 @@ double targetShare(Axis axis, Object category, int categoryCount) {
     case Axis.slug:
     case Axis.pair:
     case Axis.size:
+    case Axis.composition:
       return categoryCount > 0 ? 1.0 / categoryCount : 0.0;
     case Axis.ntypes:
       final n = category as int;
@@ -153,7 +150,7 @@ double sizeTargetShare(int width, int height, TargetUniverse universe) {
 // Types
 // ---------------------------------------------------------------------------
 
-enum Axis { slug, ntypes, pair, size, profile }
+enum Axis { slug, ntypes, pair, size, profile, composition }
 
 /// Pre-fill scenario categories. Each puzzle has exactly one profile,
 /// determined either at generation time (when `pathBasedScenario` or
@@ -261,6 +258,17 @@ class ProfileTarget extends Target {
   String get label => 'profile=${profile.name}';
 }
 
+class CompositionTarget extends Target {
+  final List<String> families;
+  const CompositionTarget(this.families);
+  @override
+  Axis get axis => Axis.composition;
+  @override
+  String get key => 'comp:${families.join('+')}';
+  @override
+  String get label => 'comp=${families.join('+')}';
+}
+
 /// Detect a puzzle's profile from its v2 line by reading the
 /// authoritative `scenario:<name>` suffix written by the generator at
 /// emission time (see `Puzzle.lineExport`). Any trailing part starting
@@ -289,13 +297,15 @@ ProfileCategory detectPuzzleProfile(String v2Line) {
 // Stats
 // ---------------------------------------------------------------------------
 
-/// Distributions over the 4 axes, computed from a corpus of puzzle lines.
+/// Distributions over the 6 axes (slug, ntypes, pair, size, profile,
+/// composition), computed from a corpus of puzzle lines.
 class EquilibriumStats {
   final Map<String, int> slugCounts;
   final Map<int, int> ntypesCounts;
   final Map<(String, String), int> pairCounts;
   final Map<(int, int), int> sizeCounts;
   final Map<ProfileCategory, int> profileCounts;
+  final Map<String, int> compositionCounts;
   final int totalPuzzles;
 
   const EquilibriumStats({
@@ -304,6 +314,7 @@ class EquilibriumStats {
     required this.pairCounts,
     required this.sizeCounts,
     required this.profileCounts,
+    required this.compositionCounts,
     required this.totalPuzzles,
   });
 
@@ -313,6 +324,7 @@ class EquilibriumStats {
     pairCounts: {},
     sizeCounts: {},
     profileCounts: {},
+    compositionCounts: {},
     totalPuzzles: 0,
   );
 
@@ -327,6 +339,7 @@ class EquilibriumStats {
     final pairs = <(String, String), int>{};
     final sizes = <(int, int), int>{};
     final profiles = <ProfileCategory, int>{};
+    final compositionCounts = <String, int>{};
     int total = 0;
 
     for (final raw in lines) {
@@ -343,13 +356,16 @@ class EquilibriumStats {
       if (w == null || h == null) continue;
 
       // Slugs: parts[4] = "slug:params;slug:params;..."
-      final slugs = <String>{};
+      // Collect raw slug instances (with repeats) for composition counting,
+      // then derive the deduplicated set for slug/ntypes/pair tracking.
+      final rawSlugs = <String>[];
       for (final c in parts[4].split(';')) {
         if (c.isEmpty) continue;
         final colon = c.indexOf(':');
         if (colon <= 0) continue;
-        slugs.add(c.substring(0, colon));
+        rawSlugs.add(c.substring(0, colon));
       }
+      final slugs = rawSlugs.toSet();
       if (slugs.isEmpty) continue;
 
       total++;
@@ -366,6 +382,9 @@ class EquilibriumStats {
       }
       final profile = detectPuzzleProfile(line);
       profiles[profile] = (profiles[profile] ?? 0) + 1;
+      final comp = compositionOf(rawSlugs);
+      final compKey = comp.join('+');
+      compositionCounts[compKey] = (compositionCounts[compKey] ?? 0) + 1;
     }
 
     return EquilibriumStats(
@@ -374,6 +393,7 @@ class EquilibriumStats {
       pairCounts: pairs,
       sizeCounts: sizes,
       profileCounts: profiles,
+      compositionCounts: compositionCounts,
       totalPuzzles: total,
     );
   }
@@ -384,6 +404,7 @@ class EquilibriumStats {
   /// care about the profile axis (and tests pre-dating it) stay terse.
   EquilibriumStats withPuzzle({
     required Set<String> slugs,
+    List<String>? rawSlugs,
     required int width,
     required int height,
     ProfileCategory profile = ProfileCategory.classic,
@@ -393,6 +414,7 @@ class EquilibriumStats {
     final newPairs = Map<(String, String), int>.from(pairCounts);
     final newSizes = Map<(int, int), int>.from(sizeCounts);
     final newProfiles = Map<ProfileCategory, int>.from(profileCounts);
+    final newCompositionCounts = Map<String, int>.from(compositionCounts);
 
     for (final s in slugs) {
       newSlug[s] = (newSlug[s] ?? 0) + 1;
@@ -406,6 +428,10 @@ class EquilibriumStats {
       newPairs[pair] = (newPairs[pair] ?? 0) + 1;
     }
     newProfiles[profile] = (newProfiles[profile] ?? 0) + 1;
+    final compositionSlugs = rawSlugs ?? slugs.toList();
+    final comp = compositionOf(compositionSlugs);
+    final compKey = comp.join('+');
+    newCompositionCounts[compKey] = (newCompositionCounts[compKey] ?? 0) + 1;
 
     return EquilibriumStats(
       slugCounts: newSlug,
@@ -413,6 +439,7 @@ class EquilibriumStats {
       pairCounts: newPairs,
       sizeCounts: newSizes,
       profileCounts: newProfiles,
+      compositionCounts: newCompositionCounts,
       totalPuzzles: totalPuzzles + 1,
     );
   }
@@ -435,7 +462,15 @@ class TargetUniverse {
   /// counting a size and its transpose once.
   final List<(int, int)> allowedSizes;
 
-  TargetUniverse._(this.allowedSlugs, this.allowedSizes);
+  /// All valid composition triples over the families of [allowedSlugs].
+  /// For the full 5-family set this yields 85 entries (see [allCompositions]).
+  final List<List<String>> allowedCompositions;
+
+  TargetUniverse._(
+    this.allowedSlugs,
+    this.allowedSizes,
+    this.allowedCompositions,
+  );
 
   factory TargetUniverse({
     required Iterable<String> allowedSlugs,
@@ -458,7 +493,9 @@ class TargetUniverse {
         sizes.add(canonicalSize(w, h));
       }
     }
-    return TargetUniverse._(slugs, sizes.toList());
+
+    final allowedCompositions = allCompositions(familiesOf(slugs));
+    return TargetUniverse._(slugs, sizes.toList(), allowedCompositions);
   }
 
   /// All ordered pairs (a, b) with a < b among [allowedSlugs].
@@ -693,6 +730,10 @@ Target? parseTargetKey(String key) {
         if (p.name == rest) return ProfileTarget(p);
       }
       return null;
+    case 'comp':
+      final parts = rest.split('+');
+      if (parts.isEmpty || parts.any((p) => p.isEmpty)) return null;
+      return CompositionTarget(parts);
     default:
       return null;
   }
@@ -738,6 +779,10 @@ Map<String, double> slugDeficits(
   final expSlug = nSlugs > 0 ? avgSlugsPerPuzzle / nSlugs : 0.0;
   final out = <String, double>{};
   for (final slug in universe.allowedSlugs) {
+    if (slug == 'SH') {
+      out[slug] = 0.0;
+      continue;
+    }
     final c = stats.slugCounts[slug] ?? 0;
     out[slug] = _gap(_share(c, total), expSlug);
   }
@@ -805,6 +850,20 @@ List<_ScoredTarget> _scoreAll(EquilibriumStats stats, TargetUniverse universe) {
     out.add(_ScoredTarget(ProfileTarget(entry.key), _gap(share, entry.value)));
   }
 
+  // --- Composition (ordered top-3 families, uniform target) ---
+  final nCompositions = universe.allowedCompositions.length;
+  final expComp = targetShare(Axis.composition, '', nCompositions);
+  for (final comp in universe.allowedCompositions) {
+    final key = comp.join('+');
+    final c = stats.compositionCounts[key] ?? 0;
+    out.add(
+      _ScoredTarget(
+        CompositionTarget(List<String>.from(comp)),
+        _gap(_share(c, total), expComp),
+      ),
+    );
+  }
+
   return out;
 }
 
@@ -835,9 +894,10 @@ class WarmupConfig {
   });
 }
 
-/// Pick a fast-warm-up generator config: small grid (clamped against
-/// [kWarmupMaxWidth] / [kWarmupMaxHeight]) and few constraint types
-/// (drawn from [kWarmupNTypesPool]).
+/// Pick a fast-warm-up generator config: grid size sampled from the full
+/// user-specified range weighted by the asymmetric-Gaussian-on-area
+/// distribution (so the warm-up shape matches the equilibrium target), and
+/// few constraint types (drawn from [kWarmupNTypesPool]).
 ///
 /// `baseRequired` is included in the chosen pool so user-required slugs end
 /// up prioritized in the candidate sort and trigger SH prefill if needed.
@@ -853,10 +913,32 @@ WarmupConfig pickWarmupConfig({
   required Set<String> baseRequired,
   required Random rng,
 }) {
-  final wMax = _clampUpperBound(maxWidth, kWarmupMaxWidth, minWidth);
-  final hMax = _clampUpperBound(maxHeight, kWarmupMaxHeight, minHeight);
-  final w = minWidth + rng.nextInt(wMax - minWidth + 1);
-  final h = minHeight + rng.nextInt(hMax - minHeight + 1);
+  // Sample (width, height) from the full user-specified range, weighted by
+  // the asymmetric-Gaussian-on-area distribution (same as `sizeTargetShare`)
+  // so the warm-up corpus approximates the equilibrium target from the start.
+  final sizes = <(int, int)>[];
+  final weights = <double>[];
+  double totalWeight = 0;
+  for (int w = minWidth; w <= maxWidth; w++) {
+    for (int h = minHeight; h <= maxHeight; h++) {
+      final weight = sizeRawWeight(w, h);
+      sizes.add((w, h));
+      weights.add(weight);
+      totalWeight += weight;
+    }
+  }
+  double threshold = rng.nextDouble() * totalWeight;
+  double cumulative = 0;
+  int w = sizes.last.$1;
+  int h = sizes.last.$2;
+  for (int i = 0; i < sizes.length; i++) {
+    cumulative += weights[i];
+    if (threshold <= cumulative) {
+      w = sizes[i].$1;
+      h = sizes[i].$2;
+      break;
+    }
+  }
 
   final allowedList = baseAllowedSlugs.toList()..shuffle(rng);
   final allowedSet = allowedList.toSet();
@@ -878,12 +960,4 @@ WarmupConfig pickWarmupConfig({
     allowedSlugs: chosen,
     preferredSlugs: chosen,
   );
-}
-
-/// Clamp `requested` to `hardCap`, but never below `floor` — when the caller's
-/// floor exceeds the hard cap, fall back to the floor (the warm-up still
-/// respects user-provided `min*` arguments even if it can't honor the cap).
-int _clampUpperBound(int requested, int hardCap, int floor) {
-  final capped = requested > hardCap ? hardCap : requested;
-  return capped < floor ? floor : capped;
 }
