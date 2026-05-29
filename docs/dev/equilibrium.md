@@ -36,9 +36,16 @@ except as noted on axis 3):
    puzzle. Only puzzles with **exactly 2 types** contribute to this axis;
    a 3-type puzzle `{A, B, C}` does **not** count toward `{A,B}`,
    `{A,C}`, or `{B,C}`.
-4. **Size** — `(width, height)` ordered pair. `4x5` and `5x4` are
-   **distinct**. Range: `kMinSide × kMinSide` up to `kMaxSide × kMaxSide`
-   (3 to 10 inclusive).
+4. **Size** — grid *shape*, canonicalized to `width ≤ height`, so `4x5`
+   and `5x4` are the **same bin** (`canonicalSize` in `equilibrium.dart`):
+   only the shape matters for variety, not the orientation. Range:
+   `kMinSide × kMinSide` up to `kMaxSide × kMaxSide` (3 to 10 inclusive).
+   `TargetUniverse.allowedSizes` holds the deduplicated canonical bins, and
+   `EquilibriumStats.sizeCounts` tallies a puzzle and its transpose
+   together. When a `SizeTarget` (or `pickWeightedSize`) selects a
+   non-square bin, the worker picks one of the two orientations at random
+   (`_orientSize` in `worker_io.dart`, constrained to the width/height
+   bounds), so both orientations keep being emitted while counting as one.
 5. **Profile** — pre-fill scenario category (`classic`, `sh`, `pathBased`,
    `syBased`). Identification reads the authoritative `scenario:<name>`
    suffix written by the generator at emission time (see

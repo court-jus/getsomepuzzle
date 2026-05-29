@@ -69,6 +69,16 @@ void main() {
       // Single-type puzzle does NOT add to pair counts.
       expect(stats.totalPairs, 1);
     });
+
+    test('size axis is orientation-agnostic: 4x5 and 5x4 share one bin', () {
+      var stats = EquilibriumStats.empty();
+      stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 5);
+      stats = stats.withPuzzle(slugs: {'FM'}, width: 5, height: 4);
+      // Both transposes land in the canonical (4, 5) bin; the transpose key
+      // never appears.
+      expect(stats.sizeCounts[(4, 5)], 2);
+      expect(stats.sizeCounts[(5, 4)], isNull);
+    });
   });
 
   group('targetShare', () {
@@ -97,10 +107,16 @@ void main() {
         maxHeight: 5,
       );
       expect(u.allowedSlugs, ['FM', 'SH']);
-      // Width: 3..10 = 8 values; height: 4..5 = 2 values; total = 16.
-      expect(u.allowedSizes.length, 8 * 2);
-      expect(u.allowedSizes.contains((kMinSide, 4)), isTrue);
-      expect(u.allowedSizes.contains((kMaxSide, 5)), isTrue);
+      // Width 3..10 (8) × height 4..5 (2) = 16 ordered pairs, but sizes are
+      // canonicalized to width ≤ height and deduped, so the only transpose
+      // collision is 5x4 ≡ 4x5 → 15 distinct bins.
+      expect(u.allowedSizes.length, 15);
+      expect(u.allowedSizes.contains((kMinSide, 4)), isTrue); // 3x4
+      // 10x5 is stored canonically as 5x10, never as 10x5.
+      expect(u.allowedSizes.contains((5, kMaxSide)), isTrue); // 5x10
+      expect(u.allowedSizes.contains((kMaxSide, 5)), isFalse);
+      // Every bin is canonical (width ≤ height).
+      expect(u.allowedSizes.every((s) => s.$1 <= s.$2), isTrue);
     });
 
     test('allowedPairs are sorted and unordered (a<b only)', () {
@@ -284,10 +300,11 @@ void main() {
 
     test('biased toward positive-gap bins on a sample of 1000 draws', () {
       // 100 puzzles all on (3,3): that bin is heavily over-represented; the
-      // other three each have a positive gap (their target share is
-      // unobserved). With Option B's asymmetric Gaussian on area, (4,4)
-      // (area 16, closest to peak 20) carries the largest gap, so it gets
-      // the most picks — but all three still get sampled at least once.
+      // remaining canonical bins each have a positive gap (target share
+      // unobserved). The 3..4 × 3..4 universe has only THREE bins —
+      // (3,3), (3,4), (4,4) — because 4x3 is canonicalized into 3x4. With
+      // the asymmetric Gaussian on area, (4,4) (area 16, closest to peak 20)
+      // carries the largest gap, so it gets the most picks.
       var stats = EquilibriumStats.empty();
       for (int i = 0; i < 100; i++) {
         stats = stats.withPuzzle(slugs: {'FM'}, width: 3, height: 3);
@@ -300,14 +317,14 @@ void main() {
       }
       // (3,3) is saturated → never returned.
       expect(counts[(3, 3)] ?? 0, 0);
-      // The other three have positive gaps, all eligible.
+      // pickWeightedSize only ever returns canonical bins — the 4x3 transpose
+      // is never produced; its draws fold into (3,4).
+      expect(counts[(4, 3)] ?? 0, 0);
+      // Both remaining bins have positive gaps, so both get sampled.
       expect(counts[(3, 4)] ?? 0, greaterThan(0));
-      expect(counts[(4, 3)] ?? 0, greaterThan(0));
       expect(counts[(4, 4)] ?? 0, greaterThan(0));
       // (4,4) has the biggest gap → most-picked.
-      final cMax = counts[(4, 4)] ?? 0;
-      expect(cMax, greaterThan(counts[(3, 4)] ?? 0));
-      expect(cMax, greaterThan(counts[(4, 3)] ?? 0));
+      expect(counts[(4, 4)] ?? 0, greaterThan(counts[(3, 4)] ?? 0));
     });
   });
 
@@ -601,6 +618,13 @@ void main() {
         expect(parsed!.key, equals(t.key));
         expect(parsed.runtimeType, equals(t.runtimeType));
       }
+    });
+
+    test('SizeTarget canonicalizes transposed sizes to one key', () {
+      // A 7x4 target is the same size bin as 4x7, so both expose key
+      // 'size:4x7' — the coordinator/blacklist can't tell them apart.
+      expect(const SizeTarget(7, 4).key, 'size:4x7');
+      expect(parseTargetKey('size:7x4')!.key, 'size:4x7');
     });
 
     test('returns null for unknown or malformed keys', () {

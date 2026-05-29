@@ -1,8 +1,10 @@
 /// Read-only query tool over the on-disk v2 puzzle corpus.
 ///
 /// Scans one or more `assets/*.txt` files, applies filters (ntypes,
-/// included/excluded slugs, width/height/area), and prints an aggregate
-/// table grouped by the chosen axis. Pure Dart, no Flutter dependency —
+/// included/excluded slugs, width/height/area), and prints one of: a 1-D
+/// table grouped by one axis (`--group-by`), a two-axis cross-tabulation
+/// (`--cross AXIS1,AXIS2`), or the full joint-bucket inventory
+/// (`--buckets`). Pure Dart, no Flutter dependency —
 /// runs as `dart run bin/query_corpus.dart …`.
 ///
 /// See `docs/dev/collection_management.md` for usage examples.
@@ -63,9 +65,30 @@ class _Args {
   final List<String> files;
   final _Filters filters;
   final String groupBy;
+
+  /// `[rowAxis, colAxis]` for the 2-D cross-tabulation mode, or `null` for
+  /// the default 1-D `groupBy` table.
+  final List<String>? cross;
+
+  /// Dimensions forming the joint bucket key (subset of {size, ntypes, slugs,
+  /// scenario}) for the `--buckets` mode, or `null` when not requested.
+  final List<String>? buckets;
   final int? top;
   final String sort;
-  _Args(this.files, this.filters, this.groupBy, this.top, this.sort);
+
+  /// Flip the order produced by [sort]. Combined with [top] this surfaces the
+  /// bottom of the ranking (e.g. the least-represented slug pairs).
+  final bool reverse;
+  _Args(
+    this.files,
+    this.filters,
+    this.groupBy,
+    this.cross,
+    this.buckets,
+    this.top,
+    this.sort,
+    this.reverse,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -137,40 +160,66 @@ bool _passesFilters(_Puzzle p, _Filters f) {
   return true;
 }
 
+/// Orientation-agnostic size label `min x max`, so `4x5` and `5x4` collapse
+/// to a single bin — mirrors `canonicalSize` in `equilibrium.dart`, where the
+/// generator's size axis treats a shape and its transpose as one category.
+String _sizeKey(_Puzzle p) {
+  final a = p.width <= p.height ? p.width : p.height;
+  final b = p.width <= p.height ? p.height : p.width;
+  return '${a}x$b';
+}
+
+/// All keys a puzzle contributes to along [axis]. Single-valued for every
+/// axis except `slug`, where a puzzle yields one key per distinct slug —
+/// so slug-axis marginals count *coverage* (puzzles containing this slug),
+/// which sums to ≥ 100 % when multi-slug puzzles are present, by design.
+Iterable<String> _keysFor(_Puzzle p, String axis) {
+  switch (axis) {
+    case 'slug':
+      return p.slugs;
+    case 'ntypes':
+      return [p.slugs.length >= 6 ? '6+' : '${p.slugs.length}'];
+    case 'size':
+      return [_sizeKey(p)];
+    case 'scenario':
+      return [p.scenario];
+    case 'collection':
+      return [p.collection];
+    default:
+      throw ArgumentError('Unknown axis: $axis');
+  }
+}
+
 Map<String, int> _aggregate(Iterable<_Puzzle> puzzles, String groupBy) {
   final counts = <String, int>{};
-  void bump(String key) {
-    counts[key] = (counts[key] ?? 0) + 1;
-  }
-
   for (final p in puzzles) {
-    switch (groupBy) {
-      case 'slug':
-        // Each puzzle contributes to as many rows as it has distinct slugs.
-        // The per-row share is therefore a *coverage* (puzzles containing
-        // this slug / total filtered puzzles), which sums to ≥ 100 % when
-        // multi-slug puzzles are present — that's by design.
-        for (final s in p.slugs) {
-          bump(s);
-        }
-        break;
-      case 'ntypes':
-        bump(p.slugs.length >= 6 ? '6+' : '${p.slugs.length}');
-        break;
-      case 'size':
-        bump('${p.width}x${p.height}');
-        break;
-      case 'scenario':
-        bump(p.scenario);
-        break;
-      case 'collection':
-        bump(p.collection);
-        break;
-      default:
-        throw ArgumentError('Unknown --group-by: $groupBy');
+    for (final key in _keysFor(p, groupBy)) {
+      counts[key] = (counts[key] ?? 0) + 1;
     }
   }
   return counts;
+}
+
+/// 2-D cross-tabulation: `cell[rowKey][colKey]` = number of (puzzle, key)
+/// pairs landing in that cross. A puzzle multiplies out across both axes,
+/// so for `slug × slug` a puzzle with slugs {FM, PA} fills (FM,FM), (FM,PA),
+/// (PA,FM), (PA,PA) — a symmetric co-occurrence matrix whose diagonal is the
+/// per-slug coverage.
+Map<String, Map<String, int>> _crosstab(
+  Iterable<_Puzzle> puzzles,
+  String rowAxis,
+  String colAxis,
+) {
+  final cells = <String, Map<String, int>>{};
+  for (final p in puzzles) {
+    for (final r in _keysFor(p, rowAxis)) {
+      final row = cells.putIfAbsent(r, () => <String, int>{});
+      for (final c in _keysFor(p, colAxis)) {
+        row[c] = (row[c] ?? 0) + 1;
+      }
+    }
+  }
+  return cells;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,9 +248,25 @@ void _printUsage(IOSink out) {
   out.writeln('Output:');
   out.writeln('  --group-by AXIS   slug (default) | ntypes | size | scenario');
   out.writeln('                    | collection.');
-  out.writeln('  --top N           Show only the top N rows.');
+  out.writeln('  --cross A,B       Two-axis cross-tab: A as rows, B as');
+  out.writeln('                    columns (same axis names as --group-by;');
+  out.writeln('                    A and B may be equal). Mutually exclusive');
+  out.writeln('                    with --group-by. Cells show count (row %).');
+  out.writeln('  --buckets [DIMS]  List every distinct joint bucket and its');
+  out.writeln('                    population. DIMS is a comma list over');
+  out.writeln('                    {size, ntypes, slugs, scenario}; default');
+  out.writeln('                    size,slugs,scenario. "slugs" is the whole');
+  out.writeln('                    sorted set (one atomic key, not per-slug).');
+  out.writeln(
+    '                    Mutually exclusive with --group-by/--cross.',
+  );
+  out.writeln('  --top N           Show only the top N rows (and N columns');
+  out.writeln('                    in --cross mode).');
   out.writeln('  --sort count|key  Sort descending by count (default) or');
   out.writeln('                    alphanumerically by key.');
+  out.writeln('  --reverse         Flip the sort order. With --top this');
+  out.writeln('                    surfaces the bottom of the ranking (e.g.');
+  out.writeln('                    the least-represented rows/columns).');
   out.writeln('  -h, --help        This message.');
   out.writeln('');
   out.writeln('Examples:');
@@ -214,6 +279,18 @@ void _printUsage(IOSink out) {
     '  dart run bin/query_corpus.dart --ntypes 1 --include-slug FM \\',
   );
   out.writeln('        --group-by size');
+  out.writeln('  dart run bin/query_corpus.dart --cross slug,collection');
+  out.writeln('  dart run bin/query_corpus.dart --cross slug,slug --ntypes 2');
+  out.writeln(
+    '  dart run bin/query_corpus.dart --cross slug,slug --ntypes 2 \\',
+  );
+  out.writeln('        --reverse --top 8   # least-represented slug pairs');
+  out.writeln(
+    '  dart run bin/query_corpus.dart --buckets --sort count --top 20',
+  );
+  out.writeln(
+    '        # most over-populated joint (size, slug-set, scenario) tuples',
+  );
 }
 
 _Args _parseArgs(List<String> args) {
@@ -221,8 +298,16 @@ _Args _parseArgs(List<String> args) {
   var files = <String>[];
   var pickedFiles = false;
   var groupBy = 'slug';
+  var groupBySet = false;
+  List<String>? cross;
+  List<String>? buckets;
   int? top;
   var sort = 'count';
+  var reverse = false;
+
+  const validAxes = {'slug', 'ntypes', 'size', 'scenario', 'collection'};
+  const validBucketDims = {'size', 'ntypes', 'slugs', 'scenario'};
+  const defaultBucketDims = ['size', 'slugs', 'scenario'];
 
   String need(int i) {
     if (i + 1 >= args.length) {
@@ -291,12 +376,55 @@ _Args _parseArgs(List<String> args) {
       case '--group-by':
         groupBy = need(i);
         i++;
-        const valid = {'slug', 'ntypes', 'size', 'scenario', 'collection'};
-        if (!valid.contains(groupBy)) {
+        groupBySet = true;
+        if (!validAxes.contains(groupBy)) {
           throw ArgumentError(
-            'Invalid --group-by: $groupBy. Expected one of $valid.',
+            'Invalid --group-by: $groupBy. Expected one of $validAxes.',
           );
         }
+        break;
+      case '--cross':
+        final axes = need(i).split(',').map((s) => s.trim()).toList();
+        i++;
+        if (axes.length != 2) {
+          throw ArgumentError(
+            'Invalid --cross: expected two comma-separated axes, e.g. '
+            'slug,collection.',
+          );
+        }
+        for (final ax in axes) {
+          if (!validAxes.contains(ax)) {
+            throw ArgumentError(
+              'Invalid --cross axis: $ax. Expected one of $validAxes.',
+            );
+          }
+        }
+        cross = axes;
+        break;
+      case '--buckets':
+        // Dimensions are optional: a following token that doesn't look like a
+        // flag is consumed as the comma-separated dimension list, otherwise
+        // the default joint key (size, slugs, scenario) is used.
+        var dims = List<String>.from(defaultBucketDims);
+        if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+          dims = args[i + 1].split(',').map((s) => s.trim()).toList();
+          i++;
+          if (dims.isEmpty || dims.any((d) => d.isEmpty)) {
+            throw ArgumentError('Invalid --buckets: empty dimension.');
+          }
+          for (final d in dims) {
+            if (!validBucketDims.contains(d)) {
+              throw ArgumentError(
+                'Invalid --buckets dimension: $d. Expected one of '
+                '$validBucketDims.',
+              );
+            }
+          }
+          if (dims.toSet().length != dims.length) {
+            throw ArgumentError('Invalid --buckets: duplicate dimension.');
+          }
+        }
+        buckets = dims;
         break;
       case '--top':
         top = int.parse(need(i));
@@ -309,12 +437,25 @@ _Args _parseArgs(List<String> args) {
           throw ArgumentError('Invalid --sort: $sort. Expected count|key.');
         }
         break;
+      case '--reverse':
+        reverse = true;
+        break;
       default:
         throw ArgumentError('Unknown option: $a (use --help).');
     }
   }
+  final modes = [
+    if (groupBySet) '--group-by',
+    if (cross != null) '--cross',
+    if (buckets != null) '--buckets',
+  ];
+  if (modes.length > 1) {
+    throw ArgumentError(
+      '${modes.join(', ')} are mutually exclusive; pick one output mode.',
+    );
+  }
   if (!pickedFiles) files = List<String>.from(_publishedFiles);
-  return _Args(files, filters, groupBy, top, sort);
+  return _Args(files, filters, groupBy, cross, buckets, top, sort, reverse);
 }
 
 void main(List<String> rawArgs) {
@@ -347,7 +488,6 @@ void main(List<String> rawArgs) {
   final filtered = puzzles
       .where((p) => _passesFilters(p, opts.filters))
       .toList();
-  final counts = _aggregate(filtered, opts.groupBy);
 
   // Header
   stdout.writeln(
@@ -388,44 +528,92 @@ void main(List<String> rawArgs) {
   }
   stdout.writeln('');
 
-  // Table
-  final headerKey = opts.groupBy;
-  var entries = counts.entries.toList();
-  if (opts.sort == 'count') {
-    entries.sort((a, b) {
-      final c = b.value.compareTo(a.value);
-      return c != 0 ? c : a.key.compareTo(b.key);
+  if (opts.cross != null) {
+    _printCrosstab(filtered, opts);
+  } else if (opts.buckets != null) {
+    _printBuckets(filtered, opts);
+  } else {
+    _printTable1D(filtered, opts);
+  }
+}
+
+/// Sort `keys` per `--sort`: descending by `weight` (count marginal) with an
+/// alphanumeric tie-break, or alphanumerically when `sort == 'key'`. When
+/// `reverse` is set the whole order is flipped (so `--top` then surfaces the
+/// bottom of the ranking). Finally truncate to `top` if set.
+List<String> _orderKeys(
+  Iterable<String> keys,
+  int Function(String) weight,
+  String sort,
+  bool reverse,
+  int? top,
+) {
+  final out = keys.toList();
+  if (sort == 'count') {
+    out.sort((a, b) {
+      final c = weight(b).compareTo(weight(a));
+      return c != 0 ? c : a.compareTo(b);
     });
   } else {
-    entries.sort((a, b) => a.key.compareTo(b.key));
+    out.sort();
   }
-  if (opts.top != null && entries.length > opts.top!) {
-    entries = entries.sublist(0, opts.top!);
+  if (reverse) {
+    final r = out.reversed.toList();
+    out
+      ..clear()
+      ..addAll(r);
   }
+  if (top != null && out.length > top) {
+    return out.sublist(0, top);
+  }
+  return out;
+}
 
-  // Column widths
+/// Render a `key | count | share` table for `counts`, ordered per
+/// `--sort`/`--reverse`/`--top`. `share` is `count / denom` (the filtered
+/// total), so it sums to 100 % when each puzzle contributes to exactly one
+/// key — `header` labels the key column.
+void _renderCountTable(
+  Map<String, int> counts,
+  String header,
+  int denom,
+  _Args opts,
+) {
+  final keys = _orderKeys(
+    counts.keys,
+    (k) => counts[k]!,
+    opts.sort,
+    opts.reverse,
+    opts.top,
+  );
+
   final keyWidth = [
-    headerKey.length,
-    ...entries.map((e) => e.key.length),
+    header.length,
+    ...keys.map((k) => k.length),
   ].reduce((a, b) => a > b ? a : b);
   final countWidth = [
     'count'.length,
-    ...entries.map((e) => e.value.toString().length),
+    ...keys.map((k) => counts[k]!.toString().length),
   ].reduce((a, b) => a > b ? a : b);
 
   stdout.writeln(
-    '${headerKey.padRight(keyWidth)}    ${'count'.padLeft(countWidth)}    share',
+    '${header.padRight(keyWidth)}    ${'count'.padLeft(countWidth)}    share',
   );
   stdout.writeln('${'-' * keyWidth}    ${'-' * countWidth}    -----');
-  final denom = filtered.length;
-  for (final e in entries) {
-    final share = denom == 0 ? 0.0 : e.value * 100 / denom;
+  for (final k in keys) {
+    final v = counts[k]!;
+    final share = denom == 0 ? 0.0 : v * 100 / denom;
     stdout.writeln(
-      '${e.key.padRight(keyWidth)}    '
-      '${e.value.toString().padLeft(countWidth)}    '
+      '${k.padRight(keyWidth)}    '
+      '${v.toString().padLeft(countWidth)}    '
       '${share.toStringAsFixed(1).padLeft(5)}%',
     );
   }
+}
+
+void _printTable1D(List<_Puzzle> filtered, _Args opts) {
+  final counts = _aggregate(filtered, opts.groupBy);
+  _renderCountTable(counts, opts.groupBy, filtered.length, opts);
 
   if (opts.groupBy == 'slug' && filtered.isNotEmpty) {
     stdout.writeln('');
@@ -433,6 +621,165 @@ void main(List<String> rawArgs) {
       '(slug groupings count puzzle coverage; per-row share is '
       'puzzles-containing-this-slug / total filtered, and may sum to > 100% '
       'when multi-slug puzzles are present.)',
+    );
+  }
+}
+
+/// One bucket-key field for `dim`. Unlike the `slug` axis (which explodes a
+/// puzzle into one key per slug), the `slugs` dimension is the **whole sorted
+/// set** as a single atomic label — that's the joint category equilibrium
+/// does *not* track, only its marginals.
+String _bucketField(_Puzzle p, String dim) {
+  switch (dim) {
+    case 'size':
+      return _sizeKey(p);
+    case 'ntypes':
+      return 'ntypes=${p.slugs.length}';
+    case 'slugs':
+      final sorted = p.slugs.toList()..sort();
+      return 'slugs=${sorted.join(',')}';
+    case 'scenario':
+      return 'scenario=${p.scenario}';
+    default:
+      throw ArgumentError('Unknown bucket dimension: $dim');
+  }
+}
+
+/// List every distinct joint bucket — the Cartesian tuple of the chosen
+/// `--buckets` dimensions actually present in the filtered corpus — with its
+/// population. Each puzzle lands in exactly one bucket, so shares sum to
+/// 100 %. Sorting ascending (`--reverse`) surfaces the rarest tuples.
+void _printBuckets(List<_Puzzle> filtered, _Args opts) {
+  final dims = opts.buckets!;
+  final counts = <String, int>{};
+  for (final p in filtered) {
+    final key = dims.map((d) => _bucketField(p, d)).join('  ');
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+
+  stdout.writeln('Distinct buckets (${dims.join(' x ')}): ${counts.length}');
+  stdout.writeln('');
+  _renderCountTable(counts, 'bucket', filtered.length, opts);
+}
+
+void _printCrosstab(List<_Puzzle> filtered, _Args opts) {
+  final rowAxis = opts.cross![0];
+  final colAxis = opts.cross![1];
+  final cells = _crosstab(filtered, rowAxis, colAxis);
+
+  // Marginals: row totals (over every column, before --top truncation) and
+  // column totals (over every row). These drive both sorting and the margin
+  // figures, so they must be computed on the full matrix.
+  final rowTotals = <String, int>{};
+  final colTotals = <String, int>{};
+  for (final r in cells.keys) {
+    for (final entry in cells[r]!.entries) {
+      rowTotals[r] = (rowTotals[r] ?? 0) + entry.value;
+      colTotals[entry.key] = (colTotals[entry.key] ?? 0) + entry.value;
+    }
+  }
+
+  final rows = _orderKeys(
+    cells.keys,
+    (k) => rowTotals[k] ?? 0,
+    opts.sort,
+    opts.reverse,
+    opts.top,
+  );
+  final cols = _orderKeys(
+    colTotals.keys,
+    (k) => colTotals[k] ?? 0,
+    opts.sort,
+    opts.reverse,
+    opts.top,
+  );
+
+  int cellOf(String r, String c) => cells[r]?[c] ?? 0;
+
+  // Each cell renders as "count (pct%)" where pct is share of the row total.
+  String cellText(String r, String c) {
+    final v = cellOf(r, c);
+    final rt = rowTotals[r] ?? 0;
+    final pct = rt == 0 ? 0.0 : v * 100 / rt;
+    return '$v (${pct.toStringAsFixed(0)}%)';
+  }
+
+  // Column widths: the row-label column, then one per displayed column plus a
+  // trailing "total" column.
+  final rowHeader = '$rowAxis \\ $colAxis';
+  final labelWidth = [
+    rowHeader.length,
+    'total'.length,
+    ...rows.map((r) => r.length),
+  ].reduce((a, b) => a > b ? a : b);
+
+  int colWidth(String c) {
+    final body = rows.map((r) => cellText(r, c).length);
+    final foot = (colTotals[c] ?? 0).toString().length;
+    return [c.length, foot, ...body].reduce((a, b) => a > b ? a : b);
+  }
+
+  final widths = {for (final c in cols) c: colWidth(c)};
+  final totalColWidth = [
+    'total'.length,
+    filtered.length.toString().length,
+    ...rows.map((r) => (rowTotals[r] ?? 0).toString().length),
+  ].reduce((a, b) => a > b ? a : b);
+
+  // Header row.
+  final sb = StringBuffer(rowHeader.padRight(labelWidth));
+  for (final c in cols) {
+    sb.write('  ${c.padLeft(widths[c]!)}');
+  }
+  sb.write('  ${'total'.padLeft(totalColWidth)}');
+  stdout.writeln(sb);
+
+  // Separator.
+  final sep = StringBuffer('-' * labelWidth);
+  for (final c in cols) {
+    sep.write('  ${'-' * widths[c]!}');
+  }
+  sep.write('  ${'-' * totalColWidth}');
+  stdout.writeln(sep);
+
+  // Body rows.
+  for (final r in rows) {
+    final line = StringBuffer(r.padRight(labelWidth));
+    for (final c in cols) {
+      line.write('  ${cellText(r, c).padLeft(widths[c]!)}');
+    }
+    line.write('  ${(rowTotals[r] ?? 0).toString().padLeft(totalColWidth)}');
+    stdout.writeln(line);
+  }
+
+  // Footer: column totals + grand total (raw counts, no percentage).
+  final foot = StringBuffer('total'.padRight(labelWidth));
+  var grand = 0;
+  for (final c in cols) {
+    final ct = colTotals[c] ?? 0;
+    grand += ct;
+    foot.write('  ${ct.toString().padLeft(widths[c]!)}');
+  }
+  foot.write('  ${grand.toString().padLeft(totalColWidth)}');
+  stdout.writeln(foot);
+
+  final truncated =
+      opts.top != null &&
+      (rowTotals.length > rows.length || colTotals.length > cols.length);
+  if (truncated) {
+    stdout.writeln('');
+    stdout.writeln(
+      '(showing top ${opts.top} of ${rowTotals.length} rows and '
+      '${colTotals.length} columns; "total" margins cover only the '
+      'displayed cells.)',
+    );
+  }
+  if (rowAxis == 'slug' || colAxis == 'slug') {
+    stdout.writeln('');
+    stdout.writeln(
+      '(a slug axis counts coverage: a multi-slug puzzle lands in several '
+      'cells, so the grand total can exceed ${filtered.length} filtered '
+      'puzzles.)',
     );
   }
 }

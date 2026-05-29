@@ -258,7 +258,71 @@ Explicit file paths also work and can be mixed with keywords:
 `collection`. Note that `slug` grouping counts puzzle coverage — a
 multi-slug puzzle contributes once per slug — so the per-row share can
 sum to more than 100 % (the script prints a reminder when this happens).
-Other axes are exclusive: one puzzle, one row.
+Other axes are exclusive: one puzzle, one row. The `size` axis is
+orientation-agnostic (`4x5` and `5x4` collapse to a single `4x5` bin),
+matching the generator's equilibrium size axis (`canonicalSize` in
+`equilibrium.dart`, see `equilibrium.md`).
+
+### Cross-tabulation (two axes)
+
+`--cross AXIS1,AXIS2` swaps the 1-D table for a two-entry matrix: `AXIS1`
+on rows, `AXIS2` on columns (same axis names as `--group-by`; the two may
+be equal). It is mutually exclusive with `--group-by`. Each cell shows the
+count and its share of the **row** total, with a `total` margin on the
+right (per row), a `total` row at the bottom (per column), and a grand
+total in the corner. `--sort count` (default) orders rows and columns by
+their marginal total; `--sort key` orders both alphanumerically. `--top N`
+keeps the N largest rows **and** N largest columns (a note flags the
+truncation; the margins then cover only the displayed cells). `--reverse`
+flips the order — combined with `--top` it surfaces the *bottom* of the
+ranking, e.g. the least-represented slug pairs.
+
+```bash
+# Which slugs dominate each difficulty file?
+dart run bin/query_corpus.dart --cross slug,collection
+
+# Slug co-occurrence among two-slug puzzles (symmetric matrix; the
+# diagonal is the per-slug coverage).
+dart run bin/query_corpus.dart --cross slug,slug --ntypes 2
+```
+
+When either axis is `slug`, the same coverage caveat applies — a
+multi-slug puzzle lands in several cells, so the grand total can exceed
+the filtered-puzzle count (the script prints a reminder).
+
+### Joint buckets (variety audit)
+
+`--buckets [DIMS]` lists every distinct **joint** category present in the
+filtered corpus, with its population — not the independent marginals that
+`equilibrium.dart` steers on (see `equilibrium.md`), but their full
+Cartesian product. `DIMS` is a comma list over `{size, ntypes, slugs,
+scenario}` (default `size,slugs,scenario`); `slugs` is the whole sorted
+constraint set as **one atomic key** (e.g. `slugs=CC,DF,EY,FM,GS`), so
+two puzzles share a bucket only when their size, full slug-set and
+scenario all match. It is mutually exclusive with `--group-by`/`--cross`.
+
+This is the lens for variety regressions the marginals hide. Because the
+equilibrium picker biases each axis independently, a freshly-added
+constraint can get over-targeted on its own axis and end up glued onto
+every large puzzle — so the slug *marginals* look balanced while the
+*joint* distribution collapses onto a handful of "everything-but-the-
+kitchen-sink" slug-sets repeated across sizes.
+
+```bash
+# Most over-populated (size, slug-set, scenario) tuples.
+dart run bin/query_corpus.dart --buckets --top 20
+
+# Rarest joint buckets — the long tail equilibrium under-produces.
+dart run bin/query_corpus.dart --buckets --reverse --top 20
+
+# How many distinct slug-sets exist among puzzles carrying every new
+# constraint? Narrow with filters, then inspect the bucket list.
+dart run bin/query_corpus.dart --buckets slugs \
+    --include-slug MJ --include-slug CH --include-slug RT --include-slug CT
+```
+
+Each puzzle lands in exactly one bucket, so shares sum to 100 %. The
+header line reports the number of distinct buckets.
 
 The script never writes to disk and emits nothing to `stdout` other than
 the table; warnings (missing files, parse errors) go to `stderr`.

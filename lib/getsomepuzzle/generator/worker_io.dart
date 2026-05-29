@@ -398,19 +398,40 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
         attemptPathBased = resolved.pathBasedScenario;
         attemptSyBased = resolved.syBasedScenario;
         if (resolved.width != null && resolved.height != null) {
-          w = resolved.width!;
-          h = resolved.height!;
+          // Size targets are canonical bins (width ≤ height); pick a concrete
+          // orientation so both portrait and landscape grids keep appearing.
+          final o = _orientSize(
+            resolved.width!,
+            resolved.height!,
+            effectiveMinW,
+            effectiveMaxW,
+            effectiveMinH,
+            effectiveMaxH,
+            rng,
+          );
+          w = o.$1;
+          h = o.$2;
         } else {
           // Target leaves the size axis free — sample a size weighted by
           // its gap so the attempt advances both axes. Fall back to random
           // when no size has a positive gap.
           final picked = pickWeightedSize(equiStats, universe, rng);
-          w =
-              picked?.$1 ??
-              effectiveMinW + rng.nextInt(effectiveMaxW - effectiveMinW + 1);
-          h =
-              picked?.$2 ??
-              effectiveMinH + rng.nextInt(effectiveMaxH - effectiveMinH + 1);
+          if (picked != null) {
+            final o = _orientSize(
+              picked.$1,
+              picked.$2,
+              effectiveMinW,
+              effectiveMaxW,
+              effectiveMinH,
+              effectiveMaxH,
+              rng,
+            );
+            w = o.$1;
+            h = o.$2;
+          } else {
+            w = effectiveMinW + rng.nextInt(effectiveMaxW - effectiveMinW + 1);
+            h = effectiveMinH + rng.nextInt(effectiveMaxH - effectiveMinH + 1);
+          }
         }
       } else {
         // No target (every axis balanced) — random.
@@ -753,6 +774,30 @@ class _ResolvedTarget {
     this.pathBasedScenario = false,
     this.syBasedScenario = false,
   });
+}
+
+/// Pick a concrete orientation for a canonical size bin `(width ≤ height)`.
+/// The size axis is orientation-agnostic, so both `4x5` and `5x4` should be
+/// produced from the `(4, 5)` bin — flip 50/50, but only to an orientation
+/// that still fits the configured width/height bounds (an asymmetric range
+/// must never yield an out-of-range grid). Squares are returned as-is.
+(int, int) _orientSize(
+  int width,
+  int height,
+  int minW,
+  int maxW,
+  int minH,
+  int maxH,
+  Random rng,
+) {
+  if (width == height) return (width, height);
+  bool fits(int w, int h) => w >= minW && w <= maxW && h >= minH && h <= maxH;
+  final keepOk = fits(width, height);
+  final swapOk = fits(height, width);
+  if (keepOk && swapOk) {
+    return rng.nextBool() ? (width, height) : (height, width);
+  }
+  return swapOk ? (height, width) : (width, height);
 }
 
 /// Translate an abstract [Target] into the concrete restrictions

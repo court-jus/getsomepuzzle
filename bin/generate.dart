@@ -506,15 +506,42 @@ String _csvField(String s) {
   return s;
 }
 
+/// Display order of the grid-area buckets. Used both to size the count list in
+/// [_CollectionStats] and to label the rows in the dashboard, so observed
+/// counts and equilibrium targets share the exact same partition.
+const List<String> kSizeBucketLabels = [
+  '≤12',
+  '13-20',
+  '21-30',
+  '31-42',
+  '43-56',
+  '57-72',
+  '73-80',
+  '>80',
+];
+
+/// Map a grid area (width × height) to its display bucket label. The boundaries
+/// match [kSizeBucketLabels] one-to-one.
+String _sizeBucket(int area) {
+  if (area <= 12) return '≤12';
+  if (area <= 20) return '13-20';
+  if (area <= 30) return '21-30';
+  if (area <= 42) return '31-42';
+  if (area <= 56) return '43-56';
+  if (area <= 72) return '57-72';
+  if (area <= 80) return '73-80';
+  return '>80';
+}
+
 /// Aggregated corpus stats across all axes the equilibrium engine watches:
 /// per-slug usage, grid-area buckets, and number-of-distinct-types.
 class _CollectionStats {
   final Map<String, int> slugs;
-  // Bucket counts in fixed display order: ≤20, 21-40, 41-80, >80.
-  final List<int> sizeBuckets;
-  // n=1..5 mapped to '1'..'5'; n>=6 collapsed into '6+' so the display order
-  // stays stable. The '6+' bin's target follows whatever the equilibrium
-  // profile declares for keys ≥ 6 (0 when none — historical behaviour).
+  // Per-bucket counts keyed by [kSizeBucketLabels].
+  final Map<String, int> sizeBuckets;
+  // n=1..9 mapped to '1'..'9'; n>=10 collapsed into '10+' so the display order
+  // stays stable. The '10+' bin's target follows whatever the equilibrium
+  // profile declares for keys ≥ 10 (0 when none).
   final Map<String, int> nTypes;
   // Profile axis: classic / sh / pathBased / syBased (read off the
   // authoritative `scenario:` v2 suffix via `detectPuzzleProfile` in
@@ -525,7 +552,7 @@ class _CollectionStats {
 
   factory _CollectionStats.fromLines(List<String> lines) {
     final slugs = {for (final s in constraintSlugs) s: 0};
-    final sizeBuckets = [0, 0, 0, 0];
+    final sizeBuckets = {for (final l in kSizeBucketLabels) l: 0};
     final nTypes = <String, int>{};
     final profiles = <String, int>{
       'classic': 0,
@@ -544,16 +571,8 @@ class _CollectionStats {
       if (dims.length == 2) {
         final w = int.tryParse(dims[0]) ?? 0;
         final h = int.tryParse(dims[1]) ?? 0;
-        final area = w * h;
-        if (area <= 20) {
-          sizeBuckets[0]++;
-        } else if (area <= 40) {
-          sizeBuckets[1]++;
-        } else if (area <= 80) {
-          sizeBuckets[2]++;
-        } else {
-          sizeBuckets[3]++;
-        }
+        final bucket = _sizeBucket(w * h);
+        sizeBuckets[bucket] = (sizeBuckets[bucket] ?? 0) + 1;
       }
 
       final puzzleSlugs = fields[4]
@@ -565,7 +584,7 @@ class _CollectionStats {
         slugs[s] = (slugs[s] ?? 0) + 1;
       }
       final n = puzzleSlugs.length;
-      final key = n >= 6 ? '6+' : n.toString();
+      final key = n >= 10 ? '10+' : n.toString();
       nTypes[key] = (nTypes[key] ?? 0) + 1;
 
       final profile = detectPuzzleProfile(trimmed);
@@ -653,22 +672,20 @@ void _renderDashboard({
     maxHeight: maxHeight,
   );
 
-  // Force a stable display order 1, 2, ..., 5, 6+ even when some buckets are 0.
+  // Force a stable display order 1, 2, ..., 9, 10+ even when some buckets are 0.
   final orderedTypes = <String, int>{
-    for (final k in ['1', '2', '3', '4', '5', '6+']) k: stats.nTypes[k] ?? 0,
+    for (final k in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'])
+      k: stats.nTypes[k] ?? 0,
   };
   final sizeBuckets = {
-    '≤20': stats.sizeBuckets[0],
-    '21-40': stats.sizeBuckets[1],
-    '41-80': stats.sizeBuckets[2],
-    '>80': stats.sizeBuckets[3],
+    for (final l in kSizeBucketLabels) l: stats.sizeBuckets[l] ?? 0,
   };
 
   // Bars now visualize the *gap to target* (= target - observed, clamped to
   // ≥ 0), not the raw count. The longest bar across all histograms marks
-  // the bin the picker is most likely to chase next. Target=0 buckets (e.g.
-  // ntypes 6+) always have gap=0 → no bar, which is the right signal: they
-  // are reliquats, never pushed.
+  // the bin the picker is most likely to chase next. Target=0 buckets always
+  // have gap=0 → no bar, which is the right signal: they are reliquats,
+  // never pushed.
   // Profile axis: ordered classic → sh → pathBased → syBased to match
   // the `ProfileCategory` enum order. Missing buckets default to 0
   // (e.g. early corpus).
@@ -691,14 +708,7 @@ void _renderDashboard({
     sortByValue: true,
     targets: axisTargets.slug,
     globalMaxGap: globalMaxGap,
-  );
-  stderr.writeln('');
-  stderr.writeln('Sizes (width×height):');
-  _writeHistogram(
-    sizeBuckets,
-    sortByValue: false,
-    targets: axisTargets.size,
-    globalMaxGap: globalMaxGap,
+    columns: 2,
   );
   stderr.writeln('');
   stderr.writeln('Distinct types per puzzle:');
@@ -707,15 +717,49 @@ void _renderDashboard({
     sortByValue: false,
     targets: axisTargets.ntypes,
     globalMaxGap: globalMaxGap,
+    columns: 2,
   );
+  // Sizes (left) and Pre-fill profile (right) are short axes, so render them
+  // side by side to keep the dashboard compact.
   stderr.writeln('');
-  stderr.writeln('Pre-fill profile:');
-  _writeHistogram(
-    orderedProfiles,
-    sortByValue: false,
-    targets: axisTargets.profile,
-    globalMaxGap: globalMaxGap,
+  _writeSideBySide(
+    'Sizes (width×height):',
+    _histogramLines(
+      sizeBuckets,
+      sortByValue: false,
+      targets: axisTargets.size,
+      globalMaxGap: globalMaxGap,
+    ),
+    'Pre-fill profile:',
+    _histogramLines(
+      orderedProfiles,
+      sortByValue: false,
+      targets: axisTargets.profile,
+      globalMaxGap: globalMaxGap,
+    ),
   );
+}
+
+/// Print two labelled blocks of pre-rendered lines next to each other: the
+/// left block (title + [leftLines]) in a column wide enough for its widest
+/// line plus [gap] spaces, the right block (title + [rightLines]) starting at
+/// that boundary. Shorter block is padded with blank lines.
+void _writeSideBySide(
+  String leftTitle,
+  List<String> leftLines,
+  String rightTitle,
+  List<String> rightLines, {
+  int gap = 2,
+}) {
+  final left = [leftTitle, ...leftLines];
+  final right = [rightTitle, ...rightLines];
+  final leftWidth = left.map((l) => l.length).fold<int>(0, max) + gap;
+  final rows = max(left.length, right.length);
+  for (int i = 0; i < rows; i++) {
+    final l = i < left.length ? left[i] : '';
+    final r = i < right.length ? right[i] : '';
+    stderr.writeln('${l.padRight(leftWidth)}$r');
+  }
 }
 
 class _AxisTargets {
@@ -767,36 +811,28 @@ _AxisTargets _computeAxisTargets({
     minHeight: minHeight,
     maxHeight: maxHeight,
   );
-  final size = <String, double>{'≤20': 0, '21-40': 0, '41-80': 0, '>80': 0};
+  final size = <String, double>{for (final l in kSizeBucketLabels) l: 0};
   for (final (w, h) in universe.allowedSizes) {
-    final area = w * h;
-    final bucket = area <= 20
-        ? '≤20'
-        : area <= 40
-        ? '21-40'
-        : area <= 80
-        ? '41-80'
-        : '>80';
+    final bucket = _sizeBucket(w * h);
     size[bucket] =
         (size[bucket] ?? 0) + totalCorpus * sizeTargetShare(w, h, universe);
   }
 
-  // Ntypes axis: explicit profile from kTargetNTypesProfile. Keys 1..5 each
-  // get their own dashboard row; any key ≥ 6 (when the profile defines one)
-  // is collapsed into the '6+' bin so the display order stays stable
-  // (1, 2, ..., 5, 6+) regardless of how many high-n targets the profile
-  // declares. The bin still reads 0 when the profile has no ≥6 entry —
-  // same as before the high-n targets were introduced.
+  // Ntypes axis: explicit profile from kTargetNTypesProfile. Keys 1..9 each
+  // get their own dashboard row; any key ≥ 10 (when the profile defines one)
+  // is collapsed into the '10+' bin so the display order stays stable
+  // (1, 2, ..., 9, 10+) regardless of how many high-n targets the profile
+  // declares. The bin reads 0 when the profile has no ≥10 entry.
   final ntypes = <String, double>{};
-  double sixPlusTargetShare = 0;
+  double tenPlusTargetShare = 0;
   for (final entry in kTargetNTypesProfile.entries) {
-    if (entry.key <= 5) {
+    if (entry.key <= 9) {
       ntypes['${entry.key}'] = totalCorpus * entry.value;
     } else {
-      sixPlusTargetShare += entry.value;
+      tenPlusTargetShare += entry.value;
     }
   }
-  ntypes['6+'] = totalCorpus * sixPlusTargetShare;
+  ntypes['10+'] = totalCorpus * tenPlusTargetShare;
 
   // Profile axis: three buckets (classic / sh / pathBased) with explicit
   // targets in kTargetProfile.
@@ -810,7 +846,7 @@ _AxisTargets _computeAxisTargets({
 
 /// Largest `target - observed` across all rows of one histogram, clamped to 0.
 /// Rows whose target is missing or 0 contribute 0 — so a bin with an
-/// undeclared objective (e.g. the '6+' bucket when no ≥6 key is set in
+/// undeclared objective (e.g. the '10+' bucket when no ≥10 key is set in
 /// `kTargetNTypesProfile`) is never flagged as "to push".
 double _maxGap(Map<String, int> stats, Map<String, double> targets) {
   double m = 0.0;
@@ -823,31 +859,61 @@ double _maxGap(Map<String, int> stats, Map<String, double> targets) {
   return m;
 }
 
-/// Render one histogram. The bar length encodes the *gap to target*
-/// (= target − observed, clamped to ≥ 0), normalized by [globalMaxGap]
-/// across all displayed histograms so bars are visually comparable
-/// across axes — the longest bar anywhere on the dashboard is the bin
-/// the equilibrium picker is most likely to chase next.
+/// Write one histogram to stderr. Thin wrapper over [_histogramLines].
 void _writeHistogram(
   Map<String, int> stats, {
   required bool sortByValue,
   required double globalMaxGap,
   Map<String, double>? targets,
+  int columns = 1,
+  int columnWidth = 64,
 }) {
-  if (stats.isEmpty) return;
+  for (final line in _histogramLines(
+    stats,
+    sortByValue: sortByValue,
+    globalMaxGap: globalMaxGap,
+    targets: targets,
+    columns: columns,
+    columnWidth: columnWidth,
+  )) {
+    stderr.writeln(line);
+  }
+}
+
+/// Render one histogram into a list of lines (each already indented). The bar
+/// length encodes the *gap to target* (= target − observed, clamped to ≥ 0),
+/// normalized by [globalMaxGap] across all displayed histograms so bars are
+/// visually comparable across axes — the longest bar anywhere on the dashboard
+/// is the bin the equilibrium picker is most likely to chase next.
+/// With [columns] == 2, entries are laid out in two side-by-side columns of
+/// [columnWidth] characters each (column-major: the first half fills the left
+/// column, the second half the right), to keep tall axes (slugs, ntypes)
+/// compact.
+List<String> _histogramLines(
+  Map<String, int> stats, {
+  required bool sortByValue,
+  required double globalMaxGap,
+  Map<String, double>? targets,
+  int columns = 1,
+  int columnWidth = 64,
+}) {
+  if (stats.isEmpty) return const [];
   final entries = stats.entries.toList();
   if (sortByValue) {
     entries.sort((a, b) => b.value.compareTo(a.value));
   }
-  const barWidth = 30;
-  // Fixed label column so the bars align horizontally across all three
-  // histograms (constraints / sizes / ntypes), regardless of which has the
-  // longest key. 10 characters is wide enough for every current label.
+  // Narrower bars in two-column mode so a label + bar + suffix fits within
+  // [columnWidth]; full width when a single column spans the whole line.
+  final barWidth = columns >= 2 ? 20 : 30;
+  // Fixed label column so the bars align horizontally across all histograms
+  // (constraints / sizes / ntypes), regardless of which has the longest key.
+  // 10 characters is wide enough for every current label.
   const keyWidth = 10;
   // Pre-compute the value column width so the "value / target" suffix lines
   // up across rows even when counts have different digit lengths.
   final valWidth = entries.map((e) => '${e.value}'.length).fold<int>(0, max);
-  for (final entry in entries) {
+
+  String cell(MapEntry<String, int> entry) {
     final target = targets?[entry.key];
     final gap = (target == null || target <= 0)
         ? 0.0
@@ -861,16 +927,40 @@ void _writeHistogram(
     } else {
       suffix = '${'${entry.value}'.padLeft(valWidth)} / ${target.round()}';
       // Show the observed/target ratio in percent next to the absolute
-      // counts. Skip when target == 0 (e.g. the ntypes 6+ reliquat bin)
-      // to avoid division by zero.
+      // counts. Skip when target == 0 (e.g. an undeclared reliquat bin) to
+      // avoid division by zero.
       if (target > 0) {
         final pct = (entry.value / target * 100).toStringAsFixed(1);
         suffix = '$suffix ($pct%)';
       }
     }
-    stderr.writeln('  ${entry.key.padRight(keyWidth)} $bar $suffix');
+    return '${entry.key.padRight(keyWidth)} $bar $suffix';
   }
+
+  final lines = <String>[];
+  if (columns < 2) {
+    for (final entry in entries) {
+      lines.add('  ${cell(entry)}');
+    }
+    return lines;
+  }
+
+  // Two columns, column-major: left column = first half, right = second half.
+  final leftCount = (entries.length + 1) ~/ 2;
+  for (int i = 0; i < leftCount; i++) {
+    final left = _clip(cell(entries[i]), columnWidth);
+    final rightIdx = i + leftCount;
+    final right = rightIdx < entries.length
+        ? _clip(cell(entries[rightIdx]), columnWidth)
+        : '';
+    lines.add('  ${left.padRight(columnWidth)}$right');
+  }
+  return lines;
 }
+
+/// Truncate [s] to at most [width] characters (no-op when already short).
+String _clip(String s, int width) =>
+    s.length <= width ? s : s.substring(0, width);
 
 // --- Check mode ---
 
@@ -1104,13 +1194,11 @@ void _renderCheckDashboard({
   }
 
   final orderedTypes = <String, int>{
-    for (final k in ['1', '2', '3', '4', '5', '6+']) k: stats.nTypes[k] ?? 0,
+    for (final k in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'])
+      k: stats.nTypes[k] ?? 0,
   };
   final sizeBuckets = {
-    '≤20': stats.sizeBuckets[0],
-    '21-40': stats.sizeBuckets[1],
-    '41-80': stats.sizeBuckets[2],
-    '>80': stats.sizeBuckets[3],
+    for (final l in kSizeBucketLabels) l: stats.sizeBuckets[l] ?? 0,
   };
 
   stderr.writeln('');

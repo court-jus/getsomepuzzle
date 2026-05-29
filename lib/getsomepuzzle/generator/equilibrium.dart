@@ -118,6 +118,13 @@ double targetShare(Axis axis, Object category, int categoryCount) {
   }
 }
 
+/// Canonical orientation for the (unordered) size axis: width ≤ height, so a
+/// `4x5` grid and its `5x4` transpose map to the same bin `(4, 5)`. The size
+/// axis counts orientations together — only the grid *shape* matters for
+/// variety — while the generator is still free to emit either orientation.
+(int, int) canonicalSize(int width, int height) =>
+    width <= height ? (width, height) : (height, width);
+
 /// Raw (un-normalized) size weight: asymmetric Gaussian on grid area
 /// peaking at [kSizePeakArea]. Public so callers without a [TargetUniverse]
 /// (e.g. selection-time variety bias) can compute the same target shape and
@@ -228,7 +235,13 @@ class PairTarget extends Target {
 class SizeTarget extends Target {
   final int width;
   final int height;
-  const SizeTarget(this.width, this.height);
+
+  /// Canonicalized to `width <= height` so transposed sizes share one bin
+  /// (see [canonicalSize]). The worker picks a concrete orientation when it
+  /// generates.
+  const SizeTarget(int width, int height)
+    : width = width <= height ? width : height,
+      height = width <= height ? height : width;
   @override
   Axis get axis => Axis.size;
   @override
@@ -344,7 +357,8 @@ class EquilibriumStats {
         slug[s] = (slug[s] ?? 0) + 1;
       }
       ntypes[slugs.length] = (ntypes[slugs.length] ?? 0) + 1;
-      sizes[(w, h)] = (sizes[(w, h)] ?? 0) + 1;
+      final sizeBin = canonicalSize(w, h);
+      sizes[sizeBin] = (sizes[sizeBin] ?? 0) + 1;
       if (slugs.length == 2) {
         final sorted = slugs.toList()..sort();
         final pair = (sorted[0], sorted[1]);
@@ -384,7 +398,8 @@ class EquilibriumStats {
       newSlug[s] = (newSlug[s] ?? 0) + 1;
     }
     newNtypes[slugs.length] = (newNtypes[slugs.length] ?? 0) + 1;
-    newSizes[(width, height)] = (newSizes[(width, height)] ?? 0) + 1;
+    final sizeBin = canonicalSize(width, height);
+    newSizes[sizeBin] = (newSizes[sizeBin] ?? 0) + 1;
     if (slugs.length == 2) {
       final sorted = slugs.toList()..sort();
       final pair = (sorted[0], sorted[1]);
@@ -414,8 +429,10 @@ class TargetUniverse {
   /// applying any user-facing ban list before constructing the universe.
   final List<String> allowedSlugs;
 
-  /// (w, h) pairs eligible: in [minW..maxW] × [minH..maxH] intersected
-  /// with [kMinSide..kMaxSide] on both dimensions.
+  /// Eligible size **bins**, canonicalized to `width <= height` and
+  /// deduplicated (see [canonicalSize]): the shapes in [minW..maxW] ×
+  /// [minH..maxH] intersected with [kMinSide..kMaxSide] on both dimensions,
+  /// counting a size and its transpose once.
   final List<(int, int)> allowedSizes;
 
   TargetUniverse._(this.allowedSlugs, this.allowedSizes);
@@ -433,13 +450,15 @@ class TargetUniverse {
     final w1 = maxWidth > kMaxSide ? kMaxSide : maxWidth;
     final h0 = minHeight < kMinSide ? kMinSide : minHeight;
     final h1 = maxHeight > kMaxSide ? kMaxSide : maxHeight;
-    final sizes = <(int, int)>[];
+    // Canonicalize to width ≤ height and dedup so a shape and its transpose
+    // form a single bin. A LinkedHashSet keeps a stable, deterministic order.
+    final sizes = <(int, int)>{};
     for (int w = w0; w <= w1; w++) {
       for (int h = h0; h <= h1; h++) {
-        sizes.add((w, h));
+        sizes.add(canonicalSize(w, h));
       }
     }
-    return TargetUniverse._(slugs, sizes);
+    return TargetUniverse._(slugs, sizes.toList());
   }
 
   /// All ordered pairs (a, b) with a < b among [allowedSlugs].

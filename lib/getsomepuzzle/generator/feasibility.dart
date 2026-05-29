@@ -40,9 +40,10 @@ class AttemptKey {
       '$targetKey|${sortedSlugs.join(',')}|$scenario|$sizeBucket';
 }
 
-/// Reuses the same buckets `_CollectionStats` already exposes in
-/// `bin/generate.dart` so dashboards, CSV analysis, and the blacklist stay
-/// consistent.
+/// Coarse area buckets used as part of the feasibility blacklist key (and the
+/// CSV analysis). Kept deliberately stable so existing persisted blacklist
+/// entries stay valid — the dashboard in `bin/generate.dart` now renders a
+/// finer partition (`kSizeBucketLabels`) purely for display.
 String bucketForArea(int width, int height) {
   final area = width * height;
   if (area <= 20) return '≤20';

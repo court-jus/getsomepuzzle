@@ -1452,7 +1452,9 @@ class Database {
       final p = played[i];
       final w = math.pow(0.5, i / selectionVarietyHalfLife).toDouble();
       total += w;
-      final key = (p.width, p.height);
+      // Size is orientation-agnostic: 4x5 and 5x4 share one bin, matching the
+      // generator's equilibrium (see equilibrium.canonicalSize).
+      final key = equilibrium.canonicalSize(p.width, p.height);
       sizeCounts[key] = (sizeCounts[key] ?? 0) + w;
       final distinct = p.rules.toSet();
       for (final s in distinct) {
@@ -1465,7 +1467,7 @@ class Database {
     final allowedSizes = <(int, int)>{};
     for (final p in filteredCatalog) {
       allowedSlugs.addAll(p.rules);
-      allowedSizes.add((p.width, p.height));
+      allowedSizes.add(equilibrium.canonicalSize(p.width, p.height));
     }
 
     return WeightedSelectionStats(
@@ -1517,7 +1519,8 @@ class Database {
           (sum, sz) => sum + equilibrium.sizeRawWeight(sz.$1, sz.$2),
         );
         final expSize = totalRaw > 0 ? raw / totalRaw : 0.0;
-        final c = stats.sizeCounts[(p.width, p.height)] ?? 0;
+        final c =
+            stats.sizeCounts[equilibrium.canonicalSize(p.width, p.height)] ?? 0;
         final share = c / stats.totalPuzzles;
         final gap = expSize - share;
         if (gap > 0) sizeGap = gap;
