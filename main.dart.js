@@ -105614,7 +105614,7 @@ s=j.f
 h=A.mi(new A.aGc(h,j,f,e))
 if(j.x&&!j.y){p=j.r
 p=new A.GK(d.a,d.b,d.d,p.f,p.r,i)}else p=i
-return A.tq(g,h,p,new A.RZ(c,"Version 1.6.17",'Ghislain "court-jus" L\xe9v\xeaque',s,d,new A.aGd(j),j.gaqp(),j.gard(),new A.aGe(j,a),new A.aGf(j,a),j.gXT(),new A.aGg(j,a),new A.aGh(j,a),new A.aGi(j,a),new A.aGj(j,a),i),j.ganC())}}
+return A.tq(g,h,p,new A.RZ(c,"Version 1.6.19",'Ghislain "court-jus" L\xe9v\xeaque',s,d,new A.aGd(j),j.gaqp(),j.gard(),new A.aGe(j,a),new A.aGf(j,a),j.gXT(),new A.aGg(j,a),new A.aGh(j,a),new A.aGi(j,a),new A.aGj(j,a),i),j.ganC())}}
 A.aGl.prototype={
 $0(){var s=this.a
 if(s.c!=null)s.X(new A.aGk())},
