@@ -375,6 +375,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get createTitle => 'Créer un puzzle';
 
   @override
+  String get createNewPuzzle => 'Nouveau puzzle';
+
+  @override
   String get createStart => 'Commencer l\'édition';
 
   @override

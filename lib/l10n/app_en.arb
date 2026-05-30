@@ -485,6 +485,7 @@
     },
     "create": "Create",
     "createTitle": "Create a puzzle",
+    "createNewPuzzle": "New puzzle",
     "createStart": "Start editing",
     "createTest": "Test",
     "createValidate": "Validate",

@@ -599,6 +599,23 @@ class _CreatePageState extends State<CreatePage> {
 
   // --- Action buttons ---
 
+  void _newPuzzle() {
+    _solveDebounce?.cancel();
+    setState(() {
+      _width = 4;
+      _height = 4;
+      _constraints.clear();
+      _fixedCells.clear();
+      _solvedValues.clear();
+      _propagationCells.clear();
+      _forceCells.clear();
+      _editing = false;
+      _autoComplexity = null;
+      _autoImpossibleBy = null;
+      _autoSolving = false;
+    });
+  }
+
   void _testPuzzle() {
     if (widget.onPuzzleSelected == null) return;
     _saveState();
@@ -664,6 +681,12 @@ class _CreatePageState extends State<CreatePage> {
                 icon: const Icon(Icons.check),
                 label: Text(loc.createLetterGroupDone),
               ),
+            ),
+          if (_editing)
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              tooltip: loc.createNewPuzzle,
+              onPressed: _newPuzzle,
             ),
         ],
       ),

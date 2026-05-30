@@ -766,6 +766,12 @@ abstract class AppLocalizations {
   /// **'Create a puzzle'**
   String get createTitle;
 
+  /// No description provided for @createNewPuzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'New puzzle'**
+  String get createNewPuzzle;
+
   /// No description provided for @createStart.
   ///
   /// In en, this message translates to:

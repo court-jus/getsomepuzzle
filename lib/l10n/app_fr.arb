@@ -280,6 +280,7 @@
 
     "create": "Créer",
     "createTitle": "Créer un puzzle",
+    "createNewPuzzle": "Nouveau puzzle",
     "createStart": "Commencer l'édition",
     "createTest": "Tester",
     "createValidate": "Valider",
