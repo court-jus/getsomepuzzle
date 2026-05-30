@@ -70,7 +70,7 @@ A number in a circle above a column indicates how many cells of that color must 
 
 ### Column transition
 
-A tilde (~) with a number in a square above a column indicates how many color changes (transitions) must appear in that column. A transition is counted each time two adjacent cells are filled with different colors.
+A square wave with a number in a square above a column tells how many color changes (transitions) must appear in that column. Each step of the wave is one change; a flat wave with 0 means the whole column is a single color.
 
 ### Row count
 
@@ -78,7 +78,7 @@ A number in a circle to the left of a row indicates how many cells of that color
 
 ### Row transition
 
-A tilde (~) with a number in a square beside a row indicates how many color changes (transitions) must appear in that row. A transition is counted each time two adjacent cells are filled with different colors.
+A square wave with a number in a square beside a row tells how many color changes (transitions) must appear in that row. Each step of the wave is one change; a flat wave with 0 means the whole row is a single color.
 
 ### Group count
 

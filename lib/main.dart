@@ -666,6 +666,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return l10n.constraintEyes;
       case 'RC':
         return l10n.constraintRowCount;
+      case 'RT':
+        return l10n.constraintRowTransition;
+      case 'CT':
+        return l10n.constraintColumnTransition;
       case '*':
         return l10n.complicityOtherConstraint;
       default:

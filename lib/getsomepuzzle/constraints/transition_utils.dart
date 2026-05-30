@@ -35,6 +35,20 @@ bool verifyTransitionLine(Puzzle puzzle, List<Cell> line, int count) {
   if (t > count) return false;
   final fp = countFreePairs(line);
   if (t + fp < count) return false;
+
+  // Endpoint parity: for binary domains, the parity of the transition
+  // count must match the endpoint color relationship. Same ends → even
+  // transitions; different ends → odd transitions.
+  if (puzzle.domain.length == 2) {
+    final firstVal = line.first.value;
+    final lastVal = line.last.value;
+    if (firstVal != 0 && lastVal != 0) {
+      final endsMatch = firstVal == lastVal;
+      if (endsMatch && count.isOdd) return false;
+      if (!endsMatch && count.isEven) return false;
+    }
+  }
+
   return true;
 }
 
@@ -54,6 +68,24 @@ Move? applyTransitionLine(
 
   if (t + fp < count) {
     return Move(0, 0, constraint, isImpossible: constraint);
+  }
+
+  // Endpoint parity deduction (binary domain only): when exactly one
+  // endpoint is known, the transition count parity determines the other.
+  // Even count → same color; odd count → opposite color.
+  if (puzzle.domain.length == 2) {
+    final firstVal = line.first.value;
+    final lastVal = line.last.value;
+    if (firstVal == 0 && lastVal != 0) {
+      final opposite = puzzle.domain.firstWhere((v) => v != lastVal);
+      final forced = count.isEven ? lastVal : opposite;
+      return Move(line.first.idx, forced, constraint, complexity: 3);
+    }
+    if (firstVal != 0 && lastVal == 0) {
+      final opposite = puzzle.domain.firstWhere((v) => v != firstVal);
+      final forced = count.isEven ? firstVal : opposite;
+      return Move(line.last.idx, forced, constraint, complexity: 3);
+    }
   }
 
   // Saturated: no more transitions allowed. Valid for any domain size —

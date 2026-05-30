@@ -70,7 +70,7 @@ Un nombre dans un cercle au dessus d'une colonne indique combien de cellules de 
 
 ### Transition de colonne
 
-Un tilde (~) avec un nombre dans un carré au-dessus d'une colonne indique combien de changements de couleur (transitions) doivent apparaître dans cette colonne. Une transition est comptée chaque fois que deux cases adjacentes sont remplies de couleurs différentes.
+Une onde carrée avec un nombre dans un carré au-dessus d'une colonne indique combien de changements de couleur doivent apparaître dans cette colonne. Chaque marche de l'onde est un changement ; une onde plate avec 0 signifie que toute la colonne est d'une seule couleur.
 
 ### Nombre par ligne
 
@@ -78,7 +78,7 @@ Un nombre dans un cercle à gauche d'une ligne indique combien de cellules de ce
 
 ### Transition de ligne
 
-Un tilde (~) avec un nombre dans un carré à gauche d'une ligne indique combien de changements de couleur (transitions) doivent apparaître dans cette ligne. Une transition est comptée chaque fois que deux cases adjacentes sont remplies de couleurs différentes.
+Une onde carrée avec un nombre dans un carré à gauche d'une ligne indique combien de changements de couleur doivent apparaître dans cette ligne. Chaque marche de l'onde est un changement ; une onde plate avec 0 signifie que toute la ligne est d'une seule couleur.
 
 ### Nombre de groupes
 

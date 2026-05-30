@@ -155,9 +155,11 @@ void main() {
     });
 
     test('no deduction — intermediate state', () {
-      // Row 0: [1, 0, 0], count=1
-      // t=0, fp=2, t<count and t+fp>count and t+fp!=count → no deduction
-      final p = makePuzzle('100\n222');
+      // Row 0: [0, 1, 0], count=1
+      // t=0 (no filled pair is both filled and different), fp=2,
+      // t<count and t+fp>count and t+fp!=count → no deduction.
+      // Neither endpoint is known → endpoint parity can't fire either.
+      final p = makePuzzle('010\n222');
       final rt = RowTransitionConstraint('0.1');
       p.addConstraint(rt);
       expect(rt.apply(p), isNull);
@@ -313,6 +315,73 @@ void main() {
     });
   });
 
+  group('RowTransitionConstraint.apply — endpoint parity', () {
+    test('last known, odd count → first is opposite', () {
+      // Row 0: [0, 0, 0, 1], count=1
+      // Last=1 (odd count) → first must differ → first=2
+      final p = makePuzzle('0001\n2222');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      final move = rt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 0);
+      expect(move.value, 2);
+    });
+
+    test('last known, even count → first is same', () {
+      // Row 0: [0, 0, 0, 1], count=2
+      // Last=1 (even count) → first must match → first=1
+      final p = makePuzzle('0001\n2222');
+      final rt = RowTransitionConstraint('0.2');
+      p.addConstraint(rt);
+      final move = rt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 0);
+      expect(move.value, 1);
+    });
+
+    test('first known, odd count → last is opposite', () {
+      // Row 0: [2, 0, 0, 0], count=1
+      // First=2 (odd count) → last must differ → last=1
+      final p = makePuzzle('2000\n2222');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      final move = rt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 3);
+      expect(move.value, 1);
+    });
+
+    test('first known, even count → last is same', () {
+      // Row 0: [2, 0, 0, 0], count=2
+      // First=2 (even count) → last must match → last=2
+      final p = makePuzzle('2000\n2222');
+      final rt = RowTransitionConstraint('0.2');
+      p.addConstraint(rt);
+      final move = rt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 3);
+      expect(move.value, 2);
+    });
+
+    test('two-cell row, odd count → last differs from first', () {
+      // Row 0: [1, 0], count=1
+      // First=1 (odd) → last must differ → last=2
+      final p = makePuzzle('10\n22');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      final move = rt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 1);
+      expect(move.value, 2);
+    });
+  });
+
   group('ColumnTransitionConstraint.apply', () {
     test('saturated deduction on column', () {
       // Column 0: [1, 2, 0], count=1
@@ -325,6 +394,66 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.value, 2);
+    });
+
+    test('endpoint parity — column, last known, odd count', () {
+      // Column 0: [0, 0, 1], count=1
+      // Last=1 (odd) → first must differ → first=2
+      final p = makePuzzle('0\n0\n1');
+      final ct = ColumnTransitionConstraint('0.1');
+      p.addConstraint(ct);
+      final move = ct.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 0);
+      expect(move.value, 2);
+    });
+  });
+
+  group('verifyTransitionLine — endpoint parity', () {
+    test('same ends, odd count → unreachable', () {
+      // Row 0: [1, 0, 0, 1], count=1
+      // Both ends=1 (same), count=1 (odd) → impossible
+      final p = makePuzzle('1001\n2222');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      expect(rt.verify(p), isFalse);
+    });
+
+    test('same ends, even count → reachable', () {
+      // Row 0: [1, 0, 0, 1], count=2
+      // Both ends=1 (same), count=2 (even) → reachable
+      final p = makePuzzle('1001\n2222');
+      final rt = RowTransitionConstraint('0.2');
+      p.addConstraint(rt);
+      expect(rt.verify(p), isTrue);
+    });
+
+    test('different ends, odd count → reachable', () {
+      // Row 0: [1, 0, 0, 2], count=1
+      // Ends differ (1≠2), count=1 (odd) → reachable
+      final p = makePuzzle('1002\n2222');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      expect(rt.verify(p), isTrue);
+    });
+
+    test('different ends, even count → unreachable', () {
+      // Row 0: [1, 0, 0, 2], count=2
+      // Ends differ (1≠2), count=2 (even) → impossible
+      final p = makePuzzle('1002\n2222');
+      final rt = RowTransitionConstraint('0.2');
+      p.addConstraint(rt);
+      expect(rt.verify(p), isFalse);
+    });
+
+    test('one endpoint free → parity check skipped, reachable', () {
+      // Row 0: [1, 0, 0, 0], count=1
+      // Only first known, last free → parity not checked
+      final p = makePuzzle('1000\n2222');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      expect(rt.verify(p), isTrue);
     });
   });
 }

@@ -146,7 +146,13 @@ Shared `apply`. Four cases, checked in order:
 
 3. **Unreachable** — `t + freePairs < count`: `Move(..., isImpossible: this)`.
 
-4. **Full need** — `t + freePairs == count`: every free pair **must** produce a transition.
+4. **Endpoint parity** — when exactly one endpoint of the line is known and the
+   domain has exactly two colours, the transition-count parity determines the
+   other endpoint: an even count means both ends are the same colour; an odd
+   count means they differ. The free endpoint is forced accordingly.
+   - Return the forced Move (complexity 3).
+
+5. **Full need** — `t + freePairs == count`: every free pair **must** produce a transition.
    - For each free cell `f` adjacent to a filled cell `n`: `f` must be
      `domain.firstWhere((v) => v != n.value)` (the other value in the domain, to create a
      transition).
@@ -180,14 +186,15 @@ meaningful — it forces a monochrome line).
 | 2 | Maximum transitions (checkerboard line) | 1 |
 | 3 | Intermediate, saturated (`t == count`) | 1 |
 | 4 | Intermediate, full need (`t + freePairs == count`) | 2 |
+| 5 | Endpoint parity (`t + fp > count` and `t < count`) | 3 |
 
 ## Known limitations
 
-- The `apply` deduction for saturated/full-need cases is conservative: it only forces free
-  cells with at least one filled neighbour. Isolated free cells cannot be deduced by RT/CT
-  alone.
 - The `freePairs` count in `verify` is an over-approximation. A tighter bound could
   consider that filling a free cell resolves its pair with both neighbours simultaneously.
+  The endpoint parity check (same/odd → impossible) partially closes this gap for binary
+  domains by catching states where the parity mismatch is already visible from the
+  endpoints.
 - The full-need branch is binary-only: when `domain.length > 2`, it cannot pick a unique
   "differ from neighbour" value and returns `null`. The saturated branch remains active
   for any domain size.

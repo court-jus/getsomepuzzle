@@ -193,6 +193,7 @@ See [`transition.md`](transition.md) for the full deduction walkthrough.
 | - | ----------------------------------------------------- | -----: |
 | 1 | Saturated (`t == count`): free cell forced to match neighbour | 1 |
 | 2 | Full need (`t + fp == count`): free cell forced to differ  | 2 |
+| 3 | Endpoint parity: one endpoint known, parity deduces the other | 3 |
 
 Zero-transition and maximum-transition cases use the same branches
 (saturated / full need) and carry the same weights — the boundary
