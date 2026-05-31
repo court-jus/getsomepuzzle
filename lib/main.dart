@@ -45,10 +45,10 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 const versionText = "Version 1.6.20";
 
-/// Where the GitHub Pages web build lives. Share links target this URL with
-/// a `?puzzle=<line>` query — works as a browser fallback everywhere, and
-/// later as the App Links / Universal Links target on mobile when set up.
-const kShareBaseUrl = 'https://court-jus.github.io/getsomepuzzle/';
+/// Share links target this URL with a `?puzzle=<line>` query — works as a
+/// browser fallback everywhere, and later as the App Links / Universal Links
+/// target on mobile when set up.
+const kShareBaseUrl = 'https://leveque.cc/getsomepuzzle/play/';
 
 /// Extract a puzzle line passed at startup, either via web URL
 /// (`?puzzle=v2_...`) or as a desktop CLI argument (raw `v2_...` line, or
