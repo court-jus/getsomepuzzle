@@ -9,9 +9,10 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-Puzzle preFillSh(int width, int height, List<int> domain, Random rng) {
+Puzzle preFillSh(int width, int height, List<CellValue> domain, Random rng) {
   final solved = Puzzle.empty(width, height, domain);
   final chosenMotif = _pickShapeMotif(width, height, domain, rng);
   final sc = ShapeConstraint(chosenMotif);
@@ -24,7 +25,12 @@ Puzzle preFillSh(int width, int height, List<int> domain, Random rng) {
 
 /// Pick one motif string via weighted random sampling, where the weight
 /// depends on the motif's bounding-box size (`rows × cols`).
-String _pickShapeMotif(int width, int height, List<int> domain, Random rng) {
+String _pickShapeMotif(
+  int width,
+  int height,
+  List<CellValue> domain,
+  Random rng,
+) {
   final possibleMotifs = ShapeConstraint.generateAllParameters(
     width,
     height,
@@ -70,8 +76,12 @@ void _placeInitialVariant(Puzzle solved, ShapeConstraint sc, Random rng) {
 }
 
 /// Fill every still-free cell of [solved] with the color opposite [color].
-void _fillRemainingWithOpposite(Puzzle solved, int color, List<int> domain) {
-  final opposite = domain.whereNot((i) => i == color).first;
+void _fillRemainingWithOpposite(
+  Puzzle solved,
+  CellValue color,
+  List<CellValue> domain,
+) {
+  final opposite = domain.whereNot((c) => c == color).first;
   for (int i = 0; i < solved.width * solved.height; i++) {
     if (!solved.cells[i].isFree) continue;
     solved.cells[i].setForSolver(opposite);
@@ -92,16 +102,16 @@ void _placeAdditionalVariants(Puzzle solved, Random rng) {
   }
 }
 
-/// Write non-zero cells of [variant] onto [solved] at (rowOffset, colOffset).
+/// Write non-free cells of [variant] onto [solved] at (rowOffset, colOffset).
 void _paintVariant(
   Puzzle solved,
-  List<List<int>> variant,
+  List<List<CellValue>> variant,
   int rowOffset,
   int colOffset,
 ) {
   for (final (ridx, row) in variant.indexed) {
     for (final (cidx, value) in row.indexed) {
-      if (value == 0) continue;
+      if (value == CellValue.free) continue;
       solved.cells[(ridx + rowOffset) * solved.width + (cidx + colOffset)]
           .setForSolver(value);
     }

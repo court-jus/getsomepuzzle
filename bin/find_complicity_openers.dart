@@ -196,11 +196,18 @@ List<String>? _analyzeLeadingMoves(String line, {required int maxN}) {
     } else {
       tags.add('constraint');
     }
-
-    try {
-      p.setValue(move.idx, move.value);
-    } catch (_) {
-      break;
+    if (move.value != null) {
+      try {
+        p.setValue(move.idx, move.value!);
+      } catch (_) {
+        break;
+      }
+    } else if (move.removeOption != null) {
+      try {
+        p.removeOption(move.idx, move.removeOption!);
+      } catch (_) {
+        break;
+      }
     }
     if (p.complete) break;
   }

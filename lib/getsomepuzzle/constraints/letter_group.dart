@@ -11,6 +11,10 @@ class LetterGroup extends CellsCentricConstraint {
   @override
   String get slug => 'LT';
 
+  // Colour-agnostic: groups same-letter cells, independent of colour.
+  @override
+  Set<CellValue> get referencedColors => const {};
+
   String letter = "";
 
   LetterGroup(String strParams) {
@@ -39,7 +43,7 @@ class LetterGroup extends CellsCentricConstraint {
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final size = width * height;
@@ -69,17 +73,17 @@ class LetterGroup extends CellsCentricConstraint {
     // constraint is unreachable, so return false immediately. This early
     // check runs before the "any cell still empty" short-circuit so the
     // detection fires even on partial states.
-    int? seenColor;
+    CellValue? seenColor;
     for (final idx in indices) {
       final v = puzzle.cellValues[idx];
-      if (v == 0) continue;
+      if (v == CellValue.free) continue;
       if (seenColor == null) {
         seenColor = v;
       } else if (seenColor != v) {
         return false;
       }
     }
-    if (indices.any((i) => puzzle.cellValues[i] == 0)) return true;
+    if (indices.any((i) => puzzle.cellValues[i] == CellValue.free)) return true;
     final groups = getGroups(puzzle);
     final myIndicesSet = indices.toSet();
     final myGroups = groups
@@ -108,7 +112,7 @@ class LetterGroup extends CellsCentricConstraint {
   Move? apply(Puzzle puzzle) {
     final myColors = indices
         .map((idx) => puzzle.getValue(idx))
-        .where((value) => value != 0);
+        .where((value) => value != CellValue.free);
     if (myColors.isEmpty) return null;
     final myColor = myColors.first;
     final otherLetters = puzzle.constraints
@@ -116,15 +120,20 @@ class LetterGroup extends CellsCentricConstraint {
         .where((c) => c.letter != letter)
         .map((c) => c.indices)
         .flattenedToList;
-    final myOpposite = puzzle.domain.whereNot((v) => v == myColor).first;
-    // 1. Every member must take myColor; opposite-coloured ones are an error.
+    // 1. Every member must take myColor; any other coloured value is an error
+    //    (on 3+ colours that includes the third colour, not just the single
+    //    "opposite"), and a free member with myColor pruned from its options
+    //    can no longer satisfy the group.
     for (var member in indices) {
       final memberValue = puzzle.getValue(member);
-      if (memberValue == myOpposite) {
-        return Move(member, myColor, this, isImpossible: this);
+      if (memberValue == CellValue.free) {
+        if (!puzzle.cells[member].options.contains(myColor)) {
+          return Impossible(this);
+        }
+        return SetValue(member, myColor, this, complexity: 0);
       }
-      if (memberValue == 0) {
-        return Move(member, myColor, this, complexity: 0);
+      if (memberValue != myColor) {
+        return Impossible(this);
       }
     }
     final allGroups = getGroups(puzzle);
@@ -141,10 +150,15 @@ class LetterGroup extends CellsCentricConstraint {
     for (var nei in neighborWithLetters) {
       final neiValue = puzzle.getValue(nei);
       if (neiValue == myColor) {
-        return Move(nei, myOpposite, this, isImpossible: this);
+        return Impossible(this);
       }
-      if (neiValue == 0) {
-        return Move(nei, myOpposite, this, complexity: 1);
+      // The neighbour just can't be myColor (it would merge two letters); on
+      // 3+ colours that's a removeOption, not a force to one specific opposite.
+      // On a 2-colour domain removeOption collapses to the other colour, so
+      // the historical behaviour is preserved.
+      if (neiValue == CellValue.free &&
+          puzzle.cells[nei].options.contains(myColor)) {
+        return RemoveOption(nei, myColor, this, complexity: 1);
       }
     }
 
@@ -155,7 +169,7 @@ class LetterGroup extends CellsCentricConstraint {
       puzzle,
     ).any((vg) => indices.every((m) => vg.contains(m)));
     if (!canConnect) {
-      return Move(0, 0, this, isImpossible: this);
+      return Impossible(this);
     }
 
     final sameGroup = allGroups.any(
@@ -168,9 +182,9 @@ class LetterGroup extends CellsCentricConstraint {
     //    has its lone exit as articulation point).
     if (!sameGroup && indices.length > 1) {
       for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
-        if (puzzle.getValue(idx) != 0) continue;
+        if (puzzle.getValue(idx) != CellValue.free) continue;
         if (blockingDisconnectsMembers(puzzle, idx, myColor, indices)) {
-          return Move(idx, myColor, this, complexity: 4);
+          return SetValue(idx, myColor, this, complexity: 4);
         }
       }
     }
@@ -196,7 +210,7 @@ class LetterGroup extends CellsCentricConstraint {
           groupFreeNeighbors.addAll(
             puzzle
                 .getNeighbors(groupCell)
-                .where((idx) => puzzle.getValue(idx) == 0),
+                .where((idx) => puzzle.getValue(idx) == CellValue.free),
           );
         }
       }
@@ -204,8 +218,13 @@ class LetterGroup extends CellsCentricConstraint {
         final neighborsWithOther = puzzle
             .getNeighbors(groupFreeNeighbor)
             .where((nei) => otherGroups.contains(nei));
-        if (neighborsWithOther.isNotEmpty) {
-          return Move(groupFreeNeighbor, myOpposite, this, complexity: 2);
+        // Taking myColor here would bridge my group to another letter's
+        // same-colour group → forbidden. Prune myColor rather than forcing a
+        // specific opposite (collapses to the other colour on a 2-colour
+        // domain; leaves the remaining options on 3+).
+        if (neighborsWithOther.isNotEmpty &&
+            puzzle.cells[groupFreeNeighbor].options.contains(myColor)) {
+          return RemoveOption(groupFreeNeighbor, myColor, this, complexity: 2);
         }
       }
     }
@@ -218,7 +237,7 @@ class LetterGroup extends CellsCentricConstraint {
     if (!verify(puzzle)) return false;
     if (indices.any((i) => i >= puzzle.cellValues.length)) return false;
     final myCellValues = indices.map((i) => puzzle.cellValues[i]).toList();
-    if (myCellValues.contains(0)) return false;
+    if (myCellValues.contains(CellValue.free)) return false;
     final groups = getGroups(puzzle);
     final myGroup = groups.firstWhereOrNull(
       (grp) =>
@@ -228,7 +247,7 @@ class LetterGroup extends CellsCentricConstraint {
     for (final member in myGroup) {
       final freeNeighbors = puzzle
           .getNeighbors(member)
-          .where((nei) => puzzle.cellValues[nei] == 0);
+          .where((nei) => puzzle.cellValues[nei] == CellValue.free);
       if (freeNeighbors.isNotEmpty) return false;
     }
     return true;

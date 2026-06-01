@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -8,19 +7,22 @@ class ChainConstraint extends Constraint {
   @override
   String get slug => 'CH';
 
-  int color = 0;
+  CellValue color = CellValue.free;
   String fromSide = '';
   String toSide = '';
 
+  @override
+  Set<CellValue> get referencedColors => {color};
+
   ChainConstraint(String strParams) {
     final params = strParams.split(".");
-    color = int.parse(params[0]);
+    color = cellRepresentationToValue(params[0]);
     fromSide = params[1];
     toSide = params[2];
   }
 
   @override
-  String serialize() => 'CH:$color.$fromSide.$toSide';
+  String serialize() => 'CH:${cellValueToString(color)}.$fromSide.$toSide';
 
   @override
   String toString() {
@@ -44,7 +46,7 @@ class ChainConstraint extends Constraint {
 
   @override
   String toHuman(Puzzle puzzle) {
-    return 'Path from $fromSide to $toSide in color $color';
+    return 'Path from $fromSide to $toSide in color ${cellValueToString(color)}';
   }
 
   @override
@@ -64,19 +66,19 @@ class ChainConstraint extends Constraint {
       newFrom = newTo;
       newTo = tmp;
     }
-    return ChainConstraint('$color.$newFrom.$newTo');
+    return ChainConstraint('${cellValueToString(color)}.$newFrom.$newTo');
   }
 
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final List<String> result = [];
     for (final value in domain) {
-      result.add('$value.top.bottom');
-      result.add('$value.left.right');
+      result.add('${cellValueToString(value)}.top.bottom');
+      result.add('${cellValueToString(value)}.left.right');
     }
     return result;
   }
@@ -97,19 +99,29 @@ class ChainConstraint extends Constraint {
     }
   }
 
+  /// A cell is passable for a `color` chain iff it can still become `color`:
+  /// already `color`, or still free *and* with `color` among its remaining
+  /// options. A free cell whose `color` option has been pruned (only possible
+  /// on a 3+-colour puzzle) can never join the path, so it blocks just like a
+  /// committed cell of a different colour.
+  bool _passable(Puzzle puzzle, int idx) {
+    final v = puzzle.cellValues[idx];
+    if (v == color) return true;
+    return v == CellValue.free && puzzle.cells[idx].options.contains(color);
+  }
+
   bool _isBlocked(Puzzle puzzle) {
-    final oppositeColor = puzzle.domain.whereNot((v) => v == color).first;
     final fromCells = _borderCells(
       fromSide,
       puzzle.width,
       puzzle.height,
-    ).where((i) => puzzle.cellValues[i] != oppositeColor);
+    ).where((i) => _passable(puzzle, i));
     final toCellSet = _borderCells(toSide, puzzle.width, puzzle.height).toSet();
     return !canReach(
       puzzle,
       fromCells,
       toCellSet.contains,
-      (i) => puzzle.cellValues[i] != oppositeColor,
+      (i) => _passable(puzzle, i),
     );
   }
 
@@ -119,38 +131,70 @@ class ChainConstraint extends Constraint {
   @override
   Move? apply(Puzzle puzzle) {
     if (_isBlocked(puzzle)) {
-      return Move(0, 0, this, isImpossible: this);
+      return Impossible(this);
     }
 
-    final oppositeColor = puzzle.domain.whereNot((v) => v == color).first;
     final fromCells = _borderCells(fromSide, puzzle.width, puzzle.height);
     final toCells = _borderCells(toSide, puzzle.width, puzzle.height);
 
     // Border saturation (weight 1): only one free cell remains on a side
-    // and all other cells on that side are opposite colour.
-    final fromFree = fromCells.where((i) => puzzle.cellValues[i] == 0).toList();
-    final fromOpposite = fromCells
-        .where((i) => puzzle.cellValues[i] == oppositeColor)
-        .length;
-    if (fromFree.length == 1 && fromOpposite == fromCells.length - 1) {
-      return Move(fromFree.first, color, this, complexity: 1);
+    // and every other cell on that side is blocking (committed, non-`color`).
+    final fromFree = fromCells
+        .where((i) => puzzle.cellValues[i] == CellValue.free)
+        .toList();
+    final fromBlocked = fromCells.where((i) => !_passable(puzzle, i)).length;
+    if (fromFree.length == 1 &&
+        fromBlocked == fromCells.length - 1 &&
+        puzzle.cells[fromFree.first].options.contains(color)) {
+      // The lone free cell is the only possible path start *and* it can still
+      // take `color`. If `color` were pruned from it, the saturation premise
+      // would be false (some committed `color` cell is the real start), so we
+      // fall through rather than force an impossible value.
+      return SetValue(fromFree.first, color, this, complexity: 1);
     }
-    final toFree = toCells.where((i) => puzzle.cellValues[i] == 0).toList();
-    final toOpposite = toCells
-        .where((i) => puzzle.cellValues[i] == oppositeColor)
-        .length;
-    if (toFree.length == 1 && toOpposite == toCells.length - 1) {
-      return Move(toFree.first, color, this, complexity: 1);
+    final toFree = toCells
+        .where((i) => puzzle.cellValues[i] == CellValue.free)
+        .toList();
+    final toBlocked = toCells.where((i) => !_passable(puzzle, i)).length;
+    if (toFree.length == 1 &&
+        toBlocked == toCells.length - 1 &&
+        puzzle.cells[toFree.first].options.contains(color)) {
+      // Symmetric to the fromSide saturation above: only force when the lone
+      // free endpoint can actually take `color`.
+      return SetValue(toFree.first, color, this, complexity: 1);
     }
 
-    // Forced bridge (weight 2): setting a free cell to opposite blocks
-    // every possible path → it must be the target colour.
+    // Forced bridge (weight 2): blocking a free cell (committing it to any
+    // non-`color` colour) cuts every possible path → it must be `color`.
+    // Any non-`color` colour is equivalent for the blocking test (it makes
+    // the cell non-passable), so a single representative suffices — but it
+    // has to be a colour the cell can actually take. Picking from the
+    // cell's own options rather than the whole domain avoids assigning a
+    // value the option set has already excluded, which threw a RangeError
+    // on 3-colour grids where the first non-`color` domain entry was pruned.
     for (int i = 0; i < puzzle.cellValues.length; i++) {
-      if (puzzle.cellValues[i] != 0) continue;
+      if (puzzle.cellValues[i] != CellValue.free) continue;
+      final options = puzzle.cells[i].options;
+      CellValue? blocker;
+      for (final v in options) {
+        if (v != color) {
+          blocker = v;
+          break;
+        }
+      }
+      // No non-`color` option: the cell can only be `color`, so it can't be
+      // blocked — nothing to probe here.
+      if (blocker == null) continue;
       final clone = puzzle.clone();
-      clone.setValue(i, oppositeColor);
+      clone.setValue(i, blocker);
       if (_isBlocked(clone)) {
-        return Move(i, color, this, complexity: 2);
+        // Every non-`color` choice for this cell severs the chain. If
+        // `color` is still an option it must take it; otherwise no colour
+        // keeps a path open and the chain is unsatisfiable.
+        if (options.contains(color)) {
+          return SetValue(i, color, this, complexity: 2);
+        }
+        return Impossible(this);
       }
     }
 

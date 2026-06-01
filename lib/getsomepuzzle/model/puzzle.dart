@@ -78,9 +78,15 @@ bool _isStepTooHardFor(SolveStep step, PuzzleLevel target) {
 enum SolveMethod { propagation, force }
 
 /// One step in the step-by-step solving trace.
-class SolveStep {
+/// One deduction in a [Puzzle.solveExplained] trace. Two mutually-exclusive
+/// shapes, modelled as sealed subtypes: [SetValueStep] (the cell takes a
+/// colour) and [RemoveOptionStep] (a colour is pruned). A trace never records
+/// an impossibility — that ends the trace — so there is no impossible variant.
+///
+/// The `value` / `removeOption` getters are a thin read-only accessor API over
+/// the subtypes, used by the replay loops and tests.
+sealed class SolveStep {
   final int cellIdx;
-  final int value;
   final String constraint;
   final SolveMethod method;
   // For a force step, length of the propagation chain that exposed the
@@ -93,9 +99,8 @@ class SolveStep {
   // than an individual `Constraint`. Always false for force steps.
   final bool isComplicity;
 
-  const SolveStep({
+  const SolveStep._({
     required this.cellIdx,
-    required this.value,
     required this.constraint,
     required this.method,
     this.forceDepth = 0,
@@ -103,10 +108,54 @@ class SolveStep {
     this.isComplicity = false,
   });
 
+  CellValue? get value => switch (this) {
+    SetValueStep(:final value) => value,
+    RemoveOptionStep() => null,
+  };
+  CellValue? get removeOption => switch (this) {
+    RemoveOptionStep(:final option) => option,
+    SetValueStep() => null,
+  };
+
   @override
-  String toString() {
-    return '${method.name}: cell $cellIdx = $value${constraint.isNotEmpty ? ' by $constraint' : ''}${method == SolveMethod.force ? ' (depth=$forceDepth)' : ''}';
-  }
+  String toString() => switch (this) {
+    SetValueStep(:final value) =>
+      '${method.name}: cell $cellIdx = ${value.name}'
+          '${constraint.isNotEmpty ? ' by $constraint' : ''}'
+          '${method == SolveMethod.force ? ' (depth=$forceDepth)' : ''}',
+    RemoveOptionStep(:final option) =>
+      '${method.name}: cell $cellIdx != ${option.name}'
+          '${constraint.isNotEmpty ? ' by $constraint' : ''}'
+          '${method == SolveMethod.force ? ' (depth=$forceDepth)' : ''}',
+  };
+}
+
+/// Trace step assigning a colour to a cell.
+final class SetValueStep extends SolveStep {
+  @override
+  final CellValue value;
+  const SetValueStep({
+    required super.cellIdx,
+    required this.value,
+    required super.constraint,
+    required super.method,
+    super.complexity,
+    super.isComplicity,
+  }) : super._();
+}
+
+/// Trace step pruning one colour from a still-free cell.
+final class RemoveOptionStep extends SolveStep {
+  final CellValue option;
+  const RemoveOptionStep({
+    required super.cellIdx,
+    required this.option,
+    required super.constraint,
+    required super.method,
+    super.forceDepth,
+    super.complexity,
+    super.isComplicity,
+  }) : super._();
 }
 
 class Stats {
@@ -181,7 +230,7 @@ class Stats {
 
 class Puzzle {
   String lineRepresentation;
-  List<int> domain = [];
+  List<CellValue> domain = [];
   int width = 0;
   int height = 0;
   List<Cell> _cells = [];
@@ -203,7 +252,7 @@ class Puzzle {
   }
 
   int? cachedComplexity;
-  List<int>? cachedSolution;
+  List<CellValue>? cachedSolution;
 
   /// Cached result of `getGroups(this)`. Invalidated whenever any cell's
   /// value or options change via `Cell.onMutate`.
@@ -238,14 +287,20 @@ class Puzzle {
   Puzzle(this.lineRepresentation) {
     var attributesStr = lineRepresentation.split("_");
     final dimensions = attributesStr[2].split("x");
-    domain = attributesStr[1].split("").map((e) => int.parse(e)).toList();
+    domain = attributesStr[1].split("").map(cellRepresentationToValue).toList();
     width = int.parse(dimensions[0]);
     height = int.parse(dimensions[1]);
     cells = attributesStr[3]
         .split("")
-        .map((e) => int.parse(e))
         .indexed
-        .map((e) => Cell(e.$2, e.$1, domain, e.$2 > 0))
+        .map(
+          (e) => Cell(
+            cellRepresentationToValue(e.$2),
+            e.$1,
+            domain,
+            cellRepresentationToValue(e.$2) != CellValue.free,
+          ),
+        )
         .toList();
     final strConstraints = attributesStr[4].split(";");
     for (var strConstraint in strConstraints) {
@@ -265,7 +320,7 @@ class Puzzle {
       if (solParts[0] == '1' && solParts.length > 1) {
         cachedSolution = solParts[1]
             .split('')
-            .map((e) => int.parse(e))
+            .map(cellRepresentationToValue)
             .toList();
       }
     }
@@ -297,8 +352,8 @@ class Puzzle {
         if (values.length != cells.length) continue;
         for (int j = 0; j < cells.length; j++) {
           if (cells[j].readonly) continue;
-          final v = int.tryParse(values[j]);
-          if (v != null && v != 0) cells[j].setValue(v);
+          final v = values[j];
+          if (v != "0") cells[j].setValue(cellRepresentationToValue(v));
         }
         hasRestoredProgress = true;
       } else if (field.startsWith('scenario:')) {
@@ -516,7 +571,7 @@ class Puzzle {
   String lineWithPlayState() {
     final parts = lineRepresentation.split('_');
     parts.removeWhere((p) => p.startsWith('p:'));
-    final playStr = cellValues.map((v) => v.toString()).join('');
+    final playStr = cellValues.map(cellValueToString).join('');
     parts.add('p:$playStr');
     return parts.join('_');
   }
@@ -524,14 +579,17 @@ class Puzzle {
   void restart() {
     for (var cell in cells) {
       if (!cell.readonly) {
-        cell.value = 0;
-        cell.options = cell.domain;
+        // `cell.reset()` copies `domain` into a fresh list; assigning
+        // `cell.domain` directly would alias every cell's options to the
+        // single shared `domain` list, so the first removeOption would
+        // wipe that colour from every cell at once.
+        cell.reset();
       }
     }
     _invalidateCaches();
   }
 
-  List<int> get cellValues => cells.map((cell) => cell.value).toList();
+  List<CellValue> get cellValues => cells.map((e) => e.value).toList();
   Map<int, List<Constraint>> get cellConstraints {
     final Map<int, List<Constraint>> result = {};
     for (var constraint in constraints.whereType<CellsCentricConstraint>()) {
@@ -545,7 +603,7 @@ class Puzzle {
     return result;
   }
 
-  int getValue(int idx) {
+  CellValue getValue(int idx) {
     return cells[idx].value;
   }
 
@@ -582,9 +640,16 @@ class Puzzle {
     return result;
   }
 
-  bool setValue(int idx, int value) {
+  bool setValue(int idx, CellValue value, {bool ignoreOptions = false}) {
     final cell = cells[idx];
-    final result = cell.setValue(value);
+    final result = cell.setValue(value, ignoreOptions: ignoreOptions);
+    updateConstraintStatus();
+    return result;
+  }
+
+  bool removeOption(int idx, CellValue option) {
+    final cell = cells[idx];
+    final result = cell.removeOption(option);
     updateConstraintStatus();
     return result;
   }
@@ -600,13 +665,112 @@ class Puzzle {
     cell.reset();
   }
 
+  /// Manual cycling triggered by a tap. Steps through the puzzle's
+  /// declared `domain` in order:
+  ///   `free → domain[0] → domain[1] → … → domain[last] → free → …`
+  ///
+  /// Wrapping back to free goes through `resetCell` so the cell's
+  /// options are restored to the full domain (otherwise the cell would
+  /// end up in the degenerate `value = free, options = []` state).
+  ///
+  /// `ignoreOptions: true` on the non-free transitions is intentional:
+  /// the player can override a constraint-driven option pruning by
+  /// tapping through to the desired value, even when that value has
+  /// previously been excluded by the solver.
   void incrValue(int idx) {
+    if (domain.isEmpty) return;
+    if (cells[idx].readonly) return;
     final currentValue = cellValues[idx];
-    setValue(idx, (currentValue + 1) % (domain.length + 1));
+    if (currentValue == CellValue.free) {
+      setValue(idx, domain.first, ignoreOptions: true);
+      return;
+    }
+    final currentDomainIdx = domain.indexOf(currentValue);
+    if (currentDomainIdx < 0 || currentDomainIdx == domain.length - 1) {
+      // Either the current colour isn't part of this puzzle's domain
+      // (legacy data, or a domain narrower than the cell's colour) or
+      // it is the last domain entry — wrap back to free.
+      resetCell(idx);
+      updateConstraintStatus();
+      return;
+    }
+    setValue(idx, domain[currentDomainIdx + 1], ignoreOptions: true);
+  }
+
+  /// Mirror of [incrValue] that walks the domain backward. Steps through:
+  ///   `free → domain[last] → domain[last-1] → … → domain[0] → free → …`
+  ///
+  /// Wired to right-click (desktop) and long-press (mobile) so the player
+  /// can reach the last colour of the domain in one click instead of N.
+  /// Same `resetCell` + `updateConstraintStatus` dance as [incrValue] on
+  /// the wrap-back-to-free step. `ignoreOptions: true` matches [incrValue]
+  /// — manual cycling can always override constraint-driven pruning.
+  void decrValue(int idx) {
+    if (domain.isEmpty) return;
+    if (cells[idx].readonly) return;
+    final currentValue = cellValues[idx];
+    if (currentValue == CellValue.free) {
+      setValue(idx, domain.last, ignoreOptions: true);
+      return;
+    }
+    final currentDomainIdx = domain.indexOf(currentValue);
+    if (currentDomainIdx <= 0) {
+      // Either the current colour isn't part of this puzzle's domain
+      // (legacy data) or it is the first domain entry — wrap back to
+      // free with full options restored.
+      resetCell(idx);
+      updateConstraintStatus();
+      return;
+    }
+    setValue(idx, domain[currentDomainIdx - 1], ignoreOptions: true);
+  }
+
+  /// Manual option-pruning cycle triggered by a tap on a *free* cell in
+  /// "remove-option" mode. Walks through:
+  ///   all options → drop domain[0] → drop domain[1] → … → drop
+  ///   domain[last] → all options → …
+  /// Each step restores the previously dropped option (if any) and
+  /// removes the next one in domain order. A 2-colour domain has no
+  /// useful intermediate state (any single removal collapses to a
+  /// `setValue`), so this method is only meaningful on 3+ colour
+  /// puzzles — the caller gates on `domain.length`.
+  ///
+  /// If the cell already has a value, falls back to [incrValue] so the
+  /// tap still has the regular cycling effect.
+  ///
+  /// A non-canonical option state (more than one option missing, e.g.
+  /// from a prior right-click prune) is treated as "start fresh": the
+  /// cell is reset and the first domain colour is removed.
+  void cycleRemoveOption(int idx) {
+    if (domain.isEmpty) return;
+    final cell = cells[idx];
+    if (cell.readonly) return;
+    if (cell.value != CellValue.free) {
+      incrValue(idx);
+      return;
+    }
+    final missing = domain.where((v) => !cell.options.contains(v)).toList();
+    if (missing.isEmpty) {
+      removeOption(idx, domain.first);
+      return;
+    }
+    if (missing.length == 1) {
+      final m = domain.indexOf(missing.first);
+      if (m == domain.length - 1) {
+        resetCell(idx);
+        updateConstraintStatus();
+        return;
+      }
+      resetCell(idx);
+      removeOption(idx, domain[m + 1]);
+      return;
+    }
+    resetCell(idx);
+    removeOption(idx, domain.first);
   }
 
   bool get complete {
-    return !cellValues.any((val) => val == 0);
+    return !cellValues.any((val) => val == CellValue.free);
   }
 
   List<Constraint> check({bool saveResult = true}) {
@@ -656,7 +820,7 @@ class Puzzle {
   }
 
   /// Try setting each free cell to each domain value on a fresh clone; if a
-  /// value leads to contradiction, return the opposite as a forced move.
+  /// value leads to contradiction, remove this option.
   ///
   /// Scans every (cell, value) pair and returns the move whose refutation
   /// requires the **shortest propagation chain** (`forceDepth`). The
@@ -669,12 +833,11 @@ class Puzzle {
     Move? best;
     int bestDepth = -1;
     for (final (idx, cell) in cells.indexed) {
-      if (cell.value != 0) continue;
-      for (final value in domain) {
+      if (cell.value != CellValue.free) continue;
+      for (final value in cell.options) {
         final clone = this.clone();
         clone.setValue(idx, value);
         final r = clone._propagateCount();
-        final opposite = domain.whereNot((v) => v == value).first;
 
         Move? candidate;
         int depth;
@@ -683,9 +846,9 @@ class Puzzle {
           // Propagation hit an explicit impossibility. Re-run apply once
           // to recover the responsible constraint for the hint display.
           final diag = clone.apply();
-          candidate = Move(
+          candidate = RemoveOption(
             idx,
-            opposite,
+            value,
             diag?.givenBy ?? clone.constraints.first,
             isForce: true,
             forceDepth: r.moves,
@@ -694,9 +857,9 @@ class Puzzle {
         } else {
           final errors = clone.check(saveResult: false);
           if (errors.isNotEmpty) {
-            candidate = Move(
+            candidate = RemoveOption(
               idx,
-              opposite,
+              value,
               errors.first,
               isForce: true,
               forceDepth: r.moves,
@@ -730,8 +893,29 @@ class Puzzle {
     while (true) {
       final m = findAMove(checkErrors: false, tryForce: false);
       if (m == null) return (moves: moves, failed: false);
-      if (m.isImpossible != null) return (moves: moves, failed: true);
-      setValue(m.idx, m.value);
+      switch (m) {
+        case Impossible():
+          return (moves: moves, failed: true);
+        case SetValue(:final idx, :final value):
+          // A setValue move whose value is no longer in the cell's options is
+          // a contradiction surfaced by a constraint that has not been
+          // updated to inspect `Cell.options`. In a 2-colour domain this
+          // never happens (removeOption collapses to a setValue of the only
+          // surviving option); on 3+ colours the cell can be free with
+          // several options and a constraint may claim "must be X" after X
+          // was already excluded. Treat as failure rather than throwing.
+          final cell = cells[idx];
+          if (cell.value == CellValue.free && !cell.options.contains(value)) {
+            return (moves: moves, failed: true);
+          }
+          setValue(idx, value);
+        case RemoveOption(:final idx, :final option):
+          // A no-op removeOption (option already pruned) would loop forever
+          // without progress. Bail out as "stuck".
+          if (!removeOption(idx, option)) {
+            return (moves: moves, failed: false);
+          }
+      }
       moves++;
       if (complete) return (moves: moves, failed: false);
     }
@@ -760,14 +944,17 @@ class Puzzle {
     if (sol == null) return null;
     for (int i = 0; i < cells.length; i++) {
       final v = cells[i].value;
-      if (v != 0 && v != sol[i]) return i;
+      if (v != CellValue.free && v != sol[i]) return i;
     }
     return null;
   }
 
   // --- Constructor for empty puzzles (no lineRepresentation parsing) ---
   Puzzle.empty(this.width, this.height, this.domain) : lineRepresentation = '' {
-    cells = List.generate(width * height, (idx) => Cell(0, idx, domain, false));
+    cells = List.generate(
+      width * height,
+      (idx) => Cell(CellValue.free, idx, domain, false),
+    );
   }
 
   Puzzle clone() {
@@ -804,7 +991,7 @@ class Puzzle {
 
   double computeRatio() {
     final values = cellValues;
-    return values.where((v) => v == 0).length / values.length;
+    return values.where((v) => v == CellValue.free).length / values.length;
   }
 
   bool isPossible() {
@@ -822,8 +1009,23 @@ class Puzzle {
     while (true) {
       final m = findAMove(checkErrors: false, tryForce: false);
       if (m == null) return moves;
-      if (m.isImpossible != null) return null;
-      setValue(m.idx, m.value);
+      switch (m) {
+        case Impossible():
+          return null;
+        case SetValue(:final idx, :final value):
+          // See `_propagateCount` for the rationale: a setValue that targets
+          // a value no longer in the cell's options is a contradiction.
+          final cell = cells[idx];
+          if (cell.value == CellValue.free && !cell.options.contains(value)) {
+            return null;
+          }
+          setValue(idx, value);
+        case RemoveOption(:final idx, :final option):
+          // Bail out on a no-op removeOption (option already pruned).
+          if (!removeOption(idx, option)) {
+            return moves;
+          }
+      }
       moves++;
       if (verifyAfterEachMove && check(saveResult: false).isNotEmpty) {
         return null;
@@ -900,15 +1102,35 @@ class Puzzle {
   /// values; `solved` is null when the puzzle hits a contradiction or can't
   /// be finished by deduction. Shared by [computeComplexity] and
   /// [traceEffort].
-  ({int effort, List<int>? solved}) _solveEffort() {
+  ({int effort, List<CellValue>? solved}) _solveEffort() {
     final test = clone();
     int effort = 0;
+    solveLoop:
     for (int step = 0; step < 1000; step++) {
       final m = test.findAMove(checkErrors: false);
       if (m == null) break;
-      if (m.isImpossible != null) return (effort: effort, solved: null);
-      test.setValue(m.idx, m.value);
-      effort += m.isForce ? (5 + 5 * m.forceDepth) : m.complexity;
+      switch (m) {
+        case Impossible():
+          return (effort: effort, solved: null);
+        case SetValue(:final idx, :final value, :final complexity):
+          // See `_propagateCount`: a setValue against an already-excluded
+          // option is treated as an impossibility surfaced by a constraint.
+          final cell = test.cells[idx];
+          if (cell.value == CellValue.free && !cell.options.contains(value)) {
+            return (effort: effort, solved: null);
+          }
+          test.setValue(idx, value);
+          effort += complexity;
+        case RemoveOption(
+          :final idx,
+          :final option,
+          :final complexity,
+          :final isForce,
+          :final forceDepth,
+        ):
+          if (!test.removeOption(idx, option)) break solveLoop;
+          effort += isForce ? (5 + 5 * forceDepth) : complexity;
+      }
       if (test.complete) break;
     }
     if (test.freeCells().isNotEmpty) return (effort: effort, solved: null);
@@ -942,22 +1164,51 @@ class Puzzle {
     bool timedOut() =>
         stopwatch != null && stopwatch.elapsedMilliseconds > timeoutMs!;
 
+    solveLoop:
     for (int step = 0; step < 1000; step++) {
       if (timedOut() || shouldStop?.call() == true) return [];
       final m = test.findAMove(checkErrors: false);
-      if (m == null || m.isImpossible != null) break;
-      test.setValue(m.idx, m.value);
-      steps.add(
-        SolveStep(
-          cellIdx: m.idx,
-          value: m.value,
-          constraint: m.isForce ? '' : m.givenBy.serialize(),
-          method: m.isForce ? SolveMethod.force : SolveMethod.propagation,
-          forceDepth: m.isForce ? m.forceDepth : 0,
-          complexity: m.isForce ? 0 : m.complexity,
-          isComplicity: !m.isForce && m.givenBy is Complicity,
-        ),
-      );
+      if (m == null) break;
+      switch (m) {
+        case Impossible():
+          break solveLoop;
+        case SetValue(:final idx, :final value, :final complexity):
+          // See `_propagateCount`: bail out on an excluded-option setValue.
+          final cell = test.cells[idx];
+          if (cell.value == CellValue.free && !cell.options.contains(value)) {
+            break solveLoop;
+          }
+          test.setValue(idx, value);
+          steps.add(
+            SetValueStep(
+              cellIdx: idx,
+              value: value,
+              constraint: m.givenBy.serialize(),
+              method: SolveMethod.propagation,
+              complexity: complexity,
+              isComplicity: m.givenBy is Complicity,
+            ),
+          );
+        case RemoveOption(
+          :final idx,
+          :final option,
+          :final complexity,
+          :final isForce,
+          :final forceDepth,
+        ):
+          if (!test.removeOption(idx, option)) break solveLoop;
+          steps.add(
+            RemoveOptionStep(
+              cellIdx: idx,
+              option: option,
+              constraint: isForce ? '' : m.givenBy.serialize(),
+              method: isForce ? SolveMethod.force : SolveMethod.propagation,
+              forceDepth: isForce ? forceDepth : 0,
+              complexity: isForce ? 0 : complexity,
+              isComplicity: !isForce && m.givenBy is Complicity,
+            ),
+          );
+      }
       if (test.complete) return steps;
     }
 
@@ -973,11 +1224,24 @@ class Puzzle {
   /// expensive `apply()` like CH on large grids) can still honour the
   /// `maxAttemptTime` deadline.
   bool solve({int maxSteps = 200, bool Function()? shouldStop}) {
+    solveLoop:
     for (int i = 0; i < maxSteps; i++) {
       if (shouldStop?.call() == true) break;
       final m = findAMove(checkErrors: false);
-      if (m == null || m.isImpossible != null) break;
-      setValue(m.idx, m.value);
+      if (m == null) break;
+      switch (m) {
+        case Impossible():
+          break solveLoop;
+        case SetValue(:final idx, :final value):
+          // See `_propagateCount`: bail out on an excluded-option setValue.
+          final cell = cells[idx];
+          if (cell.value == CellValue.free && !cell.options.contains(value)) {
+            break solveLoop;
+          }
+          setValue(idx, value);
+        case RemoveOption(:final idx, :final option):
+          if (!removeOption(idx, option)) break solveLoop;
+      }
     }
     return complete && check(saveResult: false).isEmpty;
   }
@@ -1203,7 +1467,11 @@ class Puzzle {
   PuzzleLevel _classifyFromSteps(List<SolveStep> steps, double prefillRatio) {
     final replay = clone();
     for (final s in steps) {
-      replay.setValue(s.cellIdx, s.value);
+      if (s.value != null) {
+        replay.setValue(s.cellIdx, s.value!);
+      } else if (s.removeOption != null) {
+        replay.removeOption(s.cellIdx, s.removeOption!);
+      }
     }
     final completed =
         replay.complete && replay.check(saveResult: false).isEmpty;
@@ -1225,7 +1493,7 @@ class Puzzle {
     final newWidth = height;
     final newHeight = width;
 
-    final newValues = List<int>.filled(n, 0);
+    final newValues = List<CellValue>.filled(n, CellValue.free);
     final newReadonly = List<bool>.filled(n, false);
     for (int origIdx = 0; origIdx < n; origIdx++) {
       final newIdx = rotateIdx90CW(origIdx, width, height);
@@ -1238,10 +1506,10 @@ class Puzzle {
     // the trailing `_p:` field.
     final prefillStr = List.generate(
       n,
-      (i) => newReadonly[i] ? newValues[i] : 0,
-    ).map((v) => v.toString()).join('');
+      (i) => newReadonly[i] ? newValues[i] : CellValue.free,
+    ).map(cellValueToString).join('');
 
-    final domainStr = domain.map((v) => v.toString()).join('');
+    final domainStr = domain.map(cellValueToString).join('');
     final rotatedConstraintsStr = constraints
         .map((c) => c.rotated(width, height).serialize())
         .join(';');
@@ -1249,11 +1517,11 @@ class Puzzle {
     String solutionStr = '0:0';
     final sol = cachedSolution;
     if (sol != null && sol.length == n) {
-      final rotatedSolution = List<int>.filled(n, 0);
+      final rotatedSolution = List<CellValue>.filled(n, CellValue.free);
       for (int origIdx = 0; origIdx < n; origIdx++) {
         rotatedSolution[rotateIdx90CW(origIdx, width, height)] = sol[origIdx];
       }
-      solutionStr = '1:${rotatedSolution.map((v) => v.toString()).join('')}';
+      solutionStr = '1:${rotatedSolution.map(cellValueToString).join('')}';
     }
 
     final complexityStr = (cachedComplexity ?? 0).toString();
@@ -1263,25 +1531,26 @@ class Puzzle {
 
     final hasProgress = List.generate(
       n,
-      (i) => !newReadonly[i] && newValues[i] != 0,
+      (i) => !newReadonly[i] && newValues[i] != CellValue.free,
     ).any((x) => x);
     if (hasProgress) {
-      final playStr = newValues.map((v) => v.toString()).join('');
+      final playStr = newValues.map(cellValueToString).join('');
       line = '${line}_p:$playStr';
     }
-
     return Puzzle(line);
   }
 
   /// Export puzzle to the v2 line format.
   /// When [compute] is false, skip complexity and solution computation.
   String lineExport({bool compute = true}) {
-    final domainStr = domain.map((v) => v.toString()).join('');
-    final valuesStr = cellValues.map((v) => v.toString()).join('');
+    final domainStr = domain.map(cellValueToString).join('');
+    final valuesStr = cellValues.map(cellValueToString).join('');
     final constraintsStr = constraints.map((c) => c.serialize()).join(';');
     final complexity = compute ? computeComplexity() : 0;
     final sol = cachedSolution;
-    final solutionStr = sol != null ? '1:${sol.join('')}' : '0:0';
+    final solutionStr = sol != null
+        ? '1:${sol.map(cellValueToString).join('')}'
+        : '0:0';
     final base =
         'v2_${domainStr}_${width}x${height}_${valuesStr}_${constraintsStr}_${solutionStr}_$complexity';
     final scenario = generationScenario;

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
@@ -39,6 +40,7 @@ class PuzzleWidget extends StatefulWidget {
     this.hintIsError = false,
     this.onCellRightDrag,
     this.onCellRightDragEnd,
+    this.onCellLongPress,
   });
 
   final Puzzle currentPuzzle;
@@ -50,6 +52,10 @@ class PuzzleWidget extends StatefulWidget {
   final bool hintIsError;
   final ValueChanged<int>? onCellRightDrag;
   final VoidCallback? onCellRightDragEnd;
+
+  /// Long-press = cycle backward. Mobile equivalent of the right-click
+  /// on desktop — the host wires both to the same `GameModel` entry.
+  final ValueChanged<int>? onCellLongPress;
 
   @override
   State<PuzzleWidget> createState() => _PuzzleWidgetState();
@@ -328,14 +334,14 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               : null,
                           constraint: constraint,
                           actualCount: widget.currentPuzzle.cellValues
-                              .where((val) => val == constraint.value)
+                              .where((val) => val == constraint.color)
                               .length,
                           oppositeActual: widget.currentPuzzle.cellValues
                               .where(
                                 (val) =>
                                     val ==
                                     widget.currentPuzzle.domain
-                                        .whereNot((v) => v == constraint.value)
+                                        .whereNot((v) => v == constraint.color)
                                         .first,
                               )
                               .length,
@@ -603,6 +609,9 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       onSecondaryTap: isDesktopOrWeb
           ? () => _handleCellTap(idx, secondary: true)
           : null,
+      onLongPress: widget.onCellLongPress != null
+          ? () => widget.onCellLongPress!(idx)
+          : null,
       onDrag: (Offset offset) {
         final idx = _dragTargetIdx(rowidx, cellidx, offset);
         if (idx != null) widget.onCellDrag(idx);
@@ -624,6 +633,14 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
         return 0;
       },
       zoneHighlightColor: zoneTint,
+      // Option dots are only meaningful on 3+ colour puzzles: with a
+      // 2-colour domain, every `removeOption` collapses to a `setValue`,
+      // so the cell either has all options or none.
+      optionDots:
+          (widget.currentPuzzle.domain.length > 2 &&
+              cell.value == CellValue.free)
+          ? cell.options
+          : null,
     );
   }
 }

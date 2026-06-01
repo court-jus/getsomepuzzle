@@ -2,18 +2,25 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/to_flutter.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
 
-const bgColors = {
-  0: Color.fromARGB(255, 192, 235, 241),
-  1: Colors.black,
-  2: Colors.white,
+final bgColors = {
+  CellValue.free: Color.fromARGB(255, 192, 235, 241),
+  CellValue.black: Colors.black,
+  CellValue.white: Colors.white,
+  CellValue.purple: Colors.purple[100],
 };
-const fgColors = {0: Colors.black, 1: Colors.white, 2: Colors.black};
+const fgColors = {
+  CellValue.free: Colors.black,
+  CellValue.black: Colors.white,
+  CellValue.white: Colors.black,
+  CellValue.purple: Colors.green,
+};
 
 class CellWidget extends StatelessWidget {
   // Constructor
@@ -28,6 +35,7 @@ class CellWidget extends StatelessWidget {
     required this.onDrag,
     required this.onDragEnd,
     this.onSecondaryTap,
+    this.onLongPress,
     this.constraints,
     this.borderColor,
     this.borderWidth,
@@ -36,16 +44,24 @@ class CellWidget extends StatelessWidget {
     this.onRightDragEnd,
     this.getCellGroupSize,
     this.zoneHighlightColor,
+    this.optionDots,
   });
 
   // Attributes
-  final int value;
+  final CellValue value;
   final int idx;
   final bool readonly;
   final bool isHighlighted;
   final List<Constraint>? constraints;
   final VoidCallback onTap;
   final VoidCallback? onSecondaryTap;
+
+  /// Long-press fallback for mobile (where there is no right-click).
+  /// Wired to the puzzle's "cycle backward" action so the player can
+  /// reach the last colour of the domain in one gesture instead of N
+  /// taps. Null = no long-press handling (e.g. 2-colour puzzles where
+  /// the right-click toggle already reaches every colour in one step).
+  final VoidCallback? onLongPress;
   final ValueChanged<Offset> onDrag;
   final VoidCallback onDragEnd;
   final double cellSize;
@@ -57,7 +73,7 @@ class CellWidget extends StatelessWidget {
   final double? borderWidth;
 
   /// If set, draws a small colored triangle in the top-left corner
-  final int? cornerIndicatorValue;
+  final CellValue? cornerIndicatorValue;
 
   final ValueChanged<Offset>? onRightDrag;
   final VoidCallback? onRightDragEnd;
@@ -68,6 +84,14 @@ class CellWidget extends StatelessWidget {
   /// When set, draws a low-opacity tinted overlay behind the cell content
   /// (used for MJ zone highlighting).
   final Color? zoneHighlightColor;
+
+  /// One coloured dot per remaining option, drawn at the bottom of the cell.
+  /// Used on 3+ colour puzzles so the player can see why a cell is "narrowed"
+  /// — `Cell.options` drives every deduction now but is otherwise invisible.
+  /// Callers pass `null` when the dots should not be rendered (cell already
+  /// has a value, or domain has 2 colours so option pruning is equivalent to
+  /// setValue and the dots would be redundant).
+  final List<CellValue>? optionDots;
 
   // Build UI
   @override
@@ -140,6 +164,7 @@ class CellWidget extends StatelessWidget {
           : null,
       child: GestureDetector(
         onTap: onTap,
+        onLongPress: onLongPress,
         onVerticalDragUpdate: (details) {
           final localPos = details.localPosition;
           final offsetX = localPos.dx / cellSize;
@@ -178,11 +203,21 @@ class CellWidget extends StatelessWidget {
                     child: CustomPaint(
                       size: Size(cellSize * 0.4, cellSize * 0.4),
                       painter: _CornerTrianglePainter(
-                        color: cornerIndicatorValue == 1
+                        color: cornerIndicatorValue == CellValue.black
                             ? Colors.black
                             : Colors.white,
                         borderColor: Colors.grey,
                       ),
+                    ),
+                  ),
+                if (optionDots != null && optionDots!.isNotEmpty)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: cellSize * 0.04,
+                    child: _OptionDots(
+                      options: optionDots!,
+                      cellSize: cellSize,
                     ),
                   ),
               ],
@@ -190,6 +225,43 @@ class CellWidget extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A horizontal row of small coloured dots, one per remaining option for a
+/// cell. Drawn at the bottom of the [CellWidget] when the puzzle uses a
+/// 3+ colour domain. Dot colour mirrors the cell-background palette so the
+/// player can map each dot to a colour they have already seen on filled
+/// cells. A subtle outline keeps the white dot visible against the cyan
+/// "free" background.
+class _OptionDots extends StatelessWidget {
+  const _OptionDots({required this.options, required this.cellSize});
+
+  final List<CellValue> options;
+  final double cellSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final dotSize = cellSize * 0.10;
+    final gap = cellSize * 0.04;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int i = 0; i < options.length; i++) ...[
+          if (i > 0) SizedBox(width: gap),
+          Container(
+            width: dotSize,
+            height: dotSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: bgColors[options[i]],
+              border: Border.all(color: Colors.black54, width: 0.5),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

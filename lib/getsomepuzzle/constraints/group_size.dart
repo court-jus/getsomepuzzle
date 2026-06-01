@@ -14,6 +14,10 @@ class GroupSize extends CellsCentricConstraint {
   @override
   String get slug => 'GS';
 
+  // Colour-agnostic: constrains group sizes, not a specific colour.
+  @override
+  Set<CellValue> get referencedColors => const {};
+
   int size = 0;
 
   GroupSize(String strParams) {
@@ -44,7 +48,7 @@ class GroupSize extends CellsCentricConstraint {
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final maxSize = min(
@@ -71,16 +75,24 @@ class GroupSize extends CellsCentricConstraint {
     if (puzzle.complete) {
       return myGroup.length == size;
     } else {
-      // If it has free neighbors it can still grow
+      // The group can only grow through a free neighbour that can still take
+      // the group's colour. On a 3+-colour puzzle a free cell whose `myColor`
+      // option has been pruned can never join the group, so it does not keep
+      // the group growable.
+      final myColor = puzzle.cellValues[idx];
       for (var member in myGroup) {
-        final freeNeighbors = puzzle
+        final growableNeighbors = puzzle
             .getNeighbors(member)
-            .where((nei) => puzzle.cellValues[nei] == 0);
-        if (freeNeighbors.isNotEmpty) {
+            .where(
+              (nei) =>
+                  puzzle.cellValues[nei] == CellValue.free &&
+                  puzzle.cells[nei].options.contains(myColor),
+            );
+        if (growableNeighbors.isNotEmpty) {
           return myGroup.length <= size;
         }
       }
-      // The group has no free neighbor, it needs to be exactly the target size
+      // No growable neighbour left: the group must be exactly the target size.
       return myGroup.length == size;
     }
   }
@@ -90,9 +102,8 @@ class GroupSize extends CellsCentricConstraint {
     final groups = getGroups(puzzle);
     final idx = indices[0];
     final myColor = puzzle.cellValues[idx];
-    final myOpposite = puzzle.domain.whereNot((v) => v == myColor).first;
     final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
-    if (myColor == 0) {
+    if (myColor == CellValue.free) {
       final neighbors = puzzle.getNeighbors(idx);
       for (var neighbor in neighbors) {
         final neighborGroup = groups.firstWhereOrNull(
@@ -100,16 +111,14 @@ class GroupSize extends CellsCentricConstraint {
         );
         if (neighborGroup != null && neighborGroup.length >= size) {
           final neighborColor = puzzle.cellValues[neighbor];
-          if (neighborColor != 0) {
-            final oppositeColor = puzzle.domain
-                .whereNot((v) => v == neighborColor)
-                .first;
-            return Move(idx, oppositeColor, this, complexity: 1);
+          if (neighborColor != CellValue.free &&
+              puzzle.cells[idx].options.contains(neighborColor)) {
+            return RemoveOption(idx, neighborColor, this, complexity: 1);
           }
         }
       }
       // Per-color feasibility: combine two checks for each candidate color.
-      //  (a) Reachability: flood-fill from idx through cells that are empty
+      //  (a) Reachability: flood-fill from idx through cells that have this color as an option
       //      OR already this color; the size of that component is the max
       //      group size idx could reach. < size ⇒ infeasible.
       //  (b) Mandatory-merge overshoot: if idx took this color, it would
@@ -117,85 +126,88 @@ class GroupSize extends CellsCentricConstraint {
       //      absorbed mass already exceeds size, OR if every free boundary
       //      cell of that mass would push it past size on its first growth
       //      step, the color is infeasible.
-      int? forcedColor;
       for (final color in puzzle.domain) {
         final reachable = floodFill(puzzle, [idx], (i) {
-          final v = puzzle.cellValues[i];
-          return v == 0 || v == color;
+          final c = puzzle.cells[i];
+          return c.value == color || c.options.contains(color);
         });
-        bool infeasible = reachable.length < size;
-        if (!infeasible) {
-          final mandatoryGroup = <int>{idx};
-          for (final nei in puzzle.getNeighbors(idx)) {
-            if (puzzle.cellValues[nei] == color) {
-              final neiGroup = groups.firstWhereOrNull((g) => g.contains(nei));
-              if (neiGroup != null) mandatoryGroup.addAll(neiGroup);
+        if (reachable.length < size) {
+          return RemoveOption(idx, color, this, complexity: 3);
+        }
+        final mandatoryGroup = <int>{idx};
+        for (final nei in puzzle.getNeighbors(idx)) {
+          if (puzzle.cellValues[nei] == color) {
+            final neiGroup = groups.firstWhereOrNull((g) => g.contains(nei));
+            if (neiGroup != null) mandatoryGroup.addAll(neiGroup);
+          }
+        }
+        if (mandatoryGroup.length > size) {
+          return RemoveOption(idx, color, this, complexity: 3);
+        } else if (mandatoryGroup.length < size) {
+          final margin = size - mandatoryGroup.length;
+          final boundary = <int>{};
+          for (final m in mandatoryGroup) {
+            for (final nei in puzzle.getNeighbors(m)) {
+              if (puzzle.cellValues[nei] == CellValue.free) boundary.add(nei);
             }
           }
-          if (mandatoryGroup.length > size) {
-            infeasible = true;
-          } else if (mandatoryGroup.length < size) {
-            final margin = size - mandatoryGroup.length;
-            final boundary = <int>{};
-            for (final m in mandatoryGroup) {
-              for (final nei in puzzle.getNeighbors(m)) {
-                if (puzzle.cellValues[nei] == 0) boundary.add(nei);
+          if (boundary.isNotEmpty) {
+            final externalGroups = groups
+                .where(
+                  (g) =>
+                      g.any((c) => puzzle.cellValues[c] == color) &&
+                      !g.any(mandatoryGroup.contains),
+                )
+                .toList();
+            bool anyViable = false;
+            for (final b in boundary) {
+              final bNei = puzzle.getNeighbors(b);
+              int addition = 1;
+              for (final g in externalGroups) {
+                if (bNei.any(g.contains)) addition += g.length;
+              }
+              if (addition <= margin) {
+                anyViable = true;
+                break;
               }
             }
-            if (boundary.isNotEmpty) {
-              final externalGroups = groups
-                  .where(
-                    (g) =>
-                        g.any((c) => puzzle.cellValues[c] == color) &&
-                        !g.any(mandatoryGroup.contains),
-                  )
-                  .toList();
-              bool anyViable = false;
-              for (final b in boundary) {
-                final bNei = puzzle.getNeighbors(b);
-                int addition = 1;
-                for (final g in externalGroups) {
-                  if (bNei.any(g.contains)) addition += g.length;
-                }
-                if (addition <= margin) {
-                  anyViable = true;
-                  break;
-                }
-              }
-              if (!anyViable) infeasible = true;
+            if (!anyViable) {
+              return RemoveOption(idx, color, this, complexity: 3);
             }
           }
         }
-        if (infeasible) {
-          if (forcedColor != null) {
-            return Move(0, 0, this, isImpossible: this);
-          }
-          forcedColor = puzzle.domain.whereNot((v) => v == color).first;
-        }
-      }
-      if (forcedColor != null) {
-        return Move(idx, forcedColor, this, complexity: 3);
       }
     }
     if (myGroup == null) return null;
     if (myGroup.length == size) {
-      // My group is finished, we can fill the neighbors
+      // My group is finished, we can remove my color from the neighbors' option
       for (var member in myGroup) {
         final freeNeighbors = puzzle
             .getNeighbors(member)
-            .where((nei) => puzzle.cellValues[nei] == 0);
+            .where(
+              (nei) =>
+                  puzzle.cellValues[nei] == CellValue.free &&
+                  puzzle.cells[nei].options.contains(myColor),
+            );
         if (freeNeighbors.isNotEmpty) {
-          return Move(freeNeighbors.first, myOpposite, this, complexity: 0);
+          return RemoveOption(
+            freeNeighbors.first,
+            myColor,
+            this,
+            complexity: 0,
+          );
         }
       }
     } else if (myGroup.length > size) {
-      return Move(0, 0, this, isImpossible: this);
+      return Impossible(this);
     } else {
       // Find members that only have one empty neighbor
       final Set<int> groupFreeNeighbors = {};
       for (var member in myGroup) {
         groupFreeNeighbors.addAll(
-          puzzle.getNeighbors(member).where((idx) => puzzle.getValue(idx) == 0),
+          puzzle
+              .getNeighbors(member)
+              .where((idx) => puzzle.getValue(idx) == CellValue.free),
         );
       }
       if (groupFreeNeighbors.length == 1) {
@@ -213,11 +225,16 @@ class GroupSize extends CellsCentricConstraint {
           }
         }
         if (1 + mergedSize > margin) {
-          return Move(0, 0, this, isImpossible: this);
+          return Impossible(this);
         }
-        return Move(boundary, myColor, this, complexity: 1);
+        // The single exit must take myColor. If options have already
+        // excluded myColor (3-colour puzzles), the group can't grow.
+        if (!puzzle.cells[boundary].options.contains(myColor)) {
+          return Impossible(this);
+        }
+        return SetValue(boundary, myColor, this, complexity: 1);
       } else if (myGroup.length < size && groupFreeNeighbors.isEmpty) {
-        return Move(0, 0, this, isImpossible: this);
+        return Impossible(this);
       }
       // If extending in a direction would merge me with other groups and create a "too big group",
       // then add a boundary in that direction, it is forbidden to grow there.
@@ -239,8 +256,9 @@ class GroupSize extends CellsCentricConstraint {
             mergedSize += grp.length;
           }
         }
-        if (mergedSize >= margin) {
-          return Move(boundary, myOpposite, this, complexity: 2);
+        if (mergedSize >= margin &&
+            puzzle.cells[boundary].options.contains(myColor)) {
+          return RemoveOption(boundary, myColor, this, complexity: 2);
         }
       }
       // Path-based articulation: any empty cell whose blocking would shrink
@@ -249,12 +267,17 @@ class GroupSize extends CellsCentricConstraint {
       // single-exit rule to bottlenecks several steps away from the group.
       final seed = myGroup.first;
       if (reachableComponentSize(puzzle, seed, myColor) < size) {
-        return Move(0, 0, this, isImpossible: this);
+        return Impossible(this);
       }
       for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
-        if (puzzle.cellValues[idx] != 0) continue;
+        if (puzzle.cellValues[idx] != CellValue.free) continue;
         if (blockingShrinksReachableBelow(puzzle, idx, myColor, seed, size)) {
-          return Move(idx, myColor, this, complexity: 4);
+          // Articulation point must take myColor. If options exclude it,
+          // the group cannot reach `size` along any growth path.
+          if (!puzzle.cells[idx].options.contains(myColor)) {
+            return Impossible(this);
+          }
+          return SetValue(idx, myColor, this, complexity: 4);
         }
       }
     }
@@ -271,7 +294,7 @@ class GroupSize extends CellsCentricConstraint {
     for (var member in myGroup) {
       final freeNeighbors = puzzle
           .getNeighbors(member)
-          .where((nei) => puzzle.cellValues[nei] == 0);
+          .where((nei) => puzzle.cellValues[nei] == CellValue.free);
       if (freeNeighbors.isNotEmpty) return false;
     }
     return myGroup.length == size;

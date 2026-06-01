@@ -27,6 +27,14 @@ In spirit this is Number Link / Flow Free on top of a bicolouring: a
 path is a chain of cells of a given colour that interleaves with the
 opposing path rather than just avoiding its neighbours.
 
+> **2-colour by design.** The whole routing model (bipartite anchor
+> colouring, opposing-path interleaving) is intrinsically binary, so
+> `preFillPath` always builds a `defaultDomain` (black/white) grid and
+> ignores `GeneratorConfig.domain`. A `--domain 3` run that lands on
+> this scenario still produces a valid 2-colour puzzle; the generator's
+> auto-shrink relabels its exported line as `v2_12_...`. There is no
+> 3-colour variant of path-based generation.
+
 ### Why this design
 
 - **Strong aesthetic identity** — the player immediately knows what to

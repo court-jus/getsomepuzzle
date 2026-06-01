@@ -164,6 +164,8 @@ class Filters {
   Set<String> bannedRules;
   Set<String> wantedFlags;
   Set<String> bannedFlags;
+  Set<String> wantedDomains;
+  Set<String> bannedDomains;
   final log = Logger("Filters");
 
   /// Default value of [bannedFlags] for a fresh install or a player who
@@ -188,6 +190,8 @@ class Filters {
     this.bannedRules = const {},
     this.wantedFlags = const {},
     this.bannedFlags = defaultBannedFlags,
+    this.wantedDomains = const {},
+    this.bannedDomains = const {"d3"},
   });
 
   Future<void> load() async {
@@ -206,6 +210,10 @@ class Filters {
           (prefs.getStringList("bannedFlagsFilter") ??
                   defaultBannedFlags.toList())
               .toSet();
+      wantedDomains = (prefs.getStringList("wantedDomainsFilter") ?? [])
+          .toSet();
+      bannedDomains = (prefs.getStringList("bannedDomainsFilter") ?? ["d3"])
+          .toSet();
       // Cleanup of obsolete keys (cplx filter replaced by adaptive player level).
       await prefs.remove("minCplxFilter");
       await prefs.remove("maxCplxFilter");
@@ -228,8 +236,14 @@ class Filters {
     prefs.setStringList("bannedRulesFilter", bannedRules.toList());
     prefs.setStringList("wantedFlagsFilter", wantedFlags.toList());
     prefs.setStringList("bannedFlagsFilter", bannedFlags.toList());
+    prefs.setStringList("wantedDomainsFilter", wantedDomains.toList());
+    prefs.setStringList("bannedDomainsFilter", bannedDomains.toList());
   }
 }
+
+/// Filter key for a puzzle's domain size — matches the `"d<n>"` slugs
+/// stored in [Filters.wantedDomains] / [Filters.bannedDomains].
+String domainFilterKey(int domainSize) => 'd$domainSize';
 
 /// Recency-weighted observed distribution over the size and slug axes,
 /// computed from the player's [Database.puzzles] history. Used by
@@ -471,6 +485,17 @@ class Database {
   /// slugs the player has never seen in any played puzzle.
   int playCountForSlug(String slug) => _playCountBySlug[slug] ?? 0;
 
+  /// Cheap parse of the domain segment of a puzzle line: returns true
+  /// iff the puzzle's domain contains the purple cell value (encoded
+  /// as the integer 3). Used by [loadStats] to backfill
+  /// [hasPlayedThirdColor] from history without instantiating a full
+  /// [PuzzleData] per stat entry. Tolerates malformed lines silently.
+  static bool _puzzleLineHasThirdColor(String line) {
+    final parts = line.split('_');
+    if (parts.length < 2) return false;
+    return parts[1].contains('3');
+  }
+
   /// Count of finished, non-skipped plays attributed to the
   /// onboarding journey. Bumped via [notePuzzleCompleted] and
   /// persisted to `SharedPreferences`. Drives [currentPhase] — every
@@ -480,6 +505,46 @@ class Database {
   Map<String, int> onboardingCompletions = {};
 
   static const _onboardingCompletionsKey = 'onboardingCompletions';
+
+  /// Timestamp at which the player most recently graduated past the
+  /// last onboarding phase. Captured the first time [currentPhase]
+  /// transitions to null after [notePuzzleCompleted], or eagerly by
+  /// [skipOnboarding]. For pre-feature graduates (no recorded
+  /// timestamp), [loadPuzzlesFile] backfills it lazily to "now" so the
+  /// third-color suggestion gate has a baseline to count from. Reset
+  /// by [resetOnboardingProgress].
+  DateTime? onboardingCompletedAt;
+
+  static const _onboardingCompletedAtKey = 'onboardingCompletedAt';
+
+  /// Finished, non-skipped plays accumulated **after** the player
+  /// graduated from the last onboarding phase. Distinct from
+  /// [onboardingCompletions] (which stops growing at graduation) and
+  /// from [_globalUsablePlays] (which includes pre-onboarding history
+  /// too). Drives the third-color suggestion gate. Reset by
+  /// [resetOnboardingProgress].
+  int postOnboardingCompletions = 0;
+
+  static const _postOnboardingCompletionsKey = 'postOnboardingCompletions';
+
+  /// True once the player has finished or skipped at least one puzzle
+  /// whose domain contains the purple cell value (i.e. a 3-colour
+  /// puzzle). Set by [notePuzzleCompleted] for the current session and
+  /// rebuilt from the stats history by [loadStats] — so reinstalls
+  /// reconstruct the flag from the stats file alone. Used as a guard
+  /// to avoid suggesting 3 colours to a player who already plays them.
+  bool hasPlayedThirdColor = false;
+
+  static const _hasPlayedThirdColorKey = 'hasPlayedThirdColor';
+
+  /// True once the "try 3 colours" suggestion modal has been displayed
+  /// at least once. Prevents the modal from firing again after the
+  /// player has chosen "Later" — they can still opt in via the filters
+  /// page. Reset by [resetOnboardingProgress] so a fresh onboarding
+  /// re-arms the suggestion.
+  bool thirdColorSuggestionShown = false;
+
+  static const _thirdColorSuggestionShownKey = 'thirdColorSuggestionShown';
 
   /// Onboarding phase the player is currently in. Returns null once
   /// they've graduated past the last defined phase, in which case
@@ -503,6 +568,15 @@ class Database {
       if (slug.isEmpty || slug == 'TX') continue;
       _playCountBySlug.update(slug, (v) => v + 1, ifAbsent: () => 1);
     }
+    // Latch the third-colour flag on the first 3-colour play we ever
+    // see (purple has integer value 3 in `PuzzleData.domain`, which
+    // mirrors the v2 line format). Once true it never flips back:
+    // future puzzles still in the history bear witness even after a
+    // stats reload.
+    if (!hasPlayedThirdColor && puz.domain.contains(3)) {
+      hasPlayedThirdColor = true;
+      _persistHasPlayedThirdColor();
+    }
     final wasOnboarding = oldPhase != null;
     if (wasOnboarding) {
       for (var slug in puz.rules) {
@@ -510,20 +584,20 @@ class Database {
             ? 1
             : onboardingCompletions[slug]! + 1;
       }
-      // Fire-and-forget: persistence failures only mean the counter
-      // resets on next launch, which the player will perceive as a
-      // benign delay (one extra puzzle in the same phase).
       _persistOnboardingCompletions();
-      // Just graduated the strict phases into soft discovery: load the
-      // widened pool now — the launch-time load skipped it while a strict
-      // phase was still active.
-      if (currentPhase == null && _softFilterActive) {
-        _refreshSoftDiscoveryPool();
+      if (currentPhase == null) {
+        if (_softFilterActive) {
+          _refreshSoftDiscoveryPool();
+        }
+        onboardingCompletedAt = DateTime.now();
+        _persistOnboardingCompletedAt();
       }
-    } else if (_softFilterActive) {
-      // A soft-discovery play: advance the cadence counter that drives the
-      // elected-rule injection in [getPuzzlesByLevel].
-      _softPlaysSinceElectedChange++;
+    } else {
+      postOnboardingCompletions++;
+      _persistPostOnboardingCompletions();
+      if (_softFilterActive) {
+        _softPlaysSinceElectedChange++;
+      }
     }
     // Keep currentFilters aligned with the onboarding recommendation.
     // Without this, the player keeps playing puzzles from the previous
@@ -536,7 +610,13 @@ class Database {
             !setEquals(currentFilters.bannedRules, reco.bannedRules))) {
       currentFilters.wantedRules = reco.wantedRules;
       currentFilters.bannedRules = reco.bannedRules;
-      currentFilters.save();
+      // Fire-and-forget like the _persist* helpers above: Filters.save()
+      // hits SharedPreferences, which throws without a Flutter binding
+      // (some unit tests exercise notePuzzleCompleted's semantics without
+      // booting the app). Swallow that async error so it can't surface as
+      // an unhandled rejection; a real failure just delays the filter
+      // realignment to the next launch.
+      currentFilters.save().catchError((_) {});
     }
   }
 
@@ -559,6 +639,95 @@ class Database {
     }
   }
 
+  Future<void> _persistOnboardingCompletedAt() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final value = onboardingCompletedAt;
+      if (value == null) {
+        await prefs.remove(_onboardingCompletedAtKey);
+      } else {
+        await prefs.setString(
+          _onboardingCompletedAtKey,
+          value.toIso8601String(),
+        );
+      }
+    } catch (e) {
+      log.fine('Failed to persist onboardingCompletedAt: $e');
+    }
+  }
+
+  Future<void> _persistPostOnboardingCompletions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+        _postOnboardingCompletionsKey,
+        postOnboardingCompletions,
+      );
+    } catch (e) {
+      log.fine('Failed to persist postOnboardingCompletions: $e');
+    }
+  }
+
+  Future<void> _persistHasPlayedThirdColor() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_hasPlayedThirdColorKey, hasPlayedThirdColor);
+    } catch (e) {
+      log.fine('Failed to persist hasPlayedThirdColor: $e');
+    }
+  }
+
+  Future<void> _persistThirdColorSuggestionShown() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(
+        _thirdColorSuggestionShownKey,
+        thirdColorSuggestionShown,
+      );
+    } catch (e) {
+      log.fine('Failed to persist thirdColorSuggestionShown: $e');
+    }
+  }
+
+  /// Should the "try 3 colours" suggestion modal be shown right now?
+  /// All four conditions must hold:
+  /// 1. The modal hasn't been shown yet.
+  /// 2. The player has never played a 3-colour puzzle.
+  /// 3. The player has finished onboarding ([currentPhase] is null and
+  ///    a graduation timestamp exists).
+  /// 4. They've completed at least 50 plays since graduation.
+  ///
+  /// The 50-plays threshold matches the spec: enough plays past the
+  /// last rule introduction that the player has built confidence on
+  /// the 2-colour core, and is ready for a fresh challenge.
+  bool shouldSuggestThirdColor() {
+    final result =
+        !thirdColorSuggestionShown &&
+        !hasPlayedThirdColor &&
+        currentPhase == null &&
+        onboardingCompletedAt != null &&
+        postOnboardingCompletions >= _thirdColorSuggestionThreshold;
+    log.fine(
+      'shouldSuggestThirdColor=$result '
+      '(shown=$thirdColorSuggestionShown, '
+      'playedThird=$hasPlayedThirdColor, '
+      'phase=${currentPhase?.index}, '
+      'onbAt=$onboardingCompletedAt, '
+      'postCount=$postOnboardingCompletions/$_thirdColorSuggestionThreshold)',
+    );
+    return result;
+  }
+
+  static const int _thirdColorSuggestionThreshold = 50;
+
+  /// Mark the suggestion as shown so it never fires again. Called by
+  /// the modal regardless of which button the player tapped: dismissal
+  /// is enough — the player has been informed.
+  Future<void> noteThirdColorSuggestionShown() async {
+    thirdColorSuggestionShown = true;
+    await _persistThirdColorSuggestionShown();
+  }
+
   /// Reset the onboarding counter so the player re-enters phase 0.
   /// Pairs with `ConstraintProgress.clear()` for the full
   /// "Rejouer l'onboarding" workflow. Persists immediately because
@@ -566,9 +735,22 @@ class Database {
   /// counter from prefs and would otherwise silently undo the reset.
   Future<void> resetOnboardingProgress() async {
     onboardingCompletions = {};
+    onboardingCompletedAt = null;
+    postOnboardingCompletions = 0;
+    // Re-arm the third-colour suggestion so the player who chooses to
+    // start over also gets a fresh chance to discover 3 colours after
+    // the new graduation. [hasPlayedThirdColor] is history-derived and
+    // intentionally NOT reset — it stays true if the player has any
+    // 3-colour play in their stats.
+    thirdColorSuggestionShown = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_onboardingFiltersAppliedKey);
-    await _persistOnboardingCompletions();
+    await Future.wait([
+      _persistOnboardingCompletions(),
+      _persistOnboardingCompletedAt(),
+      _persistPostOnboardingCompletions(),
+      _persistThirdColorSuggestionShown(),
+    ]);
   }
 
   /// Push the onboarding counter past every defined phase so
@@ -584,9 +766,13 @@ class Database {
     for (var phase in OnboardingPhase.phases) {
       onboardingCompletions[phase.introducing] = OnboardingPhase.phaseLength;
     }
+    onboardingCompletedAt ??= DateTime.now();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_onboardingFiltersAppliedKey);
-    await _persistOnboardingCompletions();
+    await Future.wait([
+      _persistOnboardingCompletions(),
+      _persistOnboardingCompletedAt(),
+    ]);
   }
 
   /// Drop the rule filters (`wantedRules`/`bannedRules`) back to their
@@ -767,10 +953,22 @@ class Database {
     // Phase 2: derive counters from the per-puzzle entries (not the raw
     // history) so replays don't inflate them.
     int usablePlays = 0;
+    int postOnboardingFromStats = 0;
+    bool sawThirdColor = false;
+    final onbAt = onboardingCompletedAt;
     _playCountBySlug.clear();
     for (final entry in solvedPuzzles.values) {
       if (entry.finished != null && entry.skipped == null) {
         usablePlays++;
+        if (onbAt != null) {
+          final finishedAt = DateTime.tryParse(entry.finished!);
+          if (finishedAt != null && finishedAt.isAfter(onbAt)) {
+            postOnboardingFromStats++;
+          }
+        }
+        if (!sawThirdColor && _puzzleLineHasThirdColor(entry.puzzleLine)) {
+          sawThirdColor = true;
+        }
         final slugs = ConstraintProgress.slugsFromLine(entry.puzzleLine);
         for (final s in slugs) {
           _playCountBySlug.update(s, (v) => v + 1, ifAbsent: () => 1);
@@ -793,6 +991,31 @@ class Database {
       }
     }
     _globalUsablePlays = usablePlays;
+    // Synchronise hasPlayedThirdColor with the current stats history.
+    // Both directions matter: the up-promote covers a reinstall that
+    // wiped prefs but kept stats; the down-promote covers a stats
+    // reset (or 2-only import) where a stale `true` would otherwise
+    // stick around and silently disqualify the player from the
+    // third-colour suggestion forever. The risk of overriding an
+    // in-session true with a stale-stats false is negligible —
+    // loadStats only fires at boot or after an explicit import, and
+    // neither path has an unpersisted in-session 3-colour play to
+    // protect.
+    if (sawThirdColor != hasPlayedThirdColor) {
+      hasPlayedThirdColor = sawThirdColor;
+      _persistHasPlayedThirdColor();
+    }
+    // Backfill postOnboardingCompletions from history when the stats
+    // count is higher than the live counter. This matters in two
+    // scenarios: (1) the player imports a stats file from another
+    // device — the import folds new history that should bump the
+    // counter, and (2) the live counter was lost (e.g. wiped prefs)
+    // but the stats survived. `max` semantics protect an in-session
+    // counter that has been bumped past the last stats flush.
+    if (onbAt != null && postOnboardingFromStats > postOnboardingCompletions) {
+      postOnboardingCompletions = postOnboardingFromStats;
+      _persistPostOnboardingCompletions();
+    }
     log.finest("solved $solvedPuzzles");
     for (final puz in puzzles) {
       final entry = solvedPuzzles[canonicalPuzzleKey(puz.lineRepresentation)];
@@ -872,6 +1095,12 @@ class Database {
               .isNotEmpty) {
         return false;
       }
+      final domainKey = domainFilterKey(puz.domain.length);
+      if (currentFilters.bannedDomains.contains(domainKey)) return false;
+      if (currentFilters.wantedDomains.isNotEmpty &&
+          !currentFilters.wantedDomains.contains(domainKey)) {
+        return false;
+      }
       return true;
     }
   }
@@ -905,6 +1134,23 @@ class Database {
       log.severe(error);
       // The user probably had this saved in the previous version
       onboardingCompletions = {};
+    }
+    final rawCompletedAt = prefs.getString(_onboardingCompletedAtKey);
+    onboardingCompletedAt = rawCompletedAt == null
+        ? null
+        : DateTime.tryParse(rawCompletedAt);
+    postOnboardingCompletions =
+        prefs.getInt(_postOnboardingCompletionsKey) ?? 0;
+    hasPlayedThirdColor = prefs.getBool(_hasPlayedThirdColorKey) ?? false;
+    thirdColorSuggestionShown =
+        prefs.getBool(_thirdColorSuggestionShownKey) ?? false;
+    // Lazy backfill: a player who graduated before this feature shipped
+    // has currentPhase == null but no recorded timestamp. Stamp "now"
+    // so the 50-plays gate starts counting from their first launch on
+    // this version — otherwise they'd never see the suggestion.
+    if (currentPhase == null && onboardingCompletedAt == null) {
+      onboardingCompletedAt = DateTime.now();
+      await _persistOnboardingCompletedAt();
     }
     await loadUserPlaylists();
     String assetContent;

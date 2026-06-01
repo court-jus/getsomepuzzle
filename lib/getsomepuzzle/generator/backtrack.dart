@@ -20,6 +20,7 @@
 // The cost for the no-propagation case is negligible at the puzzle
 // sizes we care about.
 
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 /// Enumerates up to [limit] valid completions of [puzzle] by exhaustive
@@ -29,13 +30,13 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 /// Used for uniqueness verification: pass `limit: 2` and inspect the
 /// result — `length == 1` ⇒ deductively unique, `length >= 2` ⇒
 /// ambiguous.
-List<List<int>> enumerateSolutions(Puzzle puzzle, {int limit = 2}) {
-  final out = <List<int>>[];
+List<List<CellValue>> enumerateSolutions(Puzzle puzzle, {int limit = 2}) {
+  final out = <List<CellValue>>[];
   _backtrack(
     puzzle,
     propagate: false,
     onSolution: (solved) {
-      out.add(List<int>.from(solved.cellValues));
+      out.add(List<CellValue>.from(solved.cellValues));
       return out.length < limit;
     },
   );
@@ -55,17 +56,17 @@ List<List<int>> enumerateSolutions(Puzzle puzzle, {int limit = 2}) {
 ///
 /// If [timeoutMs] is set and elapses before a solution is found,
 /// returns `null`.
-List<int>? findOneSolutionByDpll(Puzzle puzzle, {int? timeoutMs}) {
+List<CellValue>? findOneSolutionByDpll(Puzzle puzzle, {int? timeoutMs}) {
   final deadline = timeoutMs != null
       ? DateTime.now().add(Duration(milliseconds: timeoutMs))
       : null;
-  List<int>? result;
+  List<CellValue>? result;
   _backtrack(
     puzzle,
     propagate: true,
     deadline: deadline,
     onSolution: (solved) {
-      result = List<int>.from(solved.cellValues);
+      result = List<CellValue>.from(solved.cellValues);
       return false; // stop at the first solution
     },
   );
@@ -129,10 +130,10 @@ bool _backtrack(
   return true;
 }
 
-/// First cell whose value is `0` (free), or `-1` if every cell is set.
+/// First free cell, or `-1` if every cell is set.
 int _firstFreeCell(Puzzle puzzle) {
   for (int i = 0; i < puzzle.cells.length; i++) {
-    if (puzzle.cells[i].value == 0) return i;
+    if (puzzle.cells[i].value == CellValue.free) return i;
   }
   return -1;
 }

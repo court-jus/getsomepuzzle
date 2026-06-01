@@ -47,7 +47,7 @@ class GSQAComplicity extends Complicity {
     final anchor = gs.indices.first;
     final anchorColor = puzzle.cellValues[anchor];
 
-    final feasible = <int>[];
+    final feasible = <CellValue>[];
     for (final color in puzzle.domain) {
       if (_colorIsFeasible(gs, color, qas, puzzle)) {
         feasible.add(color);
@@ -55,16 +55,38 @@ class GSQAComplicity extends Complicity {
     }
 
     if (feasible.isEmpty) {
-      return Move(0, 0, this, isImpossible: this);
+      return Impossible(this);
     }
-    if (feasible.length != 1) return null;
 
-    final forced = feasible.first;
-    if (anchorColor == 0) {
-      return Move(anchor, forced, this, complexity: 3);
+    // Anchor already committed: a contradiction iff its colour is one
+    // the QA arithmetic ruled out. Otherwise nothing to add.
+    if (anchorColor != CellValue.free) {
+      if (!feasible.contains(anchorColor)) {
+        return Impossible(this);
+      }
+      return null;
     }
-    if (anchorColor != forced) {
-      return Move(0, 0, this, isImpossible: this);
+
+    // Anchor free with a single feasible colour: force it — unless that
+    // colour has been pruned from the anchor's options (3+-colour domain),
+    // in which case no in-options colour is QA-feasible and the state is
+    // unsatisfiable.
+    if (feasible.length == 1) {
+      if (puzzle.cells[anchor].options.contains(feasible.first)) {
+        return SetValue(anchor, feasible.first, this, complexity: 3);
+      }
+      return Impossible(this);
+    }
+
+    // Several colours still feasible — only reachable on domain ≥ 3.
+    // Prune any infeasible colour still sitting in the anchor's option
+    // set. On a 2-colour domain this loop never fires (both colours are
+    // either feasible or the single-feasible branch above already ran).
+    final anchorCell = puzzle.cells[anchor];
+    for (final color in puzzle.domain) {
+      if (!feasible.contains(color) && anchorCell.options.contains(color)) {
+        return RemoveOption(anchor, color, this, complexity: 3);
+      }
     }
     return null;
   }
@@ -74,11 +96,11 @@ class GSQAComplicity extends Complicity {
   /// anchor would form with already-coloured `color` neighbours.
   bool _colorIsFeasible(
     GroupSize gs,
-    int color,
+    CellValue color,
     List<QuantityConstraint> qas,
     Puzzle puzzle,
   ) {
-    final qa = qas.firstWhereOrNull((q) => q.value == color);
+    final qa = qas.firstWhereOrNull((q) => q.color == color);
     if (qa == null) return true;
 
     final anchor = gs.indices.first;
@@ -90,24 +112,66 @@ class GSQAComplicity extends Complicity {
       return false;
     }
 
-    final placedSameColor = puzzle.cellValues.where((v) => v == color).length;
-    // `mergedSize` counts the would-be cluster including the anchor.
-    // The anchor itself only contributes to `placedSameColor` if it is
-    // already coloured `color`; otherwise (empty or different colour)
-    // the cluster size overcounts by 1 versus currently-placed cells.
-    final anchorMatches = puzzle.cellValues[anchor] == color;
-    final placedInsideGroup = anchorMatches ? mergedSize : mergedSize - 1;
-    final placedOutsideGroup = placedSameColor - placedInsideGroup;
-    // Once the group is grown to `gs.size`, the grid has at least
-    // `gs.size + placedOutsideGroup` cells of `color`. Compare against
-    // the QA cap.
-    return gs.size + placedOutsideGroup <= qa.count;
+    // Lower bound on the grid's total `color` count if the anchor takes
+    // `color`: the `gs.size` cells of its group, plus every already-placed
+    // `color` cell that *cannot* belong to that group.
+    //
+    // A placed cell is only "definitely outside" the group when no
+    // connected run of ≤ `gs.size` cells could ever link it to the
+    // anchor — i.e. its 4-connected distance over {`color` ∪ free} cells
+    // is ≥ `gs.size` (a connected subgraph containing both would need
+    // more than `gs.size` cells), or it is wholly unreachable that way.
+    // Cells closer than that might still join the group as the free
+    // intermediates get coloured, so counting them as "outside" would be
+    // unsound: the old `placedSameColor - placedInsideGroup` heuristic
+    // counted every cell outside the *immediate* committed cluster as
+    // outside, which wrongly forced cells on valid puzzles whenever a
+    // future group member was still free (e.g. once SY's weaker 3-colour
+    // port stopped colouring the connecting cells early).
+    final dist = _distancesOverPassable(puzzle, anchor, color);
+    var definitelyOutside = 0;
+    for (int i = 0; i < puzzle.cellValues.length; i++) {
+      if (i == anchor || puzzle.cellValues[i] != color) continue;
+      final d = dist[i];
+      if (d == null || d >= gs.size) definitelyOutside++;
+    }
+    return gs.size + definitelyOutside <= qa.count;
+  }
+
+  /// 4-connected BFS edge-distances from [anchor], traversing only cells
+  /// that are either [color] or free — the cells that could end up part
+  /// of a `color` group containing the anchor. Cells unreachable this way
+  /// are absent from the returned map.
+  static Map<int, int> _distancesOverPassable(
+    Puzzle puzzle,
+    int anchor,
+    CellValue color,
+  ) {
+    final dist = <int, int>{anchor: 0};
+    final queue = <int>[anchor];
+    var head = 0;
+    while (head < queue.length) {
+      final cur = queue[head++];
+      final d = dist[cur]!;
+      for (final nei in puzzle.getNeighbors(cur)) {
+        if (dist.containsKey(nei)) continue;
+        final v = puzzle.cellValues[nei];
+        if (v != color && v != CellValue.free) continue;
+        dist[nei] = d + 1;
+        queue.add(nei);
+      }
+    }
+    return dist;
   }
 
   /// Size of the cluster that would contain the anchor if it were
   /// coloured `color`, i.e. 4-connected flood-fill from the anchor
   /// over cells of `color` (treating the anchor as `color`).
-  static int _hypotheticalMergedSize(Puzzle puzzle, int anchor, int color) {
+  static int _hypotheticalMergedSize(
+    Puzzle puzzle,
+    int anchor,
+    CellValue color,
+  ) {
     return floodFill(puzzle, [
       anchor,
     ], (i) => puzzle.cellValues[i] == color).length;

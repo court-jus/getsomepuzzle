@@ -52,7 +52,7 @@ final class RowTransitionConstraint extends LineCentricConstraint {
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     return generateAllTransitionParams(height, width - 1);

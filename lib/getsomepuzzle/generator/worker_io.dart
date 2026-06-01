@@ -10,6 +10,7 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/feasibility.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 
 class GeneratorWorker {
   StreamController<GeneratorMessage>? _controller;
@@ -89,11 +90,14 @@ class GeneratorWorker {
         allowedSlugs: config.allowedSlugs?.toList(),
         maxTimeMs: config.maxTime.inMilliseconds,
         maxAttemptTimeMs: config.maxAttemptTime.inMilliseconds,
+        maxStallMs: config.maxStall.inMilliseconds,
         count: config.count,
         targetLevelIndex: config.targetLevel?.index,
         easingBudgetMs: config.easingBudget.inMilliseconds,
         pathBasedScenario: config.pathBasedScenario,
         syBasedScenario: config.syBasedScenario,
+        domain: config.domain,
+        strategy: config.strategy,
         usageStats: usageStats,
         puzzleLines: puzzleLines,
         equilibriumRequested: equilibriumRequested,
@@ -163,6 +167,16 @@ class GeneratorWorker {
               slugDeficitScores: deficits,
             ),
           );
+        } else if (type == 'reject') {
+          _controller?.add(
+            GeneratorRejectMessage(
+              GenerationRejectReason.values[message['reason'] as int],
+            ),
+          );
+        } else if (type == 'timings') {
+          final micros = (message['micros'] as Map).cast<String, int>();
+          final calls = (message['calls'] as Map).cast<String, int>();
+          _controller?.add(GeneratorTimingsMessage(micros, calls));
         } else if (type == 'done') {
           _controller?.add(GeneratorDoneMessage(message['generated'] as int));
           _controller?.close();
@@ -186,11 +200,16 @@ class _IsolateParams {
   /// pathological combo can't monopolize [maxTimeMs].
   final int maxAttemptTimeMs;
 
+  /// Watchdog: if no candidate is accepted within this duration, the
+  /// attempt is abandoned.
+  final int maxStallMs;
   final int count;
   final int? targetLevelIndex;
   final int easingBudgetMs;
   final bool pathBasedScenario;
   final bool syBasedScenario;
+  final List<CellValue> domain;
+  final GenerationStrategy strategy;
   final Map<String, int>? usageStats;
   final List<String>? puzzleLines;
   final bool equilibriumRequested;
@@ -224,11 +243,14 @@ class _IsolateParams {
     this.allowedSlugs,
     required this.maxTimeMs,
     required this.maxAttemptTimeMs,
+    required this.maxStallMs,
     required this.count,
     this.targetLevelIndex,
     required this.easingBudgetMs,
     this.pathBasedScenario = false,
     this.syBasedScenario = false,
+    required this.domain,
+    required this.strategy,
     this.usageStats,
     this.puzzleLines,
     this.equilibriumRequested = false,
@@ -538,6 +560,9 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       // Same OR pattern for the SY-based scenario.
       syBasedScenario: params.syBasedScenario || attemptSyBased,
       slugDeficitScores: slugDeficitMap,
+      domain: params.domain,
+      strategy: params.strategy,
+      maxStall: Duration(milliseconds: params.maxStallMs),
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;
@@ -572,6 +597,16 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       result = PuzzleGenerator.generateOne(
         config,
         usageStats: usageStats,
+        onTimings: (micros, calls) {
+          // One message per attempt. The CLI aggregates both maps
+          // additively across workers and attempts so `total_micros /
+          // total_calls` yields a meaningful average per stage.
+          params.sendPort.send({
+            'type': 'timings',
+            'micros': micros,
+            'calls': calls,
+          });
+        },
         onProgress: (p) {
           lastTried = p.constraintsTried;
           lastTotalConstraints = p.constraintsTotal;
@@ -605,6 +640,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
         },
         onReject: (r, rejectedPu) {
           lastReject = r;
+          params.sendPort.send({'type': 'reject', 'reason': r.index});
           // Persist every rejected puzzle to `assets/<reason>.txt` so
           // post-run analysis can inspect each failure mode (why did
           // the easing plateau? what did the ratio-too-high puzzles
@@ -777,6 +813,42 @@ class _ResolvedTarget {
   });
 }
 
+/// Slugs whose observed share in `stats` exceeds [k] × uniform target
+/// share (1 / nSlugs). Used to *hard-ban* those slugs from the
+/// `allowedSlugs` of an attempt, so the iterative loop cannot quietly
+/// add them on top of a target slug. Without this, propagation-friendly
+/// slugs (NC, EY, …) pile up in every generated puzzle even when the
+/// equilibrium picker is actively targeting under-represented slugs —
+/// the picker's preference is "soft" for SlugTarget / SizeTarget cases
+/// (those leave `allowedSlugs` unrestricted by design).
+///
+/// Returns an empty set when the corpus is too small for shares to
+/// stabilise (< 20 puzzles): on a sparse corpus a single outlier slug
+/// would trip the threshold and lock out an otherwise-balanced
+/// generation.
+Set<String> _overrepresentedSlugs(
+  EquilibriumStats stats,
+  TargetUniverse universe,
+  double k,
+) {
+  if (stats.totalPuzzles < 20) return const {};
+  if (universe.allowedSlugs.isEmpty) return const {};
+  final target = 1.0 / universe.allowedSlugs.length;
+  final threshold = k * target;
+  return {
+    for (final s in universe.allowedSlugs)
+      if ((stats.slugCounts[s] ?? 0) / stats.totalPuzzles > threshold) s,
+  };
+}
+
+/// Multiplier on the uniform target share that defines "over-represented"
+/// for the hard-ban path. `k=3` bans a slug once its observed share
+/// exceeds 3× its target — on a 13-slug universe that's ≈ 23 %. Picked
+/// to bite the worst offenders (NC, EY in our preseed corpus at 54 % /
+/// 39 %) without starving the iterative loop on more moderate slugs
+/// (RC, CC sit just under at ≈ 24 %).
+const double kOverrepBanRatio = 3.0;
+
 /// Pick a concrete orientation for a canonical size bin `(width ≤ height)`.
 /// The size axis is orientation-agnostic, so both `4x5` and `5x4` should be
 /// produced from the `(4, 5)` bin — flip 50/50, but only to an orientation
@@ -807,6 +879,14 @@ class _ResolvedTarget {
 /// the slug or size axis so each attempt advances multiple axes at once,
 /// without making it deterministic enough that workers collide on the same
 /// sub-config.
+///
+/// Over-represented slugs (see [_overrepresentedSlugs]) are hard-banned
+/// from `allowedSlugs` for `SlugTarget`, `SizeTarget` and `NTypesTarget` —
+/// those used to leave `allowedSlugs` unrestricted (Slug/Size) or pinned
+/// to a tight 3-4 slug pool (NTypes), both of which collapsed productivity
+/// once the corpus left warmup. `PairTarget` keeps its hard restriction:
+/// the picker only chooses two under-represented slugs there, so the pair
+/// is by construction free of over-rep entries.
 _ResolvedTarget _resolveTarget(
   Target target,
   TargetUniverse universe,
@@ -814,24 +894,46 @@ _ResolvedTarget _resolveTarget(
   EquilibriumStats stats,
   Random rng,
 ) {
+  final banned = _overrepresentedSlugs(stats, universe, kOverrepBanRatio);
   switch (target) {
     case SlugTarget(:final slug):
       // Slug axis fixed (X). Size axis is filled by the worker loop after
-      // resolve. allowedSlugs stays unrestricted so the iterative loop has
-      // room to add other slugs naturally.
+      // resolve.
       if (slug == 'SH') {
         // SH is handled by the profile axis (5%). Don't give it preferred
         // status from the slug axis — only ProfileTarget(sh) should.
         return const _ResolvedTarget();
       }
-      return _ResolvedTarget(preferredSlugs: {slug});
+      // allowedSlugs is restricted to "everything except the
+      // over-represented" — the iterative loop can still pick anything
+      // else, but propagation-dominant slugs can't piggyback.
+      // Re-add the explicitly-targeted slug even if it is itself
+      // over-represented: otherwise the ban would strip it from both
+      // `allowedSlugs` and (after the downstream `preferred ∩ allowed`) the
+      // preferred set, leaving the attempt chasing a slug it can't place.
+      final allowed =
+          universe.allowedSlugs.where((s) => !banned.contains(s)).toSet()
+            ..add(slug);
+      return _ResolvedTarget(allowedSlugs: allowed, preferredSlugs: {slug});
 
     case NTypesTarget():
-      // Ntypes axis fixed (N). Pick the N slugs by slug-axis gap so this
-      // attempt also advances the slug axis. The 6+ bucket is never
-      // targeted, so target.n is always in [1, 5] here.
+      // Ntypes axis fixed (N). Pick N slugs by slug-axis gap so this attempt
+      // also advances the slug axis. Those N slugs are passed as `preferred`
+      // (priority in candidate ranking) but `allowedSlugs` stays open
+      // (everything except over-represented). Locking `allowedSlugs` to the
+      // chosen N tanked productivity to < 1 % on a balanced 3-colour corpus
+      // (bench final-r1, 2026-05-13): every constraint slot competed for the
+      // same 3-4 slug pool, and once propagation closed the puzzle there was
+      // no fallback. Soft target trades exact ntypes guarantee for
+      // productivity — the picker self-corrects via the stats feedback loop.
       final chosen = pickWeightedSlugs(stats, universe, target.n, rng);
-      return _ResolvedTarget(allowedSlugs: chosen, preferredSlugs: chosen);
+      // Re-add the chosen slugs even if some are over-represented, so the
+      // ban can't strip a targeted slug out from under the downstream
+      // `preferred ∩ allowed` intersection.
+      final allowed =
+          universe.allowedSlugs.where((s) => !banned.contains(s)).toSet()
+            ..addAll(chosen);
+      return _ResolvedTarget(allowedSlugs: allowed, preferredSlugs: chosen);
 
     case PairTarget(:final slugA, :final slugB):
       // Slugs fixed (the pair). Size filled by worker loop.
@@ -840,12 +942,16 @@ _ResolvedTarget _resolveTarget(
 
     case SizeTarget(:final width, :final height):
       // Size axis fixed. Push one weighted slug as soft preference so this
-      // attempt also nudges the slug axis. allowedSlugs stays unrestricted
-      // (the iterative loop can still draw from the full pool).
+      // attempt also nudges the slug axis. allowedSlugs is restricted to
+      // exclude over-represented slugs (same rationale as SlugTarget).
       final extra = pickWeightedSlugs(stats, universe, 1, rng);
+      final allowed = universe.allowedSlugs
+          .where((s) => !banned.contains(s))
+          .toSet();
       return _ResolvedTarget(
         width: width,
         height: height,
+        allowedSlugs: allowed,
         preferredSlugs: extra,
       );
 

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 
@@ -13,11 +14,11 @@ Puzzle _make(String grid) {
       .toList();
   final h = rows.length;
   final w = rows.first.length;
-  final p = Puzzle.empty(w, h, [1, 2]);
+  final p = Puzzle.empty(w, h, defaultDomain);
   for (int r = 0; r < h; r++) {
     for (int c = 0; c < w; c++) {
-      final v = int.parse(rows[r][c]);
-      if (v != 0) {
+      final v = cellRepresentationToValue(rows[r][c]);
+      if (v != CellValue.free) {
         p.cells[r * w + c].setForSolver(v);
       }
     }
@@ -76,13 +77,14 @@ void main() {
   group('ColumnCountConstraint.apply', () {
     test('all color cells placed → fills remaining with opposite', () {
       // 3x2 grid, column 0: [1, 0, 0], CC says 1 cell of color 1
-      // → free cells in column 0 should become 2
+      // → free cells in column 0 must drop the colour-1 option (which
+      // collapses them to colour 2 in a two-colour domain).
       final p = _make('12\n02\n02');
       final cc = ColumnCountConstraint('0.1.1');
       final move = cc.apply(p);
       expect(move, isNotNull);
       // cell at (1,0) = index 2 or (2,0) = index 4
-      expect(move!.value, 2);
+      expect(move!.removeOption, CellValue.black);
       expect(move.idx, anyOf(2, 4));
     });
 
@@ -93,7 +95,7 @@ void main() {
       final cc = ColumnCountConstraint('0.1.2');
       final move = cc.apply(p);
       expect(move, isNotNull);
-      expect(move!.value, 1);
+      expect(move!.value, CellValue.black);
       expect(move.idx, anyOf(0, 2));
     });
 
@@ -128,7 +130,7 @@ void main() {
       final cc = ColumnCountConstraint('2.1.3');
       expect(cc.serialize(), 'CC:2.1.3');
       expect(cc.columnIdx, 2);
-      expect(cc.color, 1);
+      expect(cc.color, CellValue.black);
       expect(cc.count, 3);
     });
   });
@@ -136,23 +138,27 @@ void main() {
   group('ColumnCountConstraint.generateAllParameters', () {
     test('generates correct number of parameters', () {
       // 4 columns × 2 colors × (height-1) counts = 4 × 2 × 4 = 32
-      final params = ColumnCountConstraint.generateAllParameters(4, 5, [
-        1,
-        2,
-      ], null);
+      final params = ColumnCountConstraint.generateAllParameters(
+        4,
+        5,
+        defaultDomain,
+        null,
+      );
       expect(params.length, 32);
     });
 
     test('all parameters are valid', () {
-      final params = ColumnCountConstraint.generateAllParameters(3, 4, [
-        1,
-        2,
-      ], null);
+      final params = ColumnCountConstraint.generateAllParameters(
+        3,
+        4,
+        defaultDomain,
+        null,
+      );
       for (final p in params) {
         // Should parse without error
         final cc = ColumnCountConstraint(p);
         expect(cc.columnIdx, lessThan(3));
-        expect(cc.color, anyOf(1, 2));
+        expect(cc.color, anyOf(CellValue.black, CellValue.white));
         expect(cc.count, greaterThan(0));
         expect(cc.count, lessThan(4));
       }

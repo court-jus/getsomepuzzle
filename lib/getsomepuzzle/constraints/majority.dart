@@ -10,7 +10,10 @@ class MajorityConstraint extends Constraint {
   int c0 = 0;
   int r1 = 0;
   int c1 = 0;
-  int targetColor = 0;
+  CellValue targetColor = CellValue.free;
+
+  @override
+  Set<CellValue> get referencedColors => {targetColor};
 
   List<int>? _zoneIndices;
 
@@ -20,7 +23,7 @@ class MajorityConstraint extends Constraint {
     c0 = int.parse(parts[1]);
     r1 = int.parse(parts[2]);
     c1 = int.parse(parts[3]);
-    targetColor = int.parse(parts[4]);
+    targetColor = cellRepresentationToValue(parts[4]);
   }
 
   /// Absolute cell indices contained in the zone for a grid of given [width].
@@ -50,22 +53,22 @@ class MajorityConstraint extends Constraint {
 
   @override
   String toHuman(Puzzle puzzle) =>
-      'Zone (${r0 + 1},${c0 + 1})-(${r1 + 1},${c1 + 1}) : majority of $targetColor';
+      'Zone (${r0 + 1},${c0 + 1})-(${r1 + 1},${c1 + 1}) : majority of ${cellValueToString(targetColor)}';
 
   @override
-  String serialize() => 'MJ:$r0.$c0.$r1.$c1.$targetColor';
+  String serialize() => 'MJ:$r0.$c0.$r1.$c1.${cellValueToString(targetColor)}';
 
   @override
   Constraint rotated(int origWidth, int origHeight) {
     return MajorityConstraint(
-      '$c0.${origHeight - 1 - r1}.$c1.${origHeight - 1 - r0}.$targetColor',
+      '$c0.${origHeight - 1 - r1}.$c1.${origHeight - 1 - r0}.${cellValueToString(targetColor)}',
     );
   }
 
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final List<String> result = [];
@@ -80,7 +83,7 @@ class MajorityConstraint extends Constraint {
             if (h == 1 || w == 1) continue;
             if (zs > (width * height) * 0.6) continue;
             for (final color in domain) {
-              result.add('$r0.$c0.$r1.$c1.$color');
+              result.add('$r0.$c0.$r1.$c1.${cellValueToString(color)}');
             }
           }
         }
@@ -95,49 +98,77 @@ class MajorityConstraint extends Constraint {
     final currentCount = indices
         .where((i) => puzzle.cellValues[i] == targetColor)
         .length;
-    final opposite = puzzle.domain.firstWhere((v) => v != targetColor);
-    final oppositeCount = indices
-        .where((i) => puzzle.cellValues[i] == opposite)
+    // Every coloured cell that is not the target counts against the majority,
+    // regardless of which non-target colour it is (matters on 3+ colours).
+    final nonTargetCount = indices
+        .where(
+          (i) =>
+              puzzle.cellValues[i] != CellValue.free &&
+              puzzle.cellValues[i] != targetColor,
+        )
         .length;
-    final freeCount = indices.where((i) => puzzle.cellValues[i] == 0).length;
+    // Only free cells that can still take `targetColor` count toward
+    // reaching the majority; one with `targetColor` pruned is destined to be
+    // a non-target cell and can never raise `currentCount`.
+    final freeCount = indices
+        .where(
+          (i) =>
+              puzzle.cellValues[i] == CellValue.free &&
+              puzzle.cells[i].options.contains(targetColor),
+        )
+        .length;
 
     if (freeCount == 0) {
       return currentCount >= target;
     }
 
     if (currentCount + freeCount < target) return false;
-    if (oppositeCount > zoneSize - target) return false;
+    if (nonTargetCount > zoneSize - target) return false;
     return true;
   }
 
   @override
   Move? apply(Puzzle puzzle) {
     final indices = indicesFor(puzzle.width);
-    final opposite = puzzle.domain.firstWhere((v) => v != targetColor);
-    final freeCells = indices.where((i) => puzzle.cellValues[i] == 0).toList();
+    final freeCells = indices
+        .where((i) => puzzle.cellValues[i] == CellValue.free)
+        .toList();
     if (freeCells.isEmpty) return null;
 
     final currentCount = indices
         .where((i) => puzzle.cellValues[i] == targetColor)
         .length;
-    final oppositeCount = indices
-        .where((i) => puzzle.cellValues[i] == opposite)
+    // Coloured cells that are not the target (any non-target colour).
+    final nonTargetCount = indices
+        .where(
+          (i) =>
+              puzzle.cellValues[i] != CellValue.free &&
+              puzzle.cellValues[i] != targetColor,
+        )
         .length;
     final firstFree = freeCells.first;
 
-    /// Too much opposite
-    if (oppositeCount > zoneSize - target) {
-      return Move(0, 0, this, isImpossible: this);
+    /// Too many non-target cells: the majority can no longer be reached.
+    if (nonTargetCount > zoneSize - target) {
+      return Impossible(this);
     }
 
     /// Not enough space to grow
     if (currentCount + freeCells.length < target) {
-      return Move(0, 0, this, isImpossible: this);
+      return Impossible(this);
     }
 
     /// Just enough space to grow
     if (currentCount + freeCells.length == target) {
-      return Move(firstFree, targetColor, this, complexity: 0);
+      // Every free cell must become targetColor. If any has pruned it the
+      // majority is unreachable; otherwise force one (mirrors QA / NC,
+      // instead of emitting an excluded-option setValue caught generically).
+      for (final i in freeCells) {
+        if (!puzzle.cells[i].options.contains(targetColor)) {
+          return Impossible(this);
+        }
+      }
+      return SetValue(firstFree, targetColor, this, complexity: 0);
     }
 
     return null;
@@ -147,7 +178,7 @@ class MajorityConstraint extends Constraint {
   bool isCompleteFor(Puzzle puzzle) {
     if (!verify(puzzle)) return false;
     final indices = indicesFor(puzzle.width);
-    return indices.every((i) => puzzle.cellValues[i] != 0);
+    return indices.every((i) => puzzle.cellValues[i] != CellValue.free);
   }
 
   /// Two MJ zones conflict when their dashed borders would overlap visually:

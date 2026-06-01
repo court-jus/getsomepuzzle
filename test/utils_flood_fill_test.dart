@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 import 'helpers/make_puzzle.dart';
@@ -14,7 +15,10 @@ void main() {
       // both corners must visit both components even though they are not
       // connected to each other.
       final p = makePuzzle('100\n222\n001');
-      final visited = floodFill(p, [0, 8], (i) => p.cellValues[i] == 1);
+      final visited = floodFill(p, [
+        0,
+        8,
+      ], (i) => p.cellValues[i] == CellValue.black);
       expect(visited, {0, 8});
     });
 
@@ -23,7 +27,9 @@ void main() {
       // cell while traversing only color-1 cells must include the seed
       // (callers like reachableComponentSize rely on this).
       final p = makePuzzle('011\n000\n000');
-      final visited = floodFill(p, [0], (i) => p.cellValues[i] == 1);
+      final visited = floodFill(p, [
+        0,
+      ], (i) => p.cellValues[i] == CellValue.black);
       expect(visited, {0, 1, 2});
     });
   });

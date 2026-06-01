@@ -10,6 +10,7 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/feasibility.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
@@ -24,6 +25,7 @@ Future<void> main(List<String> args) async {
       await _runCheck(
         parsed['checkFile'] as String,
         detailed: parsed['detailed'] as bool,
+        debug: parsed['debug'] as bool,
       );
     case 'read-stats':
       _runReadStats(parsed['statsDir'] as String);
@@ -33,6 +35,7 @@ Future<void> main(List<String> args) async {
 // --- Generate mode ---
 
 Future<void> _runGenerate(Map<String, dynamic> parsed) async {
+  final debug = parsed['debug'] as bool;
   final count = parsed['count'] as int;
   final minWidth = parsed['minWidth'] as int;
   final maxWidth = parsed['maxWidth'] as int;
@@ -52,6 +55,10 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final easingBudget = parsed['easingBudget'] as int;
   final scenarioPathBased = (parsed['scenario'] as String?) == 'path-based';
   final scenarioSyBased = (parsed['scenario'] as String?) == 'sy-based';
+  final domainSize = parsed['domain'] as int;
+  final domain = domainSize == 3 ? fullDomain : defaultDomain;
+  final strategies = parsed['strategy'] as List<GenerationStrategy>;
+  final maxStall = parsed['maxStall'] as int;
   if (logDir != null) {
     final dir = Directory(logDir);
     if (!dir.existsSync()) dir.createSync(recursive: true);
@@ -154,6 +161,20 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   // the current attempt has been chewing. Null between attempts (after
   // `'puzzle'` or `'done'`, before the next `'target'`).
   final attemptStartMs = List<int?>.filled(jobs, null);
+  // Global rejection breakdown — keyed by `GenerationRejectReason`,
+  // aggregated across all workers. The delta between
+  // `sum(attemptCounts) - generated - sum(rejectCounts.values)`
+  // approximates in-flight attempts; usually small.
+  final rejectCounts = <GenerationRejectReason, int>{
+    for (final r in GenerationRejectReason.values) r: 0,
+  };
+  // Per-stage wall-time totals (microseconds) and invocation counts,
+  // summed across all workers and all attempts (success + failure).
+  // Together they yield "total time" and "average µs per call" — the
+  // dashboard prints both at end-of-run alongside the rejection
+  // breakdown so the bottleneck is obvious.
+  final stageTotalsMicros = <String, int>{};
+  final stageTotalsCalls = <String, int>{};
   // Cached corpus stats — only recomputed when a puzzle is appended, so
   // target-only updates (which happen many times per second) avoid the
   // O(N) rescan.
@@ -194,6 +215,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       bucketRotation.next(globalEquiStats, coordinatorUniverse)?.key;
 
   void render() {
+    if (debug) return;
     final liveCount = currentLines.where((l) => l.trim().isNotEmpty).length;
     _renderDashboard(
       generated: generated,
@@ -215,6 +237,14 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       attemptStartMs: attemptStartMs,
       nowMs: totalSw.elapsedMilliseconds,
       maxAttemptTimeMs: maxAttemptTime * 1000,
+      rejectCounts: rejectCounts,
+      stageTotalsMicros: stageTotalsMicros,
+      stageTotalsCalls: stageTotalsCalls,
+      domainSize: domainSize,
+      requiredRules: requiredRules,
+      bannedRules: bannedRules,
+      strategies: strategies,
+      allowedRules: allowedSlugsArg,
     );
   }
 
@@ -300,8 +330,14 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
 
   final consumers = <Future<void>>[];
   for (int j = 0; j < jobs; j++) {
+    // `jobs` is clamped to `count`, so `base >= 1` and every worker
+    // produces at least one puzzle — there are no idle slots to skip.
     final workerCount = base + (j < remainder ? 1 : 0);
-    if (workerCount == 0) continue;
+    // Round-robin strategy assignment across the (all active) workers so a
+    // heterogeneous pool (e.g. `--strategy phase-gate,phase-1-oneshot,prop-only`)
+    // splits the work between strategies. With a single-element list
+    // every worker gets the same strategy.
+    final workerStrategy = strategies[j % strategies.length];
     final config = GeneratorConfig(
       width: minWidth,
       height: minHeight,
@@ -318,6 +354,9 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       easingBudget: Duration(seconds: easingBudget),
       pathBasedScenario: scenarioPathBased,
       syBasedScenario: scenarioSyBased,
+      domain: domain,
+      strategy: workerStrategy,
+      maxStall: Duration(seconds: maxStall),
     );
     final worker = GeneratorWorker();
     workers.add(worker);
@@ -352,7 +391,11 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
             attemptCounts[j]++;
             currentTargets[j] = label;
             attemptStartMs[j] = totalSw.elapsedMilliseconds;
-            render();
+            if (debug) {
+              stderr.writeln('[w$j] -> ${label ?? '(idle)'}');
+            } else {
+              render();
+            }
           case GeneratorPuzzleMessage(:final puzzleLine, :final level):
             successCounts[j]++;
             generated++;
@@ -388,7 +431,14 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
             }
             cachedStats = _CollectionStats.fromLines(currentLines);
             globalEquiStats = EquilibriumStats.fromLines(currentLines);
-            render();
+            if (debug) {
+              stderr.writeln(
+                '[w$j] + generated ${level.name} '
+                'in ${_fmt(totalSw.elapsed)}',
+              );
+            } else {
+              render();
+            }
           case GeneratorAttemptMessage():
             // One row per attempt — both successes and abandons. Chained
             // through `statsChain` so concurrent worker streams don't
@@ -400,10 +450,30 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
               statsSink.writeln(row);
               await statsSink.flush();
             });
+          case GeneratorRejectMessage(:final reason):
+            rejectCounts[reason] = (rejectCounts[reason] ?? 0) + 1;
+            if (debug) {
+              stderr.writeln('[w$j] reject: ${reason.name}');
+            } else {
+              render();
+            }
+          case GeneratorTimingsMessage(:final micros, :final calls):
+            for (final entry in micros.entries) {
+              stageTotalsMicros[entry.key] =
+                  (stageTotalsMicros[entry.key] ?? 0) + entry.value;
+            }
+            for (final entry in calls.entries) {
+              stageTotalsCalls[entry.key] =
+                  (stageTotalsCalls[entry.key] ?? 0) + entry.value;
+            }
           case GeneratorDoneMessage():
             currentTargets[j] = null;
             attemptStartMs[j] = null;
-            render();
+            if (debug) {
+              stderr.writeln('[w$j] finished');
+            } else {
+              render();
+            }
         }
       }
     }());
@@ -629,18 +699,47 @@ void _renderDashboard({
   required int maxWidth,
   required int minHeight,
   required int maxHeight,
+  required int domainSize,
+  required Set<String> requiredRules,
+  required Set<String> bannedRules,
+  required List<GenerationStrategy> strategies,
+  Set<String>? allowedRules,
   List<String?> targets = const [],
   List<int> attemptCounts = const [],
   List<int> successCounts = const [],
   List<int?> attemptStartMs = const [],
   int nowMs = 0,
   int maxAttemptTimeMs = 0,
+  Map<GenerationRejectReason, int> rejectCounts = const {},
+  Map<String, int> stageTotalsMicros = const {},
+  Map<String, int> stageTotalsCalls = const {},
 }) {
   // \x1B[2J clears the screen, \x1B[H homes the cursor.
   stderr.write('\x1B[2J\x1B[H');
   stderr.writeln('Corpus: $existingPuzzles puzzles (live count)');
   stderr.writeln(equilibriumLine);
   stderr.writeln('Jobs: $jobs parallel worker(s)');
+  // Surface the CLI knobs that drove this run, so a glance at the
+  // dashboard explains where the histograms come from. "any" stands in
+  // for an unset filter (no `--require` / no `--ban`).
+  final sizeLabel = (minWidth == maxWidth && minHeight == maxHeight)
+      ? '${minWidth}x$minHeight'
+      : '$minWidth-$maxWidth × $minHeight-$maxHeight';
+  final reqLabel = requiredRules.isEmpty ? 'any' : requiredRules.join(',');
+  final banLabel = bannedRules.isEmpty ? 'none' : bannedRules.join(',');
+  final allowLabel = (allowedRules == null || allowedRules.isEmpty)
+      ? 'all'
+      : allowedRules.join(',');
+  String labelFor(GenerationStrategy s) => switch (s) {
+    GenerationStrategy.singleTier => 'single-tier',
+    GenerationStrategy.phaseGate => 'phase-gate',
+    GenerationStrategy.phase1Oneshot => 'phase-1-oneshot',
+    GenerationStrategy.propOnly => 'prop-only',
+  };
+  stderr.writeln(
+    'Config: size $sizeLabel | domain $domainSize | '
+    'allow $allowLabel | require $reqLabel | ban $banLabel',
+  );
   stderr.writeln('');
   if (durations.isEmpty) {
     stderr.writeln('[${_fmt(elapsed)}] $generated/$count');
@@ -672,7 +771,100 @@ void _renderDashboard({
             ? ' (running ${elapsedS}s / ${maxAttemptTimeMs ~/ 1000}s)'
             : ' (running ${elapsedS}s)';
       }
-      stderr.writeln('  #${i.toString().padLeft(2)} [$counter]$runtime → $t');
+      // Strategy assigned to this worker (round-robin from the
+      // user-supplied list). Same logic as bin/generate.dart's
+      // GeneratorConfig builder, repeated here so the dashboard
+      // stays decoupled from the worker spawn loop.
+      final strat = labelFor(strategies[i % strategies.length]);
+      stderr.writeln(
+        '  #${i.toString().padLeft(2)} [$counter]$runtime '
+        '<${strat.padRight(15)}> → $t',
+      );
+    }
+  }
+
+  // Aggregate rejection breakdown — `att - ok` tells you how often a
+  // worker rejected; this line tells you *why*. A run dominated by
+  // `ratioTooHigh` means the iterative loop isn't picking strong-enough
+  // constraints (or the threshold is too tight) — see `docs/dev/third_color.md`
+  // for the targeted constraint generation plan that addresses this.
+  // Always print the rejection line, even with zero rejects: when
+  // staring at the dashboard mid-run, "no Rejects line" is ambiguous
+  // (no rejects yet? or did I forget to enable that view?). Showing
+  // "Rejects (0)" removes the ambiguity until the run completes.
+  final totalRejects = rejectCounts.values.fold<int>(0, (a, b) => a + b);
+  stderr.writeln('');
+  final parts = <String>[];
+  for (final r in GenerationRejectReason.values) {
+    final n = rejectCounts[r] ?? 0;
+    if (n > 0) parts.add('${r.name}=$n');
+  }
+  final partsStr = parts.isEmpty ? '-' : parts.join(', ');
+  stderr.writeln('Rejects ($totalRejects): $partsStr');
+
+  // Per-stage timing breakdown — summed across every worker and every
+  // attempt (success + failure). Columns:
+  //   * pct       share of CPU time
+  //   * total     cumulative wall time
+  //   * calls     total invocations of the stage across all attempts
+  //                (loop stages run many times per attempt; one-shot
+  //                 stages match the attempt count)
+  //   * avg       µs per call — the per-call cost, the actual "is this
+  //                worth optimising?" signal
+  // Sorted by total time descending so the dominant stage is on top.
+  final totalStageMicros = stageTotalsMicros.values.fold<int>(
+    0,
+    (a, b) => a + b,
+  );
+  if (totalStageMicros > 0) {
+    stderr.writeln('');
+    stderr.writeln(
+      'Timing breakdown (sum across $jobs workers, '
+      '${(totalStageMicros / 1000000).toStringAsFixed(1)}s of CPU):',
+    );
+    stderr.writeln(
+      '  ${'stage'.padRight(18)}'
+      '${'pct'.padLeft(7)}'
+      '${'total'.padLeft(11)}'
+      '${'calls'.padLeft(11)}'
+      '${'avg'.padLeft(11)}',
+    );
+    final entries = stageTotalsMicros.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    for (final e in entries) {
+      if (e.value == 0) continue;
+      final calls = stageTotalsCalls[e.key] ?? 0;
+      final pct = '${(e.value * 100 / totalStageMicros).toStringAsFixed(1)}%';
+      final secs = '${(e.value / 1000000).toStringAsFixed(2)}s';
+      final avg = calls > 0 ? _humanMicros((e.value / calls).round()) : '-';
+      stderr.writeln(
+        '  ${e.key.padRight(18)}'
+        '${pct.padLeft(7)}'
+        '${secs.padLeft(11)}'
+        '${calls.toString().padLeft(11)}'
+        '${avg.padLeft(11)}',
+      );
+    }
+
+    // Two-tier acceptance breakdown — derived from the timer counts.
+    // `loop_candidate_prop.calls` runs once per candidate tested.
+    // `loop_candidate_full.calls` runs only when the cheap signal was
+    // silent, so `prop - full` is the count of cheap-path accepts.
+    // The remaining calls fall to the expensive path, which itself
+    // either accepts (updating cachedRatioBefore) or rejects to
+    // secondChance. The cheap-accept ratio is the headline number to
+    // decide whether the cheap path is paying off in this run.
+    final propCalls = stageTotalsCalls['loop_candidate_prop'] ?? 0;
+    final fullCalls = stageTotalsCalls['loop_candidate_full'] ?? 0;
+    if (propCalls > 0) {
+      final cheapAccepts = propCalls - fullCalls;
+      final cheapPct = (cheapAccepts * 100 / propCalls).toStringAsFixed(1);
+      stderr.writeln('');
+      stderr.writeln(
+        'Two-tier breakdown: $propCalls candidates tested → '
+        '$cheapAccepts cheap accepts ($cheapPct%), '
+        '$fullCalls fell to expensive path',
+      );
     }
   }
 
@@ -1067,7 +1259,11 @@ enum _DetailedCategory {
   };
 }
 
-Future<void> _runCheck(String filePath, {bool detailed = false}) async {
+Future<void> _runCheck(
+  String filePath, {
+  bool detailed = false,
+  bool debug = false,
+}) async {
   final file = File(filePath);
   if (!file.existsSync()) {
     stderr.writeln('File not found: $filePath');
@@ -1097,6 +1293,16 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
   var stats = _CollectionStats.fromLines(goodLines);
 
   void render() {
+    if (debug) {
+      final pct = lines.isEmpty
+          ? 0
+          : (100 * (valid + invalid + errored) ~/ lines.length);
+      stderr.writeln(
+        '[${valid + invalid + errored}/${lines.length} ($pct%)] '
+        'valid $valid | invalid $invalid | errors $errored',
+      );
+      return;
+    }
     _renderCheckDashboard(
       filePath: filePath,
       goodPath: goodPath,
@@ -1376,6 +1582,15 @@ int _medianMs(List<int> durations) {
   return (sorted[mid - 1] + sorted[mid]) ~/ 2;
 }
 
+/// Compact microseconds → `12µs` / `3.4ms` / `1.2s`, picking the unit
+/// so 2-3 significant digits show. Used by the timing-breakdown table
+/// where space is tight but the dynamic range spans 1µs → 10s.
+String _humanMicros(int micros) {
+  if (micros < 1000) return '$micros µs';
+  if (micros < 1000000) return '${(micros / 1000).toStringAsFixed(1)}ms';
+  return '${(micros / 1000000).toStringAsFixed(2)}s';
+}
+
 Map<String, dynamic> _parseArgs(List<String> args) {
   final result = <String, dynamic>{
     'mode': 'generate',
@@ -1402,6 +1617,10 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'blacklistMinAttempts': 30,
     'blacklistAdaptiveK': 20,
     'blacklistSkipSafety': 100,
+    'debug': false,
+    'domain': 2,
+    'strategy': <GenerationStrategy>[GenerationStrategy.phaseGate],
+    'maxStall': 15,
   };
 
   for (int i = 0; i < args.length; i++) {
@@ -1482,6 +1701,41 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['jobs'] = int.parse(args[++i]);
       case '--log-dir':
         result['logDir'] = args[++i];
+      case '--debug':
+        result['debug'] = true;
+      case '--domain':
+        final raw = args[++i];
+        final v = int.tryParse(raw);
+        if (v != 2 && v != 3) {
+          stderr.writeln('--domain must be 2 or 3 (got $raw)');
+          exit(1);
+        }
+        result['domain'] = v;
+      case '--max-stall':
+        result['maxStall'] = int.parse(args[++i]);
+      case '--strategy':
+        final v = args[++i];
+        // Comma-separated list → round-robin across workers. Single
+        // value → all workers use the same strategy.
+        result['strategy'] = v.split(',').map((p) {
+          switch (p.trim()) {
+            case 'single-tier':
+              return GenerationStrategy.singleTier;
+            case 'phase-gate':
+              return GenerationStrategy.phaseGate;
+            case 'phase-1-oneshot':
+              return GenerationStrategy.phase1Oneshot;
+            case 'prop-only':
+              return GenerationStrategy.propOnly;
+            default:
+              stderr.writeln(
+                "--strategy values must be from "
+                "'single-tier', 'phase-gate', 'phase-1-oneshot', "
+                "'prop-only' (got '$p')",
+              );
+              exit(1);
+          }
+        }).toList();
       case '-h':
       case '--help':
         _printUsage();
@@ -1542,7 +1796,7 @@ Generation options:
   -o, --output FILE       Output file (default: stdout)
       --ban RULES         Comma-separated rule slugs to exclude (e.g. FM,LT)
       --allow RULES       Comma-separated whitelist — when set, only these
-                          slugs are eligible (e.g. NC,EY,CC for a small
+                          slugs are eligible (e.g. NC,EY,RC,CC for a small
                           subset). Combines with --ban: the effective set
                           is (allow minus ban). Useful for bisecting which
                           constraint is making generation slow.
@@ -1560,6 +1814,40 @@ Generation options:
                           the easing loop (default: 30). When exceeded,
                           the candidate is dropped and the worker moves
                           on. No effect without --target-collection.
+      --domain N          Colour domain size: 2 (black/white, default) or 3
+                          (adds purple). 3-colour puzzles use option-pruning
+                          deductions; see docs/dev/third_color.md.
+      --strategy S        Candidate-acceptance strategy (default: phase-gate).
+                          Accepts a single value or a comma-separated list;
+                          a list is distributed round-robin across workers
+                          for a heterogeneous pool (e.g.
+                          --strategy phase-gate,phase-1-oneshot,prop-only
+                          on -j 4 → 2× phase-gate + 1× each others). Slugs
+                          unreachable by one strategy (e.g. prop-only on
+                          FM) are picked up by sibling strategies via the
+                          shared equilibrium picker.
+                          Values:
+                            single-tier      Pre-everything baseline. Full
+                                             cloned.solve() per candidate;
+                                             accept iff post-solve ratio
+                                             strictly drops. No cleanup.
+                            phase-gate       Phase 1 cheap prop-only accepts
+                                             then phase 2 full-solve fallback
+                                             + removeUselessRules post-loop.
+                            phase-1-oneshot  Phase 1 limited to one sweep,
+                                             then unconditional transition
+                                             to phase 2. Caps phase-1 cost
+                                             when cheap accepts are sparse.
+                            prop-only        Phase 1 only — no fallback to
+                                             phase 2. Rejects puzzles that
+                                             need force; produces only
+                                             pure-propagation puzzles.
+      --max-stall S       No-progress watchdog: abandon an attempt that
+                          has spent S seconds without accepting a
+                          candidate. Avoids pathological cases where
+                          one worker burns the entire budget on a single
+                          plateaued attempt. Default 15 s. Pass 0 to
+                          disable.
       --no-equilibrium    Disable the multi-axis equilibrium bias.
                           Default: ON. When OFF, only the legacy slug-usage
                           bias is applied (matches pre-equilibrium behavior).
@@ -1595,6 +1883,8 @@ Generation options:
                           puzzles. Default: no logging.
 
 General:
+      --debug             Enable debug mode: sequential output
+                          instead of the real-time dashboard.
   -h, --help              Show this help
 
 Rule slugs: $rules

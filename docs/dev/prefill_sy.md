@@ -24,6 +24,14 @@ their declared axis until each island is fully recovered, while
 convincing oneself that two islands can't be merged without breaking
 their respective symmetries.
 
+> **2-colour by design.** The background/island model is intrinsically
+> binary (one background colour, islands in the opposite one), so
+> `preFillSy` always builds a `defaultDomain` (black/white) grid and
+> ignores `GeneratorConfig.domain`. A `--domain 3` run that lands on
+> this scenario still produces a valid 2-colour puzzle; the generator's
+> auto-shrink relabels its exported line as `v2_12_...`. There is no
+> 3-colour variant of sy-based generation.
+
 ### Why this design
 
 - **Aesthetic identity.** `SY`'s icons (`⟍ | ⟋ ― 🞋` — cf.

@@ -325,7 +325,11 @@ _Vector? _vectorize(_Entry entry, {required int timeoutMs}) {
   // be vectorizing partial information.
   final replay = puzzle.clone();
   for (final s in steps) {
-    replay.setValue(s.cellIdx, s.value);
+    if (s.value != null) {
+      replay.setValue(s.cellIdx, s.value!);
+    } else if (s.removeOption != null) {
+      replay.removeOption(s.cellIdx, s.removeOption!);
+    }
   }
   final solved = replay.complete && replay.check(saveResult: false).isEmpty;
   if (!solved) return null;

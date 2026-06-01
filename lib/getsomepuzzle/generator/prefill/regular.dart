@@ -6,9 +6,15 @@
 
 import 'dart:math';
 
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-Puzzle preFillRegular(int width, int height, List<int> domain, Random rng) {
+Puzzle preFillRegular(
+  int width,
+  int height,
+  List<CellValue> domain,
+  Random rng,
+) {
   final solved = Puzzle.empty(width, height, domain);
   final size = solved.width * solved.height;
   for (int i = 0; i < size; i++) {

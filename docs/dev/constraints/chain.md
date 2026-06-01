@@ -47,17 +47,22 @@ bottom: [(height-1)*width, ..., height*width-1]
 
 ### `_isBlocked(Puzzle)` → `bool`
 
-Checks whether an opposite-color barrier permanently separates the two sides.
+Checks whether the `color` chain is permanently severed — i.e. no path of cells that can still
+take `color` connects the two sides.
 
 Delegates to the shared `canReach` helper (`lib/getsomepuzzle/utils/groups.dart`): flood-fill
-from every cell on `fromSide` that is **not** of the opposite color (i.e., free cells and
-already-correct-colored cells), traversing cells that are _not_ the opposite color (free or
-target-color). If `toSide` is unreachable, the path is permanently blocked.
+from every **passable** cell on `fromSide`, traversing passable cells only. A cell is
+*passable* for the chain iff it can still become `color`: it is already `color`, **or** it is
+still free *and* `color` is among its remaining options. A committed cell of any other colour
+blocks the path — and so does a free cell whose `color` option has been pruned (possible only
+on a 3+-colour puzzle, via another constraint's `removeOption`). If `toSide` is unreachable
+through passable cells, the path is permanently blocked.
 
-When no non-opposite cell exists on `fromSide` (all border cells are already filled with the
-wrong color), the start set is empty and `canReach` returns `false` → blocked.
+When no passable cell exists on `fromSide` (every border cell on that side is either the
+wrong colour or a free cell that can no longer be `color`), the start set is empty and
+`canReach` returns `false` → blocked.
 
-When the puzzle is complete (no free cells), "not opposite" reduces to "target color", so
+When the puzzle is complete (no free cells), "passable" reduces to "already `color`", so
 `_isBlocked` doubles as a final-state path check.
 
 ### `verify(Puzzle)` → `bool`

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
@@ -82,7 +83,7 @@ void main() {
       final move = rt.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
     });
 
     test('saturated — free cell forced (right side)', () {
@@ -95,7 +96,7 @@ void main() {
       final move = rt.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('saturated — conflicting neighbours leads to impossible', () {
@@ -120,7 +121,7 @@ void main() {
       final move = rt.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
     });
 
     test('full need — free cell forced to differ in other direction', () {
@@ -133,7 +134,7 @@ void main() {
       final move = rt.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('impossible — t > count', () {
@@ -199,28 +200,34 @@ void main() {
   group('generateAllParameters', () {
     test('RT correct count for 4x4 grid', () {
       // 4 rows × 4 t values (0..3) = 16 (no color loop)
-      final params = RowTransitionConstraint.generateAllParameters(4, 4, [
-        1,
-        2,
-      ], null);
+      final params = RowTransitionConstraint.generateAllParameters(
+        4,
+        4,
+        defaultDomain,
+        null,
+      );
       expect(params.length, 4 * 4);
       expect(params.any((p) => p.endsWith('.0')), isTrue);
     });
 
     test('CT correct count for 4x4 grid', () {
       // 4 cols × 4 t values (0..3) = 16 (no color loop)
-      final params = ColumnTransitionConstraint.generateAllParameters(4, 4, [
-        1,
-        2,
-      ], null);
+      final params = ColumnTransitionConstraint.generateAllParameters(
+        4,
+        4,
+        defaultDomain,
+        null,
+      );
       expect(params.length, 4 * 4);
     });
 
     test('RT includes t=0', () {
-      final params = RowTransitionConstraint.generateAllParameters(4, 4, [
-        1,
-        2,
-      ], null);
+      final params = RowTransitionConstraint.generateAllParameters(
+        4,
+        4,
+        defaultDomain,
+        null,
+      );
       expect(params.where((p) => p.endsWith('.0')).length, 4);
     });
   });
@@ -267,51 +274,56 @@ void main() {
     test('synthetic puzzle solvable by propagation with combined RT+RC', () {
       // 3-wide row: RC says 2 black cells, RT says 1 transition
       // 2 black cells with 1 transition → contiguous block [1 1 2]
-      final p = Puzzle.empty(3, 1, [1, 2]);
-      p.cells[0].setForSolver(1);
+      final p = Puzzle.empty(3, 1, defaultDomain);
+      p.cells[0].setForSolver(CellValue.black);
       p.cells[0].readonly = true;
       p.addConstraint(RowCountConstraint('0.1.2'));
       p.addConstraint(RowTransitionConstraint('0.1'));
       p.solve();
       expect(p.complete, isTrue);
       // [1,1,2]: transitions=1 (pair 1→2), black cells=2
-      expect(p.cellValues, [1, 1, 2]);
+      expect(p.cellValues, [CellValue.black, CellValue.black, CellValue.white]);
     });
   });
 
   group('Zero transitions', () {
     test('RT:0.0 — one cell colored forces all others to same', () {
       // Row 0: RT with 0 transitions. One cell is 1 → all must be 1.
-      final p = Puzzle.empty(4, 1, [1, 2]);
-      p.cells[0].setForSolver(1);
+      final p = Puzzle.empty(4, 1, defaultDomain);
+      p.cells[0].setForSolver(CellValue.black);
       p.cells[0].readonly = true;
       p.addConstraint(RowTransitionConstraint('0.0'));
       p.solve();
       expect(p.complete, isTrue);
-      expect(p.cellValues.every((v) => v == 1), isTrue);
+      expect(p.cellValues.every((v) => v == CellValue.black), isTrue);
     });
 
     test('RT:0.0 — one cell value 2 forces all to 2', () {
-      final p = Puzzle.empty(4, 1, [1, 2]);
-      p.cells[0].setForSolver(2);
+      final p = Puzzle.empty(4, 1, defaultDomain);
+      p.cells[0].setForSolver(CellValue.white);
       p.cells[0].readonly = true;
       p.addConstraint(RowTransitionConstraint('0.0'));
       p.solve();
       expect(p.complete, isTrue);
-      expect(p.cellValues.every((v) => v == 2), isTrue);
+      expect(p.cellValues.every((v) => v == CellValue.white), isTrue);
     });
   });
 
   group('Maximum transitions', () {
     test('RT:0.3 on 4-wide forces strict alternation', () {
       // 4-wide row, max transitions=3 → each adjacent pair must differ
-      final p = Puzzle.empty(4, 1, [1, 2]);
-      p.cells[0].setForSolver(1);
+      final p = Puzzle.empty(4, 1, defaultDomain);
+      p.cells[0].setForSolver(CellValue.black);
       p.cells[0].readonly = true;
       p.addConstraint(RowTransitionConstraint('0.3'));
       p.solve();
       expect(p.complete, isTrue);
-      expect(p.cellValues, [1, 2, 1, 2]);
+      expect(p.cellValues, [
+        CellValue.black,
+        CellValue.white,
+        CellValue.black,
+        CellValue.white,
+      ]);
     });
   });
 
@@ -326,7 +338,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 0);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
     });
 
     test('last known, even count → first is same', () {
@@ -339,7 +351,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 0);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('first known, odd count → last is opposite', () {
@@ -352,7 +364,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 3);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('first known, even count → last is same', () {
@@ -365,7 +377,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 3);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
     });
 
     test('two-cell row, odd count → last differs from first', () {
@@ -378,7 +390,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 1);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
     });
   });
 
@@ -393,7 +405,7 @@ void main() {
       final move = ct.apply(p);
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
     });
 
     test('endpoint parity — column, last known, odd count', () {
@@ -406,7 +418,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 0);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
     });
   });
 
@@ -451,6 +463,86 @@ void main() {
       // Row 0: [1, 0, 0, 0], count=1
       // Only first known, last free → parity not checked
       final p = makePuzzle('1000\n2222');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      expect(rt.verify(p), isTrue);
+    });
+  });
+
+  group('Transitions on a 3-colour domain', () {
+    // Single-row puzzle on the full 3-colour domain so free cells keep three
+    // options (black/white/purple) and removeOption deductions are meaningful.
+    Puzzle makeRow3(String row) {
+      final w = row.length;
+      final p = Puzzle.empty(w, 1, fullDomain);
+      for (int c = 0; c < w; c++) {
+        final v = cellRepresentationToValue(row[c]);
+        if (v != CellValue.free) p.cells[c].setForSolver(v);
+      }
+      return p;
+    }
+
+    test('full-need → removeOption neighbour colour (no forced value)', () {
+      // [1, ., 2], count=2: t=0, fp=2, t+fp==count → every free pair must be a
+      // transition. The middle cell must differ from both neighbours; we can
+      // only prune one neighbour colour at a time (it cannot be forced to a
+      // single value the way 2 colours would).
+      final p = makeRow3('102');
+      final rt = RowTransitionConstraint('0.2');
+      p.addConstraint(rt);
+      final move = rt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.value, isNull);
+      expect(move.idx, 1);
+      expect(move.removeOption, CellValue.black);
+    });
+
+    test('endpoint count==1 → removeOption the known end colour', () {
+      // [1, ., ., .], count=1: exactly two runs ⇒ the far endpoint must differ
+      // from the known one. Can't force a unique colour (two remain), only
+      // prune the known colour.
+      final p = makeRow3('1000');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      final move = rt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 3);
+      expect(move.removeOption, CellValue.black);
+    });
+
+    test('endpoint count==1 with equal coloured ends → impossible', () {
+      // [1, ., 1], count=1: two runs would need different ends, but both ends
+      // are colour 1 → unreachable.
+      final p = makeRow3('101');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      expect(rt.verify(p), isFalse);
+      final move = rt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('lower-bound probing prunes a wedged third colour', () {
+      // [1, ., 2], count=1: the middle cell taking a *third* colour (3) would
+      // create two transitions (1→3, 3→2) and overshoot count=1. Neither
+      // saturated nor full-need fires here; the probing fallback prunes 3.
+      final p = makeRow3('102');
+      final rt = RowTransitionConstraint('0.1');
+      p.addConstraint(rt);
+      final move = rt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 1);
+      expect(move.removeOption, CellValue.purple);
+      expect(move.complexity, 4);
+    });
+
+    test('count==1 with differing coloured ends stays reachable', () {
+      // [1, ., 2], count=1: middle can still be 1 or 2 → reachable (guards
+      // against the endpoint rule over-rejecting on 3 colours).
+      final p = makeRow3('102');
       final rt = RowTransitionConstraint('0.1');
       p.addConstraint(rt);
       expect(rt.verify(p), isTrue);

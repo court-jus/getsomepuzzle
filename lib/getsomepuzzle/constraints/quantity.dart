@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -7,38 +6,41 @@ class QuantityConstraint extends Constraint {
   @override
   String get slug => 'QA';
 
-  int value = 0;
+  CellValue color = CellValue.free;
   int count = 0;
+
+  @override
+  Set<CellValue> get referencedColors => {color};
 
   QuantityConstraint(String strParams) {
     final params = strParams.split(".");
-    value = int.parse(params[0]);
+    color = cellRepresentationToValue(params[0]);
     count = int.parse(params[1]);
   }
 
   @override
-  String serialize() => 'QA:$value.$count';
+  String serialize() => 'QA:${cellValueToString(color)}.$count';
 
   @override
   Constraint rotated(int origWidth, int origHeight) =>
-      QuantityConstraint('$value.$count');
+      QuantityConstraint('${cellValueToString(color)}.$count');
 
   @override
   String toString() {
-    return "$value = $count";
+    return "${cellValueToString(color)} = $count";
   }
 
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final maxCount = width * height - 1;
     final List<String> result = [];
     for (int count = 1; count < maxCount; count++) {
       for (final value in domain) {
-        result.add('$value.$count');
+        result.add('${cellValueToString(value)}.$count');
       }
     }
     return result;
@@ -46,30 +48,49 @@ class QuantityConstraint extends Constraint {
 
   @override
   bool verify(Puzzle puzzle) {
-    final have = puzzle.cellValues.where((val) => val == value).length;
+    final have = puzzle.cellValues.where((val) => val == color).length;
     if (puzzle.complete) return have == count;
     if (have > count) return false;
-    final free = puzzle.cellValues.where((val) => val == 0).length;
+    // Only free cells that can still take `color` count toward reachability:
+    // a cell that has pruned `color` from its options can never raise `have`.
+    final free = puzzle.cells
+        .where((c) => c.value == CellValue.free && c.options.contains(color))
+        .length;
     if (have + free < count) return false;
     return true;
   }
 
   @override
   Move? apply(Puzzle puzzle) {
-    final myValues = puzzle.cellValues.where((val) => val == value);
-    final myOpposite = puzzle.domain.whereNot((val) => val == value).first;
-    final freeCells = puzzle.cellValues.indexed.where((val) => val.$2 == 0);
+    final myValues = puzzle.cellValues.where((val) => val == color);
+    final freeCells = puzzle.cellValues.indexed.where(
+      (val) => val.$2 == CellValue.free,
+    );
     if (freeCells.isEmpty) return null;
-    final firstFreeCell = freeCells.first.$1;
     if (myValues.length > count) {
-      return Move(0, 0, this, isImpossible: this);
+      return Impossible(this);
     }
     if (myValues.length == count) {
-      // I'm already complete, all the rest of the puzzle should be myOpposite
-      return Move(firstFreeCell, myOpposite, this, complexity: 0);
+      // I'm already complete, all the rest of the puzzle should an opposite color
+      for (var freeCell in freeCells) {
+        if (puzzle.cells[freeCell.$1].options.contains(color)) {
+          return RemoveOption(freeCell.$1, color, this, complexity: 0);
+        }
+      }
+      // No free cell still has `color` in options — every remaining cell
+      // already can't take this colour, so the count stays at target. The
+      // constraint is satisfied; return null instead of reporting an
+      // impossibility. (Same domain-3 trap as SH Level 2.)
+      return null;
     } else if (count - myValues.length == freeCells.length) {
-      // The number of free cells match what I need, I take all them
-      return Move(firstFreeCell, value, this, complexity: 0);
+      // The number of free cells matches what I need: they all become color.
+      // If the chosen cell has already excluded `color` (3-colour puzzles),
+      // the target is unreachable.
+      final target = freeCells.first;
+      if (!puzzle.cells[target.$1].options.contains(color)) {
+        return Impossible(this);
+      }
+      return SetValue(target.$1, color, this, complexity: 0);
     }
     return null;
   }

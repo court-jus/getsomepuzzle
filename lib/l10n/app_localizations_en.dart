@@ -92,6 +92,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get labelWidgetBannedrules => 'Banned rules';
 
   @override
+  String get labelWidgetDomain => 'Number of colors';
+
+  @override
+  String get labelDomainTwoColors => '2 colors';
+
+  @override
+  String get labelDomainThreeColors => '3 colors';
+
+  @override
   String get msgCountMatchingPuzzles => 'Puzzles matching filters';
 
   @override
@@ -139,6 +148,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tooltipClue => 'Clue';
+
+  @override
+  String get tooltipTapModeIncrValue => 'Tap cycles colour';
+
+  @override
+  String get tooltipTapModeRemoveOption => 'Tap removes an option';
 
   @override
   String get tooltipUndo => 'Undo';
@@ -288,6 +303,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hintCellDeducible => 'This cell can be deduced';
+
+  @override
+  String get hintCellOptionRemovable =>
+      'One of the options for this cell can be ruled out';
+
+  @override
+  String get hintForceRemoveOption =>
+      'An option can be ruled out by combining multiple constraints';
+
+  @override
+  String hintRemoveOptionDeducedFrom(String constraintName) {
+    return 'An option can be ruled out from the $constraintName constraint';
+  }
+
+  @override
+  String hintRemoveOptionComplicity(String c1, String c2) {
+    return 'An option can be ruled out by combining the $c1 and $c2 constraints';
+  }
+
+  @override
+  String hintRemoveOptionComplicityTwin(String c) {
+    return 'An option can be ruled out by combining two $c constraints';
+  }
 
   @override
   String get constraintForbiddenPattern => 'forbidden pattern';
@@ -565,6 +603,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newConstraintModalSkip => 'Skip learning';
+
+  @override
+  String get thirdColorSuggestionTitle => 'Ready for 3 colors?';
+
+  @override
+  String get thirdColorSuggestionBody =>
+      'You\'ve solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. It\'s a fresh kind of challenge built on what you already know.';
+
+  @override
+  String get thirdColorSuggestionTryLabel => 'Try it';
+
+  @override
+  String get thirdColorSuggestionLaterLabel => 'Maybe later';
+
+  @override
+  String get thirdColorSuggestionFiltersReminder =>
+      'Remember that you can always choose the type of puzzles you want from the advanced filters in the library.';
 
   @override
   String get welcomeModalTitle => 'Welcome';

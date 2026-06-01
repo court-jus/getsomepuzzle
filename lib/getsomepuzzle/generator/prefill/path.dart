@@ -27,9 +27,10 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-const _domain = [1, 2];
+const _domain = defaultDomain;
 
 // Garde-fou slugs allowed during bipartite desambiguation. LT is
 // explicitly excluded (already placed by the pre-fill). SH is
@@ -52,7 +53,7 @@ const _guardRailSlugs = [
 
 class PathPrefillResult {
   final Puzzle puzzle; // player-facing state: LT + garde-fou + reveals
-  final List<int> solution; // full solution values, index-ordered
+  final List<CellValue> solution; // full solution values, index-ordered
   final int anchorRevealedCount; // anchors revealed during bipartite
   final int pathRevealedCount; // path cells revealed during bipartite
   final int guardRailCount; // non-LT constraints added during bipartite
@@ -192,7 +193,7 @@ PathPrefillResult? preFillPath(
 Map<String, Set<int>> _computeIntendedPaths(
   int width,
   int height,
-  List<int> solution,
+  List<CellValue> solution,
   Map<String, List<int>> anchorMap,
 ) {
   final result = <String, Set<int>>{};
@@ -242,7 +243,7 @@ class _BipartiteResult {
 
 _BipartiteResult? _bipartiteDesambiguate({
   required Puzzle puzzle,
-  required List<int> solution,
+  required List<CellValue> solution,
   required List<_Anchor> anchors,
   required Map<String, Set<int>> intendedPaths,
   required List<Constraint> candidates,
@@ -319,7 +320,7 @@ _BipartiteResult? _bipartiteDesambiguate({
 /// pool: a later guardrail may unlock their propagation.
 bool _tryRevealAnchorStrict({
   required Puzzle puzzle,
-  required List<int> solution,
+  required List<CellValue> solution,
   required List<_Anchor> unrevealed,
 }) {
   for (int i = 0; i < unrevealed.length; i++) {
@@ -344,7 +345,7 @@ bool _tryRevealAnchorStrict({
 /// of a letter's colored connected component).
 bool _tryRevealPathCellStrict({
   required Puzzle puzzle,
-  required List<int> solution,
+  required List<CellValue> solution,
   required List<int> unrevealed,
 }) {
   for (int i = 0; i < unrevealed.length; i++) {
@@ -367,7 +368,7 @@ bool _tryRevealPathCellStrict({
 /// Probe whether revealing [idx] propagates to at least one other cell.
 /// Clones the puzzle, solves, counts free cells, then sets the cell and
 /// re-solves. Accept iff the free-cell count drops by ≥ 2.
-bool _revealPropagates(Puzzle puzzle, List<int> solution, int idx) {
+bool _revealPropagates(Puzzle puzzle, List<CellValue> solution, int idx) {
   final probe = puzzle.clone();
   probe.solve();
   final freeBefore = probe.freeCells().length;
@@ -386,10 +387,10 @@ bool _revealPropagates(Puzzle puzzle, List<int> solution, int idx) {
 /// cap of one per (slug, color). If the preferred slug yields no
 /// helpful candidate, falls back to the other slug.
 bool _tryAddGcOrQa(Puzzle puzzle, List<Constraint> candidates, Random rng) {
-  final occupied = <(String, int)>{};
+  final occupied = <(String, CellValue)>{};
   for (final c in puzzle.constraints) {
     if (c is GroupCountConstraint) occupied.add(('GC', c.color));
-    if (c is QuantityConstraint) occupied.add(('QA', c.value));
+    if (c is QuantityConstraint) occupied.add(('QA', c.color));
   }
   // 2 colors × 2 slugs = 4 max slots
   if (occupied.length >= 4) return false;
@@ -399,11 +400,11 @@ bool _tryAddGcOrQa(Puzzle puzzle, List<Constraint> candidates, Random rng) {
     for (int i = 0; i < candidates.length; i++) {
       final c = candidates[i];
       if (c.slug != preferredSlug) continue;
-      int color;
+      CellValue color;
       if (c is GroupCountConstraint) {
         color = c.color;
       } else if (c is QuantityConstraint) {
-        color = c.value;
+        color = c.color;
       } else {
         continue;
       }
@@ -528,29 +529,31 @@ Map<String, List<int>>? _sampleAnchors(
   return result;
 }
 
-Map<String, int> _assignColors(
+Map<String, CellValue> _assignColors(
   List<String> letters,
   double sameColorProb,
   Random rng,
 ) {
-  // For L=2, two sub-cases: same-color (both 1 or both 2) or different.
-  // For L>=3 with 2 colors, at least one same-color pair exists by
-  // pigeonhole — we partition into two color groups randomly.
-  final colors = <String, int>{};
+  // For L=2, two sub-cases: same-color (both black or both white) or
+  // different. For L>=3 with 2 colors, at least one same-color pair
+  // exists by pigeonhole — we partition into two color groups randomly.
+  final colors = <String, CellValue>{};
   if (letters.length == 2) {
     if (rng.nextDouble() < sameColorProb) {
-      final shared = rng.nextBool() ? 1 : 2;
+      final shared = rng.nextBool() ? CellValue.black : CellValue.white;
       colors[letters[0]] = shared;
       colors[letters[1]] = shared;
     } else {
-      final c0 = rng.nextBool() ? 1 : 2;
+      final c0 = rng.nextBool() ? CellValue.black : CellValue.white;
       colors[letters[0]] = c0;
-      colors[letters[1]] = 3 - c0;
+      colors[letters[1]] = c0 == CellValue.black
+          ? CellValue.white
+          : CellValue.black;
     }
   } else {
     // For L>=3: assign each letter a random color independently.
     for (final l in letters) {
-      colors[l] = rng.nextBool() ? 1 : 2;
+      colors[l] = rng.nextBool() ? CellValue.black : CellValue.white;
     }
   }
   return colors;
@@ -583,7 +586,7 @@ List<Constraint> _enumerateGuardRail(
   return out;
 }
 
-Puzzle _buildSolvedPuzzle(int width, int height, List<int> solution) {
+Puzzle _buildSolvedPuzzle(int width, int height, List<CellValue> solution) {
   final pu = Puzzle.empty(width, height, _domain);
   for (int i = 0; i < pu.cells.length; i++) {
     pu.cells[i].setForSolver(solution[i]);

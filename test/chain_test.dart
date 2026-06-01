@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 
@@ -103,7 +104,7 @@ void main() {
         expect(move, isNotNull);
         expect(move!.isImpossible, isNull);
         expect(move.idx, 4);
-        expect(move.value, 1);
+        expect(move.value, CellValue.black);
         expect(move.complexity, 2);
       },
     );
@@ -123,8 +124,32 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 4);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
+
+    test(
+      '3-colour bridge probes a colour the cell can take (pruned blocker)',
+      () {
+        // Regression: on a 3-colour domain the forced-bridge probe committed
+        // the bridge cell to `domain.firstWhere((v) => v != color)` without
+        // checking the cell's options. When that colour was already pruned
+        // the probe's setValue threw an ArgumentError (observed via the generator
+        // on a random 3-colour grid). Geometry mirrors the 2-colour bridge
+        // test with white (2) as the chain colour: white components {0, 3}
+        // (left) and {5} (right), bridge at cell 4. Pruning black from cell 4
+        // leaves it {white, purple}; the probe must pick purple (an allowed
+        // non-white colour), find the chain blocked, and force cell 4 white —
+        // without throwing.
+        final p = Puzzle('v2_123_3x3_201202101_CH:2.left.right_0:0_0');
+        p.cells[4].removeOptionForSolver(CellValue.black);
+        final ch = p.constraints.whereType<ChainConstraint>().first;
+        final move = ch.apply(p);
+        expect(move, isNotNull);
+        expect(move!.isImpossible, isNull);
+        expect(move.idx, 4);
+        expect(move.value, CellValue.white);
+      },
+    );
   });
 
   group('ChainConstraint.apply - border saturation', () {
@@ -142,7 +167,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 3);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
       expect(move.complexity, 1);
     });
 
@@ -162,7 +187,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 15);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
   });
 
@@ -250,7 +275,12 @@ void main() {
   group('ChainConstraint.generateAllParameters', () {
     test('generates only opposite-side pairs without mirror duplicates', () {
       // 2 opposite pairs × 2 colours = 4 parameters.
-      final params = ChainConstraint.generateAllParameters(3, 3, [1, 2], null);
+      final params = ChainConstraint.generateAllParameters(
+        3,
+        3,
+        defaultDomain,
+        null,
+      );
       expect(params.length, 4);
       expect(params, contains('1.left.right'));
       expect(params, contains('2.left.right'));
@@ -259,7 +289,12 @@ void main() {
     });
 
     test('no self-pair (from==to)', () {
-      final params = ChainConstraint.generateAllParameters(3, 3, [1, 2], null);
+      final params = ChainConstraint.generateAllParameters(
+        3,
+        3,
+        defaultDomain,
+        null,
+      );
       expect(params, isNot(contains('1.left.left')));
       expect(params, isNot(contains('2.right.right')));
     });
@@ -267,7 +302,7 @@ void main() {
 
   group('ChainConstraint.toHuman', () {
     test('describes path between two sides', () {
-      final p = Puzzle.empty(4, 4, [1, 2]);
+      final p = Puzzle.empty(4, 4, defaultDomain);
       expect(
         ChainConstraint('1.left.right').toHuman(p),
         'Path from left to right in color 1',
@@ -289,6 +324,71 @@ void main() {
       // match the forms produced by generateAllParameters.
       final rotated = ChainConstraint('1.top.bottom').rotated(3, 3);
       expect(rotated.serialize(), 'CH:1.left.right');
+    });
+  });
+
+  group('ChainConstraint on a 3-colour domain', () {
+    // Build a puzzle on the full 3-colour domain so cells can hold purple (3).
+    Puzzle makePuzzle3(String grid) {
+      final rows = grid
+          .trim()
+          .split('\n')
+          .map((r) => r.trim())
+          .where((r) => r.isNotEmpty)
+          .toList();
+      final h = rows.length;
+      final w = rows.first.length;
+      final p = Puzzle.empty(w, h, fullDomain);
+      for (int r = 0; r < h; r++) {
+        for (int c = 0; c < w; c++) {
+          final v = cellRepresentationToValue(rows[r][c]);
+          if (v != CellValue.free) p.cells[r * w + c].setForSolver(v);
+        }
+      }
+      return p;
+    }
+
+    test('a third colour on the only corridor blocks the chain → invalid', () {
+      // White walls top/bottom; the single black corridor on the middle row
+      // is cut by a purple cell at (1,1). The old binary `oppositeColor`
+      // logic treated purple as traversable and wrongly accepted this.
+      final p = makePuzzle3('222\n131\n222');
+      expect(ChainConstraint('1.left.right').verify(p), isFalse);
+    });
+
+    test('same corridor left free (no third colour) → valid', () {
+      // Identical grid but (1,1) is free instead of purple: the black
+      // corridor can still complete, so the constraint is satisfiable.
+      // Isolates the purple cell as the blocking factor.
+      final p = makePuzzle3('222\n101\n222');
+      expect(ChainConstraint('1.left.right').verify(p), isTrue);
+    });
+
+    test('border saturation counts a third colour as blocking', () {
+      // Left border (col 0): white(block), purple(block), free. The chain
+      // must enter through the only non-blocking cell → it is forced to
+      // black. The old logic counted only the white cell as opposite and
+      // would not fire.
+      final p = makePuzzle3('200\n300\n000');
+      final move = ChainConstraint('1.left.right').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 6); // (2,0), the lone free cell on the left border
+      expect(move.value, CellValue.black);
+    });
+
+    test('free corridor cell with the chain colour pruned blocks chain', () {
+      // Same geometry as the satisfiable "free corridor" case: white walls
+      // on the top and bottom rows, black endpoints at (1,0) and (1,2), and a
+      // single free cell at (1,1). But here black (the chain colour) is pruned
+      // from that lone corridor cell's options, so it can never become black
+      // and no left→right path can ever complete — even though the cell is
+      // still `free`. The old `_passable` treated every free cell as
+      // traversable and wrongly accepted this state; the option-aware check
+      // now reports it blocked.
+      final p = makePuzzle3('222\n101\n222');
+      p.cells[4].removeOptionForSolver(CellValue.black);
+      expect(ChainConstraint('1.left.right').verify(p), isFalse);
     });
   });
 }

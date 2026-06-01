@@ -119,6 +119,14 @@ class _GeneratePageState extends State<GeneratePage> {
           // Per-attempt telemetry is consumed only by the CLI (writes a row
           // to `generator_stats.csv`). The in-app generator ignores it.
           break;
+        case GeneratorRejectMessage():
+          // In-app generator UI doesn't surface a rejection breakdown
+          // (the CLI dashboard does). Counts are still implicit in the
+          // attempt counter vs. generated count.
+          break;
+        case GeneratorTimingsMessage():
+          // Stage timings are CLI-only diagnostics.
+          break;
       }
     });
   }

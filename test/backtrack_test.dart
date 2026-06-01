@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
@@ -62,25 +63,25 @@ void main() {
       // Non-alternating around the boundary (going clockwise: A, B, B, A)
       // → topologically feasible (Jordan curve theorem allows a vertical
       // wall partitioning). Many routings exist.
-      final pu = Puzzle.empty(5, 5, [1, 2]);
-      pu.cells[0].setForSolver(1);
+      final pu = Puzzle.empty(5, 5, defaultDomain);
+      pu.cells[0].setForSolver(CellValue.black);
       pu.cells[0].readonly = true;
-      pu.cells[20].setForSolver(1);
+      pu.cells[20].setForSolver(CellValue.black);
       pu.cells[20].readonly = true;
-      pu.cells[4].setForSolver(2);
+      pu.cells[4].setForSolver(CellValue.white);
       pu.cells[4].readonly = true;
-      pu.cells[24].setForSolver(2);
+      pu.cells[24].setForSolver(CellValue.white);
       pu.cells[24].readonly = true;
       pu.addConstraint(LetterGroup('A.0.20'));
       pu.addConstraint(LetterGroup('B.4.24'));
 
       final solution = findOneSolutionByDpll(pu, timeoutMs: 5000);
       expect(solution, isNotNull);
-      expect(solution![0], equals(1));
-      expect(solution[20], equals(1));
-      expect(solution[4], equals(2));
-      expect(solution[24], equals(2));
-      expect(solution.any((v) => v == 0), isFalse);
+      expect(solution![0], equals(CellValue.black));
+      expect(solution[20], equals(CellValue.black));
+      expect(solution[4], equals(CellValue.white));
+      expect(solution[24], equals(CellValue.white));
+      expect(solution.any((v) => v == CellValue.free), isFalse);
     });
 
     test('returns null for topologically infeasible alternating anchors', () {
@@ -98,14 +99,14 @@ void main() {
       //
       // The DPLL must correctly identify this as infeasible and return
       // null (rather than time out indefinitely).
-      final pu = Puzzle.empty(5, 5, [1, 2]);
-      pu.cells[0].setForSolver(1);
+      final pu = Puzzle.empty(5, 5, defaultDomain);
+      pu.cells[0].setForSolver(CellValue.black);
       pu.cells[0].readonly = true;
-      pu.cells[24].setForSolver(1);
+      pu.cells[24].setForSolver(CellValue.black);
       pu.cells[24].readonly = true;
-      pu.cells[4].setForSolver(2);
+      pu.cells[4].setForSolver(CellValue.white);
       pu.cells[4].readonly = true;
-      pu.cells[20].setForSolver(2);
+      pu.cells[20].setForSolver(CellValue.white);
       pu.cells[20].readonly = true;
       pu.addConstraint(LetterGroup('A.0.24'));
       pu.addConstraint(LetterGroup('B.4.20'));
@@ -124,10 +125,10 @@ void main() {
       //   . . .
       // This exercises the "immediate violation" path: solve() can't
       // propagate anywhere because check() already fails on the input.
-      final pu = Puzzle.empty(3, 3, [1, 2]);
-      pu.cells[0].setForSolver(1);
+      final pu = Puzzle.empty(3, 3, defaultDomain);
+      pu.cells[0].setForSolver(CellValue.black);
       pu.cells[0].readonly = true;
-      pu.cells[1].setForSolver(1);
+      pu.cells[1].setForSolver(CellValue.black);
       pu.cells[1].readonly = true;
       pu.addConstraint(LetterGroup('A.0'));
       pu.addConstraint(LetterGroup('B.1'));

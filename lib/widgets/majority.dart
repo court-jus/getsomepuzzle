@@ -1,15 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/widgets/dashed_painter.dart';
 
 const Color _mjBorderBlackTarget = Color(0xFF3A4A6B);
 const Color _mjBorderWhiteTarget = Color(0xFFC8D4E8);
 
-Color _mjBorderColor(int targetColor) {
-  if (targetColor == 1) return _mjBorderBlackTarget;
-  if (targetColor == 2) return _mjBorderWhiteTarget;
+Color _mjBorderColor(CellValue targetColor) {
+  if (targetColor == CellValue.black) return _mjBorderBlackTarget;
+  if (targetColor == CellValue.white) return _mjBorderWhiteTarget;
   return Colors.grey;
 }
 

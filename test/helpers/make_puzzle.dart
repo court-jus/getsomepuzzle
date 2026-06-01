@@ -1,3 +1,4 @@
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 /// Build a puzzle from a grid string (domain [1,2]).
@@ -12,11 +13,11 @@ Puzzle makePuzzle(String grid) {
       .toList();
   final h = rows.length;
   final w = rows.first.length;
-  final p = Puzzle.empty(w, h, [1, 2]);
+  final p = Puzzle.empty(w, h, defaultDomain);
   for (int r = 0; r < h; r++) {
     for (int c = 0; c < w; c++) {
-      final v = int.parse(rows[r][c]);
-      if (v != 0) {
+      final v = cellRepresentationToValue(rows[r][c]);
+      if (v != CellValue.free) {
         p.cells[r * w + c].setForSolver(v);
       }
     }

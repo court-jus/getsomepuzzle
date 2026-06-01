@@ -7,43 +7,46 @@ class GroupCountConstraint extends Constraint {
   @override
   String get slug => 'GC';
 
-  int color = 0;
+  CellValue color = CellValue.free;
   int count = 0;
+
+  @override
+  Set<CellValue> get referencedColors => {color};
 
   GroupCountConstraint(String strParams) {
     final params = strParams.split(".");
-    color = int.parse(params[0]);
+    color = cellRepresentationToValue(params[0]);
     count = int.parse(params[1]);
   }
 
   @override
-  String serialize() => 'GC:$color.$count';
+  String serialize() => 'GC:${cellValueToString(color)}.$count';
 
   @override
   Constraint rotated(int origWidth, int origHeight) =>
-      GroupCountConstraint('$color.$count');
+      GroupCountConstraint('${cellValueToString(color)}.$count');
 
   @override
   String toString() {
-    return "$color = $count groups";
+    return "${cellValueToString(color)} = $count groups";
   }
 
   @override
   String toHuman(Puzzle puzzle) {
-    return "$count groups of color $color";
+    return "$count groups of color ${cellValueToString(color)}";
   }
 
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     final maxCount = (width * height / 2).ceil();
     final List<String> result = [];
     for (int count = 1; count <= maxCount; count++) {
       for (final value in domain) {
-        result.add('$value.$count');
+        result.add('${cellValueToString(value)}.$count');
       }
     }
     return result;
@@ -63,10 +66,14 @@ class GroupCountConstraint extends Constraint {
       if (_exceedingTargetIsImpossible(puzzle)) return false;
     }
     if (currentCount < count) {
-      // Look for free cells where we could put a 'color' cell without
-      // merging into an existing group
-      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
-      if (candidates.length + currentCount < count) {
+      // Free cells where we could start a new 'color' group without merging
+      // into an existing one. The helper is option-aware: a free cell with
+      // `color` pruned can never become one, so it is not a candidate.
+      final candidates = getFreeCellsThatCanStartNewColorGroup(
+        puzzle,
+        color,
+      ).length;
+      if (candidates + currentCount < count) {
         return false;
       }
     }
@@ -79,7 +86,7 @@ class GroupCountConstraint extends Constraint {
 
     if (currentCount > count) {
       if (_exceedingTargetIsImpossible(puzzle)) {
-        return Move(0, 0, this, isImpossible: this);
+        return Impossible(this);
       }
       // Force on a single direct merge-cell only if colouring it opposite
       // would make the target unreachable. The direct-merge enumeration
@@ -88,17 +95,27 @@ class GroupCountConstraint extends Constraint {
       final mergeableCells = getCellsThatMergeColorGroups(puzzle, color);
       if (mergeableCells.length == 1) {
         final mergeCell = mergeableCells.first;
-        final opposite = puzzle.domain.firstWhere((v) => v != color);
+        final anyOpposite = puzzle.domain.firstWhere((v) => v != color);
         final probe = puzzle.clone();
-        probe.cells[mergeCell].setForSolver(opposite);
+        probe.cells[mergeCell].setForSolver(anyOpposite);
         if (calculateMinGroups(probe, color) > count) {
-          return Move(mergeCell, color, this, complexity: 3);
+          // Force the merge-cell to color. If color was already excluded
+          // from its options (3-colour puzzles), the constraint cannot be
+          // satisfied — neither merge nor non-merge keeps the count at
+          // target.
+          if (!puzzle.cells[mergeCell].options.contains(color)) {
+            return Impossible(this);
+          }
+          return SetValue(mergeCell, color, this, complexity: 3);
         }
       }
     } else if (currentCount < count) {
-      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
+      // Option-aware new-group candidates (see the verify-side filter): a
+      // free cell pruned of `color` can never seed a new group, so it must
+      // not inflate the count and mask a real impossibility.
+      final candidates = getFreeCellsThatCanStartNewColorGroup(puzzle, color);
       if (candidates.length + currentCount < count) {
-        return Move(0, 0, this, isImpossible: this);
+        return Impossible(this);
       }
       if (candidates.length + currentCount == count && candidates.isNotEmpty) {
         // Every candidate would need to become its own isolated group for the
@@ -106,21 +123,37 @@ class GroupCountConstraint extends Constraint {
         // merge into one group, so any adjacency among candidates makes the
         // target unreachable.
         if (_candidatesHaveAdjacency(puzzle, candidates)) {
-          return Move(0, 0, this, isImpossible: this);
+          return Impossible(this);
         }
-        return Move(candidates.first, color, this, complexity: 3);
+        // Candidates are already option-filtered; the head is therefore a
+        // safe target for `value: color`.
+        return SetValue(candidates.first, color, this, complexity: 3);
       }
     } else if (currentCount == count && !puzzle.complete) {
-      final opposite = puzzle.domain.firstWhere((c) => c != color);
-      final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
+      // Option-aware: only cells that can still become `color` count as
+      // able to start a new group. When this set is empty, no new group can
+      // ever form (even if free cells remain, they have `color` pruned), so
+      // every merge-cell must be forced to an opposite colour. Counting
+      // pruned cells here would skip that deduction and route to the
+      // simulation branch with nothing to find.
+      final candidates = getFreeCellsThatCanStartNewColorGroup(puzzle, color);
       if (candidates.isEmpty) {
         // Candidate set is monotone decreasing: empty now means empty
         // forever, so no new group can ever form. Colouring a merge-cell
         // would drop the count below target with no way to compensate, so
-        // every merge-cell must be opposite.
+        // every merge-cell must be an opposite color.
         final forcedCells = getCellsThatMergeColorGroups(puzzle, color);
         if (forcedCells.isNotEmpty) {
-          return Move(forcedCells.first, opposite, this, complexity: 3);
+          for (var forcedCell in forcedCells) {
+            if (puzzle.cells[forcedCell].options.contains(color)) {
+              return RemoveOption(forcedCell, color, this, complexity: 3);
+            }
+          }
+          // No forced cell still has `color` in options — every merge-cell
+          // already can't take this colour, so the count is locked at target.
+          // Constraint satisfied, nothing more to do. (Same domain-3 trap as
+          // SH Level 2 and the base_line_constraint == count branch.)
+          return null;
         }
       } else {
         // Simulation-based probe: for each candidate, simulate colouring
@@ -128,7 +161,7 @@ class GroupCountConstraint extends Constraint {
         // currentCount + 1 (a new isolated group appeared). To recover
         // the target we'd need merges. If even the minimum achievable
         // count in the new state exceeds the target, the target is
-        // unreachable → force the candidate to opposite.
+        // unreachable → force the candidate to an opposite color.
         //
         // We use `calculateMinGroups` (flood-fill via free-or-same-color
         // cells) rather than enumerating direct merge-cells, because the
@@ -137,8 +170,9 @@ class GroupCountConstraint extends Constraint {
         for (final cand in candidates) {
           final clone = puzzle.clone();
           clone.cells[cand].setForSolver(color);
-          if (calculateMinGroups(clone, color) > count) {
-            return Move(cand, opposite, this, complexity: 4);
+          if (calculateMinGroups(clone, color) > count &&
+              puzzle.cells[cand].options.contains(color)) {
+            return RemoveOption(cand, color, this, complexity: 4);
           }
         }
       }
@@ -152,7 +186,10 @@ class GroupCountConstraint extends Constraint {
     if (!verify(puzzle)) return false;
     final currentCount = _getGroupCount(puzzle);
     if (currentCount != count) return false;
-    final candidates = getFreeCellsWithoutNeighborColor(puzzle, color);
+    // Option-aware candidates: a free cell pruned of `color` can never start
+    // a new group, so it must count as "settled" for grey-out — otherwise GC
+    // would never grey out even though apply() can no longer fire.
+    final candidates = getFreeCellsThatCanStartNewColorGroup(puzzle, color);
     // Candidate set is monotone decreasing: an empty set now stays empty
     // forever, so no new group can ever form. Otherwise future play could
     // raise the count above target and apply() would fire.
@@ -179,7 +216,11 @@ class GroupCountConstraint extends Constraint {
   /// `calculateMinGroups > count` lower bound stays usable in both
   /// cases as a fallback.
   bool _exceedingTargetIsImpossible(Puzzle puzzle) {
-    final canAddNewGroup = getFreeCellsWithoutNeighborColor(
+    // Option-aware: a free cell pruned of `color` can never add a new group,
+    // so it must not keep `canAddNewGroup` true. With it correctly false the
+    // exact reachable-by-merges set is used instead of the loose
+    // `calculateMinGroups > count` fallback, catching more over-counts.
+    final canAddNewGroup = getFreeCellsThatCanStartNewColorGroup(
       puzzle,
       color,
     ).isNotEmpty;
@@ -230,7 +271,7 @@ class GroupCountConstraint extends Constraint {
         final setJ = groups[j].toSet();
         bool found = false;
         for (int idx = 0; idx < puzzle.cellValues.length; idx++) {
-          if (puzzle.cellValues[idx] != 0) continue;
+          if (puzzle.cellValues[idx] != CellValue.free) continue;
           final neighbors = puzzle.getNeighbors(idx);
           final adjI = neighbors.any(setI.contains);
           final adjJ = neighbors.any(setJ.contains);

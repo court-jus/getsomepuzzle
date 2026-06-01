@@ -6,11 +6,12 @@ import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 /// PA + (FM | LT) complicity: a `ParityConstraint` fixes the
-/// composition of one of its sides (n/2 of each colour). For each
-/// such side we enumerate every balanced colouring of the free cells,
-/// drop the ones that would violate any `ForbiddenMotif` or
-/// `LetterGroup`, and force the cells whose value is identical across
-/// every survivor.
+/// composition of one of its sides (`side.length / domain.length` of
+/// each colour). For each such side we enumerate every balanced
+/// colouring of the free cells, drop the ones that would violate any
+/// `ForbiddenMotif` or `LetterGroup`, and either force the cells whose
+/// value is identical across every survivor or prune a colour that no
+/// survivor uses.
 ///
 /// This generalises the original PA + FM complicity to also cover
 /// PA + LT:
@@ -28,14 +29,21 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 /// - **Mixed FM and LT** — both filters run on every candidate;
 ///   complementary cuts often combine to leave a single survivor.
 ///
-/// Domain restriction: the parity-as-colour-counter argument only
-/// holds when the domain is exactly `{1, 2}`.
+/// Domain-agnostic: the balanced-composition argument holds for any
+/// domain (`targetCount = side.length / domain.length` of each
+/// colour), so the enumeration is multinomial rather than binary. On a
+/// 2-colour domain it reduces exactly to the original `C(n, n/2)`
+/// binary set, so 2-colour behaviour is unchanged.
 ///
-/// Side length is capped at [_maxSideLen] = 10 (so up to 10×10 grids
-/// are handled in full). `C(10, 5) = 252` configurations is the
-/// practical upper bound on enumeration cost per side.
+/// Side length is capped by [_maxSideLen]: 10 on a 2-colour domain
+/// (`C(10, 5) = 252` configs) but only 6 on a 3+ colour domain, where
+/// the multinomial blows up faster (`multinomial(6; 2,2,2) = 90`,
+/// `multinomial(9; 3,3,3) = 1680`).
 class PABalancedSideComplicity extends Complicity {
-  static const int _maxSideLen = 10;
+  /// Largest side this complicity will enumerate, given the domain
+  /// size. The multinomial cost grows much faster with more colours,
+  /// so the cap tightens from 10 (binary) to 6 (3+ colours).
+  static int _maxSideLen(int domainSize) => domainSize >= 3 ? 6 : 10;
 
   /// Slug of the constraint that explains this particular deduction
   /// alongside `PA`. Set when [apply] returns a move whose dropped
@@ -54,7 +62,6 @@ class PABalancedSideComplicity extends Complicity {
 
   @override
   bool isPresent(Puzzle puzzle) {
-    if (!_domainIsOneTwo(puzzle)) return false;
     final pas = puzzle.constraints.whereType<ParityConstraint>();
     if (pas.isEmpty) return false;
     final hasFm = puzzle.constraints.whereType<ForbiddenMotif>().isNotEmpty;
@@ -64,7 +71,6 @@ class PABalancedSideComplicity extends Complicity {
 
   @override
   Move? apply(Puzzle puzzle) {
-    if (!_domainIsOneTwo(puzzle)) return null;
     final fms = puzzle.constraints.whereType<ForbiddenMotif>().toList();
     final lts = puzzle.constraints.whereType<LetterGroup>().toList();
     if (fms.isEmpty && lts.isEmpty) return null;
@@ -80,82 +86,111 @@ class PABalancedSideComplicity extends Complicity {
 
   /// Run the enumeration on a single PA side and return either an
   /// `isImpossible` move (no surviving config), a force move (all
-  /// survivors agree on at least one free cell), or null.
+  /// survivors agree on a free cell), a `removeOption` move (a colour
+  /// no survivor uses on a free cell), or null.
   Move? _solveSide(
     List<int> side,
     Puzzle puzzle,
     List<ForbiddenMotif> fms,
     List<LetterGroup> lts,
   ) {
-    if (side.isEmpty || side.length.isOdd) return null;
-    if (side.length > _maxSideLen) return null;
+    final domain = puzzle.domain;
+    if (side.isEmpty || side.length % domain.length != 0) return null;
+    if (side.length > _maxSideLen(domain.length)) return null;
 
     final current = side.map((idx) => puzzle.cellValues[idx]).toList();
-    final fixed1 = current.where((v) => v == 1).length;
-    final fixed2 = current.where((v) => v == 2).length;
-    final half = side.length ~/ 2;
-    if (fixed1 > half || fixed2 > half) {
-      // Existing colouring already fails the parity composition;
-      // ParityConstraint will report it. Nothing to add here.
-      return null;
+    final targetCount = side.length ~/ domain.length;
+
+    // Per-colour shortfall on this side. `need[c]` cells of colour `c`
+    // still have to be placed among the free positions.
+    final need = <CellValue, int>{};
+    for (final color in domain) {
+      final fixed = current.where((v) => v == color).length;
+      if (fixed > targetCount) {
+        // Existing colouring already fails the balanced composition;
+        // ParityConstraint will report it. Nothing to add here.
+        return null;
+      }
+      need[color] = targetCount - fixed;
     }
 
     final freePositions = <int>[];
     for (int i = 0; i < side.length; i++) {
-      if (current[i] == 0) freePositions.add(i);
+      if (current[i] == CellValue.free) freePositions.add(i);
     }
     if (freePositions.isEmpty) return null;
-    final ones = half - fixed1;
-    if (ones < 0 || ones > freePositions.length) return null;
 
-    final survivors = <List<int>>[];
+    final survivors = <List<CellValue>>[];
     // Track which constraint *types* rejected at least one config.
     // Used to tag the returned move so the hint UI can render
     // "PA + FM", "PA + LT" or "PA + other" rather than always "PA + *".
     final rejectingSlugs = <String>{};
 
-    _enumerate(freePositions.length, ones, (selected) {
-      final selSet = selected.toSet();
-      final config = List<int>.from(current);
-      for (int i = 0; i < freePositions.length; i++) {
-        config[freePositions[i]] = selSet.contains(i) ? 1 : 2;
-      }
-      final clone = puzzle.clone();
-      for (int i = 0; i < side.length; i++) {
-        if (current[i] == 0) {
-          clone.cells[side[i]].setForSolver(config[i]);
+    _enumerateMultinomial(
+      freePositions.length,
+      domain,
+      [for (final c in domain) need[c]!],
+      (assignment) {
+        final config = List<CellValue>.from(current);
+        for (int i = 0; i < freePositions.length; i++) {
+          config[freePositions[i]] = assignment[i];
         }
-      }
-      for (final fm in fms) {
-        if (!fm.verify(clone)) {
-          rejectingSlugs.add('FM');
-          return;
+        final clone = puzzle.clone();
+        for (int i = 0; i < side.length; i++) {
+          if (current[i] == CellValue.free) {
+            clone.cells[side[i]].setForSolver(config[i]);
+          }
         }
-      }
-      for (final lt in lts) {
-        if (!lt.verify(clone)) {
-          rejectingSlugs.add('LT');
-          return;
+        for (final fm in fms) {
+          if (!fm.verify(clone)) {
+            rejectingSlugs.add('FM');
+            return;
+          }
         }
-      }
-      survivors.add(config);
-    });
+        for (final lt in lts) {
+          if (!lt.verify(clone)) {
+            rejectingSlugs.add('LT');
+            return;
+          }
+        }
+        survivors.add(config);
+      },
+    );
 
     if (survivors.isEmpty) {
-      return _withTag(Move(0, 0, this, isImpossible: this), rejectingSlugs);
+      return _withTag(Impossible(this), rejectingSlugs);
     }
-    // Partial determination: any free cell that takes the same value
-    // in every surviving configuration is forced. With a single
-    // survivor this collapses to "force every empty cell on the side".
+    // Partial determination on each free cell:
+    //  * every survivor agrees on its value → force it;
+    //  * otherwise, any colour no survivor uses (but still in the
+    //    cell's options) is impossible there → prune it.
+    // On a 2-colour domain a non-unanimous cell already covers both
+    // colours, so the removeOption branch never fires and this reduces
+    // to "force the first uniquely-determined empty cell" as before.
     for (final freePos in freePositions) {
-      final v0 = survivors.first[freePos];
-      if (survivors.every((s) => s[freePos] == v0)) {
-        // Combination deduction (PA × FMs/LTs): two rules in mind at
-        // once. Tier 3 weight per docs/dev/complexity.md.
-        return _withTag(
-          Move(side[freePos], v0, this, complexity: 3),
-          rejectingSlugs,
-        );
+      final used = {for (final s in survivors) s[freePos]};
+      final cell = puzzle.cells[side[freePos]];
+      // Combination deduction (PA × FMs/LTs): two rules in mind at
+      // once. Tier 3 weight per docs/dev/complexity.md.
+      if (used.length == 1) {
+        // Every survivor agrees on this cell's colour. Force it — unless that
+        // colour has been pruned from the cell's options (3+-colour domain),
+        // in which case no allowed colour satisfies the balanced composition.
+        if (cell.options.contains(used.first)) {
+          return _withTag(
+            SetValue(side[freePos], used.first, this, complexity: 3),
+            rejectingSlugs,
+          );
+        }
+        return _withTag(Impossible(this), rejectingSlugs);
+      }
+      for (final color in domain) {
+        if (!used.contains(color) && cell.options.contains(color)) {
+          return _withTag(
+            RemoveOption(side[freePos], color, this, complexity: 3),
+            rejectingSlugs,
+          );
+        }
       }
     }
     return null;
@@ -166,14 +201,7 @@ class PABalancedSideComplicity extends Complicity {
   /// "PA + LT" instead of the generic "PA + other".
   Move _withTag(Move move, Set<String> rejectingSlugs) {
     if (rejectingSlugs.length != 1) return move;
-    final tagged = PABalancedSideComplicity(rejectingSlugs.first);
-    return Move(
-      move.idx,
-      move.value,
-      tagged,
-      isImpossible: move.isImpossible == null ? null : tagged,
-      complexity: move.complexity,
-    );
+    return move.retag(PABalancedSideComplicity(rejectingSlugs.first));
   }
 
   /// Cells covered by [pa] for each of its sides, in natural reading
@@ -201,30 +229,34 @@ class PABalancedSideComplicity extends Complicity {
     return result;
   }
 
-  /// True when [puzzle.domain] is exactly {1, 2}: parity's odd/even
-  /// split coincides with colour counting only on that domain.
-  static bool _domainIsOneTwo(Puzzle puzzle) {
-    final d = puzzle.domain;
-    return d.length == 2 && d.contains(1) && d.contains(2);
-  }
-
-  /// Enumerate every k-combination of indices in [0..n) and pass each
-  /// (as a sorted ascending list) to the callback.
-  static void _enumerate(int n, int k, void Function(List<int>) callback) {
-    if (k < 0 || k > n) return;
-    final selection = <int>[];
-    void recur(int start, int rem) {
-      if (rem == 0) {
-        callback(List<int>.from(selection));
+  /// Enumerate every assignment of [n] free positions to colours from
+  /// [colors] such that colour `colors[i]` is used exactly `need[i]`
+  /// times, passing each (a list of length [n], position → colour) to
+  /// the callback. On a 2-colour domain with `need = [k, n - k]` this
+  /// produces exactly the `C(n, k)` distinct binary configurations the
+  /// old combination enumerator did.
+  static void _enumerateMultinomial(
+    int n,
+    List<CellValue> colors,
+    List<int> need,
+    void Function(List<CellValue>) callback,
+  ) {
+    final assignment = List<CellValue>.filled(n, colors.first);
+    final remaining = List<int>.from(need);
+    void recur(int pos) {
+      if (pos == n) {
+        callback(List<CellValue>.from(assignment));
         return;
       }
-      for (int i = start; i <= n - rem; i++) {
-        selection.add(i);
-        recur(i + 1, rem - 1);
-        selection.removeLast();
+      for (int ci = 0; ci < colors.length; ci++) {
+        if (remaining[ci] == 0) continue;
+        remaining[ci]--;
+        assignment[pos] = colors[ci];
+        recur(pos + 1);
+        remaining[ci]++;
       }
     }
 
-    recur(0, k);
+    recur(0);
   }
 }

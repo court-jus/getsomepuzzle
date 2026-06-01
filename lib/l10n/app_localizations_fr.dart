@@ -92,6 +92,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get labelWidgetBannedrules => 'Règles refusées';
 
   @override
+  String get labelWidgetDomain => 'Nombre de couleurs';
+
+  @override
+  String get labelDomainTwoColors => '2 couleurs';
+
+  @override
+  String get labelDomainThreeColors => '3 couleurs';
+
+  @override
   String get msgCountMatchingPuzzles => 'Nombre de puzzles correspondant';
 
   @override
@@ -140,6 +149,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get tooltipClue => 'Indice';
+
+  @override
+  String get tooltipTapModeIncrValue => 'Cliquer change la couleur';
+
+  @override
+  String get tooltipTapModeRemoveOption => 'Cliquer retire une option';
 
   @override
   String get tooltipUndo => 'Annuler';
@@ -291,6 +306,29 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get hintCellDeducible => 'Cette cellule est déductible';
+
+  @override
+  String get hintCellOptionRemovable =>
+      'Une option de cette cellule peut être éliminée';
+
+  @override
+  String get hintForceRemoveOption =>
+      'Une option peut être éliminée en combinant plusieurs contraintes';
+
+  @override
+  String hintRemoveOptionDeducedFrom(String constraintName) {
+    return 'Une option peut être éliminée à partir de la contrainte $constraintName';
+  }
+
+  @override
+  String hintRemoveOptionComplicity(String c1, String c2) {
+    return 'Une option peut être éliminée en combinant les contraintes $c1 et $c2';
+  }
+
+  @override
+  String hintRemoveOptionComplicityTwin(String c) {
+    return 'Une option peut être éliminée en combinant deux contraintes $c';
+  }
 
   @override
   String get constraintForbiddenPattern => 'motif interdit';
@@ -570,6 +608,23 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get newConstraintModalSkip => 'Ignorer l\'apprentissage';
+
+  @override
+  String get thirdColorSuggestionTitle => 'Prêt pour les 3 couleurs ?';
+
+  @override
+  String get thirdColorSuggestionBody =>
+      'Vous avez résolu un bon nombre de puzzles en noir et blanc. Envie d\'essayer le mode 3 couleurs ? Une nouvelle couleur — le violet — rejoint le noir et le blanc, et les règles s\'appliquent à chaque couleur indépendamment. C\'est un nouveau type de défi qui s\'appuie sur ce que vous savez déjà.';
+
+  @override
+  String get thirdColorSuggestionTryLabel => 'J\'essaie';
+
+  @override
+  String get thirdColorSuggestionLaterLabel => 'Plus tard';
+
+  @override
+  String get thirdColorSuggestionFiltersReminder =>
+      'N\'oubliez pas que vous pouvez toujours choisir le type de puzzles que vous voulez dans les filtres avancés de la bibliothèque.';
 
   @override
   String get welcomeModalTitle => 'Bienvenue';

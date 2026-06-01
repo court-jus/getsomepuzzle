@@ -12,6 +12,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/shgs.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/syfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
@@ -36,8 +37,11 @@ void main() {
     expect(move!.isImpossible, isNull);
     // The move targets one of LT:A's cells (6 or 0)…
     expect(ltA.indices, contains(move.idx));
-    // …with color 1 (black)…
-    expect(move.value, 1);
+    // …removes the colour-2 option (white). The FM blocks LT:A from
+    // being white via the vertical adjacency it requires; on a
+    // 2-colour domain stripping white collapses to black, on 3-colour
+    // it leaves a smaller option set.
+    expect(move.removeOption, CellValue.white);
     // …and is given by the complicity itself, not a Constraint.
     expect(move.givenBy, puzzle.complicities.first);
     // Combination deduction: weight tier 3 (per docs/dev/complexity.md).
@@ -86,7 +90,7 @@ void main() {
       final move = pabs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 2);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
       expect(move.complexity, 3);
     });
 
@@ -101,7 +105,7 @@ void main() {
       final move = pabs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 1);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('apply returns null when FM and PA axes are orthogonal', () {
@@ -147,7 +151,7 @@ void main() {
       // Anchor 22 → top side rows 0..3 → [2, 7, 12, 17]. Cell 2 is
       // already 1 (matches first half) → next empty is 7, also 1.
       expect(move!.idx, 7);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('apply returns null when 3-cell FM leaves multiple survivors', () {
@@ -183,7 +187,7 @@ void main() {
         final move = pabs.apply(puzzle);
         expect(move, isNotNull);
         expect(move!.idx, 4);
-        expect(move.value, 2);
+        expect(move.value, CellValue.white);
         expect(move.complexity, 3);
       },
     );
@@ -218,7 +222,7 @@ void main() {
       final move = pabs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 3);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
       expect(move.complexity, 3);
     });
 
@@ -245,7 +249,7 @@ void main() {
       final move = pabs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 0);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
       expect(move.complexity, 3);
       // Rejection slug should be LT (no FM in the puzzle), letting the
       // hint UI render "PA + LT" instead of the generic "PA + other".
@@ -279,6 +283,53 @@ void main() {
       expect(move!.isImpossible, isNotNull);
       expect((move.givenBy as PABalancedSideComplicity).slugs, ('PA', '*'));
     });
+
+    test('domain-3: multinomial enumeration forces a cell via vertical FM', () {
+      // Domain {black, white, purple}, 3x4 grid. PA:9.top covers
+      // column 0 above cell 9 → cells [0, 3, 6] (length 3, target 1 of
+      // each colour). Cell 0 is pre-coloured purple, so the two free
+      // cells [3, 6] need one black + one white. FM:3.1 (vertical
+      // purple-above-black) forbids the (3=black) config, leaving only
+      // (3=white, 6=black) → cell 3 forced to white. PA alone could not
+      // force this: it only knows purple is done, not which of black /
+      // white lands where.
+      final puzzle = Puzzle('v2_123_3x4_300000000000_FM:3.1;PA:9.top_0:0_100');
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      final move = pabs.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.idx, 3);
+      expect(move.value, CellValue.white);
+      expect(move.complexity, 3);
+      expect((move.givenBy as PABalancedSideComplicity).slugs, ('PA', 'FM'));
+    });
+
+    test('domain-3: prunes a colour no survivor uses (removeOption)', () {
+      // Domain {black, white, purple}, 3x4 grid. PA:1.bottom covers
+      // column 1 below cell 1 → cells [4, 7, 10] (length 3, target 1 of
+      // each). The anchor cell 1 is pre-coloured black and sits just
+      // above cell 4. FM:1.3 (vertical black-above-purple) forbids any
+      // config with cell 4 = purple (cell 1 = black above it) and, run
+      // along the column, also cuts the configs that place purple right
+      // under another committed black. Of the six balanced colourings
+      // only (b,w,p) and (w,p,b) survive — both keep cell 4 ∈
+      // {black, white}, so cell 4 is not forced but purple is pruned
+      // from it.
+      final puzzle = Puzzle(
+        'v2_123_3x4_010000000000_PA:1.bottom;FM:1.3_0:0_100',
+      );
+      final pabs = puzzle.complicities
+          .whereType<PABalancedSideComplicity>()
+          .first;
+      final move = pabs.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.idx, 4);
+      expect(move.value, isNull);
+      expect(move.removeOption, CellValue.purple);
+      expect(move.complexity, 3);
+      expect((move.givenBy as PABalancedSideComplicity).slugs, ('PA', 'FM'));
+    });
   });
 
   group('SHGSComplicity', () {
@@ -298,13 +349,16 @@ void main() {
     });
 
     test('apply forces opposite colour when only one SH disagrees', () {
-      // SH:111 (color 1, size 3) + GS:0.2 → cell 0 must be 2.
+      // SH:111 (color 1, size 3) + GS:0.2 → cell 0 cannot be colour 1
+      // (its group has the wrong size for SH:111). On a 2-colour
+      // domain this collapses to "must be 2"; on 3-colour we emit
+      // `removeOption: 1`.
       final puzzle = Puzzle('v2_12_3x3_000000000_SH:111;GS:0.2_0:0_100');
       final shgs = puzzle.complicities.whereType<SHGSComplicity>().first;
       final move = shgs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 0);
-      expect(move.value, 2);
+      expect(move.removeOption, CellValue.black);
       expect(move.complexity, 3);
     });
 
@@ -327,6 +381,37 @@ void main() {
       final move = shgs.apply(puzzle);
       expect(move, isNull);
     });
+
+    test('3-colour: prunes an excluded colour while a viable one remains', () {
+      // domain {black, white, purple}. SH:111 (black, size 3) +
+      // SH:33 (purple, size 2) + GS:0.4 (cell 0, size 4): both black and
+      // purple are SH-excluded for cell 0, but white carries no SH so it
+      // stays viable. With a viable option left, the complicity prunes an
+      // excluded colour rather than forcing or declaring impossibility.
+      final puzzle = Puzzle('v2_123_3x3_000000000_SH:111;SH:33;GS:0.4_0:0_100');
+      final shgs = puzzle.complicities.whereType<SHGSComplicity>().first;
+      final move = shgs.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.idx, 0);
+      expect(move.removeOption, anyOf(CellValue.black, CellValue.purple));
+      expect(move.isImpossible, isNull);
+    });
+
+    test('3-colour: impossible when options are pruned to all-excluded', () {
+      // Same SH:111 + SH:33 + GS:0.4 setup, but cell 0's options are
+      // pre-pruned to {black, purple} (white removed by another rule).
+      // Both survivors are SH-excluded, so cell 0 can take no allowed
+      // colour → impossible. Regression: the old domain-length test
+      // (`excluded.length >= domain.length`, here 2 >= 3 → false) missed
+      // this and the removeOption loop would have collapsed cell 0 onto
+      // the excluded `purple` — an unsound force.
+      final puzzle = Puzzle('v2_123_3x3_000000000_SH:111;SH:33;GS:0.4_0:0_100');
+      puzzle.cells[0].removeOption(CellValue.white);
+      final shgs = puzzle.complicities.whereType<SHGSComplicity>().first;
+      final move = shgs.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
   });
 
   group('SYFMComplicity', () {
@@ -346,13 +431,14 @@ void main() {
       // vertical 1s.
       // Free neighbour cell 1 (above anchor) → mirror = cell 7 (below).
       // Hypothesis: cell 1 = 1 + cell 7 = 1, with anchor cell 4 = 1.
-      // Column 1 reads 1, 1, 1 → FM:1.1.1 violated → cell 1 must be 2.
+      // Column 1 reads 1, 1, 1 → FM:1.1.1 violated → cell 1 cannot be
+      // colour 1. On 2-colour this collapses to white.
       final puzzle = Puzzle('v2_12_3x3_000010000_SY:4.4;FM:1.1.1_0:0_100');
       final syfm = puzzle.complicities.whereType<SYFMComplicity>().first;
       final move = syfm.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 1);
-      expect(move.value, 2);
+      expect(move.removeOption, CellValue.black);
       expect(move.complexity, 4);
     });
 
@@ -402,7 +488,7 @@ void main() {
         expect(move.complexity, 4);
         // The forced value must be 2 — that's the unanimous outcome
         // of both hypotheses for the cells we expect to be determined.
-        expect(move.value, 2);
+        expect(move.value, CellValue.white);
       },
     );
 
@@ -430,7 +516,7 @@ void main() {
       final move = syfm.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 7);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
       expect(move.complexity, 4);
     });
   });
@@ -469,7 +555,7 @@ void main() {
       final move = ltgs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 1);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
       expect(move.complexity, 4);
     });
 
@@ -504,7 +590,7 @@ void main() {
       final move = ltgs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 2);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
   });
 
@@ -531,8 +617,9 @@ void main() {
 
     test('apply forces opposite when one anchor is coloured', () {
       // 5x5 grid roomy enough that GS reachability doesn't fire first.
-      // Cell 0 = 1, GS:0.3 + GS:1.5 → cell 1 must be 2 (sharing a
-      // group is impossible because the sizes disagree).
+      // Cell 0 = 1, GS:0.3 + GS:1.5 → cell 1 cannot be colour 1
+      // (sharing a group with cell 0 is impossible because the sizes
+      // disagree). On 2-colour, stripping `1` collapses to `2`.
       final puzzle = Puzzle(
         'v2_12_5x5_1000000000000000000000000_GS:0.3;GS:1.5_0:0_100',
       );
@@ -540,7 +627,7 @@ void main() {
       final move = gsgs.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 1);
-      expect(move.value, 2);
+      expect(move.removeOption, CellValue.black);
       expect(move.complexity, 3);
     });
 
@@ -605,7 +692,7 @@ void main() {
       final move = gsqa.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 0);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
       // Combination deduction: tier 3 (per docs/dev/complexity.md).
       expect(move.complexity, 3);
       expect(move.isImpossible, isNull);
@@ -636,10 +723,29 @@ void main() {
       expect(move, isNull);
     });
 
+    test('apply does not force when a same-colour cell can still join '
+        'the group', () {
+      // Regression: a 5x1 row `0 0 ■ 0 0` (cell 2 = 1). GS:0.3 + QA:1.3.
+      // Cell 2 sits 2 steps from the anchor (cell 0) through free cells,
+      // so a 3-cell black group {0, 1, 2} can absorb it: colouring cell 0
+      // black needs only 3 blacks total, exactly the cap. Black is
+      // therefore feasible and nothing is forced.
+      //
+      // The old `placedSameColor - immediateCluster` heuristic counted
+      // cell 2 as "outside" the group (it isn't in the anchor's committed
+      // cluster yet) and concluded 3 + 1 = 4 > 3 → wrongly forced cell 0
+      // white. The fix only counts a cell as out-of-group when its
+      // distance over {colour ∪ free} is ≥ the group size.
+      final puzzle = Puzzle('v2_12_5x1_00100_GS:0.3;QA:1.3_0:0_100');
+      final gsqa = puzzle.complicities.whereType<GSQAComplicity>().first;
+      expect(gsqa.apply(puzzle), isNull);
+    });
+
     test('apply accounts for same-colour cells outside the anchor group', () {
-      // Cell 24 = 1 (far corner, not reachable from cell 0). GS:0.5 +
-      // QA:1.5 — colouring cell 0 as 1 would create a 5-cell group of
-      // colour 1, plus the isolated cell 24, total 6 cells > QA cap 5
+      // Cell 24 = 1 (far corner). GS:0.5 + QA:1.5 — cell 24 is 8 steps
+      // from cell 0, more than the group size 5, so no 5-cell connected
+      // black group can ever contain both. Colouring cell 0 black then
+      // forces 5 (group) + 1 (cell 24) = 6 cells of colour 1 > QA cap 5
       // → colour 1 infeasible. Force cell 0 = 2.
       final puzzle = Puzzle(
         'v2_12_5x5_0000000000000000000000001_GS:0.5;QA:1.5_0:0_100',
@@ -648,7 +754,7 @@ void main() {
       final move = gsqa.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 0);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
     });
 
     test(
@@ -667,9 +773,47 @@ void main() {
         final move = gsqa.apply(puzzle);
         expect(move, isNotNull);
         expect(move!.idx, 0);
-        expect(move.value, 2);
+        expect(move.value, CellValue.white);
       },
     );
+
+    test(
+      'domain-3: prunes the single infeasible colour from a free anchor',
+      () {
+        // Domain {black, white, purple}. GS:0.5 needs a 5-cell group;
+        // QA:1.4 caps black at 4. Black is therefore infeasible for the
+        // anchor's group (5 > 4) but white and purple are both uncapped,
+        // so two colours survive. On a 3-colour domain the complicity can
+        // no longer force a single value — it prunes black from the free
+        // anchor's options instead (removeOption rather than setValue).
+        final puzzle = Puzzle(
+          'v2_123_5x5_0000000000000000000000000_GS:0.5;QA:1.4_0:0_100',
+        );
+        final gsqa = puzzle.complicities.whereType<GSQAComplicity>().first;
+        final move = gsqa.apply(puzzle);
+        expect(move, isNotNull);
+        expect(move!.idx, 0);
+        expect(move.value, isNull);
+        expect(move.removeOption, CellValue.black);
+        expect(move.complexity, 3);
+      },
+    );
+
+    test('domain-3: reports impossibility when the anchor holds the '
+        'infeasible colour', () {
+      // Same GS:0.5 + QA:1.4 on domain 3, but the anchor is already
+      // black — the very colour the QA cap rules out. Two other colours
+      // remain feasible, yet the committed anchor still contradicts the
+      // bound → explicit impossibility (the multi-feasible removeOption
+      // branch must not mask a committed-anchor contradiction).
+      final puzzle = Puzzle(
+        'v2_123_5x5_1000000000000000000000000_GS:0.5;QA:1.4_0:0_100',
+      );
+      final gsqa = puzzle.complicities.whereType<GSQAComplicity>().first;
+      final move = gsqa.apply(puzzle);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
   });
 
   group('GSAllComplicity', () {
@@ -695,7 +839,7 @@ void main() {
       final move = gsall.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 4);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
     });
 
     test('apply forces an empty anchor when only one colour is feasible', () {
@@ -710,7 +854,7 @@ void main() {
       final move = gsall.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 8);
-      expect(move.value, 2);
+      expect(move.value, CellValue.white);
       expect(move.complexity, 4);
     });
 
@@ -732,7 +876,7 @@ void main() {
         final move = gsall.apply(puzzle);
         expect(move, isNotNull);
         expect(move!.idx, 5);
-        expect(move.value, 1);
+        expect(move.value, CellValue.black);
         expect(move.complexity, 3);
       },
     );
@@ -789,13 +933,14 @@ void main() {
       // forbidden whenever a 3-cell vertical window fits. With cell
       // 6 = 1, the window at column 0 / rows 0–2 fixes the bottom
       // (cell 6 = 1); the synthesized motif then forces cell 3
-      // (the middle, row 1) away from value 2 → cell 3 = 1.
+      // (the middle, row 1) to drop the colour-2 option (collapses
+      // to colour 1 on a 2-colour domain).
       final puzzle = Puzzle('v2_12_3x4_000000100000_FM:2.2.1;FM:1.2.1_0:0_100');
       final fmfm = puzzle.complicities.whereType<FMFMComplicity>().first;
       final move = fmfm.apply(puzzle);
       expect(move, isNotNull);
       expect(move!.idx, 3);
-      expect(move.value, 1);
+      expect(move.removeOption, CellValue.white);
       expect(move.complexity, 4);
       // The move is attributed to the complicity itself, not to a
       // synthetic FM that the player would not see.

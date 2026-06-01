@@ -61,6 +61,13 @@ Future<void> _waitForAppReady(WidgetTester tester) async {
 Future<void> _waitForCreateTileInDrawer(WidgetTester tester) async {
   // The drawer's "Create" entry is gated by `database != null` — database
   // loading is async (file reads) and may not be done by the first settle.
+
+  // Tap the "Library" menu category
+  final libraryCategory = find.text("LIBRARY");
+  expect(libraryCategory, findsOneWidget);
+  await tester.tap(libraryCategory);
+  await tester.pumpAndSettle();
+
   for (int i = 0; i < 20; i++) {
     await tester.pump(const Duration(milliseconds: 500));
     final tile = find.descendant(

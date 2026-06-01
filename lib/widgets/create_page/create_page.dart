@@ -15,6 +15,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/chain.dart';
 import 'package:getsomepuzzle/widgets/majority.dart';
@@ -87,12 +88,12 @@ class _CreatePageState extends State<CreatePage> {
   Timer? _solveDebounce;
   Set<int> _propagationCells = {};
   Set<int> _forceCells = {};
-  Map<int, int> _solvedValues = {};
+  Map<int, CellValue> _solvedValues = {};
   int? _autoComplexity;
   String? _autoImpossibleBy;
   bool _autoSolving = false;
 
-  final Map<int, int> _fixedCells = {};
+  final Map<int, CellValue> _fixedCells = {};
 
   String _targetPlaylist = 'custom';
 
@@ -149,9 +150,11 @@ class _CreatePageState extends State<CreatePage> {
     if (!mounted) return;
     final propCells = <int>{};
     final frcCells = <int>{};
-    final values = <int, int>{};
+    final values = <int, CellValue>{};
     for (final step in result.steps) {
-      values[step.cellIdx] = step.value;
+      if (step.value != null) {
+        values[step.cellIdx] = step.value!;
+      }
       if (step.method == SolveMethod.propagation) {
         propCells.add(step.cellIdx);
       } else {
@@ -192,25 +195,51 @@ class _CreatePageState extends State<CreatePage> {
     final test = puzzle.clone();
     final stopwatch = Stopwatch()..start();
     String? impossibleBy;
+    solveLoop:
     for (int step = 0; step < 1000; step++) {
       if (stopwatch.elapsedMilliseconds > 10000) break;
       final m = test.findAMove(checkErrors: false);
       if (m == null) break;
-      if (m.isImpossible != null) {
-        impossibleBy = m.isImpossible!.serialize();
-        break;
+      switch (m) {
+        case Impossible(:final givenBy):
+          impossibleBy = givenBy.serialize();
+          break solveLoop;
+        case SetValue(
+          :final idx,
+          :final value,
+          :final complexity,
+          :final givenBy,
+        ):
+          test.setValue(idx, value);
+          steps.add(
+            SetValueStep(
+              cellIdx: idx,
+              value: value,
+              constraint: givenBy.serialize(),
+              method: SolveMethod.propagation,
+              complexity: complexity,
+            ),
+          );
+        case RemoveOption(
+          :final idx,
+          :final option,
+          :final complexity,
+          :final isForce,
+          :final forceDepth,
+          :final givenBy,
+        ):
+          test.removeOption(idx, option);
+          steps.add(
+            RemoveOptionStep(
+              cellIdx: idx,
+              option: option,
+              constraint: isForce ? '' : givenBy.serialize(),
+              method: isForce ? SolveMethod.force : SolveMethod.propagation,
+              forceDepth: isForce ? forceDepth : 0,
+              complexity: isForce ? 0 : complexity,
+            ),
+          );
       }
-      test.setValue(m.idx, m.value);
-      steps.add(
-        SolveStep(
-          cellIdx: m.idx,
-          value: m.value,
-          constraint: m.isForce ? '' : m.givenBy.serialize(),
-          method: m.isForce ? SolveMethod.force : SolveMethod.propagation,
-          forceDepth: m.isForce ? m.forceDepth : 0,
-          complexity: m.isForce ? 0 : m.complexity,
-        ),
-      );
       if (test.complete) break;
     }
     return (steps: steps, impossibleBy: impossibleBy);
@@ -231,7 +260,7 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Puzzle _buildPuzzle() {
-    final p = Puzzle.empty(_width, _height, [1, 2]);
+    final p = Puzzle.empty(_width, _height, defaultDomain);
     for (final entry in _fixedCells.entries) {
       p.cells[entry.key].setForSolver(entry.value);
       p.cells[entry.key].readonly = true;
@@ -374,9 +403,9 @@ class _CreatePageState extends State<CreatePage> {
         setState(() => _fixedCells.remove(cellIdx));
         _scheduleAutoSolve();
       case CellAction.fixBlack:
-        _setFixedCell(cellIdx, 1);
+        _setFixedCell(cellIdx, CellValue.black);
       case CellAction.fixWhite:
-        _setFixedCell(cellIdx, 2);
+        _setFixedCell(cellIdx, CellValue.white);
     }
   }
 
@@ -483,10 +512,10 @@ class _CreatePageState extends State<CreatePage> {
       case ConstraintType.chain:
         added = await showChainDialog(context);
       case ConstraintType.fixBlack:
-        _setFixedCell(cellIdx, 1);
+        _setFixedCell(cellIdx, CellValue.black);
         return;
       case ConstraintType.fixWhite:
-        _setFixedCell(cellIdx, 2);
+        _setFixedCell(cellIdx, CellValue.white);
         return;
     }
     if (added != null) _addConstraint(added);
@@ -586,7 +615,7 @@ class _CreatePageState extends State<CreatePage> {
     });
   }
 
-  void _setFixedCell(int cellIdx, int value) {
+  void _setFixedCell(int cellIdx, CellValue value) {
     setState(() {
       if (_fixedCells[cellIdx] == value) {
         _fixedCells.remove(cellIdx);
@@ -939,7 +968,7 @@ class _CreatePageState extends State<CreatePage> {
                     constraint: constraint,
                     actualCount: 0,
                     oppositeActual: 0,
-                    oppositeTotal: (_width * _height) - constraint.value,
+                    oppositeTotal: (_width * _height) - constraint.count,
                     cellSize: topBarSize,
                   ),
                 )
@@ -1154,7 +1183,7 @@ class _CreatePageState extends State<CreatePage> {
     final fixedValue = _fixedCells[cellIdx];
     final isFixed = fixedValue != null;
 
-    final cellValue = isFixed ? fixedValue : 0;
+    final cellValue = isFixed ? fixedValue : CellValue.free;
 
     Color? borderColor;
     double? borderWidth;

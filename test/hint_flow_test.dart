@@ -2,16 +2,33 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 
-/// Heavy-prefilled 6x7 puzzle that is fully solvable by propagation. Reused
-/// from `solve_explained_test.dart` — guarantees `findAMove` returns a real
-/// deducible move once the help debounce fires.
-PuzzleData _deducibleFixture() => PuzzleData(
-  'v2_12_6x7_002000210001022011020210200200100010202211_FM:12;FM:1.1.2;PA:17.top_0:0_0',
-);
+/// Minimal puzzle whose first deducible move is a **setValue** (not a
+/// `removeOption`). `LT:A.0.4` with cell 0 already coloured black forces
+/// cell 4 to the same colour through a `Move(value: black)`. This shape
+/// matters because `GameModel._applyHelpMove` currently only handles the
+/// `value` branch — applying a `removeOption` hint is a TODO tracked in
+/// `docs/dev/third_color.md`. Any fixture whose first hint were a
+/// `removeOption` (typically FM/PA/CC) would make tap 4 a no-op and the
+/// stage-3-then-apply cycle untestable.
+PuzzleData _deducibleFixture() =>
+    PuzzleData('v2_12_3x3_100000000_LT:A.0.4_0:0_0');
+
+/// Same shape as [_deducibleFixture] but with an embedded solution
+/// (field 5 = `1:<cells>`), so `cachedSolution` is populated straight
+/// from the line. The addConstraint search
+/// ([GameModel.startHintConstraintComputation]) only starts when a
+/// cached solution is present — `_deducibleFixture` alone never yields
+/// one because the lone LT leaves seven cells undeducible, so
+/// `computeComplexity` cannot complete a solve. The all-black solution
+/// is consistent with the given (cell 0 black) and the LT (cells 0, 4
+/// share a colour).
+PuzzleData _searchableFixture() =>
+    PuzzleData('v2_12_3x3_100000000_LT:A.0.4_1:111111111_0');
 
 /// Empty 2x2 with no real constraints. `findAMove` will return null because
 /// nothing is deducible — used to exercise the `helpMove == null` guards.
@@ -28,7 +45,14 @@ const HintTexts _texts = HintTexts(
   hintConstraintAdded: 'constraint added',
   hintConstraintInprogress: 'in progress',
   hintConstraintNone: 'no more constraints',
+  hintCellOptionRemovable: 'cell option removable',
+  hintForceRemoveOption: 'force remove option',
+  hintRemoveOptionDeducedFrom: _hintRemoveOptionDeducedFrom,
 );
+
+String _hintRemoveOptionDeducedFrom(CanApply givenBy) => givenBy is Constraint
+    ? 'remove option from ${givenBy.slug}'
+    : 'remove option from ${givenBy.serialize()}';
 
 String _hintDeducedFrom(CanApply givenBy) => givenBy is Constraint
     ? 'deduced from ${givenBy.slug}'
@@ -88,6 +112,50 @@ void main() {
         game.dispose();
       });
     });
+
+    test(
+      'on a complete & valid puzzle, tap past stage 1 invokes onPuzzleCompleted',
+      () {
+        fakeAsync((async) {
+          final game = GameModel();
+          final settings = Settings(hintType: HintType.deducibleCell);
+          // Empty 2x2 with no constraints: any filled grid is trivially
+          // valid, so writing a value into every cell brings the puzzle
+          // to the "complete & valid" state needed by the new branch.
+          game.openPuzzle(_emptyFixture(), 1);
+          for (var i = 0; i < 4; i++) {
+            game.currentPuzzle!.setValue(i, CellValue.black);
+          }
+          async.elapse(const Duration(milliseconds: 350));
+
+          var nextPuzzleCalls = 0;
+          // Tap 1: existing "all correct so far" message, no advance.
+          game.onHintTap(
+            settings,
+            _texts,
+            onPuzzleCompleted: () => nextPuzzleCalls++,
+          );
+          expect(game.hintText, 'all correct');
+          expect(nextPuzzleCalls, 0);
+          expect(game.hintStage, 1);
+
+          // Tap 2: puzzle is complete and valid → repurpose as next puzzle.
+          game.onHintTap(
+            settings,
+            _texts,
+            onPuzzleCompleted: () => nextPuzzleCalls++,
+          );
+          expect(nextPuzzleCalls, 1);
+          expect(
+            game.hintStage,
+            0,
+            reason: 'cycle must reset after firing onPuzzleCompleted',
+          );
+
+          game.dispose();
+        });
+      },
+    );
 
     test('reaching stage 3 increments the hint counter exactly once', () {
       fakeAsync((async) {
@@ -205,9 +273,8 @@ void main() {
       final game = GameModel();
       final settings = Settings(hintType: HintType.addConstraint);
       game.hintType = HintType.addConstraint;
-      game.openPuzzle(_deducibleFixture(), 1);
-      // forPuzzle needs a cached solution; computeComplexity populates it.
-      game.currentPuzzle!.computeComplexity(force: true);
+      // Carries an embedded solution so the search has a target to aim at.
+      game.openPuzzle(_searchableFixture(), 1);
 
       game.onHintTap(settings, _texts); // stage 0 → 1, triggers the search
       expect(game.hintStage, 1);
@@ -321,13 +388,16 @@ void main() {
       final game = GameModel();
       final settings = Settings(hintType: HintType.addConstraint);
       game.hintType = HintType.addConstraint;
-      game.openPuzzle(_deducibleFixture(), 1);
-      game.currentPuzzle!.computeComplexity(force: true);
+      // Embedded solution → the error pass has a reference to diverge from.
+      game.openPuzzle(_searchableFixture(), 1);
 
       // Fill a free cell with the wrong colour so tap 1 reports an error.
       final cell = game.currentPuzzle!.cells.firstWhere((c) => !c.readonly);
       final correct = game.currentPuzzle!.cachedSolution![cell.idx];
-      game.currentPuzzle!.setValue(cell.idx, correct == 1 ? 2 : 1);
+      game.currentPuzzle!.setValue(
+        cell.idx,
+        correct == CellValue.black ? CellValue.white : CellValue.black,
+      );
 
       game.onHintTap(settings, _texts); // stage 0 → 1, error pass
       expect(game.hintIsError, isTrue, reason: 'tap 1 must flag the mistake');
@@ -401,7 +471,7 @@ void main() {
       final game = GameModel();
       final settings = Settings(hintType: HintType.deducibleCell);
       game.openPuzzle(_deducibleFixture(), 1);
-      final before = List<int>.from(game.currentPuzzle!.cellValues);
+      final before = List<CellValue>.from(game.currentPuzzle!.cellValues);
       expect(game.helpMove, isNull);
 
       game.onHintTap(settings, _texts); // 0 → 1: errors path always works

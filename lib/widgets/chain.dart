@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 
-const _textColors = {0: Colors.transparent, 1: Colors.black, 2: Colors.white};
+const _textColors = {
+  CellValue.free: Colors.transparent,
+  CellValue.black: Colors.black,
+  CellValue.white: Colors.white,
+  CellValue.purple: Color(0xFF8E44AD),
+};
 
 /// Fixed 6×6 path cells for vertical (top→bottom) chain.
 const _chainPathCells = {1, 7, 8, 14, 15, 21, 22, 28, 34};

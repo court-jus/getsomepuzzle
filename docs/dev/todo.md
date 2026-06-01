@@ -1,5 +1,42 @@
 # TODO
 
+## Solver soundness: 3-colour audit, round 2 — DONE (pending corpus `--check`)
+
+The "too-lenient on pruned options" sweep is complete (the dual of the
+2026-05-13 too-strict audit). Every `verify` / `apply` / `isCompleteFor` in
+`constraints/` and every `apply` in `constraints/complicities/` was checked
+for code that counts a still-`free` cell as able to take a colour already
+pruned from its `options`. Fixes shipped (see `third_color.md` § "Solver
+soundness audit, round 2" for the per-constraint record):
+
+* **GC** — the new-group predicate is now the single option-aware helper
+  `getFreeCellsThatCanStartNewColorGroup` (replacing the split
+  `getFreeCellsWithoutNeighborColor` + ad-hoc `.where` convention) at all
+  five sites.
+* **EY** — `_scan` now treats a free cell pruned of `color` as a sight
+  blocker (was: counted as a fillable empty → over-counted `max`, unsound).
+* **SH** — `isOpen` (verify + apply) is option-aware: a group fenced in by
+  cells pruned of its colour is closed, not "still growing" (was: undersized
+  frozen group passed verify, unsound).
+* **NC** — `isCompleteFor` greys out once the only free neighbours are pruned
+  of `color` (invariant alignment, matching GC).
+* **SHGS complicity** — impossibility judged on the cell's options, not the
+  full domain (was: collapsed a cell onto an excluded colour, unsound).
+
+Audited and already sound (no change): QA / NC / PA / MJ / base-line `verify`
+(option-aware), GS growth and LT virtual groups (option-aware `groups.dart`
+helpers), CH `_passable` (round-1), and the other complicities. Conservative
+`isCompleteFor` predicates (QA, MJ, PA, DF, base-line) only ever grey out
+late, never early — sound, left as-is.
+
+Regressions added: `constraints_test.dart` (GC ×2, EY, NC),
+`shape_utils_test.dart` (SH), `complicities_test.dart` (SHGS ×2).
+
+**Remaining (release gate):** re-run `--check` over the 3-colour corpus.
+EY/SH/GC `verify` are now stricter, so some lines previously accepted may be
+flagged as genuinely multi-solution — drop those, exactly as the round-1
+audit did. Unit tests are green but do not substitute for the corpus pass.
+
 ## Solver improvements
 
 ### Hint constraint: selection strategy refinements
@@ -46,6 +83,36 @@ keeps retrying until the global `maxTime` budget runs out.
 failures (5 is the value used in early sketches) add the target's `key` to
 a session blacklist passed to `pickTarget` so the loop falls back to the
 next-deepest gap. Reset on successful generation or on warm-up.
+
+## Generator code health
+
+* **Refactor `generator/generator.dart`.** The file grew from ~534 to ~1302
+  lines absorbing the strategies (`phaseGate`, `propOnly`, `singleTier`,
+  `phase1Oneshot`), watchdogs, the `secondChance` queue, the targeted sort and
+  the multi-strat round-robin. Well documented in `third_color.md` but dense.
+  Suggested extraction (not urgent — do it if a new strategy is added):
+  * `generator/strategy.dart` — enum `GenerationStrategy` + dispatcher
+  * `generator/strategies/{phase_gate,prop_only,single_tier}.dart`
+  * `generator/targeted_sort.dart` — `_generateTargetedKeys`, `_StageTimer`,
+    the `ratioBefore` cache machinery
+  * `generateOne` stays in `generator.dart` and delegates.
+* **Strategy test coverage.** `propOnly` / `phase1Oneshot` / `singleTier` have
+  no unit test (validated only via external benchmarks — consistent with the
+  "no generator smoke tests" convention, but a silent-regression risk). Idea:
+  a parameterised canary that runs `generateOne` per strategy on a
+  deterministic seed + minimal grid (3x3 domain 2) and checks a valid puzzle
+  is produced within a reasonable budget. Not a quality test, just a tripwire.
+
+## Notes and nits
+
+* **`apply()` ordering determinism.** `Puzzle.apply()` iterates sequentially
+  and returns the first match; `sortConstraintsByDifficulty` reorders by min
+  complexity, so the constraint order drives the trace. Documented in that
+  method's docstring. No action — a reminder that determinism holds only while
+  the constraint order is stable between runs; mind it when changing the sort.
+* **`Cell.removeOption` dead state.** Removing a cell's last option leaves
+  `value == free`, `options == []` (an unsignalled dead state). Unreachable
+  via the solver (a 2→1 prune auto-collapses to `setValue`); defensive only.
 
 ## Quality of the gameplay
 
@@ -112,3 +179,7 @@ docs):
     without GMS, and the user can disable cloud backup system-wide.
   - Decide whether to opt in for *all* app data (simpler) or whitelist
     only the stats subtree (safer in case we ever persist secrets).
+
+## Editor
+
+* The RowCount constraint is missing

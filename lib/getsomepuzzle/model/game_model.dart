@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
@@ -111,9 +110,9 @@ class GameModel extends ChangeNotifier {
   Set<String> learnedHintSlugs = const <String>{};
 
   // --- Drag state ---
-  int? firstDragValue;
+  CellValue? firstDragValue;
   int? lastDragIdx;
-  int? firstRightDragValue;
+  CellValue? firstRightDragValue;
   int? lastRightDragIdx;
 
   /// Cell index of an in-flight right-click whose toggle is **deferred**
@@ -407,11 +406,21 @@ class GameModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// Returns true if the tap was handled (cell was toggled).
-  bool handleTap(int idx) {
+  ///
+  /// [removeOptionMode] switches a free cell's tap from the regular
+  /// `incrValue` cycle to the option-pruning cycle (only meaningful on
+  /// 3+ colour puzzles — collapses to `incrValue` everywhere else).
+  /// When the cell already has a value, both modes share the same
+  /// behaviour so the player never gets "stuck" on a coloured cell.
+  bool handleTap(int idx, {bool removeOptionMode = false}) {
     if (currentPuzzle == null) return false;
     if (currentPuzzle!.cells[idx].readonly) return false;
     _beforeMutation();
-    currentPuzzle!.incrValue(idx);
+    if (removeOptionMode && currentPuzzle!.domain.length > 2) {
+      currentPuzzle!.cycleRemoveOption(idx);
+    } else {
+      currentPuzzle!.incrValue(idx);
+    }
     currentMeta?.stats?.recordCellEdit();
     currentPuzzle!.clearConstraintsValidity();
     if (history.isEmpty || history.last != idx) history.add(idx);
@@ -427,23 +436,42 @@ class GameModel extends ChangeNotifier {
     _beforeMutation();
     lastDragIdx = idx;
     if (firstDragValue == null) {
-      final myOpposite = currentPuzzle!.domain
-          .whereNot((e) => e == currentPuzzle!.cellValues[idx])
-          .first;
-      firstDragValue = myOpposite;
-      currentPuzzle!.setValue(idx, firstDragValue!);
-      currentMeta?.stats?.recordCellEdit();
-      if (history.isEmpty || history.last != idx) history.add(idx);
-      _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
-    }
-    if (currentPuzzle!.cellValues[idx] != firstDragValue &&
-        currentPuzzle!.cellValues[idx] == 0) {
-      currentPuzzle!.setValue(idx, firstDragValue!);
-      currentMeta?.stats?.recordCellEdit();
-      if (history.isEmpty || history.last != idx) history.add(idx);
-      _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
+      // First cell of the drag: pick the *next* colour in the cycle
+      // (so the drag mirrors what a tap would do). Paint the initial
+      // cell unconditionally, then lock that value for the rest of
+      // the drag.
+      firstDragValue = _nextCycle(currentPuzzle!.cellValues[idx]);
+      _applyLeftDragPaint(idx);
+    } else if (firstDragValue != CellValue.free &&
+        currentPuzzle!.cellValues[idx] == CellValue.free) {
+      // Subsequent cells: only repaint *free* cells, never overwrite
+      // an already-coloured cell. When the cycle's "next" value is
+      // free (drag starting on the domain's last colour), there's no
+      // useful repaint to do — the initial cell was reset, the rest
+      // is left alone.
+      _applyLeftDragPaint(idx);
     }
     notifyListeners();
+  }
+
+  /// Apply [firstDragValue] to cell [idx]. Free target uses [resetCell]
+  /// so the cell's options are restored to the full domain (otherwise it
+  /// would land in the degenerate `value = free, options = []` state).
+  void _applyLeftDragPaint(int idx) {
+    if (firstDragValue == CellValue.free) {
+      if (currentPuzzle!.cells[idx].value == CellValue.free) return;
+      currentPuzzle!.resetCell(idx);
+      currentPuzzle!.updateConstraintStatus();
+    } else {
+      // `ignoreOptions` because painting overrides any option-pruning the
+      // player did on that cell — and an already-coloured start cell has
+      // empty options, so the unguarded setValue would throw RangeError.
+      // Mirrors the right-drag path (`_commitRightPaint` / `decrValue`).
+      currentPuzzle!.setValue(idx, firstDragValue!, ignoreOptions: true);
+    }
+    currentMeta?.stats?.recordCellEdit();
+    if (history.isEmpty || history.last != idx) history.add(idx);
+    _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
   }
 
   void handleDragEnd() {
@@ -462,45 +490,69 @@ class GameModel extends ChangeNotifier {
     if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
     if (lastRightDragIdx != null && idx == lastRightDragIdx) return;
     final currentValue = currentPuzzle!.cellValues[idx];
-    if (firstRightDragValue == null && currentValue == 1) return;
 
     if (firstRightDragValue == null) {
-      // First event of a right-button gesture (pointer-down on a cell
-      // whose value is not black). Defer the toggle: we don't know
-      // yet whether this is a single click (commit on release) or a
-      // drag (commit at the moment the user moves to another cell).
-      firstRightDragValue = currentValue == 0 ? 2 : 0;
+      // First event of a right-button gesture. The deferred-commit
+      // dance with [_pendingRightClickIdx] is kept: a lone press-and-
+      // release acts as a right-click (committed at pointer-up), while
+      // a move to another cell flushes the initial cell and starts
+      // painting. The cached value is the *paint target* used on the
+      // subsequent cells of a right-drag — derived from the initial
+      // cell's colour through the cycle's previous step so the right
+      // gesture mirrors the right-click cycle (free → domain.last,
+      // domain[i] → domain[i-1], domain[0] → free).
+      firstRightDragValue = _prevCycle(currentValue);
       _pendingRightClickIdx = idx;
       lastRightDragIdx = idx;
       return;
     }
 
     // Subsequent event on a *different* cell: a drag is happening.
-    // Flush the deferred initial click first (logged as a click,
-    // since at the time it was committed the user hadn't moved yet),
-    // then paint the new cell if it sits at the opposite value.
+    // Flush the deferred initial cell (which applies a [decrValue],
+    // i.e. one step backward in the cycle), then paint the new cell
+    // if it is free. We never overwrite an already-coloured cell on
+    // a right-drag — symmetric with the left-drag.
     _beforeMutation();
     lastRightDragIdx = idx;
     if (_pendingRightClickIdx != null) {
-      _commitRightToggle(_pendingRightClickIdx!, isDrag: false);
+      _commitRightDecr(_pendingRightClickIdx!, isDrag: false);
       _pendingRightClickIdx = null;
     }
-    final oppositeValue = firstRightDragValue == 0 ? 2 : 0;
-    if (currentValue == oppositeValue) {
-      _commitRightToggle(idx, isDrag: true);
+    if (firstRightDragValue != CellValue.free &&
+        currentValue == CellValue.free) {
+      _commitRightPaint(idx);
     }
     notifyListeners();
   }
 
-  void _commitRightToggle(int idx, {required bool isDrag}) {
-    final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
+  /// Apply [Puzzle.decrValue] to the initial cell of a right gesture.
+  /// Used both for a pure right-click (release without move) and as
+  /// the deferred commit when a right-drag starts moving away from
+  /// the initial cell.
+  void _commitRightDecr(int idx, {required bool isDrag}) {
+    final before = currentPuzzle!.cellValues[idx];
+    currentPuzzle!.decrValue(idx);
+    final after = currentPuzzle!.cellValues[idx];
+    if (before != after) {
+      currentMeta?.stats?.recordCellEdit();
+      if (history.isEmpty || history.last != idx) history.add(idx);
+      _log.fine('${isDrag ? "right-drag" : "right-click"} cell $idx → $after');
+    }
+  }
+
+  /// Paint the [firstRightDragValue] colour on a free cell traversed
+  /// during a right-drag. Caller must have already checked the target
+  /// is not free and the cell currently holds [CellValue.free].
+  void _commitRightPaint(int idx) {
+    final changed = currentPuzzle!.setValue(
+      idx,
+      firstRightDragValue!,
+      ignoreOptions: true,
+    );
     if (changed) {
       currentMeta?.stats?.recordCellEdit();
       if (history.isEmpty || history.last != idx) history.add(idx);
-      _log.fine(
-        '${isDrag ? "right-drag" : "right-click"} cell $idx '
-        '→ ${currentPuzzle!.cellValues[idx]}',
-      );
+      _log.fine('right-drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
     }
   }
 
@@ -517,13 +569,62 @@ class GameModel extends ChangeNotifier {
     // left button live.
     if (_pendingRightClickIdx != null) {
       _beforeMutation();
-      _commitRightToggle(_pendingRightClickIdx!, isDrag: false);
+      _commitRightDecr(_pendingRightClickIdx!, isDrag: false);
       _pendingRightClickIdx = null;
     }
     _log.fine('right-drag end');
     firstRightDragValue = null;
     lastRightDragIdx = null;
     _afterMutation();
+  }
+
+  /// Long-press on a cell — mobile fallback for the right-click cycle.
+  /// On desktop the right-click reaches the same goal, but mobile has
+  /// no secondary mouse button so the player needs another way to step
+  /// backward through the cycle (most importantly: reach `domain.last`
+  /// in one tap instead of N). Mode-agnostic: it stays a "go to the
+  /// previous colour" shortcut even when [removeOptionMode] is on.
+  bool handleLongPress(int idx, {bool removeOptionMode = false}) {
+    if (currentPuzzle == null) return false;
+    if (currentPuzzle!.cells[idx].readonly) return false;
+    _beforeMutation();
+    final before = currentPuzzle!.cellValues[idx];
+    currentPuzzle!.decrValue(idx);
+    final after = currentPuzzle!.cellValues[idx];
+    if (before == after) {
+      // No change (degenerate domain or already-blocked cell) — skip
+      // the recordCellEdit / history bookkeeping but still flush state.
+      _afterMutation();
+      return false;
+    }
+    currentMeta?.stats?.recordCellEdit();
+    currentPuzzle!.clearConstraintsValidity();
+    if (history.isEmpty || history.last != idx) history.add(idx);
+    _log.fine('long-press cell $idx → $after');
+    _afterMutation();
+    return true;
+  }
+
+  /// One step forward in the puzzle's colour cycle. Used to derive a
+  /// left-drag's paint target from the first touched cell's colour, so
+  /// the drag stays in sync with a regular tap.
+  CellValue _nextCycle(CellValue v) {
+    final domain = currentPuzzle!.domain;
+    if (domain.isEmpty) return CellValue.free;
+    if (v == CellValue.free) return domain.first;
+    final i = domain.indexOf(v);
+    if (i < 0 || i == domain.length - 1) return CellValue.free;
+    return domain[i + 1];
+  }
+
+  /// Mirror of [_nextCycle] used by right-drag and long-press handlers.
+  CellValue _prevCycle(CellValue v) {
+    final domain = currentPuzzle!.domain;
+    if (domain.isEmpty) return CellValue.free;
+    if (v == CellValue.free) return domain.last;
+    final i = domain.indexOf(v);
+    if (i <= 0) return CellValue.free;
+    return domain[i - 1];
   }
 
   // ---------------------------------------------------------------------------
@@ -645,7 +746,18 @@ class GameModel extends ChangeNotifier {
   /// modes only differ on what subsequent taps do. The caller pre-resolves
   /// every l10n string into [texts]; this method picks the right one for the
   /// stage being entered.
-  void onHintTap(Settings settings, HintTexts texts) {
+  ///
+  /// [onPuzzleCompleted] is invoked when the player taps the hint button on
+  /// a fully-and-validly-completed puzzle past stage 1. Tap 1 still shows
+  /// the "everything filled so far is correct" message (since no error /
+  /// no wrong cell can be surfaced); the next tap repurposes the hint
+  /// button as a "next puzzle" trigger so the player keeps moving without
+  /// having to find a separate UI control.
+  void onHintTap(
+    Settings settings,
+    HintTexts texts, {
+    void Function()? onPuzzleCompleted,
+  }) {
     if (currentPuzzle == null) return;
     final mode = settings.hintType;
     _log.fine('hint tap: stage=$hintStage mode=$mode');
@@ -668,6 +780,18 @@ class GameModel extends ChangeNotifier {
         startHintConstraintComputation();
       }
       notifyListeners();
+      return;
+    }
+
+    // Past stage 1, on a complete-and-valid puzzle there is nothing left
+    // to deduce — repurpose the next tap as "advance to the next puzzle"
+    // so the player doesn't get stuck pressing a no-op button.
+    if (currentPuzzle!.complete &&
+        currentPuzzle!.check(saveResult: false).isEmpty) {
+      if (onPuzzleCompleted != null) {
+        onPuzzleCompleted();
+        resetHintCycle();
+      }
       return;
     }
 
@@ -739,10 +863,22 @@ class GameModel extends ChangeNotifier {
   /// No-op if [helpMove] hasn't been computed (debounce race or puzzle
   /// already solved); the next tap will retry from the current stage.
   void _revealCellOnly(HintTexts texts) {
-    if (helpMove == null) return;
+    final move = helpMove;
+    if (move == null) return;
     currentPuzzle!.clearHighlights();
-    currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-    hintText = texts.hintCellDeducible;
+    switch (move) {
+      case SetValue(:final idx):
+        currentPuzzle!.cells[idx].isHighlighted = true;
+        hintText = texts.hintCellDeducible;
+      case RemoveOption(:final idx):
+        currentPuzzle!.cells[idx].isHighlighted = true;
+        hintText = texts.hintCellOptionRemovable;
+      case Impossible():
+        // A contradiction has no single deducible cell to highlight at this
+        // stage; tap 3 (_revealCellAndConstraint) surfaces it as
+        // `hintImpossible`.
+        break;
+    }
     hintIsError = false;
   }
 
@@ -750,27 +886,32 @@ class GameModel extends ChangeNotifier {
   /// triggers the arrow widget (see `widgets/puzzle.dart`). Increment the
   /// hint counter here: this is the "real" reveal — tap 1 is diagnostic only.
   void _revealCellAndConstraint(HintTexts texts) {
-    if (helpMove == null) return;
+    final move = helpMove;
+    if (move == null) return;
     currentPuzzle!.clearHighlights();
-    if (helpMove!.isImpossible != null) {
-      final impossibleSource = helpMove!.isImpossible;
-      // Only Constraints carry the `isValid` UI flag; complicities
-      // currently have no on-screen representation, so we just skip the
-      // highlight in that branch.
-      if (impossibleSource is Constraint) impossibleSource.isValid = false;
-      hintText = texts.hintImpossible;
-      hintIsError = true;
-    } else {
-      if (helpMove!.isForce) {
-        currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-        hintText = texts.hintForce;
-      } else {
-        final givenBy = helpMove!.givenBy;
+    switch (move) {
+      case Impossible(:final givenBy):
+        // Only Constraints carry the `isValid` UI flag; complicities
+        // currently have no on-screen representation, so we just skip the
+        // highlight in that branch.
+        if (givenBy is Constraint) givenBy.isValid = false;
+        hintText = texts.hintImpossible;
+        hintIsError = true;
+      case RemoveOption(:final idx, :final isForce, :final givenBy):
+        currentPuzzle!.cells[idx].isHighlighted = true;
+        if (isForce) {
+          hintText = texts.hintForceRemoveOption;
+        } else {
+          if (givenBy is Constraint) givenBy.isHighlighted = true;
+          hintText = texts.hintRemoveOptionDeducedFrom(givenBy);
+        }
+        hintIsError = false;
+      case SetValue(:final idx, :final givenBy):
+        // A setValue is never a force (forces always emit removeOption).
         if (givenBy is Constraint) givenBy.isHighlighted = true;
-        currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
+        currentPuzzle!.cells[idx].isHighlighted = true;
         hintText = texts.hintDeducedFrom(givenBy);
-      }
-      hintIsError = false;
+        hintIsError = false;
     }
     if (currentMeta != null) {
       currentMeta!.hints += 1;
@@ -780,11 +921,27 @@ class GameModel extends ChangeNotifier {
 
   /// Tap 4 of `deducibleCell` — apply the move. Triggers `_afterMutation`,
   /// which resets [hintStage] and recomputes the next [helpMove].
+  ///
+  /// Two move shapes are supported: `setValue` (the cell takes a concrete
+  /// colour) and `removeOption` (the cell loses one possible colour but
+  /// stays free, unless it was the last option in which case
+  /// `Cell.removeOption` auto-collapses to a setValue).
   void _applyHelpMove() {
-    if (helpMove == null) return;
-    currentPuzzle!.setValue(helpMove!.idx, helpMove!.value);
-    history.add(helpMove!.idx);
-    _afterMutation();
+    final move = helpMove;
+    if (move == null) return;
+    switch (move) {
+      case SetValue(:final idx, :final value):
+        currentPuzzle!.setValue(idx, value, ignoreOptions: true);
+        history.add(idx);
+        _afterMutation();
+      case RemoveOption(:final idx, :final option):
+        currentPuzzle!.removeOption(idx, option);
+        history.add(idx);
+        _afterMutation();
+      case Impossible():
+        // Nothing to apply for a contradiction (matches the prior no-op).
+        break;
+    }
   }
 
   /// Tap 2 of `addConstraint` — attach the next useful constraint, or
@@ -984,6 +1141,13 @@ class HintTexts {
   final String hintConstraintInprogress;
   final String hintConstraintNone;
 
+  /// Variants used when the help move is a `removeOption` rather than a
+  /// `setValue`. Same shape as their siblings above, but phrased in terms
+  /// of "an option can be removed" rather than "the cell can be deduced".
+  final String hintCellOptionRemovable;
+  final String hintForceRemoveOption;
+  final String Function(CanApply givenBy) hintRemoveOptionDeducedFrom;
+
   const HintTexts({
     required this.someConstraintsInvalid,
     required this.hintCellWrong,
@@ -995,5 +1159,8 @@ class HintTexts {
     required this.hintConstraintAdded,
     required this.hintConstraintInprogress,
     required this.hintConstraintNone,
+    required this.hintCellOptionRemovable,
+    required this.hintForceRemoveOption,
+    required this.hintRemoveOptionDeducedFrom,
   });
 }

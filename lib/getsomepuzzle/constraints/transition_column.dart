@@ -54,7 +54,7 @@ final class ColumnTransitionConstraint extends LineCentricConstraint {
   static List<String> generateAllParameters(
     int width,
     int height,
-    List<int> domain,
+    List<CellValue> domain,
     Set<int>? excludedIndices,
   ) {
     return generateAllTransitionParams(width, height - 1);

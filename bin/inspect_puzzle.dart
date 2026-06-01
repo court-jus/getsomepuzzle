@@ -17,21 +17,24 @@ import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-String _gridString(List<int> values, int width) {
+String _gridString(List<CellValue> values, int width) {
   final sb = StringBuffer();
   for (int i = 0; i < values.length; i++) {
     final v = values[i];
     String ch;
-    if (v == 0) {
+    if (v == CellValue.free) {
       ch = '.';
-    } else if (v == 1) {
+    } else if (v == CellValue.black) {
       ch = '#';
-    } else if (v == 2) {
+    } else if (v == CellValue.white) {
       ch = 'o';
+    } else if (v == CellValue.purple) {
+      ch = '¤';
     } else {
-      ch = v.toString();
+      ch = v.name;
     }
     sb.write(ch);
     sb.write(' ');
@@ -50,7 +53,7 @@ void main(List<String> args) {
   String? line;
   int enumLimit = 5;
   bool runEnum = true;
-  final branches = <int, int>{};
+  final branches = <int, CellValue>{};
 
   for (int i = 0; i < args.length; i++) {
     final a = args[i];
@@ -64,7 +67,7 @@ void main(List<String> args) {
         stderr.writeln('--branch expects IDX=VAL');
         exit(1);
       }
-      branches[int.parse(parts[0])] = int.parse(parts[1]);
+      branches[int.parse(parts[0])] = cellRepresentationToValue(parts[1]);
     } else if (a == '-h' || a == '--help') {
       stderr.writeln(
         'Usage: dart run bin/inspect_puzzle.dart "<v2_...>" '
@@ -122,7 +125,11 @@ void main(List<String> args) {
       'step ${(i + 1).toString().padLeft(3)}: '
       '${_coord(s.cellIdx, replay.width)} = ${s.value}  [$method]$reason',
     );
-    replay.setValue(s.cellIdx, s.value);
+    if (s.value != null) {
+      replay.setValue(s.cellIdx, s.value!);
+    } else if (s.removeOption != null) {
+      replay.removeOption(s.cellIdx, s.removeOption!);
+    }
   }
   stdout.writeln('');
   stdout.writeln('Grid after trace:');
@@ -151,7 +158,11 @@ void main(List<String> args) {
       '${branches.entries.map((e) => '${_coord(e.key, branched.width)}=${e.value}').join(', ')}',
     );
     for (int i = 0; i < stopAt; i++) {
-      branched.setValue(steps[i].cellIdx, steps[i].value);
+      if (steps[i].value != null) {
+        branched.setValue(steps[i].cellIdx, steps[i].value!);
+      } else if (steps[i].removeOption != null) {
+        branched.removeOption(steps[i].cellIdx, steps[i].removeOption!);
+      }
     }
     for (final entry in branches.entries) {
       branched.setValue(entry.key, entry.value);
@@ -200,7 +211,11 @@ void main(List<String> args) {
         '${_coord(m.idx, branched.width)} = ${m.value}  [$method] '
         'by ${m.givenBy.serialize()}',
       );
-      branched.setValue(m.idx, m.value);
+      if (m.value != null) {
+        branched.setValue(m.idx, m.value!);
+      } else if (m.removeOption != null) {
+        branched.removeOption(m.idx, m.removeOption!);
+      }
       if (branched.complete) {
         final post = branched.check(saveResult: false);
         if (post.isEmpty) {

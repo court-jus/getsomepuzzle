@@ -27,9 +27,10 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-const _domain = [1, 2];
+const _domain = defaultDomain;
 
 // Guardrail slugs allowed in the SY pipeline. SY is excluded (dominant
 // slug, already placed). SH is excluded — two shape-flavored
@@ -52,7 +53,7 @@ const _guardRailSlugs = [
 
 class SyPrefillResult {
   final Puzzle puzzle;
-  final List<int> solution;
+  final List<CellValue> solution;
   final int numIslands;
   final int seedRevealedCount;
   final int islandCellRevealedCount;
@@ -141,10 +142,10 @@ SyPrefillResult? preFillSy(
     if (islands.any((isl) => isl.cells.length < minIslandSize)) continue;
 
     // 50/50 background colour. Islands take the opposite.
-    final bg = rng.nextBool() ? 1 : 2;
-    final fg = bg == 1 ? 2 : 1;
+    final bg = rng.nextBool() ? CellValue.black : CellValue.white;
+    final fg = bg == CellValue.black ? CellValue.white : CellValue.black;
 
-    final solution = List<int>.filled(width * height, bg);
+    final solution = List<CellValue>.filled(width * height, bg);
     for (final isl in islands) {
       for (final c in isl.cells) {
         solution[c] = fg;
@@ -404,7 +405,7 @@ int _manhattan(int a, int b, int width) {
   return (ca - cb).abs() + (ra - rb).abs();
 }
 
-Puzzle _buildSolvedPuzzle(int width, int height, List<int> solution) {
+Puzzle _buildSolvedPuzzle(int width, int height, List<CellValue> solution) {
   final pu = Puzzle.empty(width, height, _domain);
   for (int i = 0; i < pu.cells.length; i++) {
     pu.cells[i].setForSolver(solution[i]);
@@ -448,7 +449,7 @@ List<Constraint> _enumerateGuardRail(
 ///   4. add any other guardrail
 (int, int, int)? _bipartiteDesambiguate({
   required Puzzle puzzle,
-  required List<int> solution,
+  required List<CellValue> solution,
   required List<int> seedPool,
   required List<int> islandCellPool,
   required List<Constraint> candidates,
@@ -537,7 +538,7 @@ List<Constraint> _enumerateGuardRail(
 /// Reveal a cell from [pool] iff doing so propagates beyond itself
 /// (free-cell count drops by ≥ 2). Failed candidates stay in the pool —
 /// a later guardrail may unlock their propagation.
-bool _tryRevealStrict(Puzzle puzzle, List<int> solution, List<int> pool) {
+bool _tryRevealStrict(Puzzle puzzle, List<CellValue> solution, List<int> pool) {
   for (int i = 0; i < pool.length; i++) {
     final idx = pool[i];
     if (puzzle.cells[idx].readonly) {
@@ -555,7 +556,7 @@ bool _tryRevealStrict(Puzzle puzzle, List<int> solution, List<int> pool) {
   return false;
 }
 
-bool _revealPropagates(Puzzle puzzle, List<int> solution, int idx) {
+bool _revealPropagates(Puzzle puzzle, List<CellValue> solution, int idx) {
   final probe = puzzle.clone();
   probe.solve();
   final freeBefore = probe.freeCells().length;
@@ -568,10 +569,10 @@ bool _revealPropagates(Puzzle puzzle, List<int> solution, int idx) {
 }
 
 bool _tryAddGcOrQa(Puzzle puzzle, List<Constraint> candidates, Random rng) {
-  final occupied = <(String, int)>{};
+  final occupied = <(String, CellValue)>{};
   for (final c in puzzle.constraints) {
     if (c is GroupCountConstraint) occupied.add(('GC', c.color));
-    if (c is QuantityConstraint) occupied.add(('QA', c.value));
+    if (c is QuantityConstraint) occupied.add(('QA', c.color));
   }
   if (occupied.length >= 4) return false;
 
@@ -587,11 +588,11 @@ bool _tryAddGcOrQa(Puzzle puzzle, List<Constraint> candidates, Random rng) {
         i++;
         continue;
       }
-      int color;
+      CellValue color;
       if (c is GroupCountConstraint) {
         color = c.color;
       } else if (c is QuantityConstraint) {
-        color = c.value;
+        color = c.color;
       } else {
         i++;
         continue;

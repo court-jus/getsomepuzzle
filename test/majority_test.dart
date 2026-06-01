@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 
 import 'helpers/make_puzzle.dart';
 
@@ -84,7 +85,7 @@ void main() {
       final move = mj('0.0.2.1.1').apply(p);
       expect(move, isNotNull);
       final m = move!;
-      expect(m.value, 1);
+      expect(m.value, CellValue.black);
       expect(m.idx, 1);
       expect(m.complexity, 0);
     });
@@ -148,7 +149,7 @@ void main() {
       expect(c.c0, 0);
       expect(c.r1, 2);
       expect(c.c1, 1);
-      expect(c.targetColor, 1);
+      expect(c.targetColor, CellValue.black);
     });
 
     test('odd-sized zone round-trip', () {
@@ -159,7 +160,7 @@ void main() {
       expect(c.r1, 2);
       expect(c.c0, 0);
       expect(c.c1, 2);
-      expect(c.targetColor, 2);
+      expect(c.targetColor, CellValue.white);
       // 3x3 = 9 cells, target = 9~/2+1 = 5
       expect(c.target, 5);
     });
@@ -175,7 +176,7 @@ void main() {
       final c = mj('0.0.2.1.1');
       final rotated = c.rotated(3, 3) as MajorityConstraint;
       expect(rotated.serialize(), 'MJ:0.0.1.2.1');
-      expect(rotated.targetColor, 1);
+      expect(rotated.targetColor, CellValue.black);
     });
   });
 
@@ -184,40 +185,48 @@ void main() {
       // 3x3 grid: only 2×2 zones survive.
       // Positions: 4 (top-left corners), × 2 colors = 8.
       // Single row/col zones (>3), 2×3/3×2 (>60%), and full grid are excluded.
-      final params = MajorityConstraint.generateAllParameters(3, 3, [
-        1,
-        2,
-      ], null);
+      final params = MajorityConstraint.generateAllParameters(
+        3,
+        3,
+        defaultDomain,
+        null,
+      );
       expect(params.length, 8);
     });
 
     test('correct count for 2x2 grid', () {
       // 2x2 grid: every rectangle is area < 3 or the full grid → 0
-      final params = MajorityConstraint.generateAllParameters(2, 2, [
-        1,
+      final params = MajorityConstraint.generateAllParameters(
         2,
-      ], null);
+        2,
+        defaultDomain,
+        null,
+      );
       expect(params.length, 0);
     });
 
     test('zones have at least 3 cells', () {
-      final params = MajorityConstraint.generateAllParameters(3, 3, [
-        1,
-        2,
-      ], null);
+      final params = MajorityConstraint.generateAllParameters(
+        3,
+        3,
+        defaultDomain,
+        null,
+      );
       for (final p in params) {
         final c = MajorityConstraint(p);
         expect(c.zoneSize, greaterThanOrEqualTo(3));
         expect(c.zoneSize, lessThan(9));
-        expect(c.targetColor, anyOf(1, 2));
+        expect(c.targetColor, anyOf(CellValue.black, CellValue.white));
       }
     });
 
     test('full grid excluded', () {
-      final params = MajorityConstraint.generateAllParameters(3, 3, [
-        1,
-        2,
-      ], null);
+      final params = MajorityConstraint.generateAllParameters(
+        3,
+        3,
+        defaultDomain,
+        null,
+      );
       for (final p in params) {
         final c = MajorityConstraint(p);
         expect(c.zoneSize, lessThan(9));
@@ -225,10 +234,12 @@ void main() {
     });
 
     test('single row excluded', () {
-      final params = MajorityConstraint.generateAllParameters(3, 3, [
-        1,
-        2,
-      ], null);
+      final params = MajorityConstraint.generateAllParameters(
+        3,
+        3,
+        defaultDomain,
+        null,
+      );
       for (final p in params) {
         final c = MajorityConstraint(p);
         expect(c.r1 - c.r0 + 1, greaterThan(1));
@@ -236,10 +247,12 @@ void main() {
     });
 
     test('single column excluded', () {
-      final params = MajorityConstraint.generateAllParameters(3, 3, [
-        1,
-        2,
-      ], null);
+      final params = MajorityConstraint.generateAllParameters(
+        3,
+        3,
+        defaultDomain,
+        null,
+      );
       for (final p in params) {
         final c = MajorityConstraint(p);
         expect(c.c1 - c.c0 + 1, greaterThan(1));
@@ -249,10 +262,12 @@ void main() {
     test('zones > 60% of grid excluded', () {
       // On a 4×4 grid, a 3×3 zone (9 cells) = 56% → kept.
       // A 3×4 zone (12 cells) = 75% → excluded.
-      final params = MajorityConstraint.generateAllParameters(4, 4, [
-        1,
-        2,
-      ], null);
+      final params = MajorityConstraint.generateAllParameters(
+        4,
+        4,
+        defaultDomain,
+        null,
+      );
       for (final p in params) {
         final c = MajorityConstraint(p);
         expect(c.zoneSize, lessThanOrEqualTo((16 * 0.6).floor()));
@@ -261,10 +276,12 @@ void main() {
 
     test('sweet spots kept on 4x4 grid', () {
       // 4×4 grid: 2×2, 2×3, 3×2, 3×3 should all survive.
-      final params = MajorityConstraint.generateAllParameters(4, 4, [
-        1,
-        2,
-      ], null);
+      final params = MajorityConstraint.generateAllParameters(
+        4,
+        4,
+        defaultDomain,
+        null,
+      );
       final zoneSizes = params
           .map((p) => MajorityConstraint(p).zoneSize)
           .toSet();

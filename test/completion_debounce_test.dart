@@ -1,5 +1,6 @@
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
@@ -14,7 +15,7 @@ String _errorsMsg(int count) => '$count errors';
 
 void _fill(GameModel game) {
   for (var i = 0; i < 4; i++) {
-    game.currentPuzzle!.setValue(i, 1);
+    game.currentPuzzle!.setValue(i, CellValue.black);
   }
 }
 
@@ -95,8 +96,11 @@ void main() {
           onPuzzleCompleted: () => completed++,
         );
 
-        // Half a second in, the user taps a cell twice to clear it back to 0:
-        // 1 → 2 (puzzle still complete), 2 → 0 (puzzle now incomplete).
+        // Half a second in, the user taps the cell to walk its
+        // domain-aware cycle back to free. The fixture is a 2-colour
+        // puzzle (domain `12`), so the cycle is
+        //   black → white (puzzle still complete)
+        //   white → free  (puzzle now incomplete).
         async.elapse(const Duration(milliseconds: 500));
         game.handleTap(0);
         game.handleCheck(
@@ -197,7 +201,7 @@ void main() {
         );
 
         // 900 ms later (close to the edge), user taps again — puzzle still
-        // complete (1 → 2) but debounce must restart from 0.
+        // complete (black → white) but debounce must restart from 0.
         async.elapse(const Duration(milliseconds: 900));
         game.handleTap(0);
         game.handleCheck(
@@ -227,8 +231,8 @@ void main() {
           liveCheckType: LiveCheckType.all,
           showRating: ShowRating.no,
         );
-        // QA:1.2 expects exactly two cells of value 1 in a 2x2 grid.
-        // Filling with four 1s therefore fails the constraint.
+        // QA:1.2 expects exactly one cell of black and two of white in a 2x2
+        // grid. Filling with four black therefore fails the constraint.
         game.openPuzzle(PuzzleData('v2_12_2x2_0000_QA:1.2_0_0'), 1);
         _fill(game);
         game.handleCheck(
