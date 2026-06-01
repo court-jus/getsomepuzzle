@@ -58,6 +58,131 @@ are the remaining blockers; everything below `## Already done` is shipped.
 - [ ] **Export compliance** (App Store) — "Uses standard encryption
       exempt from export documentation" (HTTPS only).
 
+## App Store review questionnaire (responses)
+
+App Review may ask for written answers + a screen recording before approving.
+Pre-drafted answers below (copy-paste into App Store Connect / Resolution
+Center). Apple reviewers work in English, so these are kept in English.
+
+**App facts these answers rest on** (verify before each resubmission):
+- No accounts: no login / registration / account-deletion flow. State persists
+  locally via `shared_preferences` and on-device files.
+- No payments: no `in_app_purchase` dependency, no subscriptions. App is free.
+- No active network telemetry: all outbound calls were removed (see
+  *Already done*). The only "URL" (`kShareBaseUrl` in `lib/main.dart`) just
+  builds a share link handed to the native iOS share sheet; the app sends
+  nothing to a server.
+- User-generated content stays local: the in-app editor saves puzzles on the
+  device only; sharing produces a link. No public feed, no other users'
+  content shown ⇒ no reporting/blocking mechanism needed (say so explicitly).
+- Localized en / es / fr, identical features in every region.
+- Permissions: none requested — no location / contacts / camera / photos / ATT.
+  (`file_picker` is configured `PICKER_MEDIA = false` / `PICKER_AUDIO = false`
+  in `ios/Podfile`, so the DKImagePickerController pod is not linked and no
+  `NSPhotoLibraryUsageDescription` is needed — see *Already done*. Re-run
+  `pod install` after any `file_picker` bump to keep this true.)
+
+**1. Screen recording** — see *Screen-recording scenario* section below.
+
+**2. Devices & OS tested** — fill in real values before submitting:
+```
+- iPad (<model>), iPadOS <version> — physical device (recording captured here)
+- iPhone <model>, iOS <version> — physical device (if applicable)
+- iOS Simulator (Xcode <version>) for layout checks
+```
+
+**3. Purpose & audience:**
+```
+Get Some Puzzle is a single-player logic puzzle game. The player fills a grid by
+coloring cells black or white so that all the rules shown around the grid are
+satisfied (forbidden patterns, region shapes, group sizes, parity, symmetry,
+quantities, neighbor counts, etc.). Every puzzle has exactly one solution and is
+solvable by pure deduction — no guessing.
+Value: relaxing, ad-free, fully offline brain-training puzzles with a hint system
+that teaches the next logical step, an adaptive difficulty engine, and an in-app
+generator/editor for an effectively unlimited supply.
+Audience: puzzle/logic-game enthusiasts of all ages (Sudoku / Nonogram / Picross
+audience). No violence, no mature content, no chat, no user-to-user interaction.
+```
+
+**4. Setup & access:**
+```
+No setup, account, credentials or sample files required. Free, fully offline,
+opens directly on a playable puzzle.
+- Play: tap a cell to cycle black → white → empty; rules shown around the grid.
+- Hint: hint button highlights the next logical deduction.
+- Completion: detected automatically; a between-puzzle screen lets you rate and
+  move on.
+- Open menu: pick puzzles, filter by difficulty.
+- Generate: creates new unique puzzles on device.
+- Create/edit: in-app editor; puzzles saved locally only.
+- Share: native iOS share sheet shares a puzzle as a link; nothing is uploaded.
+- Settings: language (EN/ES/FR), validation mode, display options.
+```
+
+**5. External services:**
+```
+The app relies on NO external service, backend, data provider, auth service,
+payment processor or AI service for its core functionality. All gameplay,
+generation, solving and storage run on-device, offline.
+- Backend/servers: none. No analytics, ads, or tracking SDK.
+- Auth: none. Payments: none. AI: none.
+- Networking: only the user-initiated Share button, which hands a puzzle link to
+  the iOS share sheet. The link points to a static page
+  (https://leveque.cc/getsomepuzzle/play/); the app sends no data, makes no
+  server calls.
+- Third-party OSS Flutter packages (client-side libraries only): share_plus,
+  file_picker, open_file, url_launcher, path_provider, shared_preferences, intl,
+  wakelock_plus.
+```
+
+**6. Regional differences:**
+```
+None. Same features and content in every region. UI localized in EN/ES/FR
+(from device language, changeable in Settings); puzzles are language-independent.
+No geo-restricted content.
+```
+
+**7. Regulated industry / protected material:**
+```
+Not applicable. No regulated industry, no protected third-party material. All
+puzzle content and assets are original, created by the developer. No licenses or
+authorizations required.
+```
+
+**Review-note framing text** (paste alongside the recording):
+```
+Screen recording captured on a physical <device + iPadOS version>. The app is a
+free, fully offline single-player logic puzzle game. It has NO accounts/login/
+account deletion, NO in-app purchases or subscriptions, NO user-to-user content,
+and requests NO sensitive permissions (no location, contacts, camera, or App
+Tracking Transparency). The recording shows: app launch, playing a puzzle, the
+hint system, completing a puzzle, the puzzle list with difficulty filter,
+on-device generation, the in-app editor (saved locally), the native share sheet
+(no data uploaded), and the settings/language switch.
+```
+
+### Screen-recording scenario (iPad, ~60–90 s, single continuous take)
+
+Begin with the app launch (Apple requires it). Cold-start the app first; record
+via Control Center; normal speed, no cuts.
+
+| ~Time | Action | Why |
+|---|---|---|
+| 0:00 | iPad home screen: tap the app icon to **launch**; let the splash run to the first grid. | Apple requires the recording to start at launch. |
+| 0:05 | Tap several cells (black → white → empty); show the rules around the grid. | Core: playing. |
+| 0:20 | Tap the **hint** button; show the highlighted deduction. | Core: hint system. |
+| 0:30 | **Complete** a grid (use an easy one) → between-puzzle / rating screen → next puzzle. | Completion + game loop. |
+| 0:45 | Open the **"open"** menu: scroll, show difficulty **filter**, pick a puzzle. | Content selection. |
+| 0:55 | Open **"generate"**: run a generation, show the new puzzle appear. | On-device generation. |
+| 1:05 | Open the **editor (create)**: place a few cells / a constraint, show local save. | UGC (local). |
+| 1:15 | Tap **Share**: native iOS share sheet opens, then **cancel** without sending. | Proves no automatic upload. |
+| 1:25 | Open **Settings**: switch language (e.g. EN → FR) and show validation mode. | Settings + localization. |
+| 1:35 | End. | — |
+
+Do NOT film (and mention in the review note): login/registration/account-deletion
+(none), purchases/subscriptions (none, free), sensitive-permission prompts (none).
+
 ## Recommended polish (non-blocking)
 
 - [ ] **Beta channels** before going production: Play Internal Testing
@@ -190,7 +315,14 @@ are the remaining blockers; everything below `## Already done` is shipped.
       AAB ships permission-free.
 - [x] **iOS privacy strings audit**. No `NS*UsageDescription` keys in
       `Info.plist` — none needed, since the app accesses no privacy-
-      sensitive APIs.
+      sensitive APIs. Note: `file_picker` links the
+      `DKImagePickerController/PhotoGallery` pod by default, which *would*
+      force an `NSPhotoLibraryUsageDescription`. The app only picks `.txt`
+      documents (`FileType.custom`), so `ios/Podfile` sets
+      `PICKER_MEDIA = false` and `PICKER_AUDIO = false` to drop that pod and
+      keep the app photo-permission-free. Re-run `pod install` and rebuild
+      the IPA after editing the Podfile or bumping `file_picker`; do not
+      re-add the photo key.
 - [x] **Privacy policy authored** in en / fr / es as
       `assets/privacy.{en,fr,es}.md`. Factual, declares no collection,
       no third-party SDKs, contact email `ghislain@leveque.cc`.

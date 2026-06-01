@@ -4,6 +4,14 @@
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# file_picker: we only pick `.txt` documents (FileType.custom — see open_page.dart
+# and stats_page.dart). Opt out of the media and audio sub-pickers so the
+# DKImagePickerController/PhotoGallery pod is not linked. That pod is what forces
+# an NSPhotoLibraryUsageDescription entry in Info.plist; dropping it keeps the app
+# free of any photo-library permission. PICKER_DOCUMENT stays on by default.
+PICKER_MEDIA = false
+PICKER_AUDIO = false
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,
