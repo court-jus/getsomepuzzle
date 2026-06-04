@@ -109,6 +109,18 @@ void main() {
     );
   });
 
+  test('LetterGroup never uses the letter I (confusable with SY glyph)', () {
+    // A 10x5 grid yields maxLetters = 50 ~/ 5 = 10, so the loop index reaches
+    // the slot for 'I' (l == 8) and beyond. 'I' must be skipped while the
+    // neighbouring labels 'H' and 'J' are still produced.
+    final letters = LetterGroup.generateAllParameters(10, 5, [
+      1,
+      2,
+    ], null).map((p) => p.split('.').first).toSet();
+    expect(letters, isNot(contains('I')));
+    expect(letters, containsAll(['H', 'J']));
+  });
+
   test('generateOne produces a puzzle for a seeded 3x3 grid', () {
     // Test the core algorithm with a known-good configuration
     // Build a solved grid manually and test constraint selection

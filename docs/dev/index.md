@@ -42,18 +42,20 @@ read the relevant page before touching the corresponding subsystem.
 One page per non-trivial constraint (simple constraints are described
 directly in the code):
 
-- [`chain.md`](chain.md) — `CH`: continuous path of one-colour cells.
-- [`column_count.md`](column_count.md) — `CC`: N cells of one colour
+- [`letter_group.md`](constraints/letter_group.md) — `LT`: cells sharing
+  a letter must form one same-colour group (`I` excluded from labels).
+- [`chain.md`](constraints/chain.md) — `CH`: continuous path of one-colour cells.
+- [`column_count.md`](constraints/column_count.md) — `CC`: N cells of one colour
   in a given column.
-- [`row_count.md`](row_count.md) — `RC`: row equivalent.
-- [`transition.md`](transition.md) — `RT`/`CT`: row and column transition counts.
-- [`neighbor_count.md`](neighbor_count.md) — `NC`: exact number of
+- [`row_count.md`](constraints/row_count.md) — `RC`: row equivalent.
+- [`transition.md`](constraints/transition.md) — `RT`/`CT`: row and column transition counts.
+- [`neighbor_count.md`](constraints/neighbor_count.md) — `NC`: exact number of
   orthogonal neighbours of one colour.
-- [`group_count.md`](group_count.md) — `GC`: number of connected
+- [`group_count.md`](constraints/group_count.md) — `GC`: number of connected
   groups.
-- [`eyes_constraint.md`](eyes_constraint.md) — `EY`: see N cells of
+- [`eyes.md`](constraints/eyes.md) — `EY`: see N cells of
   one colour from a given cell.
-- [`majority.md`](majority.md) — `MJ`: strict majority of one colour
+- [`majority.md`](constraints/majority.md) — `MJ`: strict majority of one colour
   in a rectangle.
 
 ## Player & experience

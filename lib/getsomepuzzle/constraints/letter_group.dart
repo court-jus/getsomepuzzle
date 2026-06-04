@@ -49,6 +49,9 @@ class LetterGroup extends CellsCentricConstraint {
       for (int idx2 = 0; idx2 < size; idx2++) {
         if (idx1 == idx2) continue;
         for (int l = 0; l < maxLetters; l++) {
+          // Skip 'I' (charCode 73): rendered in a cell it is visually
+          // confusable with the vertical-symmetry (SY) glyph.
+          if (l == 8) continue;
           result.add('${String.fromCharCode(65 + l)}.$idx1.$idx2');
         }
       }
