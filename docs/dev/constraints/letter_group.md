@@ -43,7 +43,9 @@ a regression test in `test/generator_test.dart`.
 - **`serialize()`** → `'LT:$letter.${indices.join(".")}'`
 - **`rotated(...)`** — re-maps each index 90° clockwise, keeping the letter.
 - **`verify(Puzzle)`** — Aggregation in `Puzzle` guarantees a single
-  `LetterGroup` per letter, so `indices` already lists every cell sharing it.
+  `LetterGroup` per letter, so `indices` already lists every cell sharing it
+  (`addConstraint`/`prependConstraint` apply the same merge-on-add mechanism
+  to same-axis `PA` constraints — see [`parity.md`](parity.md)).
   Returns `false` when two fixed members hold different colours (unreachable),
   or when a complete state splits the members across more than one group, or
   when a foreign-letter cell shares a member's group. A reachable-but-partial

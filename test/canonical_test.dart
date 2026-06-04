@@ -57,6 +57,34 @@ void main() {
       expect(canonicalPuzzleKey(v2), canonicalPuzzleKey(v3));
     });
 
+    test('legacy PA pair and its merged form yield the same key', () {
+      // Puzzle.addConstraint merges same-axis PA constraints sharing an
+      // anchor (top + bottom → vertical). Stats recorded before that
+      // merge existed carry the two-constraint form; the asset line may
+      // later hold the merged form (rotated play, corpus normalization).
+      // Both must canonicalize identically or the puzzle would lose its
+      // "already played" status. The orbit goes through parse →
+      // re-serialization for every member, so the merge applies to both.
+      final legacy =
+          'v2_12_5x5_0000000000000000000000000_FM:12;PA:12.top;PA:12.bottom_0:0_0';
+      final merged =
+          'v2_12_5x5_0000000000000000000000000_FM:12;PA:12.vertical_0:0_0';
+      expect(canonicalPuzzleKey(legacy), canonicalPuzzleKey(merged));
+    });
+
+    test(
+      'legacy split LT pairs and their aggregated form yield the same key',
+      () {
+        // Same contract for LetterGroup aggregation: `LT:A.0.1;LT:A.2.3`
+        // and `LT:A.0.1.2.3` are the same puzzle. Old stats lines predate
+        // the aggregation and store the split form — they must keep
+        // matching a line later rewritten in aggregated form.
+        final split = 'v2_12_3x3_000000000_FM:12;LT:A.0.1;LT:A.2.3_0:0_0';
+        final aggregated = 'v2_12_3x3_000000000_FM:12;LT:A.0.1.2.3_0:0_0';
+        expect(canonicalPuzzleKey(split), canonicalPuzzleKey(aggregated));
+      },
+    );
+
     test('different prefill produces different keys', () {
       // Sanity check that the canonicalization is not so aggressive it
       // collapses genuinely distinct puzzles. Prefill is part of identity.

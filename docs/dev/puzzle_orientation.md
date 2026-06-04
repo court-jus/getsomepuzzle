@@ -130,8 +130,18 @@ The implementation enumerates all 4 rotations of the input and returns the
 lexicographically smallest identity key. Two rotations are not enough: if the
 180° rotation of `L` happens to be lex-smaller than both `L` and `rot(L)`, the
 two-rotation `min` picks different values when called on `L` versus `rot(L)`.
-Cost: one `Puzzle(...)` parse plus 3 rotations per call. Only invoked at stats
+Cost: one `Puzzle(...)` parse plus 4 rotations per call. Only invoked at stats
 write/read time and at puzzle open — never inside the solver hot path.
+
+Every orbit member — the 0° one included, obtained as the fourth rotation
+(360°) — is **re-serialized from a parsed `Puzzle`**, so the key is also
+invariant under the constraint normalizations `Puzzle.addConstraint` applies
+in memory: per-letter `LetterGroup` aggregation (`LT:A.0.1;LT:A.2.3` ≡
+`LT:A.0.1.2.3`) and same-axis `ParityConstraint` merging (`PA:i.top;PA:i.bottom`
+≡ `PA:i.vertical`). A stats entry recorded against the split form keeps
+matching a line later rewritten in merged form. The purely textual identity
+key (dedup + sort, no parse) only serves as fallback for lines that fail to
+parse.
 
 ## `GameModel.rotateCurrentPuzzle`
 

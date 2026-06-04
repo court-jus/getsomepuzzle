@@ -26,6 +26,14 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 /// We enumerate the full orbit of 4 rotations and return the lex-smallest
 /// identity key — which is then invariant under any rotation.
 ///
+/// **Normalization invariance:** every orbit member — the 0° one
+/// included — is re-serialized from a parsed `Puzzle`, so the in-memory
+/// constraint merges (LT per-letter aggregation, PA same-axis merging)
+/// apply before the key is computed. A pre-merge line and its normalized
+/// rewrite therefore share a key, keeping old stats entries attached to
+/// their puzzle. The textual `_identityKey` only serves as fallback for
+/// lines that fail to parse.
+///
 /// Robust to both the legacy v2 line and the bare canonical form
 /// (no version prefix, no solution/complexity tail) — that way old
 /// stats lines and any line previously canonicalized both produce the
@@ -58,15 +66,23 @@ String? _identityKey(String line) {
 /// which is more expensive than `_identityKey` but only runs at
 /// canonicalization time (stats writes and puzzle open) — never inside
 /// the solver hot path. Returns `null` if the line can't be parsed.
+///
+/// All four orbit members go through parse → `rotated()` →
+/// re-serialization — including the 0° member, obtained as the fourth
+/// rotation (360°). This makes the key invariant under the constraint
+/// normalizations `Puzzle.addConstraint` applies in memory (LetterGroup
+/// per-letter aggregation, ParityConstraint same-axis merging): a legacy
+/// line carrying `PA:i.top;PA:i.bottom` and its normalized form
+/// `PA:i.vertical` re-serialize identically, so old stats entries keep
+/// matching the puzzle after its stored line is normalized.
 String? _orbitMinIdentityKey(String line) {
   try {
-    String? best = _identityKey(line);
-    if (best == null) return null;
     var p = Puzzle(line);
-    for (int i = 0; i < 3; i++) {
+    String? best;
+    for (int i = 0; i < 4; i++) {
       p = p.rotated();
       final k = _identityKey(p.lineRepresentation);
-      if (k != null && k.compareTo(best!) < 0) best = k;
+      if (k != null && (best == null || k.compareTo(best) < 0)) best = k;
     }
     return best;
   } catch (_) {

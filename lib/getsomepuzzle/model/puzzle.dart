@@ -7,6 +7,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.da
     as complicities_registry;
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
@@ -308,12 +309,15 @@ class Puzzle {
 
   /// Add a constraint to the puzzle. Goes through the central helper so
   /// every code path benefits from LetterGroup aggregation (`LT:<letter>`
-  /// pairs sharing the same letter merge into a single N-cell group)
-  /// and from the complicity-cache invalidation. The aggregation must
-  /// happen on every add — not just at parse time — otherwise the
-  /// generator can validate two `LT:D` pairs against their local
-  /// connectivity and miss the combined "all four cells in one group"
-  /// invariant that the constructor enforces after deserialisation.
+  /// pairs sharing the same letter merge into a single N-cell group),
+  /// from ParityConstraint same-axis merging (`PA:i.top` + `PA:i.bottom`
+  /// collapse into `PA:i.vertical`; a side subsumed by an existing
+  /// axis-wide constraint is dropped) and from the complicity-cache
+  /// invalidation. The aggregation must happen on every add — not just
+  /// at parse time — otherwise the generator can validate two `LT:D`
+  /// pairs against their local connectivity and miss the combined
+  /// "all four cells in one group" invariant that the constructor
+  /// enforces after deserialisation.
   void addConstraint(Constraint c) {
     if (c is LetterGroup) {
       final existing = _constraints.firstWhereOrNull(
@@ -328,8 +332,30 @@ class Puzzle {
         return;
       }
     }
+    if (c is ParityConstraint) {
+      final existing = _mergeableParity(c);
+      if (existing != null) {
+        existing.side = ParityConstraint.mergeSides(existing.side, c.side)!;
+        _complicitiesCache = null;
+        return;
+      }
+    }
     _constraints.add(c);
     _complicitiesCache = null;
+  }
+
+  /// Find an existing ParityConstraint sharing [c]'s anchor cell and
+  /// axis (vertical = top/bottom, horizontal = left/right). At most one
+  /// can exist per (anchor, axis): the merge runs on every add, so two
+  /// same-axis entries can never coexist in [_constraints].
+  ParityConstraint? _mergeableParity(ParityConstraint c) {
+    return _constraints.firstWhereOrNull(
+          (other) =>
+              other is ParityConstraint &&
+              other.indices.first == c.indices.first &&
+              ParityConstraint.mergeSides(other.side, c.side) != null,
+        )
+        as ParityConstraint?;
   }
 
   void addAllConstraints(Iterable<Constraint> cs) {
@@ -343,12 +369,13 @@ class Puzzle {
   /// a low-cplx candidate override the cell moves of a dominant
   /// high-cplx constraint already in the puzzle (e.g. a required SH).
   ///
-  /// Honours the same LetterGroup aggregation contract as
-  /// [addConstraint]: prepending a `LetterGroup` whose letter already
-  /// has a constraint in the list merges their indices and moves the
-  /// (now combined) entry to the front. This keeps the
-  /// "one LT per letter" invariant the constraint construction logic
-  /// expects, even under the front-insertion path.
+  /// Honours the same aggregation contracts as [addConstraint]:
+  /// prepending a `LetterGroup` whose letter already has a constraint
+  /// in the list merges their indices, and prepending a
+  /// `ParityConstraint` sharing an existing entry's anchor and axis
+  /// merges their sides; in both cases the (now combined) entry moves
+  /// to the front. This keeps the "one LT per letter" / "one PA per
+  /// (anchor, axis)" invariants, even under the front-insertion path.
   void prependConstraint(Constraint c) {
     if (c is LetterGroup) {
       final existingIdx = _constraints.indexWhere(
@@ -363,6 +390,16 @@ class Puzzle {
         // remaining entries left so the subsequent `insert(0, …)`
         // lands in the same slot regardless of `existingIdx`.
         _constraints.removeAt(existingIdx);
+        _constraints.insert(0, existing);
+        _complicitiesCache = null;
+        return;
+      }
+    }
+    if (c is ParityConstraint) {
+      final existing = _mergeableParity(c);
+      if (existing != null) {
+        existing.side = ParityConstraint.mergeSides(existing.side, c.side)!;
+        _constraints.remove(existing);
         _constraints.insert(0, existing);
         _complicitiesCache = null;
         return;

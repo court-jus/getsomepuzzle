@@ -58,6 +58,8 @@ directly in the code):
   groups.
 - [`eyes.md`](constraints/eyes.md) — `EY`: see N cells of
   one colour from a given cell.
+- [`parity.md`](constraints/parity.md) — `PA`: balanced even/odd counts on
+  a side of the anchor; same-axis constraints merge per anchor.
 - [`majority.md`](constraints/majority.md) — `MJ`: strict majority of one colour
   in a rectangle.
 

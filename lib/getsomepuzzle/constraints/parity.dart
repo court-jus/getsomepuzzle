@@ -28,6 +28,21 @@ class ParityConstraint extends CellsCentricConstraint {
   @override
   String serialize() => 'PA:${indices.first}.$side';
 
+  /// Returns the merged side when [a] and [b] lie on the same axis
+  /// (vertical = top/bottom, horizontal = left/right), null otherwise.
+  /// Each side of a `vertical`/`horizontal` constraint must be balanced
+  /// independently, so `vertical` subsumes `top` and `bottom` (and the
+  /// pair `top` + `bottom` is exactly `vertical`) — same for the
+  /// horizontal axis.
+  static String? mergeSides(String a, String b) {
+    if (a == b) return a;
+    const vertical = {'top', 'bottom', 'vertical'};
+    const horizontal = {'left', 'right', 'horizontal'};
+    if (vertical.contains(a) && vertical.contains(b)) return 'vertical';
+    if (horizontal.contains(a) && horizontal.contains(b)) return 'horizontal';
+    return null;
+  }
+
   /// Rotation-90°-CW mapping for the `side` parameter. Cells originally to
   /// the left of the anchor end up above it in the rotated grid, etc.
   static const Map<String, String> _rotatedSide = {
