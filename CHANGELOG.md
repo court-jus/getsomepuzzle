@@ -10,6 +10,10 @@ localised under
 `marketing/play_store/<locale>/changelogs/default.txt` and
 `marketing/app_store/<locale>/release_notes.txt`.
 
+## [1.6.22] - 2026-06-04
+
+- Fix android build
+
 ## [1.6.21] - 2026-06-04
 
 - **Unified background colors**: the grid-edge constraints (CC/RC/CT/RT) and the DF circles now use the same light-blue "mandatory" background as QA/GC/SH; purple stays reserved for "forbidden" (FM). When these constraints gray out, only the background is grayed — digits, wave glyphs and ≠ symbols keep their colors.
