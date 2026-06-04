@@ -2,6 +2,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 /// GS + (anything) complicity. For each `GroupSize` constraint we
 /// enumerate every way to seal off a connected group of exactly
@@ -127,7 +128,10 @@ class GSAllComplicity extends Complicity {
     int color,
     Set<String> blockers,
   ) {
-    final group = _floodFill(puzzle, anchor, color);
+    // All cells of `color` connected (4-adjacency) to the anchor.
+    final group = floodFill(puzzle, [
+      anchor,
+    ], (i) => puzzle.cellValues[i] == color);
     if (group.length > gs.size) return [];
     if (group.length == gs.size) {
       return _checkSealedTarget(puzzle, group, color, blockers);
@@ -261,40 +265,19 @@ class GSAllComplicity extends Complicity {
 
   /// Add [newCell] to [group], then flood-fill through every
   /// already-coloured `c`-cell reachable from [newCell] (merging
-  /// previously-disconnected same-colour groups into one).
+  /// previously-disconnected same-colour groups into one). The fill does
+  /// not propagate through cells already in [group]: only the merges
+  /// triggered by [newCell] itself are picked up.
   static Set<int> _addWithMerges(
     Puzzle puzzle,
     Set<int> group,
     int newCell,
     int c,
   ) {
-    final result = {...group, newCell};
-    final queue = <int>[newCell];
-    while (queue.isNotEmpty) {
-      final cur = queue.removeLast();
-      for (final nei in puzzle.getNeighbors(cur)) {
-        if (result.contains(nei)) continue;
-        if (puzzle.cellValues[nei] == c) {
-          result.add(nei);
-          queue.add(nei);
-        }
-      }
-    }
-    return result;
-  }
-
-  /// All cells of colour [colour] connected (4-adjacency) to [seed].
-  static Set<int> _floodFill(Puzzle puzzle, int seed, int colour) {
-    final result = <int>{seed};
-    final queue = <int>[seed];
-    while (queue.isNotEmpty) {
-      final cur = queue.removeLast();
-      for (final nei in puzzle.getNeighbors(cur)) {
-        if (puzzle.cellValues[nei] != colour) continue;
-        if (result.add(nei)) queue.add(nei);
-      }
-    }
-    return result;
+    final merged = floodFill(puzzle, [
+      newCell,
+    ], (i) => puzzle.cellValues[i] == c && !group.contains(i));
+    return {...group, ...merged};
   }
 }
 

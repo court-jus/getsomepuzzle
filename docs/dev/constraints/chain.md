@@ -49,13 +49,13 @@ bottom: [(height-1)*width, ..., height*width-1]
 
 Checks whether an opposite-color barrier permanently separates the two sides.
 
-Starts a flood-fill (DFS) from every cell on `fromSide` that is **not** of the opposite color
-(i.e., free cells and already-correct-colored cells). The fill moves through cells that are
-_not_ the opposite color (free or target-color). If `toSide` is unreachable, the path is
-permanently blocked.
+Delegates to the shared `canReach` helper (`lib/getsomepuzzle/utils/groups.dart`): flood-fill
+from every cell on `fromSide` that is **not** of the opposite color (i.e., free cells and
+already-correct-colored cells), traversing cells that are _not_ the opposite color (free or
+target-color). If `toSide` is unreachable, the path is permanently blocked.
 
-Returns `true` immediately if no non-opposite cell exists on `fromSide` (all border cells are
-already filled with the wrong color).
+When no non-opposite cell exists on `fromSide` (all border cells are already filled with the
+wrong color), the start set is empty and `canReach` returns `false` → blocked.
 
 When the puzzle is complete (no free cells), "not opposite" reduces to "target color", so
 `_isBlocked` doubles as a final-state path check.
@@ -89,10 +89,10 @@ Returns `null` when no deduction is possible.
 
 ### `_hasCompletePath(Puzzle)` → `bool`
 
-Flood-fill from every `fromSide` cell whose value is **exactly** `color`, traversing only
-cells of value `color` (free cells do *not* count, unlike `_isBlocked`). Returns `true` if
-`toSide` is reached — i.e. a finished path of already-placed target-color cells connects the
-two sides.
+Delegates to the shared `canReach` helper: flood-fill from every `fromSide` cell whose value
+is **exactly** `color`, traversing only cells of value `color` (free cells do *not* count,
+unlike `_isBlocked`). Returns `true` if `toSide` is reached — i.e. a finished path of
+already-placed target-color cells connects the two sides.
 
 ### `isCompleteFor(Puzzle)` → `bool`
 

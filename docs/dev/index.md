@@ -36,6 +36,9 @@ read the relevant page before touching the corresponding subsystem.
 - [`grayout.md`](grayout.md) — When and how a constraint is
   considered "done" and greyed out.
 - [`grayout_shape.md`](grayout_shape.md) — `SH`-specific variant.
+- [`group_utilities.md`](group_utilities.md) — Shared connectivity
+  helpers (`floodFill`/`canReach`, same-colour groups, merge-graph
+  reachability) underpinning `GS`, `LT`, `GC`, `SY`, `CH`.
 
 ## Individual constraints
 

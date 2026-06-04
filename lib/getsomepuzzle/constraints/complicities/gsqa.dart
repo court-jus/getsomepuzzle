@@ -4,6 +4,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 /// GS + QA complicity: a `GroupSize` constraint anchored on cell `i`
 /// with target size `s`, combined with a `QuantityConstraint` capping
@@ -107,17 +108,8 @@ class GSQAComplicity extends Complicity {
   /// coloured `color`, i.e. 4-connected flood-fill from the anchor
   /// over cells of `color` (treating the anchor as `color`).
   static int _hypotheticalMergedSize(Puzzle puzzle, int anchor, int color) {
-    final visited = <int>{anchor};
-    final queue = <int>[anchor];
-    while (queue.isNotEmpty) {
-      final cur = queue.removeLast();
-      for (final nei in puzzle.getNeighbors(cur)) {
-        if (visited.contains(nei)) continue;
-        if (puzzle.cellValues[nei] != color) continue;
-        visited.add(nei);
-        queue.add(nei);
-      }
-    }
-    return visited.length;
+    return floodFill(puzzle, [
+      anchor,
+    ], (i) => puzzle.cellValues[i] == color).length;
   }
 }

@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
@@ -160,18 +158,9 @@ class SymmetryConstraint extends CellsCentricConstraint {
     for (var member in myGroup) {
       for (var neighbor in puzzle.getNeighbors(member)) {
         if (puzzle.cellValues[neighbor] != 0) continue;
-        final merged = <int>{neighbor};
-        final queue = Queue<int>()..add(neighbor);
-        while (queue.isNotEmpty) {
-          final cur = queue.removeFirst();
-          for (final nei in puzzle.getNeighbors(cur)) {
-            if (merged.contains(nei)) continue;
-            if (puzzle.cellValues[nei] == myValue) {
-              merged.add(nei);
-              queue.add(nei);
-            }
-          }
-        }
+        final merged = floodFill(puzzle, [
+          neighbor,
+        ], (i) => puzzle.cellValues[i] == myValue);
         // The single-cell case is handled by the previous loop.
         if (merged.length == 1) continue;
         for (final m in merged) {

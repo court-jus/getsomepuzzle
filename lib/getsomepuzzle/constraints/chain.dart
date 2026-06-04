@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 class ChainConstraint extends Constraint {
   @override
@@ -103,28 +104,13 @@ class ChainConstraint extends Constraint {
       puzzle.width,
       puzzle.height,
     ).where((i) => puzzle.cellValues[i] != oppositeColor);
-    if (fromCells.isEmpty) return true;
-
-    final visited = <int>{};
-    final queue = List<int>.from(fromCells);
-    for (final c in fromCells) {
-      visited.add(c);
-    }
-
     final toCellSet = _borderCells(toSide, puzzle.width, puzzle.height).toSet();
-
-    while (queue.isNotEmpty) {
-      final current = queue.removeLast();
-      if (toCellSet.contains(current)) return false;
-
-      for (final nei in puzzle.getNeighbors(current)) {
-        if (!visited.contains(nei) && puzzle.cellValues[nei] != oppositeColor) {
-          visited.add(nei);
-          queue.add(nei);
-        }
-      }
-    }
-    return true;
+    return !canReach(
+      puzzle,
+      fromCells,
+      toCellSet.contains,
+      (i) => puzzle.cellValues[i] != oppositeColor,
+    );
   }
 
   @override
@@ -172,7 +158,7 @@ class ChainConstraint extends Constraint {
   }
 
   // True when a path of already-coloured target cells connects fromSide to
-  // toSide. Flood-fill restricted to cells whose value is exactly `color`
+  // toSide. Traversal restricted to cells whose value is exactly `color`
   // (free cells do NOT count, unlike _isBlocked).
   bool _hasCompletePath(Puzzle puzzle) {
     final fromCells = _borderCells(
@@ -180,24 +166,13 @@ class ChainConstraint extends Constraint {
       puzzle.width,
       puzzle.height,
     ).where((i) => puzzle.cellValues[i] == color);
-    if (fromCells.isEmpty) return false;
-
-    final visited = <int>{...fromCells};
-    final queue = List<int>.from(fromCells);
     final toCellSet = _borderCells(toSide, puzzle.width, puzzle.height).toSet();
-
-    while (queue.isNotEmpty) {
-      final current = queue.removeLast();
-      if (toCellSet.contains(current)) return true;
-
-      for (final nei in puzzle.getNeighbors(current)) {
-        if (!visited.contains(nei) && puzzle.cellValues[nei] == color) {
-          visited.add(nei);
-          queue.add(nei);
-        }
-      }
-    }
-    return false;
+    return canReach(
+      puzzle,
+      fromCells,
+      toCellSet.contains,
+      (i) => puzzle.cellValues[i] == color,
+    );
   }
 
   @override

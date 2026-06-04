@@ -119,17 +119,10 @@ class GroupSize extends CellsCentricConstraint {
       //      step, the color is infeasible.
       int? forcedColor;
       for (final color in puzzle.domain) {
-        final reachable = <int>{idx};
-        final queue = [idx];
-        while (queue.isNotEmpty) {
-          final current = queue.removeLast();
-          for (final nei in puzzle.getNeighbors(current)) {
-            final v = puzzle.cellValues[nei];
-            if ((v == 0 || v == color) && reachable.add(nei)) {
-              queue.add(nei);
-            }
-          }
-        }
+        final reachable = floodFill(puzzle, [idx], (i) {
+          final v = puzzle.cellValues[i];
+          return v == 0 || v == color;
+        });
         bool infeasible = reachable.length < size;
         if (!infeasible) {
           final mandatoryGroup = <int>{idx};
