@@ -25,7 +25,10 @@ class TransitionWidget extends StatelessWidget {
         : (constraint.isHighlighted
               ? highlightColor
               : (constraint.isValid ? Colors.grey : Colors.redAccent));
-    final waveColor = shouldGrayOut ? Colors.grey : Colors.black;
+    const waveColor = Colors.black;
+    final bgColor = shouldGrayOut
+        ? Colors.grey.withValues(alpha: 0.3)
+        : mandatoryColor;
     final squareSize = cellSize * 0.7;
 
     return SizedBox(
@@ -36,7 +39,7 @@ class TransitionWidget extends StatelessWidget {
           width: squareSize,
           height: squareSize,
           decoration: BoxDecoration(
-            color: Colors.grey[300],
+            color: bgColor,
             borderRadius: BorderRadius.circular(4),
             border: Border.all(color: borderColor, width: 2),
           ),

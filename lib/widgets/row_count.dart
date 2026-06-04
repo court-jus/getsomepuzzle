@@ -22,9 +22,10 @@ class RowCountWidget extends StatelessWidget {
         : (constraint.isHighlighted
               ? highlightColor
               : (constraint.isValid ? Colors.grey : Colors.redAccent));
-    final textColor = shouldGrayOut
-        ? Colors.grey
-        : (_textColors[constraint.color] ?? Colors.black);
+    final textColor = _textColors[constraint.color] ?? Colors.black;
+    final bgColor = shouldGrayOut
+        ? Colors.grey.withValues(alpha: 0.3)
+        : mandatoryColor;
     final fontSize = cellSize * cellSizeToFontSize * 0.6;
     final circleSize = cellSize * 0.7;
 
@@ -37,7 +38,7 @@ class RowCountWidget extends StatelessWidget {
           height: circleSize,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.grey[300],
+            color: bgColor,
             border: Border.all(color: borderColor, width: 2),
           ),
           child: Center(

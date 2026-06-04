@@ -10,8 +10,9 @@ exactly `3` cells of color `1` (black).
 
 ## Display
 
-A digit displayed above the column, outside the grid, inside a greyed circle.
-The digit color matches the constraint color.
+A digit displayed above the column, outside the grid, inside a circle with the
+`mandatoryColor` (light blue) background shared by all "mandatory" constraints
+(QA, GC, SH…). The digit color matches the constraint color.
 
 ## Implementation
 
@@ -70,9 +71,10 @@ a puzzle with both CC and CT on the same column.
 
 **Location**: `lib/widgets/column_count.dart`
 
-`ColumnCountWidget` renders the digit inside a greyed circle, with text color
-matching the constraint color (black for 1, white for 2 — same convention as
-`quantity.dart`).
+`ColumnCountWidget` renders the digit inside a `mandatoryColor` circle, with
+text color matching the constraint color (black for 1, white for 2 — same
+convention as `quantity.dart`). On grayout only the background switches to
+semi-transparent grey; the digit keeps its color.
 
 `lib/widgets/puzzle.dart` places a row of these widgets between the top
 constraint bar and the grid, aligned with `adjustedCellSize` so each indicator

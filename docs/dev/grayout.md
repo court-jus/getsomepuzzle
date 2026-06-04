@@ -160,7 +160,7 @@ any connecting path.
 
 **File:** `lib/getsomepuzzle/constraints/to_flutter.dart`
 
-Updated constraint rendering to gray out complete constraints:
+Constraint rendering grays out complete constraints:
 
 ```dart
 final bool shouldGrayOut = constraint.isComplete && constraint.isValid;
@@ -172,3 +172,18 @@ final fgcolor = shouldGrayOut
 ```
 
 Complete constraints display with a grey foreground color instead of green (valid/highlighted) or red (invalid).
+
+#### Background color semantics
+
+Constraint widgets use the background to encode the constraint's nature
+(`lib/getsomepuzzle/model/constants.dart`):
+
+- `forbiddenColor` (purple) — "forbidden" constraints (FM);
+- `mandatoryColor` (light blue) — "mandatory" constraints (QA, GC, SH,
+  CC, RC, CT, RT, DF).
+
+On grayout the background switches to `Colors.grey.withValues(alpha: 0.3)`.
+For the grid-edge widgets (`lib/widgets/column_count.dart`,
+`lib/widgets/row_count.dart`, `lib/widgets/transition.dart`) and the DF
+circles (`lib/widgets/different_from_painter.dart`), **only the background
+is grayed**: the digit, wave glyph, and ≠ symbol keep their normal colors.

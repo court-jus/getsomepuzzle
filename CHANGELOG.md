@@ -10,14 +10,12 @@ localised under
 `marketing/play_store/<locale>/changelogs/default.txt` and
 `marketing/app_store/<locale>/release_notes.txt`.
 
-## [Unreleased]
+## [1.6.21] - 2026-06-04
 
-- First public release on Google Play and the App Store.
+- **Unified background colors**: the grid-edge constraints (CC/RC/CT/RT) and the DF circles now use the same light-blue "mandatory" background as QA/GC/SH; purple stays reserved for "forbidden" (FM). When these constraints gray out, only the background is grayed — digits, wave glyphs and ≠ symbols keep their colors.
 - **Redundant parity constraints merged** (PA): two PA constraints sharing an anchor cell and an axis now collapse into one (top + bottom → vertical; a half-side next to its axis-wide form is absorbed), like the existing per-letter LT aggregation. The stats canonical key re-serializes every rotation, so puzzles played before the merge keep their "already played" status.
 - **Letter "I" removed** from Letter Group labels — it was too easy to confuse with the vertical-symmetry glyph.
 - **Chain grayout fix**: a CH constraint is grayed out as soon as a path satisfying it exists.
-- **macOS build** added.
-- **Share links** now point to `leveque.cc/getsomepuzzle/play/`.
 - The unused iOS Photo Library permission was removed.
 
 ## [1.6.20] — 2026-05-30

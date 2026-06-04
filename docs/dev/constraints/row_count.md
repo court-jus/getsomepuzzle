@@ -17,9 +17,10 @@ constraints coexist in the same puzzle, creating a nonogram-like system of cross
 ## Display
 
 The constraint is represented by a digit displayed to the **left** of the corresponding row
-(outside the grid), inside a greyed circle. The digit color matches the constraint color
-(black text for color 1, white text on dark background for color 2), mirroring the CC widget
-style.
+(outside the grid), inside a circle with the `mandatoryColor` (light blue) background shared
+by all "mandatory" constraints. The digit color matches the constraint color (black text for
+color 1, white text for color 2), mirroring the CC widget style. On grayout only the
+background switches to semi-transparent grey; the digit keeps its color.
 
 ## Gameplay notes
 
@@ -76,7 +77,7 @@ diversity score to avoid over-awarding rule_diversity when both are present.
 **File**: `lib/widgets/row_count.dart` (new)
 
 - `RowCountWidget` created, mirrors `ColumnCountWidget` style exactly
-- Displays digit in greyed circle, color matches constraint color
+- Displays digit in `mandatoryColor` circle, color matches constraint color
 
 **File**: `lib/widgets/puzzle.dart`
 

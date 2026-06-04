@@ -37,7 +37,8 @@ Equivalently: count adjacent pairs of filled cells that differ.
 ## Display
 
 RT/CT is a line-level constraint, displayed in the same peripheral bars as RC and CC,
-inside a greyed rounded square. The square shape visually distinguishes RT/CT from RC/CC
+inside a rounded square with the `mandatoryColor` (light blue) background shared by all
+"mandatory" constraints. The square shape visually distinguishes RT/CT from RC/CC
 (which use a circle). Inside the square a **square-wave glyph** is drawn together with the
 count digit: the number of vertical edges (steps) of the wave equals the transition count,
 making explicit that the constraint counts colour *changes* between adjacent cells.
@@ -47,8 +48,9 @@ making explicit that the constraint counts colour *changes* between adjacent cel
   (monochrome row); `count == lineLength - 1` is a tight alternation (checkerboard).
 - **Column CT**: displayed **above** the column. The wave runs **vertically** (plateaus along
   the column), sitting to the left of the digit.
-- **Color**: neutral black glyph and digit (no colour association); greyed out when the
-  constraint is complete, red border when violated.
+- **Color**: neutral black glyph and digit (no colour association); when the constraint
+  is complete only the background switches to semi-transparent grey (glyph and digit stay
+  black), red border when violated.
 
 The wave orientation is supplied by `to_flutter.dart`, which passes `Axis.horizontal` for
 `RowTransitionConstraint` and `Axis.vertical` for `ColumnTransitionConstraint` to
