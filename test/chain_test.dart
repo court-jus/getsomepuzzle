@@ -199,8 +199,30 @@ void main() {
       expect(ch.isCompleteFor(p), isFalse);
     });
 
-    test('incomplete grid → not complete', () {
+    test('incomplete grid without a finished path → not complete', () {
+      // Colour-1 cells on both sides but no connecting path yet: future
+      // moves could still block every path, so CH must stay active.
       final p = makePuzzle('100\n000\n001');
+      final ch = ChainConstraint('1.left.right');
+      p.addConstraint(ch);
+      expect(ch.isCompleteFor(p), isFalse);
+    });
+
+    test('incomplete grid with a finished path → complete (early grayout)', () {
+      // The middle row is a complete colour-1 path from left to right.
+      // Placed cells are immutable, so no future move can break it: the
+      // constraint is guaranteed satisfied and must gray out even though
+      // free cells remain.
+      final p = makePuzzle('000\n111\n000');
+      final ch = ChainConstraint('1.left.right');
+      p.addConstraint(ch);
+      expect(ch.isCompleteFor(p), isTrue);
+    });
+
+    test('free corridor does not count as a finished path', () {
+      // Left-to-right corridor exists only through free cells: the path is
+      // still reachable (verify true) but not yet built → not complete.
+      final p = makePuzzle('222\n100\n222');
       final ch = ChainConstraint('1.left.right');
       p.addConstraint(ch);
       expect(ch.isCompleteFor(p), isFalse);

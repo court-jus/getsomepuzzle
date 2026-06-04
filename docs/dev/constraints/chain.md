@@ -87,10 +87,26 @@ Three deduction branches, checked in order:
 
 Returns `null` when no deduction is possible.
 
+### `_hasCompletePath(Puzzle)` → `bool`
+
+Flood-fill from every `fromSide` cell whose value is **exactly** `color`, traversing only
+cells of value `color` (free cells do *not* count, unlike `_isBlocked`). Returns `true` if
+`toSide` is reached — i.e. a finished path of already-placed target-color cells connects the
+two sides.
+
 ### `isCompleteFor(Puzzle)` → `bool`
 
-Conservative: returns `true` only when `verify(puzzle)` is `true` **and** every cell on the
-grid is filled. CH rarely grays out mid-game (same as GC).
+```
+return verify(puzzle) && _hasCompletePath(puzzle)
+```
+
+Once a path of target-colored cells connects the two sides, the constraint is guaranteed
+satisfied at the end of the game: placed cells are immutable, so the path can never be
+broken. `verify` stays `true` forever, `_isBlocked` can never become `true`, and no `apply`
+branch can fire again (border saturation requires all-but-one border cells opposite, which
+the path's border cell contradicts; forced bridge requires `_isBlocked` on a clone, which the
+intact path prevents). The completion criterion is therefore **monotone** and CH grays out
+mid-game as soon as the player finishes any connecting path.
 
 ### `generateAllParameters(width, height, domain, excludedIndices)`
 
@@ -229,9 +245,6 @@ CH is included in the discovery-order slug lists in `test/onboarding_test.dart`,
 - **Cut-set reasoning not implemented.** Multi-cell minimal cuts (where a set of cells forms
   a bottleneck) are not detected. The forced-bridge check covers single-cell cuts; multi-cell
   cuts are deferred.
-- **Grayout is conservative.** `isCompleteFor` only returns `true` when the grid is fully
-  filled. A tighter check (no free cell adjacent to the path or to a barrier) is possible
-  but rarely triggers mid-game.
 - **No complicity implemented.** Cross-constraint deductions between CH and GS, FM, SY, etc.
   are natural candidates for future work.
 - **Multi-path ambiguity.** CH only requires *existence* of a path, not uniqueness. The

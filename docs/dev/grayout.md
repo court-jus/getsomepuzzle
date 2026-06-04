@@ -19,9 +19,9 @@ target on the next move and fire again).
 
 Under this semantics, two classes of constraints emerge:
 
-- **Monotone** constraints (`FM`, `GS`, `LT`, `SY`, `DF`, `CC`, `PA`): their
-  completion criterion is preserved by any future move. Once complete, they
-  stay complete. They gray out meaningfully mid-game.
+- **Monotone** constraints (`FM`, `GS`, `LT`, `SY`, `DF`, `CC`, `PA`, `CH`):
+  their completion criterion is preserved by any future move. Once complete,
+  they stay complete. They gray out meaningfully mid-game.
 - **Non-monotone** constraints (`QA`, `GC`, `SH`): future play can revive
   them. They can only be grayed out once no useful move can trigger them
   again, which for `QA` and `SH` essentially means "puzzle complete", and
@@ -144,6 +144,17 @@ Complete when column is fully filled.
 **File:** `lib/getsomepuzzle/constraints/different_from.dart`
 
 Complete when BOTH cells are filled (can verify difference).
+
+#### 2.11 `ChainConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/chain.dart`
+
+Complete as soon as a path of already-placed target-color cells connects the
+two sides (flood-fill restricted to cells of value `color`). Placed cells are
+immutable, so a finished path can never be broken: the constraint is
+guaranteed satisfied at the end, and no `apply` branch can ever fire again.
+The criterion is monotone — CH grays out mid-game once the player finishes
+any connecting path.
 
 ### 3. UI Update
 

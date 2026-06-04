@@ -171,9 +171,41 @@ class ChainConstraint extends Constraint {
     return null;
   }
 
+  // True when a path of already-coloured target cells connects fromSide to
+  // toSide. Flood-fill restricted to cells whose value is exactly `color`
+  // (free cells do NOT count, unlike _isBlocked).
+  bool _hasCompletePath(Puzzle puzzle) {
+    final fromCells = _borderCells(
+      fromSide,
+      puzzle.width,
+      puzzle.height,
+    ).where((i) => puzzle.cellValues[i] == color);
+    if (fromCells.isEmpty) return false;
+
+    final visited = <int>{...fromCells};
+    final queue = List<int>.from(fromCells);
+    final toCellSet = _borderCells(toSide, puzzle.width, puzzle.height).toSet();
+
+    while (queue.isNotEmpty) {
+      final current = queue.removeLast();
+      if (toCellSet.contains(current)) return true;
+
+      for (final nei in puzzle.getNeighbors(current)) {
+        if (!visited.contains(nei) && puzzle.cellValues[nei] == color) {
+          visited.add(nei);
+          queue.add(nei);
+        }
+      }
+    }
+    return false;
+  }
+
   @override
   bool isCompleteFor(Puzzle puzzle) {
     if (!verify(puzzle)) return false;
-    return puzzle.cellValues.every((v) => v != 0);
+    // Once a path of target-coloured cells connects the two sides, no future
+    // move can break it (placed cells are immutable): verify stays true and
+    // no apply branch can ever fire again → the constraint is complete.
+    return _hasCompletePath(puzzle);
   }
 }
