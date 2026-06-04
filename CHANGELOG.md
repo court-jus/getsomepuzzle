@@ -12,9 +12,37 @@ localised under
 
 ## [Unreleased]
 
-## [1.7.0] — TBD
+- First public release on Google Play and the App Store.
+- **Redundant parity constraints merged** (PA): two PA constraints sharing an anchor cell and an axis now collapse into one (top + bottom → vertical; a half-side next to its axis-wide form is absorbed), like the existing per-letter LT aggregation. The stats canonical key re-serializes every rotation, so puzzles played before the merge keep their "already played" status.
+- **Letter "I" removed** from Letter Group labels — it was too easy to confuse with the vertical-symmetry glyph.
+- **Chain grayout fix**: a CH constraint is grayed out as soon as a path satisfying it exists.
+- **macOS build** added.
+- **Share links** now point to `leveque.cc/getsomepuzzle/play/`.
+- The unused iOS Photo Library permission was removed.
 
-First public release on Google Play and the App Store.
+## [1.6.20] — 2026-05-30
+
+- **Editor reset button** to clear the in-app puzzle editor in one click.
+- **Smarter Transition deductions** (RT/CT).
+
+## [1.6.19] — 2026-05-30
+
+- Fixed the Windows MSIX artifact path in CI.
+
+## [1.6.18] — 2026-05-29
+
+- **Constraint families**: the constraints are grouped into five families by deduction style, and the generator's equilibrium now balances the blend of families a puzzle is built from — the catalog mixes reasoning styles more evenly.
+- Windows CI builds the MSIX installer.
+
+## [1.6.17] — 2026-05-29
+
+- **New constraint: Transitions** (RT/CT) — the marked row or column must contain exactly the indicated number of color changes.
+- **Smarter constraint hints**: suggested constraints are now ranked by the deduction effort they actually save.
+- **Onboarding refinements**: new phases; the "refresh memory" button is disabled for constraints not seen yet; hints never suggest a constraint you haven't learned; filters are reset once onboarding completes; no size-1 GroupSize puzzles during the teaching sequence.
+- **Majority generation fix**: MJ constraints with conflicting borders are no longer generated.
+- **Generator equilibrium** improvements, and the level slider is debounced.
+- Windows packaging moves to MSIX.
+- ~6K net new puzzles across the level collections.
 
 ## [1.6.16] — 2026-05-26
 
