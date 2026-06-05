@@ -103,6 +103,11 @@ next-deepest gap. Reset on successful generation or on warm-up.
   deterministic seed + minimal grid (3x3 domain 2) and checks a valid puzzle
   is produced within a reasonable budget. Not a quality test, just a tripwire.
 
+## Generator improvements
+
+* Implement 3-color for preFillSy
+* Equilibrium between domains
+
 ## Notes and nits
 
 * **`apply()` ordering determinism.** `Puzzle.apply()` iterates sequentially

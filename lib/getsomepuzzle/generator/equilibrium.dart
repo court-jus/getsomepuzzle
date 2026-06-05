@@ -275,10 +275,11 @@ class CompositionTarget extends Target {
 /// with `scenario:` is honoured, regardless of position relative to a
 /// `p:` play-state suffix.
 ///
-/// Lines without a `scenario:` suffix — including the entire legacy
-/// corpus — are reported as [ProfileCategory.classic]. There is no
-/// heuristic fallback: explicitness is what the equilibrium relies on
-/// to avoid false `pathBased` positives.
+/// Lines without a `scenario:` suffix fall back to a heuristic for the
+/// legacy corpus: if the line contains an `SH` constraint slug it is
+/// reported as [ProfileCategory.sh]. Lines without SH or a scenario
+/// marker — including the entire legacy corpus — are reported as
+/// [ProfileCategory.classic].
 ProfileCategory detectPuzzleProfile(String v2Line) {
   final parts = v2Line.split('_');
   for (int i = parts.length - 1; i >= 7; i--) {
@@ -289,6 +290,13 @@ ProfileCategory detectPuzzleProfile(String v2Line) {
       if (p.name == name) return p;
     }
     break;
+  }
+  // Heuristic for legacy corpus: SH slug → sh profile.
+  if (parts.length >= 5) {
+    for (final c in parts[4].split(';')) {
+      final colon = c.indexOf(':');
+      if (colon > 0 && c.substring(0, colon) == 'SH') return ProfileCategory.sh;
+    }
   }
   return ProfileCategory.classic;
 }

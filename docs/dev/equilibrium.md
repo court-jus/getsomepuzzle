@@ -49,8 +49,9 @@ except as noted on axis 3):
 5. **Profile** — pre-fill scenario category (`classic`, `sh`, `pathBased`,
    `syBased`). Identification reads the authoritative `scenario:<name>`
    suffix written by the generator at emission time (see
-   `detectPuzzleProfile` in `equilibrium.dart`); unmarked lines —
-   including the legacy corpus — are counted as `classic`.
+   `detectPuzzleProfile` in `equilibrium.dart`); unmarked lines fall
+   back to a heuristic: lines containing the `SH` constraint slug are
+   counted as `sh`, all others as `classic`.
 6. **Composition** — ordered triple of the puzzle's three principal
    constraint families (see `families.md`). Each constraint instance
    contributes to its family's count, so a puzzle with `3×LT, 2×PA, 1×FM`

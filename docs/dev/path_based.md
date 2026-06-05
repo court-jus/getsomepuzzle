@@ -277,10 +277,11 @@ serialiser.
 The equilibrium carries a `profile` axis (`kTargetProfile` in
 `equilibrium.dart`) with targets `{classic: 0.85, sh: 0.05,
 pathBased: 0.05, syBased: 0.05}`. Pre-existing corpus puzzles are
-classified heuristically by `detectPuzzleProfile(v2Line)`: SH in
-constraints → `sh`; ≥ 2 LT with non-4-adjacent anchors →
-`pathBased`; otherwise `classic`. The heuristic is fallible but the
-equilibrium self-corrects over runs.
+classified heuristically by `detectPuzzleProfile(v2Line)`: `scenario:`
+suffix when present, else SH in constraints → `sh`, otherwise
+`classic`. Path-based puzzles are **only** identified by the explicit
+`scenario:pathBased` suffix — there is no LT-pattern heuristic. The
+heuristic is fallible but the equilibrium self-corrects over runs.
 
 When the picker yields `ProfileTarget(pathBased)`, `_resolveTarget`
 in `worker_io.dart` flips `pathBasedScenario = true` for that

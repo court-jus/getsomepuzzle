@@ -3,10 +3,11 @@ import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 
-const textColors = {
+final textColors = {
   CellValue.free: Colors.transparent,
   CellValue.black: Colors.black,
   CellValue.white: Colors.white,
+  CellValue.purple: Colors.purple[100],
 };
 const oppositeColors = {
   CellValue.free: Colors.transparent,
