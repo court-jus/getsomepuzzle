@@ -16,21 +16,23 @@ from a few seeds. The grid is partitioned into:
 
 - a **background** of one uniform colour (say white) filling most of
   the grid;
-- a few **islands** of the opposite colour (black), each carrying one
-  or more `SY` constraints that pin its shape down.
+- a few **islands**, each in its own colour drawn from
+  `domain \ {bg}`, each carrying one or more `SY` constraints that pin
+  its shape down. On a 2-colour domain this degenerates to the classic
+  dichotomy (all islands in the colour opposite to the background).
 
-The intellectual work is mirroring a few revealed black cells across
+The intellectual work is mirroring a few revealed island cells across
 their declared axis until each island is fully recovered, while
 convincing oneself that two islands can't be merged without breaking
 their respective symmetries.
 
-> **2-colour by design.** The background/island model is intrinsically
-> binary (one background colour, islands in the opposite one), so
-> `preFillSy` always builds a `defaultDomain` (black/white) grid and
-> ignores `GeneratorConfig.domain`. A `--domain 3` run that lands on
-> this scenario still produces a valid 2-colour puzzle; the generator's
-> auto-shrink relabels its exported line as `v2_12_...`. There is no
-> 3-colour variant of sy-based generation.
+> **Domain-aware.** `preFillSy` receives `GeneratorConfig.domain` and
+> colours islands within it. On a 3-colour domain, the colour
+> assignment (`pickIslandColors` in `sy.dart`) guarantees at least two
+> distinct island colours whenever there are ≥ 2 islands — otherwise
+> the puzzle would be functionally 2-colour and the generator's
+> auto-shrink would relabel its exported line as `v2_12_...`, wasting
+> the domain-3 attempt.
 
 ### Why this design
 
@@ -88,7 +90,10 @@ The pipeline runs five stages.
 
 ### 1. Background colour
 
-50/50 random between domain values. No a priori bias.
+Uniform random over the domain values (purple can be the background on
+a 3-colour domain). No a priori bias. Island colours are assigned
+after growth, per island, from `domain \ {bg}` (`pickIslandColors`),
+with the ≥ 2 distinct island colours guarantee on 3-colour domains.
 
 ### 2. Seed sampling
 
@@ -134,7 +139,8 @@ cell and its mirror.
 
 Per-island invariants kept during growth:
 
-- `island` — set of grid indices currently `fg` (opposite of bg);
+- `island` — set of grid indices belonging to the island (painted in
+  the island's own colour at the end of growth);
 - `moat` — set of cells currently `bg` that *border* the island.
   Non-negotiable: turning a moat cell `fg` would either expand past
   the symmetric closure or merge with a neighbour;
@@ -159,8 +165,8 @@ Two stopping signals:
   number of islands) caps very aggressive growth so one island
   doesn't eat half the grid before another even starts.
 
-When every island is frozen, the islands are painted `fg` and the
-rest of the grid `bg`.
+When every island is frozen, each island is painted in its own colour
+(`pickIslandColors`) and the rest of the grid `bg`.
 
 ### 5. Bipartite disambiguation
 
@@ -189,9 +195,25 @@ keeping non-helpers in the pool causes O(N × iterations) re-tests at
 the worst possible moment — when `puzzle.constraints` is fattest and
 each `clone().solve()` is most expensive.
 
+**Shared solved snapshot.** Each cascade iteration solves the current
+puzzle once into a `solvedBase` snapshot; every probe of the iteration
+(reveal candidates via `_revealPropagates`, guardrail candidates via
+`_constraintHelps`) clones *that* instead of re-solving the base — one
+solve per candidate instead of two, starting from an already-propagated
+state. The snapshot is refreshed after a rollback (the puzzle changed).
+This matters most on 3-colour domains, where weak propagation makes
+every `solve()` degenerate into `_forceOneCell` sweeps.
+
+**Deadline (`shouldStop`).** `preFillSy` accepts the caller's
+`shouldStop` and checks it between attempts, cascade iterations, pool
+entries and candidates, and forwards it to every inner `solve()`
+(including `isDeductivelyUnique`, where an aborted solve returns
+`false` — never a false positive). Without it, a single 3-colour
+attempt can run for minutes past the worker's `maxAttemptTime`.
+
 **Non-monotonic `solve()` rollback safety net.**
-`_constraintHelps(puzzle, c)` is the fast filter: solve once, add
-`c`, re-solve, compare ratios. Faster than two independent solves but
+`_constraintHelps(solvedBase, c)` is the fast filter: add `c` on top of
+the solved snapshot, re-solve, compare ratios. Cheap but
 **non-monotonic** — adding `c` to an already-solved clone is not the
 same as adding `c` to the original puzzle and solving from scratch,
 because `solve()` is order-sensitive. A candidate that looks helpful
@@ -229,26 +251,39 @@ Guardrails (steps 3–4) never add readonly cells, only constraints.
 ## API
 
 ```dart
+SyPrefillResult? preFillSy(
+  int width,
+  int height,
+  List<CellValue> domain,   // 2- or 3-colour; islands ∈ domain \ {bg}
+  Random rng, {
+  int? numIslands,          // default: 3 if W·H ≥ 40 else 2
+  int edgeMargin = 1,
+  int? minSeedDist,         // default: max(3, ⌈min(W,H)/2⌉)
+  double stopProb = 0.2,
+  int minIslandSize = 3,
+  int? maxIslandSize,       // default: ⌈W·H/(2·N)⌉
+  int maxRetries = 30,
+  int? bipartiteMaxReveals, // default: 2 per island
+  bool Function()? shouldStop,          // caller deadline
+  void Function(String)? debugLog,      // instrumentation hook
+});
+
 class SyPrefillResult {
   final Puzzle puzzle;              // SY + guardrails + reveals
-  final List<int> solution;
+  final List<CellValue> solution;
+  final int numIslands;
   final int seedRevealedCount;
   final int islandCellRevealedCount;
   final int guardRailCount;
   int get revealedCount => seedRevealedCount + islandCellRevealedCount;
 }
-
-class SyScenarioConfig {
-  int numIslands;        // 2..4
-  int edgeMargin;        // 1..2
-  int minSeedDist;       // ≥ 3
-  double stopProb;       // 0.15..0.25
-  int? maxIslandSize;    // default: ⌈W·H/(2·N)⌉
-  int? bipartiteMaxReveals;
-  int maxRetries;
-  int routingTimeoutMs;  // kept for symmetry with path
-}
 ```
+
+`bin/validate_sy_domain3.dart` runs the pipeline end-to-end over a
+seed sweep with per-cascade-iteration instrumentation (`--domain`,
+`--seeds`, `--retries`, `--budget-ms`, `--quiet`) and reports the
+ok / timeout / failed split — the tool of choice before touching the
+cascade's cost profile.
 
 ## Why SY makes this naturally work
 
@@ -290,20 +325,34 @@ Two consequences that align with the pipeline:
   as the singleton `{seed}`. `feasible_axes` filters configurations
   where no growth is possible (would emit trivial 1-cell islands).
 
+## Convergence profile (June 2026, 6×6, 2 islands)
+
+Measured with `bin/validate_sy_domain3.dart` (20-seed sweeps, after
+the shared-snapshot optimisation):
+
+- **Domain 2**: most seeds converge in well under 10 s.
+- **Domain 3**: ~30 % converge within 10 s, ~50 % within 30 s
+  (8 retries); with the default `maxRetries = 30` and a
+  production-like budget (`max-attempt-time 240s`), **10/10 seeds
+  converge** — median ≈ 51 s, max ≈ 94 s. Domain-3 sy-based costs
+  roughly 4-10× domain-2 per puzzle; weak 3-colour propagation makes
+  every `solve()` lean on `_forceOneCell`, so attempts are slower and
+  more topologies need several retries.
+
 ## Known gaps (May 2026)
 
-- **Partial convergence.** On 6×6 with the default 2-island setup,
-  roughly 60 % of seeds finish the bipartite cascade in under 10 s
-  after the readonly-prefill + rollback-on-regression additions. The
-  remaining ~40 % exhaust the retry budget (`maxRetries = 30`) or
-  trigger the `guardRail ≥ 8` / `consecutiveRollbacks ≥ 5` bailouts.
-  Hypothesis: some island topologies are structurally ambiguous
-  (multiple SY-valid completions distinguishable only by reasoning
-  beyond what the solver does with propagation alone). Levers worth
-  trying: smarter axis pick (drop axes producing islands too small
-  or too close to the border), stricter reveal acceptance (require
-  unlocking a propagation chain that crosses an island boundary),
-  independent two-clone `_constraintHelps` (slower per candidate but
-  fewer rollbacks).
+- **Partial convergence (domain 2).** On 6×6 with the default
+  2-island setup, roughly 60 % of seeds finish the bipartite cascade
+  in under 10 s after the readonly-prefill + rollback-on-regression
+  additions. The remaining ~40 % exhaust the retry budget
+  (`maxRetries = 30`) or trigger the `guardRail ≥ 8` /
+  `consecutiveRollbacks ≥ 5` bailouts. Hypothesis: some island
+  topologies are structurally ambiguous (multiple SY-valid completions
+  distinguishable only by reasoning beyond what the solver does with
+  propagation alone). Levers worth trying: smarter axis pick (drop
+  axes producing islands too small or too close to the border),
+  stricter reveal acceptance (require unlocking a propagation chain
+  that crosses an island boundary), independent two-clone
+  `_constraintHelps` (slower per candidate but fewer rollbacks).
 - **No `sy-share` measurement script yet.** The analogue of
   `bin/extract_path_like.dart` for SY still needs to be written.

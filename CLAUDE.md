@@ -119,3 +119,4 @@ When adding or modifying a `Constraint` subclass in
 - Do not create temporary files to immediately read them back — test the logic directly
 - Do not add boilerplate around already-tested functions — if `countSolutions` is tested in one file, don't retest it in another
 - Prefer testing edge cases and real-world bugs over happy paths that are already covered
+- **Never run the generator or a pre-fill pipeline end-to-end in tests** (`generateOne`, `preFillSy`, `preFillPath`, …): these are stochastic and expensive (tens of seconds to minutes per call). Extract the deterministic logic under test into a visible helper and unit-test that instead (e.g. `pickIslandColors` in `prefill/sy.dart`). Pipeline convergence is measured by batch runs outside the test suite.

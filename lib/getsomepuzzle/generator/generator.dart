@@ -437,7 +437,13 @@ class PuzzleGenerator {
     }
 
     if (config.syBasedScenario) {
-      final result = preFillSy(width, height, _rng);
+      final result = preFillSy(
+        width,
+        height,
+        config.domain,
+        _rng,
+        shouldStop: shouldStop,
+      );
       if (result == null) {
         onReject?.call(
           GenerationRejectReason.syPrefillFailed,

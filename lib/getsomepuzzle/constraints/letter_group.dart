@@ -184,6 +184,12 @@ class LetterGroup extends CellsCentricConstraint {
       for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
         if (puzzle.getValue(idx) != CellValue.free) continue;
         if (blockingDisconnectsMembers(puzzle, idx, myColor, indices)) {
+          // The articulation cell must take myColor; if that colour was
+          // pruned from its options (3+-colour domains), the members can
+          // never connect.
+          if (!puzzle.cells[idx].options.contains(myColor)) {
+            return Impossible(this);
+          }
           return SetValue(idx, myColor, this, complexity: 4);
         }
       }

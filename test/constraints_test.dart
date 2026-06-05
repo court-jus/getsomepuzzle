@@ -76,6 +76,66 @@ void main() {
     });
   });
 
+  group('GroupSize.apply', () {
+    test('does not re-emit a removeOption for an already-pruned colour', () {
+      // Regression (3-colour, June 2026): the per-colour feasibility sweep
+      // emitted RemoveOption(anchor, colour) without checking the anchor's
+      // options. Once the colour was pruned (here: white, because joining
+      // the white neighbour would overshoot size=1), apply() re-emitted the
+      // same no-op move forever and the solver stalled on it — a generated
+      // puzzle then failed --check with "not deductively unique".
+      // Only reachable on 3+ colours: on 2 colours a prune collapses the
+      // cell to a value and the anchor is no longer free.
+      final p = Puzzle.empty(3, 3, fullDomain);
+      p.cells[5].setForSolver(CellValue.white); // white neighbour of anchor
+      p.addConstraint(GroupSize('4.1')); // anchor idx 4 (center), size 1
+      p.cells[4].removeOptionForSolver(CellValue.white);
+      final move = p.constraints.first.apply(p);
+      // Any emitted removeOption must target an option still present —
+      // otherwise the move is a no-op and the solve loop livelocks.
+      if (move is RemoveOption) {
+        expect(
+          p.cells[move.idx].options.contains(move.option),
+          isTrue,
+          reason:
+              'no-op removeOption re-emitted: '
+              'cell ${move.idx} != ${move.option}',
+        );
+      }
+    });
+  });
+
+  group('DifferentFrom.apply', () {
+    test('does not re-emit a removeOption for an already-pruned colour', () {
+      // Same no-op livelock class as GroupSize.apply (3-colour, June 2026):
+      // with cell 0 coloured, DF kept emitting RemoveOption(1, black) even
+      // after black was pruned from cell 1's options. Once pruned, there is
+      // nothing left to deduce — apply must return null.
+      final p = Puzzle.empty(2, 1, fullDomain);
+      p.cells[0].setForSolver(CellValue.black);
+      p.addConstraint(DifferentFromConstraint('0.right'));
+      p.cells[1].removeOptionForSolver(CellValue.black);
+      expect(p.constraints.first.apply(p), isNull);
+    });
+  });
+
+  group('LetterGroup.apply', () {
+    test('articulation cell with pruned colour → Impossible, not SetValue', () {
+      // 3x1 line, both letter members black at the ends: cell 1 is the
+      // articulation point every connecting path crosses, so it must take
+      // black. With black pruned from its options (3-colour domains) the
+      // letter can never connect: apply must surface Impossible. It used
+      // to emit SetValue(1, black) — a value the state already
+      // contradicts, which the solver treats as a silent dead end.
+      final p = Puzzle.empty(3, 1, fullDomain);
+      p.cells[0].setForSolver(CellValue.black);
+      p.cells[2].setForSolver(CellValue.black);
+      p.addConstraint(LetterGroup('F.0.2'));
+      p.cells[1].removeOptionForSolver(CellValue.black);
+      expect(p.constraints.first.apply(p), isA<Impossible>());
+    });
+  });
+
   group('ParityConstraint.verify', () {
     test('right: equal count → valid', () {
       // 1221: idx 1 right=[2,1] → 1 odd, 1 even → valid

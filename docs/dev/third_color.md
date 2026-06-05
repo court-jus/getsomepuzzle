@@ -585,9 +585,11 @@ Checklist:
    `TargetUniverse`), and `kTargetDomainProfile` /
    `pickWeightedDomain` in `equilibrium.dart` (the per-attempt draw and
    the equilibrium domain axis only know the sizes the profile
-   declares). The path-based and sy-based pre-fills are intrinsically
-   binary; the worker forces them to domain 2 regardless of the range
-   (see `path_based.md` / `prefill_sy.md`).
+   declares). The path-based pre-fill is intrinsically binary; the
+   worker forces it to domain 2 regardless of the range (see
+   `path_based.md`). The sy-based pre-fill is domain-aware
+   (per-island colours — see `prefill_sy.md`) and follows the normal
+   domain draw.
 8. **Re-validate** the full corpus with `--check` after generating any
    N-colour lines — the soundness invariants above are domain-sensitive
    and a wider domain can resurface "too-lenient on pruned options"

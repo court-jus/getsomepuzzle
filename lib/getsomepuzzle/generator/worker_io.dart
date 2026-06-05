@@ -512,13 +512,11 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
           ? target.size
           : pickWeightedDomain(params.allowedDomains, domainCounts, rng);
     }
-    if (params.pathBasedScenario ||
-        attemptPathBased ||
-        params.syBasedScenario ||
-        attemptSyBased) {
-      // The path-based and sy-based pre-fills are 2-colour by design (their
-      // colourings are intrinsically binary) — never hand them a 3-colour
-      // domain.
+    if (params.pathBasedScenario || attemptPathBased) {
+      // The path-based pre-fill is 2-colour by design (its colouring is
+      // intrinsically binary) — never hand it a 3-colour domain. The
+      // sy-based pre-fill is domain-aware (per-island colours) and
+      // follows the normal domain draw.
       attemptDomainSize = 2;
     }
 

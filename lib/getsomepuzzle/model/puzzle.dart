@@ -1254,9 +1254,12 @@ class Puzzle {
   /// project-wide convention: any puzzle that can't be deduced this way is
   /// invalid by definition — it would also be unsolvable with the in-game
   /// hint system, which uses the same `solve()` machinery.
-  bool isDeductivelyUnique() {
+  /// [shouldStop] is forwarded to `solve()`; an aborted run returns
+  /// `false` (never a false positive — only a completed, checked solve
+  /// can return `true`).
+  bool isDeductivelyUnique({bool Function()? shouldStop}) {
     final test = clone();
-    return test.solve();
+    return test.solve(shouldStop: shouldStop);
   }
 
   /// Remove constraints that aren't required for the puzzle to remain

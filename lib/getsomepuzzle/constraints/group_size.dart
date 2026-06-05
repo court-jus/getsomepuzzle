@@ -127,6 +127,12 @@ class GroupSize extends CellsCentricConstraint {
       //      cell of that mass would push it past size on its first growth
       //      step, the color is infeasible.
       for (final color in puzzle.domain) {
+        // Only colours still in the anchor's options can be removed; an
+        // already-pruned colour would make every emission below a no-op
+        // move re-emitted forever (the solver then stalls on it). Only
+        // reachable on 3+ colour domains — on 2 colours a pruned option
+        // collapses the cell to a value and the anchor is no longer free.
+        if (!puzzle.cells[idx].options.contains(color)) continue;
         final reachable = floodFill(puzzle, [idx], (i) {
           final c = puzzle.cells[i];
           return c.value == color || c.options.contains(color);

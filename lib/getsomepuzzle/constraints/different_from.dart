@@ -136,12 +136,22 @@ class DifferentFromConstraint extends CellsCentricConstraint {
       return null;
     }
 
+    // Guard on the free cell's options: re-emitting a removeOption for an
+    // already-pruned colour is a no-op the solve loop would livelock on.
+    // Only reachable on 3+ colour domains (on 2 colours a prune collapses
+    // the cell to a value).
     if (cell1.value != CellValue.free) {
-      return RemoveOption(cell2idx, cell1.value, this, complexity: 0);
+      if (cell2.options.contains(cell1.value)) {
+        return RemoveOption(cell2idx, cell1.value, this, complexity: 0);
+      }
+      return null;
     }
 
     if (cell2.value != CellValue.free) {
-      return RemoveOption(cell1idx, cell2.value, this, complexity: 0);
+      if (cell1.options.contains(cell2.value)) {
+        return RemoveOption(cell1idx, cell2.value, this, complexity: 0);
+      }
+      return null;
     }
 
     return null;
