@@ -289,6 +289,46 @@ void main() {
     });
   });
 
+  group('MajorityConstraint on a 3-colour domain', () {
+    // Same 3-row × 2-col layout as above: MJ:0.0.2.1.x covers the whole
+    // 6-cell grid (zoneSize=6, target=4, so at most 2 non-target cells).
+    // What domain-2 cannot express: non-target cells of *different* colours
+    // must be counted together against the majority.
+    test('mixed non-target colours together block the majority → false', () {
+      // Cells [1,2,1,3,0,2]: black = 2, white = 2, purple = 1.
+      // No single non-target colour exceeds 2, but together 3 > 2 → blocked.
+      final p = makePuzzle3('12\n13\n02');
+      expect(mj('0.0.2.1.1').verify(p), isFalse);
+    });
+
+    test('mixed non-target colours at the limit, still reachable → true', () {
+      // Cells [1,2,1,3,0,0]: black = 2, non-target (white+purple) = 2 <= 2,
+      // free = 2 → 2+2 = 4 >= 4 reachable.
+      final p = makePuzzle3('12\n13\n00');
+      expect(mj('0.0.2.1.1').verify(p), isTrue);
+    });
+
+    test('apply forces purple when it is the target colour', () {
+      // Target color 3. Cells [3,0,0,3,1,2]: purple = 2, free = 2 (cells 1,2),
+      // mixed non-target (black+white) = 2 <= 2. 2+2 = 4 == target → every
+      // free cell must become purple; the first one is forced.
+      final p = makePuzzle3('30\n03\n12');
+      final move = mj('0.0.2.1.3').apply(p);
+      expect(move, isNotNull);
+      final m = move!;
+      expect(m.value, CellValue.purple);
+      expect(m.idx, 1);
+    });
+
+    test('apply reports impossible on a blocking mix → isImpossible', () {
+      // Same blocking mix as the verify case: 3 mixed non-target cells > 2.
+      final p = makePuzzle3('12\n13\n02');
+      final move = mj('0.0.2.1.1').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+  });
+
   group('MajorityConstraint.target calculation', () {
     test('even-sized zone', () {
       // 2x2 = 4 cells, target = 4~/2+1 = 3
