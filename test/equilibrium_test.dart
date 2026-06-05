@@ -136,13 +136,16 @@ void main() {
   group('pickTarget', () {
     // 6 slugs (gap each ≤ 1/6 ≈ 0.167 < 0.30) and 9 sizes (3x3..5x5,
     // gap each ≤ 1/9 ≈ 0.111 < 0.30) so ntypes=2 (target 0.30) is the
-    // dominant gap on an empty corpus.
+    // dominant gap on an empty corpus. The domain axis is frozen to [2]
+    // so its 0.40 gap (the corpus here is all-dom2) doesn't shadow the
+    // axes these tests actually exercise.
     final universe = TargetUniverse(
       allowedSlugs: ['FM', 'PA', 'GS', 'SY', 'QA', 'CC'],
       minWidth: 3,
       maxWidth: 5,
       minHeight: 3,
       maxHeight: 5,
+      allowedDomains: const [2],
     );
 
     test('on an empty corpus, picks the bin with highest expected share', () {
@@ -179,6 +182,7 @@ void main() {
         maxWidth: 4,
         minHeight: 4,
         maxHeight: 4,
+        allowedDomains: const [2], // keep the 0.40 domain gap out of the race
       );
       var stats = EquilibriumStats.empty();
       stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
@@ -611,6 +615,7 @@ void main() {
         const NTypesTarget(3),
         const SizeTarget(4, 7),
         const ProfileTarget(ProfileCategory.syBased),
+        const DomainTarget(3),
         // PairTarget.from normalizes order — key is sorted FM+PA.
         PairTarget.from('PA', 'FM'),
       ];
@@ -838,6 +843,9 @@ void main() {
       maxWidth: 4,
       minHeight: 4,
       maxHeight: 4,
+      // Frozen domain: the missing-composition gap (0.25) must stay the
+      // largest — an active domain axis would put domain:3 (0.40) on top.
+      allowedDomains: const [2],
     );
 
     test('emits CompositionTarget when composition is most under-represented', () {
@@ -881,6 +889,168 @@ void main() {
       final t = pickTarget(stats, universe);
       expect(t, isA<CompositionTarget>());
       expect((t as CompositionTarget).key, 'comp:${missing.join('+')}');
+    });
+  });
+
+  group('domain axis', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'PA'],
+      minWidth: 4,
+      maxWidth: 4,
+      minHeight: 4,
+      maxHeight: 4,
+      // Default, spelled out: both domains eligible — the axis is active.
+      allowedDomains: const [2, 3],
+    );
+
+    test('fromLines reads the domain size off the v2 attributes field', () {
+      // The domain field is parts[1]: "12" → 2 colours, "123" → 3 colours.
+      // An auto-shrunk domain-3 attempt emits "12", so counting the line
+      // (not the attempt intent) is what keeps the stats honest.
+      final stats = EquilibriumStats.fromLines([
+        'v2_12_4x4_2210000010000000_FM:11_1:1212121212121212_2',
+        'v2_123_4x4_2210000010000000_FM:11_1:1212121212121212_2',
+      ]);
+      expect(stats.domainCounts[2], 1);
+      expect(stats.domainCounts[3], 1);
+    });
+
+    test('withPuzzle defaults to domain 2 (legacy callers stay correct)', () {
+      // Every pre-existing call site omits domainSize; they all describe
+      // 2-colour puzzles, so the default must land in the dom-2 bin.
+      final stats = EquilibriumStats.empty().withPuzzle(
+        slugs: {'FM'},
+        width: 4,
+        height: 4,
+      );
+      expect(stats.domainCounts[2], 1);
+      expect(stats.domainCounts[3], isNull);
+    });
+
+    test('withPuzzle(domainSize: 3) lands in the dom-3 bin', () {
+      final stats = EquilibriumStats.empty().withPuzzle(
+        slugs: {'FM'},
+        width: 4,
+        height: 4,
+        domainSize: 3,
+      );
+      expect(stats.domainCounts[3], 1);
+    });
+
+    test('targetShare reads kTargetDomainProfile', () {
+      expect(targetShare(Axis.domain, 2, 0), 0.60);
+      expect(targetShare(Axis.domain, 3, 0), 0.40);
+      // Outside the profile (defensive — never a real bin) → 0.
+      expect(targetShare(Axis.domain, 4, 0), 0.0);
+    });
+
+    test('an all-dom2 corpus surfaces DomainTarget(3) with the full gap', () {
+      // 100 % dom-2 → observed(3) = 0 → gap = the full 0.40 target share.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 50; i++) {
+        stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
+      }
+      final ranked = rankTargets(stats, universe);
+      final dom3 = ranked.firstWhere((c) => c.target.key == 'domain:3');
+      expect(dom3.gap, closeTo(0.40, 1e-9));
+      // dom-2 is over target (share 1.0 > 0.60) → clamped to 0, never pushed.
+      final dom2 = ranked.firstWhere((c) => c.target.key == 'domain:2');
+      expect(dom2.gap, 0.0);
+    });
+
+    test('a singleton allowedDomains disables the axis entirely', () {
+      // CLI `--domain N` freezes the domain: no DomainTarget may ever be
+      // picked, regardless of how skewed the corpus is.
+      final frozen = TargetUniverse(
+        allowedSlugs: ['FM', 'PA'],
+        minWidth: 4,
+        maxWidth: 4,
+        minHeight: 4,
+        maxHeight: 4,
+        allowedDomains: const [2],
+      );
+      final ranked = rankTargets(EquilibriumStats.empty(), frozen);
+      expect(ranked.any((c) => c.target is DomainTarget), isFalse);
+    });
+
+    test('parseTargetKey accepts domain:2/3 and rejects anything else', () {
+      expect(parseTargetKey('domain:3'), isA<DomainTarget>());
+      expect((parseTargetKey('domain:3') as DomainTarget).size, 3);
+      expect(parseTargetKey('domain:2')!.key, 'domain:2');
+      expect(parseTargetKey('domain:5'), isNull); // no such domain
+      expect(parseTargetKey('domain:x'), isNull); // non-numeric
+    });
+  });
+
+  group('pickWeightedDomain', () {
+    test('singleton allowedDomains short-circuits', () {
+      // Frozen domain: the draw must be deterministic whatever the stats.
+      expect(pickWeightedDomain(const [2], const {}, Random(0)), 2);
+      expect(pickWeightedDomain(const [3], const {2: 100}, Random(0)), 3);
+    });
+
+    test('an all-dom2 corpus always draws domain 3 (fill the gap)', () {
+      // gap(2) = 0 (over target), gap(3) = 0.40 → dom3 is the only
+      // positive-weight candidate. This is the whole point of the
+      // gap-based draw: while the corpus lags, every off-target
+      // iteration works on the deficit.
+      final rng = Random(11);
+      for (int i = 0; i < 100; i++) {
+        expect(pickWeightedDomain(const [2, 3], const {2: 100}, rng), 3);
+      }
+    });
+
+    test('a corpus at the profile falls back to the maintenance draw', () {
+      // Exactly 60/40: both gaps are 0 → the static profile takes over so
+      // the corpus *stays* at the profile instead of degenerating to
+      // whichever bin drifts below target first.
+      final rng = Random(42);
+      int threes = 0;
+      for (int i = 0; i < 1000; i++) {
+        if (pickWeightedDomain(const [2, 3], const {2: 60, 3: 40}, rng) == 3) {
+          threes++;
+        }
+      }
+      // ≈ 0.40 within sampling noise (deterministic seed keeps this stable).
+      expect(threes, inInclusiveRange(350, 450));
+    });
+  });
+
+  group('pickWarmupConfig domain draw', () {
+    test('warm-up fills the domain deficit like the main loop', () {
+      // The warm-up corpus seeds equilibrium's distributions; if it stayed
+      // all-dom2 the axis would start with the maximal 0.40 gap. With an
+      // all-dom2 count snapshot, every warm-up attempt must go dom3.
+      final rng = Random(5);
+      for (int i = 0; i < 20; i++) {
+        final wc = pickWarmupConfig(
+          minWidth: 4,
+          maxWidth: 5,
+          minHeight: 4,
+          maxHeight: 5,
+          baseAllowedSlugs: const ['FM', 'PA'],
+          baseRequired: const {},
+          rng: rng,
+          allowedDomains: const [2, 3],
+          domainCounts: const {2: 100},
+        );
+        expect(wc.domainSize, 3);
+      }
+    });
+
+    test('defaults keep legacy callers on domain 2', () {
+      // Callers that don't pass allowedDomains (tests, legacy paths) must
+      // keep producing 2-colour warm-up configs.
+      final wc = pickWarmupConfig(
+        minWidth: 4,
+        maxWidth: 4,
+        minHeight: 4,
+        maxHeight: 4,
+        baseAllowedSlugs: const ['FM'],
+        baseRequired: const {},
+        rng: Random(0),
+      );
+      expect(wc.domainSize, 2);
     });
   });
 }

@@ -1,8 +1,8 @@
 # Equilibrium
 
 The CLI generator (`bin/generate.dart`) biases generation toward
-under-represented categories across six independent axes (slug, number of
-types, pair of types, size, profile, composition). This document describes how the system works.
+under-represented categories across seven independent axes (slug, number of
+types, pair of types, size, profile, composition, domain). This document describes how the system works.
 
 The implementation lives in `lib/getsomepuzzle/generator/equilibrium.dart`
 (pure logic — constants, stats, gap-based picker) and
@@ -20,7 +20,7 @@ the algorithm simply moves on to the next most under-represented bin.
 
 ## Axes
 
-The six axes are counted independently (no conditional distributions,
+The seven axes are counted independently (no conditional distributions,
 except as noted on axis 3):
 
 1. **Slug** — every constraint type (FM, SH, GC, …), counted at most once
@@ -62,6 +62,19 @@ except as noted on axis 3):
    and *thematic focus*. For the full five-family universe `allCompositions`
    enumerates 85 distinct bins. Implementation: `compositionOf` in
    `families.dart`, `CompositionTarget` in `equilibrium.dart`.
+7. **Domain** — colour-domain size of the emitted line: 2 (`v2_12_…`,
+   black/white) or 3 (`v2_123_…`, +purple), read off the line's
+   attributes field (`parts[1].length`). Non-uniform target profile
+   `kTargetDomainProfile = {2: 0.60, 3: 0.40}`. Counting follows the
+   **emitted** line, not the attempt intent: `generateOne` auto-shrinks
+   a domain-3 puzzle to `v2_12_…` when the third colour ends up unused
+   by both the solution and the constraints, and that shrunk line is
+   what the corpus sees. Such a puzzle is still accepted (cross-axis
+   recycling, like the slug axis) — the unfilled `domain:3` gap simply
+   makes the picker retry. The axis only exists when more than one
+   domain is allowed: `--domain N` freezes the run and removes every
+   `DomainTarget` from the ranking. Implementation: `DomainTarget` and
+   `EquilibriumStats.domainCounts` in `equilibrium.dart`.
 
 ## Algorithm
 
@@ -69,7 +82,7 @@ except as noted on axis 3):
 
 Each iteration in `worker_io.dart`:
 
-1. Recompute the six distributions from the existing puzzle corpus
+1. Recompute the seven distributions from the existing puzzle corpus
    (absolute counters; recomputed at startup, never persisted). The
    pair-axis distribution aggregates only puzzles with exactly 2 types.
 2. Identify the most-imbalanced `(axis, category)` — the one whose
@@ -109,6 +122,16 @@ differences stay in `[0, 1]` and are directly comparable across axes.
 no 2-type puzzles, so the pair axis is empty), `observed_share(c) = 0`
 for every category and `gap(c) = expected_share(c)`. This kicks the
 algorithm into populating the empty axis.
+
+**Domain-axis scale**: with only two bins, the domain axis carries the
+largest single gap on a legacy corpus (`gap(domain:3) = 0.40` when no
+dom-3 line exists). That does not starve the other axes: the production
+picker is the cross-worker bucket rotation (`BucketRotation` in
+`equilibrium.dart`, wired by the CLI coordinator), which serves every
+positive-gap bucket once per cycle regardless of magnitude — and the
+bulk of the rebalancing is done by the off-target gap-based domain draw
+anyway (see "Per-axis mechanism"), which pushes in the same direction
+on every iteration. Deliberately uncapped.
 
 ### Number-of-types profile
 
@@ -150,6 +173,22 @@ split between the three themed pre-fills.
 
 Tunable via `kTargetProfile`.
 
+### Domain axis distribution
+
+| Domain | Target share | Line form    |
+| ------ | ------------ | ------------ |
+| 2      | 60 %         | `v2_12_…`    |
+| 3      | 40 %         | `v2_123_…`   |
+
+Tunable via `kTargetDomainProfile`. Unlike the other axes, the domain is
+not only pushed when a `DomainTarget` is picked: **every** iteration
+resolves a concrete domain (see "Per-axis mechanism"), so the corpus
+converges on this profile from the off-target draw alone. On a legacy
+all-dom2 corpus this means runs without `--domain` generate almost
+exclusively domain-3 lines until the observed dom-3 share reaches 40 % —
+the intended fill-the-gap behaviour, accepted with its throughput cost
+(3-colour generation is structurally slower, see `third_color.md`).
+
 ### Per-axis mechanism
 
 The general principle: **filter at the candidate-selection step** rather
@@ -185,6 +224,20 @@ than reject after the fact.
   quota — the iterative loop may still produce a puzzle whose realised
   composition differs, but the `allowedSlugs` restriction prevents
   cross-family drift.
+- **Domain**: resolved on **every** iteration, in priority order:
+  a path-based or sy-based scenario (CLI flag or `ProfileTarget`) forces
+  domain 2 (those pre-fills are intrinsically binary); a `DomainTarget`
+  pins its `size`; the warm-up uses the domain drawn by
+  `pickWarmupConfig`; every other case draws via
+  `pickWeightedDomain(allowedDomains, domainCounts, rng)` — weighted by
+  the **current gap** (same definition as `_scoreAll`), falling back to
+  the static 60/40 profile as a maintenance draw once every gap is 0.
+  The draw also runs under `--no-equilibrium` (a run-level policy,
+  orthogonal to the bias): the worker keeps a corpus-derived domain
+  count for it even when the full equilibrium stats are off. `--domain
+  N` collapses `allowedDomains` to a singleton and short-circuits the
+  draw. The resulting domain is applied to `GeneratorConfig.domain`
+  per attempt (the config is rebuilt every iteration).
 
 The post-solve free-cell ratio cap of `kMaxAcceptableRatio` (= 0.25)
 applies to every size, including 10x10.
@@ -294,6 +347,11 @@ CH alone is too weak to force a unique solution on any small grid). Without
 detection, a worker chasing such a combo burns through its entire `maxTime`
 budget repeatedly.
 
+The key's `scenario` field carries a `+d3` suffix on domain-3 attempts
+(`attemptScenarioKey` in `feasibility.dart`), so the blacklist never
+conflates the dom-2 and dom-3 populations of an otherwise identical
+combo — their success rates differ widely. See `feasibility.md`.
+
 Two complementary mechanisms address this. Both are implemented in
 `lib/getsomepuzzle/generator/feasibility.dart` and wired through
 `worker_io.dart`. Full details — including the `AttemptKey` granularity, the
@@ -377,26 +435,29 @@ override) is applied.
 ### Worker dashboard format
 
 Each line on the live dashboard shows a worker's current attempt context across
-all five resolved axes so any attempt is fully identifiable:
+all six resolved axes so any attempt is fully identifiable:
 
 ```
-  #00 [att 12/ok 3] → [slug=SY] 10x8 ntypes≤3 slugs={SY,QA,PA} scenario=classic
-  #01 [att  8/ok 1] → [ntypes=3] 6x4 ntypes=3 slugs={SY,QA,PA} scenario=classic
-  #02 [att 15/ok 2] → [profile=pathBased] 12x8 ntypes=free slugs={} scenario=pathBased
-  #03 [att 21/ok 7] → warmup 4x4 ntypes≤3 slugs={SY,QA,PA} scenario=classic
-  #04 [att  3/ok 0] → 8x8 ntypes=free slugs={} scenario=classic
-  #05 [att  9/ok 1] → [comp=path+line-centric+local] 6x4 ntypes≤6 slugs={LT,CH,RC} scenario=classic
+  #00 [att 12/ok 3] → [slug=SY] 10x8 dom3 ntypes≤3 slugs={SY,QA,PA} scenario=classic
+  #01 [att  8/ok 1] → [ntypes=3] 6x4 dom3 ntypes=3 slugs={SY,QA,PA} scenario=classic
+  #02 [att 15/ok 2] → [profile=pathBased] 12x8 dom2 ntypes=free slugs={} scenario=pathBased
+  #03 [att 21/ok 7] → warmup 4x4 dom3 ntypes≤3 slugs={SY,QA,PA} scenario=classic
+  #04 [att  3/ok 0] → 8x8 dom2 ntypes=free slugs={} scenario=classic
+  #05 [att  9/ok 1] → [domain=3] 6x4 dom3 ntypes=free slugs={} scenario=classic
 ```
 
-The prefix before the body (`WxH ntypes… slugs=… scenario=…`) encodes the
-equilibrium state for that worker:
+The prefix before the body (`WxH domN ntypes… slugs=… scenario=…`) encodes
+the equilibrium state for that worker:
 
 | Prefix | Meaning |
 |---|---|
-| `[<target.label>]` | Chasing a specific equilibrium target (e.g. `[slug=SY]`, `[ntypes=3]`, `[comp=path+line-centric+local]`) |
+| `[<target.label>]` | Chasing a specific equilibrium target (e.g. `[slug=SY]`, `[ntypes=3]`, `[domain=3]`, `[comp=path+line-centric+local]`) |
 | `warmup` | Corpus below `kEquilibriumWarmupSize`; using `pickWarmupConfig` |
 | `[balanced]` | Equilibrium on, all axes balanced, no target picked |
 | *(none)* | Equilibrium disabled (`--no-equilibrium`) |
+
+`domN` is the attempt's resolved colour-domain size (the intent — the
+emitted line may auto-shrink to dom2).
 
 The `ntypes` field distinguishes hard from soft constraints:
 - `ntypes=N` — the target is a `NTypesTarget` with `target.n == N`.
@@ -413,7 +474,7 @@ The `ntypes` field distinguishes hard from soft constraints:
 
 Equilibrium is only **actually engaged** if the target file already
 contains at least `kEquilibriumWarmupSize` (= 100) puzzles. Below the
-threshold the six distributions are too sparse to drive meaningful
+threshold the seven distributions are too sparse to drive meaningful
 targets — `pickTarget` would chase impossible bins and waste time
 blacklisting them. The CLI silently falls back to the legacy slug-only
 bias and logs:
@@ -421,6 +482,11 @@ bias and logs:
 ```
 Equilibrium: OFF (warming up: 12/100 puzzles needed)
 ```
+
+The warm-up still draws each attempt's domain gap-based
+(`pickWarmupConfig` → `pickWeightedDomain`), so the corpus enters
+equilibrium mode already close to `kTargetDomainProfile` instead of
+starting the domain axis with its maximal 0.40 gap.
 
 ### Centralized parameters
 
@@ -437,6 +503,9 @@ algorithm:
   per-key percentages — the constant is the source of truth.
 - `kTargetProfile` — map for the profile axis (`{classic: 0.85, sh: 0.05,
   pathBased: 0.05, syBased: 0.05}`).
+- `kTargetDomainProfile` — map for the domain axis (`{2: 0.60, 3: 0.40}`).
+  Drives both the `DomainTarget` gaps in `_scoreAll` and the per-attempt
+  off-target draw in `pickWeightedDomain`.
 - `kMinSide`, `kMaxSide` — size axis bounds (3, 10).
 - `kEquilibriumWarmupSize` — corpus size below which equilibrium stays
   off (100).
@@ -463,10 +532,18 @@ algorithm:
   `worker_io.dart` to populate `GeneratorConfig.slugDeficitScores` before
   each `generateOne` call (see "Secondary slug bias via `slugDeficits`"
   above).
+- `pickWeightedDomain(allowedDomains, domainCounts, rng)` — the
+  per-attempt domain draw: weighted by the current gap
+  (`max(0, kTargetDomainProfile[d] − observedShare(d))`, same definition
+  as `_scoreAll`'s domain axis), falling back to the static profile
+  weights once every gap is 0, short-circuiting on a singleton
+  `allowedDomains`. Consumed by the worker loop and by
+  `pickWarmupConfig`.
 
 The gap computation, target ranking (`rankTargets`), target selection
-(`pickTarget`), and deficit snapshot (`slugDeficits`) are pure functions
-covered by `test/equilibrium_test.dart`.
+(`pickTarget`), deficit snapshot (`slugDeficits`), and domain draw
+(`pickWeightedDomain`) are pure functions covered by
+`test/equilibrium_test.dart`.
 
 ## Out of scope
 

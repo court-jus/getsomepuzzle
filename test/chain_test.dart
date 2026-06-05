@@ -328,26 +328,6 @@ void main() {
   });
 
   group('ChainConstraint on a 3-colour domain', () {
-    // Build a puzzle on the full 3-colour domain so cells can hold purple (3).
-    Puzzle makePuzzle3(String grid) {
-      final rows = grid
-          .trim()
-          .split('\n')
-          .map((r) => r.trim())
-          .where((r) => r.isNotEmpty)
-          .toList();
-      final h = rows.length;
-      final w = rows.first.length;
-      final p = Puzzle.empty(w, h, fullDomain);
-      for (int r = 0; r < h; r++) {
-        for (int c = 0; c < w; c++) {
-          final v = cellRepresentationToValue(rows[r][c]);
-          if (v != CellValue.free) p.cells[r * w + c].setForSolver(v);
-        }
-      }
-      return p;
-    }
-
     test('a third colour on the only corridor blocks the chain → invalid', () {
       // White walls top/bottom; the single black corridor on the middle row
       // is cut by a purple cell at (1,1). The old binary `oppositeColor`

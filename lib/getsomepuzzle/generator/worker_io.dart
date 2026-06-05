@@ -28,6 +28,7 @@ class GeneratorWorker {
     int adaptiveK = 20,
     int skipSafety = 100,
     String? Function(int workerIndex)? assignTarget,
+    List<int>? allowedDomains,
   }) {
     _controller = StreamController<GeneratorMessage>();
 
@@ -43,6 +44,7 @@ class GeneratorWorker {
       adaptiveK,
       skipSafety,
       assignTarget,
+      allowedDomains,
     );
 
     return _controller!.stream;
@@ -70,6 +72,7 @@ class GeneratorWorker {
     int adaptiveK,
     int skipSafety,
     String? Function(int workerIndex)? assignTarget,
+    List<int>? allowedDomains,
   ) async {
     final receivePort = ReceivePort();
     // Reply port to this worker, captured from its `ready` handshake. The
@@ -96,7 +99,9 @@ class GeneratorWorker {
         easingBudgetMs: config.easingBudget.inMilliseconds,
         pathBasedScenario: config.pathBasedScenario,
         syBasedScenario: config.syBasedScenario,
-        domain: config.domain,
+        // No explicit list → freeze the domain to the config's: legacy
+        // callers (in-app generator) keep their exact behaviour.
+        allowedDomains: allowedDomains ?? [config.domain.length],
         strategy: config.strategy,
         usageStats: usageStats,
         puzzleLines: puzzleLines,
@@ -159,6 +164,7 @@ class GeneratorWorker {
               preferredSlugs: preferred,
               allowedSlugs: allowed,
               scenario: message['scenario'] as String,
+              domainSize: message['domain'] as int? ?? 2,
               success: message['success'] as bool,
               rejectReason: message['rejectReason'] as String?,
               durationMs: message['durationMs'] as int,
@@ -208,7 +214,12 @@ class _IsolateParams {
   final int easingBudgetMs;
   final bool pathBasedScenario;
   final bool syBasedScenario;
-  final List<CellValue> domain;
+
+  /// Colour-domain sizes this run may emit. A singleton freezes the domain
+  /// (CLI `--domain N`, or any caller without an explicit list); `[2, 3]`
+  /// activates the per-attempt gap-based draw and the equilibrium domain
+  /// axis. Plain ints so the list crosses the isolate boundary trivially.
+  final List<int> allowedDomains;
   final GenerationStrategy strategy;
   final Map<String, int>? usageStats;
   final List<String>? puzzleLines;
@@ -249,7 +260,7 @@ class _IsolateParams {
     required this.easingBudgetMs,
     this.pathBasedScenario = false,
     this.syBasedScenario = false,
-    required this.domain,
+    this.allowedDomains = const [2],
     required this.strategy,
     this.usageStats,
     this.puzzleLines,
@@ -301,6 +312,23 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
     'maxAttemptTime=${params.maxAttemptTimeMs / 1000}s',
   );
 
+  // Domain-axis counts, maintained even when equilibrium is off: the
+  // per-attempt gap-based domain draw (`pickWeightedDomain`) needs the
+  // corpus distribution regardless of the bias being active. Lenient parse
+  // (any line with a domain field counts) — close enough to the stricter
+  // `EquilibriumStats.fromLines` tally for share computation.
+  final domainCounts = <int, int>{};
+  if (params.allowedDomains.length > 1) {
+    for (final raw in params.puzzleLines ?? const <String>[]) {
+      final line = raw.trim();
+      if (line.isEmpty || line.startsWith('#')) continue;
+      final parts = line.split('_');
+      if (parts.length < 2) continue;
+      final d = parts[1].length;
+      if (d == 2 || d == 3) domainCounts[d] = (domainCounts[d] ?? 0) + 1;
+    }
+  }
+
   // Equilibrium state. We always build it when equilibrium is requested —
   // even during warm-up — so the live switch from warm-up to equilibrium
   // is instantaneous (no rebuild from `puzzleLines`).
@@ -317,6 +345,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       maxWidth: effectiveMaxW,
       minHeight: effectiveMinH,
       maxHeight: effectiveMaxH,
+      allowedDomains: params.allowedDomains,
     );
   }
 
@@ -384,6 +413,11 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
     final inWarmup =
         params.equilibriumRequested && estimatedCorpus < kEquilibriumWarmupSize;
 
+    // Colour-domain size for this attempt, resolved in priority order
+    // below: warm-up draw → DomainTarget → gap-based draw — then overridden
+    // to 2 when a binary pre-fill (path/sy) is active.
+    int attemptDomainSize = 2;
+
     if (inWarmup) {
       final wc = pickWarmupConfig(
         minWidth: effectiveMinW,
@@ -393,11 +427,14 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
         baseAllowedSlugs: baseAllowedSlugs ?? constraintSlugs.toSet(),
         baseRequired: requiredSet,
         rng: rng,
+        allowedDomains: params.allowedDomains,
+        domainCounts: domainCounts,
       );
       w = wc.width;
       h = wc.height;
       allowedSlugs = wc.allowedSlugs;
       preferredSlugs = wc.preferredSlugs;
+      attemptDomainSize = wc.domainSize;
     } else if (params.equilibriumRequested &&
         universe != null &&
         equiStats != null) {
@@ -466,10 +503,29 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       h = effectiveMinH + rng.nextInt(effectiveMaxH - effectiveMinH + 1);
     }
 
+    if (!inWarmup) {
+      // `DomainTarget` pins the attempt's domain; every other iteration
+      // (other target, balanced, equilibrium off) draws it gap-based so the
+      // corpus converges on `kTargetDomainProfile` no matter which axis is
+      // being pushed. A frozen singleton short-circuits inside the picker.
+      attemptDomainSize = target is DomainTarget
+          ? target.size
+          : pickWeightedDomain(params.allowedDomains, domainCounts, rng);
+    }
+    if (params.pathBasedScenario ||
+        attemptPathBased ||
+        params.syBasedScenario ||
+        attemptSyBased) {
+      // The path-based and sy-based pre-fills are 2-colour by design (their
+      // colourings are intrinsically binary) — never hand them a 3-colour
+      // domain.
+      attemptDomainSize = 2;
+    }
+
     // Tell the UI what this worker is currently chasing so the dashboard can
-    // show per-worker progress. We always report the 4 axes (size, ntypes,
-    // slugs, scenario) so any attempt is fully identifiable, regardless of
-    // which axis the equilibrium picker chose to push.
+    // show per-worker progress. We always report the 5 axes (size, domain,
+    // ntypes, slugs, scenario) so any attempt is fully identifiable,
+    // regardless of which axis the equilibrium picker chose to push.
     final scenario = _resolveScenario(
       pathBased: params.pathBasedScenario || attemptPathBased,
       syBased: params.syBasedScenario || attemptSyBased,
@@ -488,7 +544,9 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
               ? 'ntypes=$ntypesIntended'
               : 'ntypes≤$ntypesIntended');
     final slugsLabel = 'slugs={${preferredSlugs.join(',')}}';
-    final body = '${w}x$h $ntypesLabel $slugsLabel scenario=$scenario';
+    final body =
+        '${w}x$h dom$attemptDomainSize $ntypesLabel $slugsLabel '
+        'scenario=$scenario';
     final String targetLabel;
     if (inWarmup) {
       targetLabel = 'warmup $body';
@@ -509,7 +567,10 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
     final attemptKey = AttemptKey(
       targetKey: resolvedTarget?.key ?? 'none',
       sortedSlugs: preferredSlugs.toList()..sort(),
-      scenario: scenario,
+      // The `+d3` suffix separates the dom-2 / dom-3 populations in the
+      // blacklist (very different success rates) without touching the
+      // `scenario` column or the profile axis.
+      scenario: attemptScenarioKey(scenario, attemptDomainSize),
       sizeBucket: bucketForArea(w, h),
     );
     final blacklisted =
@@ -560,7 +621,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       // Same OR pattern for the SY-based scenario.
       syBasedScenario: params.syBasedScenario || attemptSyBased,
       slugDeficitScores: slugDeficitMap,
-      domain: params.domain,
+      domain: attemptDomainSize == 3 ? fullDomain : defaultDomain,
       strategy: params.strategy,
       maxStall: Duration(milliseconds: params.maxStallMs),
     );
@@ -726,6 +787,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       'preferredSlugs': preferredSlugs.toList(),
       'allowedSlugs': allowedSlugs?.toList(),
       'scenario': scenario,
+      'domain': attemptDomainSize,
       'success': result != null,
       'rejectReason': rejectReason,
       'durationMs': attemptDurationMs,
@@ -760,6 +822,15 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
           usageStats[slug] = (usageStats[slug] ?? 0) + 1;
         }
       }
+      // Honest domain accounting: read the domain off the *emitted* line,
+      // not the attempt intent — `generateOne` auto-shrinks a domain-3
+      // puzzle to `v2_12_…` when the third colour ends up unused, and that
+      // shrunk line is what the corpus (and the next run's stats) will see.
+      final emittedDomainSize = parts.length >= 2 ? parts[1].length : 2;
+      if (emittedDomainSize == 2 || emittedDomainSize == 3) {
+        domainCounts[emittedDomainSize] =
+            (domainCounts[emittedDomainSize] ?? 0) + 1;
+      }
       // Update equilibrium stats (used to pick the next target). We keep
       // them current during warm-up too so the switch to equilibrium picks
       // up where the warm-up corpus left off.
@@ -769,6 +840,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
           width: w,
           height: h,
           profile: detectPuzzleProfile(line),
+          domainSize: emittedDomainSize,
         );
       }
     }
@@ -1019,6 +1091,12 @@ _ResolvedTarget _resolveTarget(
         allowedSlugs: allInFamilies,
         preferredSlugs: preferred,
       );
+
+    case DomainTarget():
+      // Domain axis fixed. The worker loop reads `target.size` directly to
+      // pin the attempt's domain; every other axis stays free (size via the
+      // weighted secondary draw, slugs via the loop's default pool).
+      return const _ResolvedTarget();
   }
 }
 

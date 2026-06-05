@@ -1,6 +1,6 @@
 /// Equilibrium: bias puzzle generation toward under-represented categories
-/// across five independent axes (slug, number of types, pair of types, size,
-/// profile, composition).
+/// across seven independent axes (slug, number of types, pair of types, size,
+/// profile, composition, domain).
 ///
 /// All parameters are exposed as constants / pure functions at the top of the
 /// file so the behavior can be retuned without touching the algorithm.
@@ -31,6 +31,15 @@ const Map<ProfileCategory, double> kTargetProfile = {
   ProfileCategory.pathBased: 0.05,
   ProfileCategory.syBased: 0.05,
 };
+
+/// Target distribution for the "domain" axis (colour-domain size: 2 or 3).
+///
+/// The corpus is historically ~100 % domain-2; this profile steers the
+/// equilibrium toward domain-3 to rebalance. A bias, not a quota: a
+/// domain-3 attempt whose emitted line auto-shrinks to domain 2 (third
+/// colour unused) is still accepted and counted honestly in the domain-2
+/// bin (cross-axis recycling).
+const Map<int, double> kTargetDomainProfile = {2: 0.60, 3: 0.40};
 
 /// Target distribution for the "number of types per puzzle" axis.
 /// Only keys 1..5 are pushed by the equilibrium engine. Puzzles with ≥ 6
@@ -112,6 +121,9 @@ double targetShare(Axis axis, Object category, int categoryCount) {
     case Axis.profile:
       final p = category as ProfileCategory;
       return kTargetProfile[p] ?? 0.0;
+    case Axis.domain:
+      final d = category as int;
+      return kTargetDomainProfile[d] ?? 0.0;
   }
 }
 
@@ -150,7 +162,7 @@ double sizeTargetShare(int width, int height, TargetUniverse universe) {
 // Types
 // ---------------------------------------------------------------------------
 
-enum Axis { slug, ntypes, pair, size, profile, composition }
+enum Axis { slug, ntypes, pair, size, profile, composition, domain }
 
 /// Pre-fill scenario categories. Each puzzle has exactly one profile,
 /// determined either at generation time (when `pathBasedScenario` or
@@ -269,6 +281,18 @@ class CompositionTarget extends Target {
   String get label => 'comp=${families.join('+')}';
 }
 
+class DomainTarget extends Target {
+  /// Colour-domain size: 2 (black/white) or 3 (+purple).
+  final int size;
+  const DomainTarget(this.size);
+  @override
+  Axis get axis => Axis.domain;
+  @override
+  String get key => 'domain:$size';
+  @override
+  String get label => 'domain=$size';
+}
+
 /// Detect a puzzle's profile from its v2 line by reading the
 /// authoritative `scenario:<name>` suffix written by the generator at
 /// emission time (see `Puzzle.lineExport`). Any trailing part starting
@@ -305,8 +329,8 @@ ProfileCategory detectPuzzleProfile(String v2Line) {
 // Stats
 // ---------------------------------------------------------------------------
 
-/// Distributions over the 6 axes (slug, ntypes, pair, size, profile,
-/// composition), computed from a corpus of puzzle lines.
+/// Distributions over the 7 axes (slug, ntypes, pair, size, profile,
+/// composition, domain), computed from a corpus of puzzle lines.
 class EquilibriumStats {
   final Map<String, int> slugCounts;
   final Map<int, int> ntypesCounts;
@@ -314,6 +338,11 @@ class EquilibriumStats {
   final Map<(int, int), int> sizeCounts;
   final Map<ProfileCategory, int> profileCounts;
   final Map<String, int> compositionCounts;
+
+  /// Colour-domain size (2 or 3) → puzzle count. Keyed off the *emitted*
+  /// line's domain field (`parts[1].length`), so an auto-shrunk domain-3
+  /// attempt counts as domain 2 — the line is the only truth.
+  final Map<int, int> domainCounts;
   final int totalPuzzles;
 
   const EquilibriumStats({
@@ -323,6 +352,7 @@ class EquilibriumStats {
     required this.sizeCounts,
     required this.profileCounts,
     required this.compositionCounts,
+    this.domainCounts = const {},
     required this.totalPuzzles,
   });
 
@@ -333,6 +363,7 @@ class EquilibriumStats {
     sizeCounts: {},
     profileCounts: {},
     compositionCounts: {},
+    domainCounts: {},
     totalPuzzles: 0,
   );
 
@@ -348,6 +379,7 @@ class EquilibriumStats {
     final sizes = <(int, int), int>{};
     final profiles = <ProfileCategory, int>{};
     final compositionCounts = <String, int>{};
+    final domains = <int, int>{};
     int total = 0;
 
     for (final raw in lines) {
@@ -393,6 +425,13 @@ class EquilibriumStats {
       final comp = compositionOf(rawSlugs);
       final compKey = comp.join('+');
       compositionCounts[compKey] = (compositionCounts[compKey] ?? 0) + 1;
+      // Domain: parts[1] = "12" (2 colours) or "123" (3 colours). Only the
+      // two real bins are counted; an aberrant length means a malformed
+      // field — the line still counts on the other axes.
+      final domainSize = parts[1].length;
+      if (domainSize == 2 || domainSize == 3) {
+        domains[domainSize] = (domains[domainSize] ?? 0) + 1;
+      }
     }
 
     return EquilibriumStats(
@@ -402,20 +441,24 @@ class EquilibriumStats {
       sizeCounts: sizes,
       profileCounts: profiles,
       compositionCounts: compositionCounts,
+      domainCounts: domains,
       totalPuzzles: total,
     );
   }
 
-  /// Returns a copy with one more puzzle's slugs/size/profile accounted for.
+  /// Returns a copy with one more puzzle's slugs/size/profile/domain
+  /// accounted for.
   ///
-  /// [profile] defaults to [ProfileCategory.classic] so callers that don't
-  /// care about the profile axis (and tests pre-dating it) stay terse.
+  /// [profile] defaults to [ProfileCategory.classic] and [domainSize] to 2
+  /// so callers that don't care about those axes (and tests pre-dating
+  /// them) stay terse — the legacy corpus is classic domain-2.
   EquilibriumStats withPuzzle({
     required Set<String> slugs,
     List<String>? rawSlugs,
     required int width,
     required int height,
     ProfileCategory profile = ProfileCategory.classic,
+    int domainSize = 2,
   }) {
     final newSlug = Map<String, int>.from(slugCounts);
     final newNtypes = Map<int, int>.from(ntypesCounts);
@@ -423,6 +466,7 @@ class EquilibriumStats {
     final newSizes = Map<(int, int), int>.from(sizeCounts);
     final newProfiles = Map<ProfileCategory, int>.from(profileCounts);
     final newCompositionCounts = Map<String, int>.from(compositionCounts);
+    final newDomains = Map<int, int>.from(domainCounts);
 
     for (final s in slugs) {
       newSlug[s] = (newSlug[s] ?? 0) + 1;
@@ -440,6 +484,7 @@ class EquilibriumStats {
     final comp = compositionOf(compositionSlugs);
     final compKey = comp.join('+');
     newCompositionCounts[compKey] = (newCompositionCounts[compKey] ?? 0) + 1;
+    newDomains[domainSize] = (newDomains[domainSize] ?? 0) + 1;
 
     return EquilibriumStats(
       slugCounts: newSlug,
@@ -448,6 +493,7 @@ class EquilibriumStats {
       sizeCounts: newSizes,
       profileCounts: newProfiles,
       compositionCounts: newCompositionCounts,
+      domainCounts: newDomains,
       totalPuzzles: totalPuzzles + 1,
     );
   }
@@ -474,10 +520,16 @@ class TargetUniverse {
   /// For the full 5-family set this yields 85 entries (see [allCompositions]).
   final List<List<String>> allowedCompositions;
 
+  /// Colour-domain sizes eligible as targets (subset of `[2, 3]`). A
+  /// singleton (CLI `--domain N`) freezes the domain and disables the
+  /// domain axis entirely.
+  final List<int> allowedDomains;
+
   TargetUniverse._(
     this.allowedSlugs,
     this.allowedSizes,
     this.allowedCompositions,
+    this.allowedDomains,
   );
 
   factory TargetUniverse({
@@ -486,6 +538,7 @@ class TargetUniverse {
     required int maxWidth,
     required int minHeight,
     required int maxHeight,
+    Iterable<int> allowedDomains = const [2, 3],
   }) {
     final slugs = allowedSlugs.toList();
 
@@ -503,7 +556,12 @@ class TargetUniverse {
     }
 
     final allowedCompositions = allCompositions(familiesOf(slugs));
-    return TargetUniverse._(slugs, sizes.toList(), allowedCompositions);
+    return TargetUniverse._(
+      slugs,
+      sizes.toList(),
+      allowedCompositions,
+      allowedDomains.toList(),
+    );
   }
 
   /// All ordered pairs (a, b) with a < b among [allowedSlugs].
@@ -621,6 +679,46 @@ Set<String> pickWeightedSlugs(
     }
   }
   return chosen;
+}
+
+/// Sample one colour-domain size from [allowedDomains], weighted by the
+/// per-domain gap (`kTargetDomainProfile[d] − observedShare(d)`, clamped to
+/// ≥ 0) computed on [domainCounts]. This is the *fill-the-gap* draw used by
+/// the worker on every iteration whose target is not the domain axis: while
+/// the corpus is far from the profile (e.g. ~100 % domain-2), virtually
+/// every draw returns the deficient domain; once every gap reaches 0
+/// (profile met or exceeded) the draw falls back to the static profile
+/// weights as a maintenance distribution.
+///
+/// Shares the gap definition with `_scoreAll`'s domain axis, like
+/// [slugDeficits] does for the slug axis. A singleton [allowedDomains]
+/// (CLI-frozen domain) short-circuits to that value.
+int pickWeightedDomain(
+  List<int> allowedDomains,
+  Map<int, int> domainCounts,
+  Random rng,
+) {
+  if (allowedDomains.length == 1) return allowedDomains.first;
+  final total = allowedDomains.fold<int>(
+    0,
+    (sum, d) => sum + (domainCounts[d] ?? 0),
+  );
+  final gaps = <(int, double)>[
+    for (final d in allowedDomains)
+      (
+        d,
+        _gap(
+          _share(domainCounts[d] ?? 0, total),
+          kTargetDomainProfile[d] ?? 0.0,
+        ),
+      ),
+  ];
+  if (gaps.any((g) => g.$2 > 0)) return _weightedPick(gaps, rng);
+  // Balanced (or over) on every bin: maintenance draw on the raw profile.
+  final profile = <(int, double)>[
+    for (final d in allowedDomains) (d, kTargetDomainProfile[d] ?? 0.0),
+  ];
+  return _weightedPick(profile, rng);
 }
 
 /// Sample one item from `(item, weight)` pairs. Caller guarantees that the
@@ -742,6 +840,9 @@ Target? parseTargetKey(String key) {
       final parts = rest.split('+');
       if (parts.isEmpty || parts.any((p) => p.isEmpty)) return null;
       return CompositionTarget(parts);
+    case 'domain':
+      final d = int.tryParse(rest);
+      return (d == 2 || d == 3) ? DomainTarget(d!) : null;
     default:
       return null;
   }
@@ -872,6 +973,21 @@ List<_ScoredTarget> _scoreAll(EquilibriumStats stats, TargetUniverse universe) {
     );
   }
 
+  // --- Domain (colour-domain size) ---
+  // The axis only participates when more than one domain is allowed: a
+  // CLI-frozen domain (`--domain N`) disables it entirely.
+  if (universe.allowedDomains.length > 1) {
+    for (final d in universe.allowedDomains) {
+      final c = stats.domainCounts[d] ?? 0;
+      out.add(
+        _ScoredTarget(
+          DomainTarget(d),
+          _gap(_share(c, total), targetShare(Axis.domain, d, 0)),
+        ),
+      );
+    }
+  }
+
   return out;
 }
 
@@ -894,11 +1010,17 @@ class WarmupConfig {
   /// chosen slugs still produces a valid 1-type puzzle (cross-axis recycling).
   final Set<String> preferredSlugs;
 
+  /// Colour-domain size for this attempt, drawn gap-based via
+  /// [pickWeightedDomain] — the warm-up fills the domain deficit too, so the
+  /// corpus enters equilibrium mode already close to [kTargetDomainProfile].
+  final int domainSize;
+
   const WarmupConfig({
     required this.width,
     required this.height,
     required this.allowedSlugs,
     required this.preferredSlugs,
+    this.domainSize = 2,
   });
 }
 
@@ -920,6 +1042,8 @@ WarmupConfig pickWarmupConfig({
   required Iterable<String> baseAllowedSlugs,
   required Set<String> baseRequired,
   required Random rng,
+  List<int> allowedDomains = const [2],
+  Map<int, int> domainCounts = const {},
 }) {
   // Sample (width, height) from the full user-specified range, weighted by
   // the asymmetric-Gaussian-on-area distribution (same as `sizeTargetShare`)
@@ -967,5 +1091,6 @@ WarmupConfig pickWarmupConfig({
     height: h,
     allowedSlugs: chosen,
     preferredSlugs: chosen,
+    domainSize: pickWeightedDomain(allowedDomains, domainCounts, rng),
   );
 }

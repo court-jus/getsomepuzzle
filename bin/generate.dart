@@ -55,7 +55,15 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final easingBudget = parsed['easingBudget'] as int;
   final scenarioPathBased = (parsed['scenario'] as String?) == 'path-based';
   final scenarioSyBased = (parsed['scenario'] as String?) == 'sy-based';
-  final domainSize = parsed['domain'] as int;
+  final domainSize = parsed['domain'] as int?;
+  // No flag → both domains eligible: the worker draws each attempt's domain
+  // gap-based (see `pickWeightedDomain`) and the equilibrium domain axis is
+  // active. An explicit `--domain N` freezes the run to that domain.
+  final allowedDomains = domainSize == null
+      ? const <int>[2, 3]
+      : <int>[domainSize];
+  // Placeholder for the per-worker GeneratorConfig — the worker rebuilds
+  // the concrete domain per attempt from `allowedDomains`.
   final domain = domainSize == 3 ? fullDomain : defaultDomain;
   final strategies = parsed['strategy'] as List<GenerationStrategy>;
   final maxStall = parsed['maxStall'] as int;
@@ -207,6 +215,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     maxWidth: maxWidth,
     minHeight: minHeight,
     maxHeight: maxHeight,
+    allowedDomains: allowedDomains,
   );
   final bucketRotation = BucketRotation();
   // Answers a worker's `requestTarget`: hands out the next deficient bucket
@@ -241,6 +250,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       stageTotalsMicros: stageTotalsMicros,
       stageTotalsCalls: stageTotalsCalls,
       domainSize: domainSize,
+      allowedDomains: allowedDomains,
       requiredRules: requiredRules,
       bannedRules: bannedRules,
       strategies: strategies,
@@ -374,6 +384,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       // Cross-worker rotation: only wire the coordinator in equilibrium mode.
       // Off → workers keep the legacy local random/argmax path.
       assignTarget: equilibriumRequested ? assignBucket : null,
+      allowedDomains: allowedDomains,
     );
 
     consumers.add(() async {
@@ -525,6 +536,11 @@ const _statsColumns = [
   // `|`. Empty during warm-up and when equilibrium is off; zero-gap slugs
   // are not serialized.
   'slug_deficits',
+  // Colour-domain size the attempt was asked to generate (2 or 3) —
+  // intent, not the emitted line's (possibly auto-shrunk) domain. Appended
+  // last so rows written before the domain axis stay position-compatible;
+  // `readPersistentBlacklist` treats their missing column as 2.
+  'domain',
 ];
 
 String _statsHeader() => _statsColumns.join(',');
@@ -566,6 +582,7 @@ String _statsRow(GeneratorAttemptMessage m, String commitHash) {
     _csvField(level),
     _csvField(m.puzzleLine ?? ''),
     _csvField(deficitField),
+    '${m.domainSize}',
   ];
   return fields.join(',');
 }
@@ -624,12 +641,17 @@ class _CollectionStats {
   // are present.
   final Map<String, int> compositions;
 
+  // Domain axis: colour-domain size ('2' / '3') read off the emitted line's
+  // attributes field — an auto-shrunk domain-3 line counts as '2'.
+  final Map<String, int> domains;
+
   _CollectionStats(
     this.slugs,
     this.sizeBuckets,
     this.nTypes,
     this.profiles,
     this.compositions,
+    this.domains,
   );
 
   factory _CollectionStats.fromLines(List<String> lines) {
@@ -643,6 +665,7 @@ class _CollectionStats {
       'syBased': 0,
     };
     final compositions = <String, int>{};
+    final domains = <String, int>{'2': 0, '3': 0};
 
     for (final line in lines) {
       final trimmed = line.trim();
@@ -677,9 +700,21 @@ class _CollectionStats {
       final comp = compositionOf(rawSlugs);
       final compKey = comp.join('+');
       compositions[compKey] = (compositions[compKey] ?? 0) + 1;
+
+      final domainSize = fields[1].length;
+      if (domainSize == 2 || domainSize == 3) {
+        domains['$domainSize'] = (domains['$domainSize'] ?? 0) + 1;
+      }
     }
 
-    return _CollectionStats(slugs, sizeBuckets, nTypes, profiles, compositions);
+    return _CollectionStats(
+      slugs,
+      sizeBuckets,
+      nTypes,
+      profiles,
+      compositions,
+      domains,
+    );
   }
 }
 
@@ -699,7 +734,8 @@ void _renderDashboard({
   required int maxWidth,
   required int minHeight,
   required int maxHeight,
-  required int domainSize,
+  required int? domainSize,
+  List<int> allowedDomains = const [2, 3],
   required Set<String> requiredRules,
   required Set<String> bannedRules,
   required List<GenerationStrategy> strategies,
@@ -736,8 +772,11 @@ void _renderDashboard({
     GenerationStrategy.phase1Oneshot => 'phase-1-oneshot',
     GenerationStrategy.propOnly => 'prop-only',
   };
+  // `auto(2/3)` = no --domain flag: the domain axis is active and the
+  // worker draws each attempt's domain gap-based toward the 60/40 profile.
+  final domainLabel = domainSize?.toString() ?? 'auto(2/3)';
   stderr.writeln(
-    'Config: size $sizeLabel | domain $domainSize | '
+    'Config: size $sizeLabel | domain $domainLabel | '
     'allow $allowLabel | require $reqLabel | ban $banLabel',
   );
   stderr.writeln('');
@@ -880,6 +919,7 @@ void _renderDashboard({
     maxWidth: maxWidth,
     minHeight: minHeight,
     maxHeight: maxHeight,
+    allowedDomains: allowedDomains,
   );
 
   // Force a stable display order 1, 2, ..., 9, 10+ even when some buckets are 0.
@@ -912,11 +952,18 @@ void _renderDashboard({
     if (gap > compMaxGap) compMaxGap = gap;
   }
 
+  // Domain axis: stable '2' then '3' order; empty targets (frozen domain)
+  // suppress the histogram entirely.
+  final orderedDomains = <String, int>{
+    for (final k in ['2', '3']) k: stats.domains[k] ?? 0,
+  };
+
   final globalMaxGap = [
     _maxGap(stats.slugs, axisTargets.slug),
     _maxGap(sizeBuckets, axisTargets.size),
     _maxGap(orderedTypes, axisTargets.ntypes),
     _maxGap(orderedProfiles, axisTargets.profile),
+    _maxGap(orderedDomains, axisTargets.domain),
     compMaxGap,
   ].fold<double>(0.0, max);
 
@@ -957,6 +1004,19 @@ void _renderDashboard({
       globalMaxGap: globalMaxGap,
     ),
   );
+
+  // Domain axis (2 vs 3 colours) — hidden when frozen by `--domain N`
+  // (empty target map = axis disabled, no deficit to display).
+  if (axisTargets.domain.isNotEmpty) {
+    stderr.writeln('');
+    stderr.writeln('Domain (colours):');
+    _writeHistogram(
+      orderedDomains,
+      sortByValue: false,
+      targets: axisTargets.domain,
+      globalMaxGap: globalMaxGap,
+    );
+  }
 
   // Composition axis: compact "top deficit" panel — the ~12 largest-gap
   // buckets, sorted by gap descending. Only shown when the universe defines
@@ -1017,12 +1077,17 @@ class _AxisTargets {
   final Map<String, double> ntypes;
   final Map<String, double> profile;
   final Map<String, double> composition;
+
+  /// Empty when the domain is frozen (`--domain N`) — the axis is disabled
+  /// and its histogram is not rendered.
+  final Map<String, double> domain;
   const _AxisTargets({
     required this.slug,
     required this.size,
     required this.ntypes,
     required this.profile,
     required this.composition,
+    this.domain = const {},
   });
 }
 
@@ -1037,6 +1102,7 @@ _AxisTargets _computeAxisTargets({
   required int maxWidth,
   required int minHeight,
   required int maxHeight,
+  List<int> allowedDomains = const [2, 3],
 }) {
   // Slug axis: each puzzle contributes to multiple slug bins (one per
   // distinct slug). The "balanced" target per slug is therefore the
@@ -1107,12 +1173,23 @@ _AxisTargets _computeAxisTargets({
     }
   }
 
+  // Domain axis: explicit targets from kTargetDomainProfile. Only when more
+  // than one domain is allowed — a frozen domain disables the axis, so its
+  // histogram (keyed off this map being non-empty) is not rendered.
+  final domain = <String, double>{};
+  if (allowedDomains.length > 1) {
+    for (final d in allowedDomains) {
+      domain['$d'] = totalCorpus * (kTargetDomainProfile[d] ?? 0.0);
+    }
+  }
+
   return _AxisTargets(
     slug: slug,
     size: size,
     ntypes: ntypes,
     profile: profile,
     composition: composition,
+    domain: domain,
   );
 }
 
@@ -1618,7 +1695,11 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'blacklistAdaptiveK': 20,
     'blacklistSkipSafety': 100,
     'debug': false,
-    'domain': 2,
+    // null = no --domain flag → the domain axis is active on {2, 3} (the
+    // worker draws each attempt's domain gap-based toward
+    // kTargetDomainProfile). An explicit 2 or 3 freezes the domain and
+    // disables the axis.
+    'domain': null,
     'strategy': <GenerationStrategy>[GenerationStrategy.phaseGate],
     'maxStall': 15,
   };
@@ -1814,9 +1895,13 @@ Generation options:
                           the easing loop (default: 30). When exceeded,
                           the candidate is dropped and the worker moves
                           on. No effect without --target-collection.
-      --domain N          Colour domain size: 2 (black/white, default) or 3
-                          (adds purple). 3-colour puzzles use option-pruning
-                          deductions; see docs/dev/third_color.md.
+      --domain N          Freeze the colour domain size: 2 (black/white) or
+                          3 (adds purple), disabling the equilibrium domain
+                          axis. Without the flag the domain is drawn per
+                          attempt, gap-based toward a 60/40 (2:3) corpus
+                          profile (kTargetDomainProfile). 3-colour puzzles
+                          use option-pruning deductions; see
+                          docs/dev/third_color.md.
       --strategy S        Candidate-acceptance strategy (default: phase-gate).
                           Accepts a single value or a comma-separated list;
                           a list is distributed round-robin across workers

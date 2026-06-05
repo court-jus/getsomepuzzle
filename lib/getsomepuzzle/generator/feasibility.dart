@@ -40,6 +40,18 @@ class AttemptKey {
       '$targetKey|${sortedSlugs.join(',')}|$scenario|$sizeBucket';
 }
 
+/// Scenario field of an [AttemptKey], augmented with the attempt's colour
+/// domain when it departs from the historical default. Domain-2 attempts
+/// keep the bare scenario (`classic`, `sh`, …) so every key serialized
+/// before the domain axis existed stays valid; domain-3 attempts get a
+/// `+d3` suffix so the blacklist never conflates the two populations
+/// (their success rates differ widely). Shared by the worker (key
+/// construction) and [readPersistentBlacklist] (CSV re-aggregation) so
+/// the two sides cannot drift. The suffix lives only in the key — the
+/// `scenario` CSV column and the profile axis stay unsuffixed.
+String attemptScenarioKey(String scenario, int domainSize) =>
+    domainSize == 3 ? '$scenario+d3' : scenario;
+
 /// Coarse area buckets used as part of the feasibility blacklist key (and the
 /// CSV analysis). Kept deliberately stable so existing persisted blacklist
 /// entries stay valid — the dashboard in `bin/generate.dart` now renders a
@@ -100,15 +112,15 @@ Set<String> readPersistentBlacklist({
 
   // Column positions are fixed by `_statsColumns` in `bin/generate.dart`:
   //   4=target_key, 5=width, 6=height, 8=preferred_slugs, 10=scenario,
-  //   11=outcome. None of these ever contain `,` in practice (slugs are
-  //   joined with `|`; widths/scenarios/outcomes are word-like), so a
-  //   naive `.split(',')` truncated to the first 12 fields is safe. The
-  //   trailing `puzzle_line` column may contain commas — we ignore it.
+  //   11=outcome, 17=domain (absent on rows written before the domain
+  //   axis — those are all dom-2, the historical default). The split is
+  //   quote-aware so the `puzzle_line` column (15), which may contain
+  //   escaped commas, can't shift the columns after it.
   final aggregated = <String, _ComboStats>{};
   for (int i = 1; i < lines.length; i++) {
     final raw = lines[i];
     if (raw.trim().isEmpty) continue;
-    final parts = raw.split(',');
+    final parts = _splitCsvRow(raw);
     if (parts.length < 12) continue;
     final targetKey = parts[4].isEmpty ? 'none' : parts[4];
     final width = int.tryParse(parts[5]);
@@ -119,11 +131,14 @@ Set<String> readPersistentBlacklist({
         : parts[8].split('|');
     final scenario = parts[10];
     final outcome = parts[11];
+    final domainSize = parts.length > 17 ? (int.tryParse(parts[17]) ?? 2) : 2;
 
     final key = AttemptKey(
       targetKey: targetKey,
       sortedSlugs: [...preferredSlugs]..sort(),
-      scenario: scenario,
+      // Same rule as the worker's key construction — the shared helper
+      // guarantees a CSV row re-serializes to the exact in-session key.
+      scenario: attemptScenarioKey(scenario, domainSize),
       sizeBucket: bucketForArea(width, height),
     );
     final stat = aggregated.putIfAbsent(key.serialized, _ComboStats.new);
@@ -135,4 +150,38 @@ Set<String> readPersistentBlacklist({
     for (final e in aggregated.entries)
       if (e.value.attempts >= minAttempts && e.value.successes == 0) e.key,
   };
+}
+
+/// Minimal RFC-4180-ish row splitter: handles `"`-quoted fields containing
+/// commas and doubled-quote escapes, which is exactly what `_csvField` in
+/// `bin/generate.dart` produces (no embedded newlines — the writer strips
+/// them by construction, one row per line).
+List<String> _splitCsvRow(String row) {
+  final out = <String>[];
+  final field = StringBuffer();
+  bool inQuotes = false;
+  for (int i = 0; i < row.length; i++) {
+    final ch = row[i];
+    if (inQuotes) {
+      if (ch == '"') {
+        if (i + 1 < row.length && row[i + 1] == '"') {
+          field.write('"');
+          i++; // escaped quote
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field.write(ch);
+      }
+    } else if (ch == '"') {
+      inQuotes = true;
+    } else if (ch == ',') {
+      out.add(field.toString());
+      field.clear();
+    } else {
+      field.write(ch);
+    }
+  }
+  out.add(field.toString());
+  return out;
 }

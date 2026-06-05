@@ -65,6 +65,12 @@ class GeneratorAttemptMessage extends GeneratorMessage {
   /// One of `classic`, `sh`, `pathBased`, `syBased`.
   final String scenario;
 
+  /// Colour-domain size the attempt was *asked* to generate (2 or 3).
+  /// Intent, not outcome: an auto-shrunk domain-3 success still reports 3
+  /// here — the blacklist reasons about what was requested, while the
+  /// equilibrium stats count the emitted line.
+  final int domainSize;
+
   final bool success;
 
   /// `GenerationRejectReason.name` for an aborted attempt, `'unknown'` when
@@ -98,6 +104,7 @@ class GeneratorAttemptMessage extends GeneratorMessage {
     required this.preferredSlugs,
     required this.allowedSlugs,
     required this.scenario,
+    this.domainSize = 2,
     required this.success,
     required this.rejectReason,
     required this.durationMs,

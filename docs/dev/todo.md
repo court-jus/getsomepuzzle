@@ -106,7 +106,6 @@ next-deepest gap. Reset on successful generation or on warm-up.
 ## Generator improvements
 
 * Implement 3-color for preFillSy
-* Equilibrium between domains
 
 ## Notes and nits
 

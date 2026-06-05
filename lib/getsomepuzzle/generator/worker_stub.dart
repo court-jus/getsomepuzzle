@@ -16,6 +16,7 @@ class GeneratorWorker {
     int adaptiveK = 20,
     int skipSafety = 100,
     String? Function(int workerIndex)? assignTarget,
+    List<int>? allowedDomains,
   }) => const Stream.empty();
 
   void cancel() {}

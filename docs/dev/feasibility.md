@@ -8,7 +8,8 @@ schema, the hybrid blacklist mechanism, and the CLI flags that control it.
 
 Implementation lives in:
 - `lib/getsomepuzzle/generator/feasibility.dart` — `AttemptKey`,
-  `bucketForArea`, `InfeasibilityTracker`, `readPersistentBlacklist`
+  `attemptScenarioKey`, `bucketForArea`, `InfeasibilityTracker`,
+  `readPersistentBlacklist` (+ its quote-aware `_splitCsvRow`)
 - `lib/getsomepuzzle/generator/messages.dart` — `GeneratorAttemptMessage`
 - `lib/getsomepuzzle/generator/worker_io.dart` — emission, skip logic,
   `_resolveScenario`
@@ -35,13 +36,25 @@ identical task. The key is a 4-tuple:
 
 | Field | Source | Example |
 |---|---|---|
-| `targetKey` | `Target.key` — the equilibrium axis being pushed | `slug:SY`, `ntypes:3`, `pair:CH+SY`, `profile:pathBased`, `size:10x8`; `'none'` when no target was picked |
+| `targetKey` | `Target.key` — the equilibrium axis being pushed | `slug:SY`, `ntypes:3`, `pair:CH+SY`, `profile:pathBased`, `size:10x8`, `domain:3`; `'none'` when no target was picked |
 | `sortedSlugs` | `preferredSlugs.toList()..sort()` | `['PA', 'QA', 'SY']` |
-| `scenario` | Result of `_resolveScenario` | `classic`, `sh`, `pathBased`, `syBased` |
+| `scenario` | `attemptScenarioKey(_resolveScenario(…), domainSize)` | `classic`, `sh`, `pathBased`, `syBased`, with a `+d3` suffix on domain-3 attempts (`classic+d3`, …) |
 | `sizeBucket` | `bucketForArea(w, h)` | `≤20`, `21-40`, `41-80`, `>80` |
 
 **Why sort slugs?** `{CH, SY}` and `{SY, CH}` describe the same task. Sorting
 canonicalizes the set so both map to the same key.
+
+**Why the domain rides on the scenario field.** Domain-2 and domain-3
+attempts of an otherwise identical combo have very different success
+rates, so the blacklist must not conflate them. `attemptScenarioKey`
+suffixes the scenario with `+d3` on domain-3 attempts and leaves
+domain-2 untouched — every key serialized before the domain axis existed
+(all dom-2) therefore stays byte-identical, and historical blacklist
+evidence carries over unchanged. The suffix exists **only in the key**:
+the `scenario` CSV column and the equilibrium profile axis stay
+unsuffixed. The helper is shared by the worker (key construction) and
+`readPersistentBlacklist` (CSV re-aggregation) so the two sides cannot
+drift.
 
 **Why a size bucket rather than exact dimensions?** A combo may be infeasible
 only at small grids (e.g. CH needs enough room) while feasible at large ones.
@@ -57,8 +70,9 @@ Pipe-separated so the inner slug join (comma-separated) nests cleanly.
 Example:
 ```
 slug:SY|PA,QA,SY|classic|21-40
-ntypes:1|CH|classic|≤20
+ntypes:1|CH|classic+d3|≤20
 pair:CH+SY|CH,SY|classic|41-80
+domain:3||classic+d3|21-40
 none||pathBased|>80
 ```
 
@@ -72,7 +86,7 @@ the header row is written only on first creation (detected by checking
 ```
 date, commit, worker, phase, target_key, width, height, ntypes_intended,
 preferred_slugs, allowed_slugs, scenario, outcome, reason, duration_ms,
-level, puzzle_line
+level, puzzle_line, slug_deficits, domain
 ```
 
 **Column details:**
@@ -95,12 +109,16 @@ level, puzzle_line
 | `duration_ms` | int | Wall-clock milliseconds for the attempt |
 | `level` | string | `PuzzleLevel.name` on success; empty on failure |
 | `puzzle_line` | string | Full v2 puzzle line on success (allows joining with `puzzle_vectors.csv` via canonical key); empty on failure. Only column that can contain commas — wrapped in `"…"` by `_csvField` when needed |
+| `slug_deficits` | pipe-joined | `slug:gap` pairs that biased the secondary candidate sort (`slugDeficits` snapshot, strictly-positive gaps only, sorted descending). Empty during warm-up and when equilibrium is off. |
+| `domain` | int | Colour-domain size the attempt was *asked* to generate (2 or 3) — intent, not the emitted line's possibly auto-shrunk domain. Absent on rows written before the domain axis existed; readers treat the missing column as 2 (historically exact). |
 
-**Column count invariant.** Columns 0–14 (before `puzzle_line`) are guaranteed
-to contain no commas or newlines in practice: slugs use `|` as separator,
-`target_key` values use `:` and `+`, scenarios and outcomes are word-like. This
-property is relied on by `readPersistentBlacklist`, which parses only the first
-12 columns using a naive `split(',')` and ignores `puzzle_line`.
+**Parsing.** `readPersistentBlacklist` splits each row with a minimal
+quote-aware splitter (`_splitCsvRow`, RFC-4180-ish: `"…"` fields with
+doubled-quote escapes, no embedded newlines), so the `puzzle_line`
+column's escaped commas cannot shift the columns after it. It reads
+fixed positions — 4=`target_key`, 5/6=dimensions, 8=`preferred_slugs`,
+10=`scenario`, 11=`outcome`, 17=`domain` (defaulting to 2 when the row
+predates the column) — and ignores the rest.
 
 **Write serialization.** Multiple workers share the same `statsSink`. The CLI
 serializes writes through a `statsChain` Future (in `bin/generate.dart`) so
@@ -112,9 +130,9 @@ telemetry file is not committed to the repository.
 ### Example rows
 
 ```
-2026-05-22T14:30:01.123Z,a1b2c3d,0,equilibrium,slug:SY,8,6,3,PA|QA|SY,,classic,success,,842,advanced,"v2_12_8x6_…"
-2026-05-22T14:30:02.005Z,a1b2c3d,1,equilibrium,ntypes:1,4,4,1,CH,,classic,failure,notUnique,3201,,
-2026-05-22T14:30:02.500Z,a1b2c3d,0,warmup,,,6,5,2,PA|SY,,classic,success,,310,player,"v2_12_6x5_…"
+2026-06-05T14:30:01.123Z,a1b2c3d,0,equilibrium,slug:SY,8,6,3,PA|QA|SY,,classic,success,,842,advanced,"v2_123_8x6_…",NC:0.0700|GS:0.0212,3
+2026-06-05T14:30:02.005Z,a1b2c3d,1,equilibrium,ntypes:1,4,4,1,CH,,classic,failure,ratioTooHigh,3201,,,NC:0.0700,2
+2026-06-05T14:30:02.500Z,a1b2c3d,0,warmup,,6,5,2,PA|SY,,classic,success,,310,player,"v2_12_6x5_…",,2
 ```
 
 ## Hybrid Blacklist Mechanism
