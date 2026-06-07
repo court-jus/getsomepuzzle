@@ -47,6 +47,7 @@ class _Puzzle {
   final Set<String> slugs;
   final int width;
   final int height;
+  final int domainSize;
   final String scenario;
 
   /// The ordered top-3 composition triple joined with '+', e.g.
@@ -59,6 +60,7 @@ class _Puzzle {
     this.slugs,
     this.width,
     this.height,
+    this.domainSize,
     this.scenario,
     this.compositionKey,
   );
@@ -72,6 +74,7 @@ class _Filters {
   final Set<String> excludeSlugs = {};
   final Set<int> widths = {};
   final Set<int> heights = {};
+  final Set<int> domainSizes = {};
   int? minArea;
   int? maxArea;
 }
@@ -125,6 +128,8 @@ _Puzzle? _parseLine(String line, String collection) {
   final parts = trimmed.split('_');
   if (parts.length < 5) return null;
 
+  final domainSize = parts[1].length;
+
   final dim = parts[2].split('x');
   if (dim.length != 2) return null;
   final w = int.tryParse(dim[0]);
@@ -154,7 +159,7 @@ _Puzzle? _parseLine(String line, String collection) {
   }
   final comp = compositionOf(rawSlugs);
   final compKey = comp.join('+');
-  return _Puzzle(collection, slugs, w, h, scenario, compKey);
+  return _Puzzle(collection, slugs, w, h, domainSize, scenario, compKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +167,9 @@ _Puzzle? _parseLine(String line, String collection) {
 // ---------------------------------------------------------------------------
 
 bool _passesFilters(_Puzzle p, _Filters f) {
+  if (f.domainSizes.isNotEmpty && !f.domainSizes.contains(p.domainSize)) {
+    return false;
+  }
   final n = p.slugs.length;
   if (f.exactNtypes != null && n != f.exactNtypes) return false;
   if (f.minNtypes != null && n < f.minNtypes!) return false;
@@ -201,6 +209,8 @@ Iterable<String> _keysFor(_Puzzle p, String axis) {
       return [p.slugs.length >= 6 ? '6+' : '${p.slugs.length}'];
     case 'size':
       return [_sizeKey(p)];
+    case 'domain':
+      return [p.domainSize.toString()];
     case 'scenario':
       return [p.scenario];
     case 'collection':
@@ -266,10 +276,11 @@ void _printUsage(IOSink out) {
   out.writeln('  --height N        Exact height. Repeatable (OR).');
   out.writeln('  --min-area N      width*height >= N.');
   out.writeln('  --max-area N      width*height <= N.');
+  out.writeln('  --domain N        domain size {2, 3}.');
   out.writeln('');
   out.writeln('Output:');
   out.writeln('  --group-by AXIS   slug (default) | ntypes | size | scenario');
-  out.writeln('                    | collection | composition.');
+  out.writeln('                    | collection | composition | domain.');
   out.writeln('  --cross A,B       Two-axis cross-tab: A as rows, B as');
   out.writeln('                    columns (same axis names as --group-by;');
   out.writeln('                    A and B may be equal). Mutually exclusive');
@@ -277,7 +288,7 @@ void _printUsage(IOSink out) {
   out.writeln('  --buckets [DIMS]  List every distinct joint bucket and its');
   out.writeln('                    population. DIMS is a comma list over');
   out.writeln(
-    '                    {size, ntypes, slugs, scenario, composition}; default',
+    '                    {size, ntypes, slugs, scenario, composition, domain}; default',
   );
   out.writeln('                    size,slugs,scenario. "slugs" is the whole');
   out.writeln('                    sorted set (one atomic key, not per-slug).');
@@ -336,6 +347,7 @@ _Args _parseArgs(List<String> args) {
     'scenario',
     'collection',
     'composition',
+    'domain',
   };
   const validBucketDims = {
     'size',
@@ -343,6 +355,7 @@ _Args _parseArgs(List<String> args) {
     'slugs',
     'scenario',
     'composition',
+    'domain',
   };
   const defaultBucketDims = ['size', 'slugs', 'scenario'];
 
@@ -408,6 +421,10 @@ _Args _parseArgs(List<String> args) {
         break;
       case '--max-area':
         filters.maxArea = int.parse(need(i));
+        i++;
+        break;
+      case '--domain':
+        filters.domainSizes.add(int.parse(need(i)));
         i++;
         break;
       case '--group-by':
@@ -558,6 +575,9 @@ void main(List<String> rawArgs) {
   if (opts.filters.heights.isNotEmpty) {
     active.add('height={${opts.filters.heights.join(',')}}');
   }
+  if (opts.filters.domainSizes.isNotEmpty) {
+    active.add('domain={${opts.filters.domainSizes.join(',')}}');
+  }
   if (opts.filters.minArea != null) active.add('area>=${opts.filters.minArea}');
   if (opts.filters.maxArea != null) active.add('area<=${opts.filters.maxArea}');
   if (active.isNotEmpty) {
@@ -675,6 +695,8 @@ String _bucketField(_Puzzle p, String dim) {
     case 'slugs':
       final sorted = p.slugs.toList()..sort();
       return 'slugs=${sorted.join(',')}';
+    case 'domain':
+      return 'domain=${p.domainSize}';
     case 'scenario':
       return 'scenario=${p.scenario}';
     case 'composition':
