@@ -588,16 +588,19 @@ class _ScoredTarget {
   const _ScoredTarget(this.target, this.gap);
 }
 
-/// Pick the most under-represented (axis, category) across all axes.
+/// Pick the most under-represented (axis, category) across [enabledAxes].
 ///
-/// Returns `null` if no target has a strictly positive gap (perfect balance —
-/// extremely unlikely in practice) or if every candidate is blacklisted.
+/// When [enabledAxes] is non-empty only those axes are considered; by default
+/// all seven axes participate. Returns `null` if no target has a strictly
+/// positive gap or if every candidate is blacklisted.
 Target? pickTarget(
   EquilibriumStats stats,
   TargetUniverse universe, {
   Set<String> blacklistedKeys = const {},
+  Iterable<Axis> enabledAxes = Axis.values,
 }) {
   final scored = _scoreAll(stats, universe);
+  scored.removeWhere((s) => !enabledAxes.contains(s.target.axis));
   scored.removeWhere((s) => blacklistedKeys.contains(s.target.key));
   if (scored.isEmpty) return null;
   scored.sort((a, b) => b.gap.compareTo(a.gap));
@@ -782,9 +785,14 @@ class BucketRotation {
 
   /// Returns the next bucket to push, or `null` when no bucket has a positive
   /// gap (corpus perfectly balanced — extremely rare). Marks the returned
-  /// bucket as claimed for this cycle.
-  Target? next(EquilibriumStats stats, TargetUniverse universe) {
-    final ranked = rankTargets(stats, universe);
+  /// bucket as claimed for this cycle. When [enabledAxes] is provided, only
+  /// targets from those axes are considered.
+  Target? next(
+    EquilibriumStats stats,
+    TargetUniverse universe, {
+    Iterable<Axis> enabledAxes = Axis.values,
+  }) {
+    final ranked = rankTargets(stats, universe, enabledAxes: enabledAxes);
     var pool = [
       for (final c in ranked)
         if (c.gap > 0 && !_claimedThisCycle.contains(c.target.key)) c,
@@ -854,8 +862,10 @@ List<({Target target, double gap})> rankTargets(
   EquilibriumStats stats,
   TargetUniverse universe, {
   Set<String> blacklistedKeys = const {},
+  Iterable<Axis> enabledAxes = Axis.values,
 }) {
   final scored = _scoreAll(stats, universe);
+  scored.removeWhere((s) => !enabledAxes.contains(s.target.axis));
   scored.removeWhere((s) => blacklistedKeys.contains(s.target.key));
   scored.sort((a, b) => b.gap.compareTo(a.gap));
   return scored

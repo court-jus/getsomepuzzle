@@ -29,6 +29,7 @@ class GeneratorWorker {
     int skipSafety = 100,
     String? Function(int workerIndex)? assignTarget,
     List<int>? allowedDomains,
+    String? focusAxisName,
   }) {
     _controller = StreamController<GeneratorMessage>();
 
@@ -45,6 +46,7 @@ class GeneratorWorker {
       skipSafety,
       assignTarget,
       allowedDomains,
+      focusAxisName,
     );
 
     return _controller!.stream;
@@ -73,6 +75,7 @@ class GeneratorWorker {
     int skipSafety,
     String? Function(int workerIndex)? assignTarget,
     List<int>? allowedDomains,
+    String? focusAxisName,
   ) async {
     final receivePort = ReceivePort();
     // Reply port to this worker, captured from its `ready` handshake. The
@@ -110,6 +113,7 @@ class GeneratorWorker {
         workerIndex: workerIndex,
         logFilePath: logFilePath,
         seedBlacklist: seedBlacklist,
+        focusAxisName: focusAxisName,
         adaptiveK: adaptiveK,
         skipSafety: skipSafety,
       ),
@@ -233,6 +237,11 @@ class _IsolateParams {
   /// past runs). Each worker checks this set before every attempt.
   final List<String> seedBlacklist;
 
+  /// When non-null, restricts equilibrium targets to this single axis.
+  /// The string is an [Axis] enum name (e.g. `"composition"`), serialised
+  /// so it crosses the isolate boundary as a plain primitive.
+  final String? focusAxisName;
+
   /// In-session blacklist threshold: a worker blacklists a combo locally
   /// once it has attempted it [adaptiveK] times with no successes.
   final int adaptiveK;
@@ -269,6 +278,7 @@ class _IsolateParams {
     this.workerIndex = 0,
     this.logFilePath,
     this.seedBlacklist = const <String>[],
+    this.focusAxisName,
     this.adaptiveK = 20,
     this.skipSafety = 100,
   });
@@ -337,6 +347,22 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
   final initialCorpusSize = (params.puzzleLines ?? const [])
       .where((l) => l.trim().isNotEmpty && !l.startsWith('#'))
       .length;
+  // When [focusAxisName] is set, restrict equilibrium targets to that axis.
+  // `null` means all axes participate — the default behaviour.
+  final enabledAxes = () {
+    if (params.focusAxisName == null) return Axis.values;
+    final matched = {
+      for (final a in Axis.values)
+        if (a.name == params.focusAxisName) a,
+    };
+    if (matched.isNotEmpty) return matched;
+    log(
+      'WARNING: unknown focus axis "${params.focusAxisName}", '
+      'falling back to all axes',
+    );
+    return Axis.values;
+  }();
+
   if (params.equilibriumRequested) {
     equiStats = EquilibriumStats.fromLines(params.puzzleLines ?? const []);
     universe = TargetUniverse(
@@ -444,7 +470,16 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       final assignedKey = await requestAssignedTargetKey();
       target = assignedKey != null
           ? parseTargetKey(assignedKey)
-          : pickTarget(equiStats, universe);
+          : pickTarget(equiStats, universe, enabledAxes: enabledAxes);
+      // Safety net: if the coordinator assigned a target outside the focus
+      // axis (e.g. during a rotation cycle boundary), fall back to local.
+      if (target != null && !enabledAxes.contains(target.axis)) {
+        log(
+          'coordinator assigned ${target.key} (${target.axis}), '
+          'but focus is ${params.focusAxisName ?? "all"} — falling back',
+        );
+        target = pickTarget(equiStats, universe, enabledAxes: enabledAxes);
+      }
       if (target != null) {
         final resolved = _resolveTarget(
           target,

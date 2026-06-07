@@ -17,6 +17,7 @@ class GeneratorWorker {
     int skipSafety = 100,
     String? Function(int workerIndex)? assignTarget,
     List<int>? allowedDomains,
+    String? focusAxisName,
   }) => const Stream.empty();
 
   void cancel() {}

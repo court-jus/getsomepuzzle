@@ -65,6 +65,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   // Placeholder for the per-worker GeneratorConfig — the worker rebuilds
   // the concrete domain per attempt from `allowedDomains`.
   final domain = domainSize == 3 ? fullDomain : defaultDomain;
+  final focusAxisName = parsed['focusAxis'] as String?;
   final strategies = parsed['strategy'] as List<GenerationStrategy>;
   final maxStall = parsed['maxStall'] as int;
   if (logDir != null) {
@@ -217,11 +218,22 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     maxHeight: maxHeight,
     allowedDomains: allowedDomains,
   );
+  final coordinatorEnabledAxes = focusAxisName != null
+      ? {
+          for (final a in Axis.values)
+            if (a.name == focusAxisName) a,
+        }
+      : Axis.values;
   final bucketRotation = BucketRotation();
   // Answers a worker's `requestTarget`: hands out the next deficient bucket
   // key, or null to let the worker decide locally (no positive-gap bucket).
-  String? assignBucket(int workerIndex) =>
-      bucketRotation.next(globalEquiStats, coordinatorUniverse)?.key;
+  String? assignBucket(int workerIndex) => bucketRotation
+      .next(
+        globalEquiStats,
+        coordinatorUniverse,
+        enabledAxes: coordinatorEnabledAxes,
+      )
+      ?.key;
 
   void render() {
     if (debug) return;
@@ -385,6 +397,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       // Off → workers keep the legacy local random/argmax path.
       assignTarget: equilibriumRequested ? assignBucket : null,
       allowedDomains: allowedDomains,
+      focusAxisName: focusAxisName,
     );
 
     consumers.add(() async {
@@ -1018,9 +1031,10 @@ void _renderDashboard({
     );
   }
 
-  // Composition axis: compact "top deficit" panel — the ~12 largest-gap
+  // Composition axis: compact "top deficit" panel — the largest-gap
   // buckets, sorted by gap descending. Only shown when the universe defines
   // composition targets.
+  final compositionsToShow = 6;
   if (axisTargets.composition.isNotEmpty) {
     stderr.writeln('');
     stderr.writeln('Compositions (top deficits):');
@@ -1031,7 +1045,9 @@ void _renderDashboard({
       if (gap > 0) compGaps.add(MapEntry(entry.key, gap));
     }
     compGaps.sort((a, b) => b.value.compareTo(a.value));
-    final top = compGaps.length > 12 ? compGaps.sublist(0, 12) : compGaps;
+    final top = compGaps.length > compositionsToShow
+        ? compGaps.sublist(0, compositionsToShow)
+        : compGaps;
     final compStats = {
       for (final e in top) e.key: stats.compositions[e.key] ?? 0,
     };
@@ -1041,9 +1057,9 @@ void _renderDashboard({
       targets: axisTargets.composition,
       globalMaxGap: globalMaxGap,
     );
-    if (compGaps.length > 12) {
+    if (compGaps.length > compositionsToShow) {
       stderr.writeln(
-        '  … and ${compGaps.length - 12} more compositions with positive deficit',
+        '  … and ${compGaps.length - compositionsToShow} more compositions with positive deficit',
       );
     }
   }
@@ -1678,6 +1694,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'maxHeight': 10,
     'maxTime': 3600,
     'maxAttemptTime': 360,
+    'focusAxis': null,
     'output': null,
     'banned': null,
     'allowed': null,
@@ -1792,6 +1809,16 @@ Map<String, dynamic> _parseArgs(List<String> args) {
           exit(1);
         }
         result['domain'] = v;
+      case '--focus-axis':
+        final raw = args[++i];
+        final validAxes = [for (final a in Axis.values) a.name];
+        if (!validAxes.contains(raw)) {
+          stderr.writeln(
+            '--focus-axis must be one of: ${validAxes.join(", ")} (got "$raw")',
+          );
+          exit(1);
+        }
+        result['focusAxis'] = raw;
       case '--max-stall':
         result['maxStall'] = int.parse(args[++i]);
       case '--strategy':
@@ -1933,6 +1960,9 @@ Generation options:
                           one worker burns the entire budget on a single
                           plateaued attempt. Default 15 s. Pass 0 to
                           disable.
+      --focus-axis AXIS   Restrict equilibrium targets to a single axis.
+                          Valid values: ${Axis.values.map((a) => a.name).join(', ')}.
+                          Default: all axes active.
       --no-equilibrium    Disable the multi-axis equilibrium bias.
                           Default: ON. When OFF, only the legacy slug-usage
                           bias is applied (matches pre-equilibrium behavior).

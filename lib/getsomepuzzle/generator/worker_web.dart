@@ -20,6 +20,7 @@ class GeneratorWorker {
     int skipSafety = 100,
     String? Function(int workerIndex)? assignTarget,
     List<int>? allowedDomains,
+    String? focusAxisName,
   }) {
     // Equilibrium, warm-up and the infeasibility blacklist are CLI-only for
     // now; the web/in-app generator keeps the legacy slug-only bias and
