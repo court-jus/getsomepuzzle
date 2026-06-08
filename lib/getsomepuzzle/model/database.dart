@@ -514,6 +514,16 @@ class Database {
       // resets on next launch, which the player will perceive as a
       // benign delay (one extra puzzle in the same phase).
       _persistOnboardingCompletions();
+      // Just graduated the strict phases into soft discovery: load the
+      // widened pool now — the launch-time load skipped it while a strict
+      // phase was still active.
+      if (currentPhase == null && _softFilterActive) {
+        _refreshSoftDiscoveryPool();
+      }
+    } else if (_softFilterActive) {
+      // A soft-discovery play: advance the cadence counter that drives the
+      // elected-rule injection in [getPuzzlesByLevel].
+      _softPlaysSinceElectedChange++;
     }
     // Keep currentFilters aligned with the onboarding recommendation.
     // Without this, the player keeps playing puzzles from the previous
@@ -646,6 +656,71 @@ class Database {
     );
   }
 
+  /// Axe B (soft-discovery widening): when the player has cleared the strict
+  /// phases but not yet met every rule, pre-load a bounded pool of puzzles
+  /// carrying a post-strict slug from the **next** level collection(s) up
+  /// (see [softDiscoveryMaxLevelsAbove]). The soft slugs (`RT`, `SY`, …) are
+  /// scarce in the entry catalog; this pool gives [getPuzzlesByLevel]
+  /// somewhere to draw the elected rule from so onboarding can complete
+  /// without forcing the player to switch collections by hand — while staying
+  /// close to the entry difficulty. No-op outside the soft-filter phase.
+  Future<void> _refreshSoftDiscoveryPool() async {
+    _softDiscoveryPool = [];
+    if (!_softFilterActive) return;
+    final currentLevel = playableCollectionKeyToLevel[collection];
+    if (currentLevel == null) return; // custom / user playlists: skip
+    final softSlugs = OnboardingPhase.postStrictDiscoveryOrder.toSet();
+    final existing = puzzles.map((e) => e.lineRepresentation.trim()).toSet();
+    final perSlug = <String, int>{};
+    final seen = <String>{};
+    for (final entry in playableCollectionKeyToLevel.entries) {
+      final lvl = entry.value.index;
+      // Only the next level(s) up: the current collection (and its
+      // overfilled-easy augmentation) is already in [puzzles], and we must
+      // not serve a beginner a far-harder puzzle just to introduce a rule.
+      if (lvl <= currentLevel.index ||
+          lvl > currentLevel.index + softDiscoveryMaxLevelsAbove) {
+        continue;
+      }
+      String content;
+      try {
+        content = await rootBundle.loadString('assets/${entry.key}.txt');
+      } catch (_) {
+        continue;
+      }
+      for (final line in content.split('\n')) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+        if (existing.contains(trimmed) || !seen.add(trimmed)) continue;
+        // Cheap string pre-filter: skip lines that name no soft slug before
+        // paying for a full PuzzleData parse.
+        if (!softSlugs.any((s) => trimmed.contains('$s:'))) continue;
+        PuzzleData puz;
+        try {
+          puz = PuzzleData(trimmed);
+        } catch (_) {
+          continue;
+        }
+        final carried = puz.rules.toSet().intersection(softSlugs);
+        if (carried.isEmpty) continue;
+        // Respect the per-slug cap so a common slug can't crowd out the rest.
+        if (carried.every(
+          (s) => (perSlug[s] ?? 0) >= softDiscoveryPoolPerSlugCap,
+        )) {
+          continue;
+        }
+        for (final s in carried) {
+          perSlug[s] = (perSlug[s] ?? 0) + 1;
+        }
+        _softDiscoveryPool.add(puz);
+      }
+    }
+    log.fine(
+      'Soft-discovery pool: ${_softDiscoveryPool.length} puzzles '
+      'across slugs ${perSlug.keys.toList()..sort()}',
+    );
+  }
+
   /// True when [candidate] should supersede [incumbent] as the
   /// representative play of a puzzle. A finished play always beats an
   /// unfinished one; between two finished (or two unfinished) plays the
@@ -742,8 +817,14 @@ class Database {
     }
   }
 
-  Iterable<PuzzleData> filter() {
-    return puzzles.where((puz) {
+  Iterable<PuzzleData> filter() => puzzles.where(_matchesFilters);
+
+  /// Per-puzzle predicate behind [filter]. Extracted so the soft-discovery
+  /// injection in [getPuzzlesByLevel] can apply the *same* flag / size /
+  /// rule / domain gates to puzzles drawn from the widened pool (which are
+  /// not in [puzzles]).
+  bool _matchesFilters(PuzzleData puz) {
+    {
       if (puz.played && currentFilters.bannedFlags.contains("played")) {
         return false;
       }
@@ -792,7 +873,7 @@ class Database {
         return false;
       }
       return true;
-    });
+    }
   }
 
   Future<void> loadPuzzlesFile([String? fileToLoad]) async {
@@ -856,6 +937,7 @@ class Database {
       currentFilters.bannedRules = reco.bannedRules;
       await currentFilters.save();
     }
+    await _refreshSoftDiscoveryPool();
     preparePlaylist();
   }
 
@@ -1101,6 +1183,40 @@ class Database {
     wantedRules: {phase.introducing},
     bannedRules: OnboardingPhase.allKnownSlugs.difference(phase.allowed),
   );
+
+  /// The post-strict soft-discovery slug the player is currently meant to
+  /// meet next, or null when not in the soft-filter phase. Mirrors the
+  /// election in [_softFilterRecommendation] and drives the cadence-based
+  /// injection in [getPuzzlesByLevel].
+  String? get electedSoftSlug {
+    if (currentPhase != null) return null;
+    final p = progress;
+    if (p == null) return null;
+    for (final slug in OnboardingPhase.postStrictDiscoveryOrder) {
+      if (p.isFirstTimeFor(slug)) return slug;
+    }
+    return null;
+  }
+
+  /// Plays served since the elected soft-discovery slug last changed (i.e.
+  /// since the player last met a new rule). In-session only; a relaunch
+  /// restarts the count, at worst delaying one injection by a few plays.
+  int _softPlaysSinceElectedChange = 0;
+
+  /// The elected slug observed on the previous sampling pass, used to reset
+  /// [_softPlaysSinceElectedChange] the moment discovery advances.
+  String? _lastElectedSlug;
+
+  /// Soft-discovery candidates pulled from the level collections *above* the
+  /// current one (Axe B): puzzles carrying a post-strict slug, so a rule too
+  /// scarce in the current collection still has somewhere to come from.
+  /// Populated by [_refreshSoftDiscoveryPool] when the player enters the
+  /// soft-filter phase; empty otherwise.
+  List<PuzzleData> _softDiscoveryPool = [];
+
+  @visibleForTesting
+  set softDiscoveryPoolForTest(List<PuzzleData> pool) =>
+      _softDiscoveryPool = pool;
 
   ({Set<String> wantedRules, Set<String> bannedRules})?
   _softFilterRecommendation() {
@@ -1428,6 +1544,33 @@ class Database {
   /// empties. Once GS is past its phase, the demotion lifts (factor 1).
   static const double selectionTrivialGsPenalty = 0.05;
 
+  /// Post-strict soft-discovery cadence. The rules introduced after the
+  /// strict phases (`OnboardingPhase.postStrictDiscoveryOrder`) are rare in
+  /// the entry-level catalog and get drowned by the abundant "refresh"
+  /// draws, which stalls onboarding (the elected rule never surfaces). We
+  /// instead inject the elected rule's puzzle into the batch once the player
+  /// has gone this many plays without meeting a new rule — targeting roughly
+  /// one new rule every 10–15 plays given the 5-puzzle batch granularity,
+  /// rather than every batch (too fast) or never (the stall).
+  static const int softElectedInjectPeriod = 10;
+
+  /// Below this many eligible elected-rule puzzles in the *current*
+  /// collection, the injection widens its draw to the harder level
+  /// collections ([_softDiscoveryPool]) so a rule that is scarce at the
+  /// entry level (e.g. `RT`, `CT` in `1-easy`) still surfaces.
+  static const int softElectedMinInCollection = 8;
+
+  /// Per-slug cap when building [_softDiscoveryPool] — enough candidates to
+  /// sample from without holding the whole higher-level corpus in memory.
+  static const int softDiscoveryPoolPerSlugCap = 150;
+
+  /// How many difficulty levels above the current collection the soft-
+  /// discovery pool may reach. Kept at 1 so a beginner meets the rare soft
+  /// rules on `2-player` puzzles, never on `6-mad` ones — the entry +
+  /// next-level corpus already holds ≥ a dozen eligible puzzles for every
+  /// soft slug (RT, the scarcest, has ~12).
+  static const int softDiscoveryMaxLevelsAbove = 1;
+
   // Random source for puzzle sampling. Exposed as a package-private setter
   // so tests can pin it to a seeded Random for reproducibility.
   math.Random _samplingRandom = math.Random();
@@ -1484,7 +1627,69 @@ class Database {
       final key = -math.log(u) / w;
       return (p, key);
     }).toList()..sort((a, b) => a.$2.compareTo(b.$2));
-    return keyed.map((e) => e.$1).toList();
+    final result = keyed.map((e) => e.$1).toList();
+    _injectElectedSoftRule(result, mu.toDouble(), twoSigmaSq);
+    return result;
+  }
+
+  /// Post-strict soft-discovery injection (Axe A + B). The elected new rule
+  /// is rare in the entry catalog and gets drowned by refresh draws, so left
+  /// to the weighted sampler it almost never surfaces — the stall this
+  /// reproduces. Instead, once the player has gone [softElectedInjectPeriod]
+  /// plays without meeting a new rule (or the filtered batch is empty, as in
+  /// the terminal single-slug case), we splice one elected-rule puzzle into
+  /// the upcoming batch. Candidates come from the current collection first
+  /// and, when it is too thin ([softElectedMinInCollection]), from the
+  /// widened [_softDiscoveryPool] (Axe B). No-op outside the soft phase.
+  void _injectElectedSoftRule(
+    List<PuzzleData> result,
+    double mu,
+    double twoSigmaSq,
+  ) {
+    final elected = electedSoftSlug;
+    if (elected == null) return;
+    // Reset the cadence the moment discovery advances to a new rule.
+    if (elected != _lastElectedSlug) {
+      _lastElectedSlug = elected;
+      _softPlaysSinceElectedChange = 0;
+    }
+    final due = _softPlaysSinceElectedChange >= softElectedInjectPeriod;
+    if (!due && result.isNotEmpty) return;
+
+    final inCollection = result
+        .where((p) => p.rules.contains(elected))
+        .toList();
+    final pool = <PuzzleData>[...inCollection];
+    if (inCollection.length < softElectedMinInCollection) {
+      pool.addAll(
+        _softDiscoveryPool.where(
+          (p) => p.rules.contains(elected) && _matchesFilters(p),
+        ),
+      );
+    }
+    if (pool.isEmpty) return; // genuine corpus gap — the test will surface it
+
+    // Weighted pick by the same cplx-Gaussian used above.
+    PuzzleData? pick;
+    var bestKey = double.infinity;
+    for (final p in pool) {
+      final d = p.cplx - mu;
+      final w = math.exp(-math.min(d * d / twoSigmaSq, 700));
+      final u = _samplingRandom.nextDouble() + 1e-300;
+      final key = -math.log(u) / w;
+      if (key < bestKey) {
+        bestKey = key;
+        pick = p;
+      }
+    }
+    if (pick == null) return;
+
+    // Splice the elected puzzle into a random slot inside the upcoming batch
+    // so it is served within the next few plays (≈ period … period+batch).
+    result.remove(pick);
+    final span = math.min(playlistBatchSize, result.length + 1);
+    final slot = span <= 1 ? 0 : _samplingRandom.nextInt(span);
+    result.insert(slot, pick);
   }
 
   /// Build the recency-weighted observed distribution over size and slug

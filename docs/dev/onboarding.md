@@ -52,9 +52,9 @@ flag is stored: stats remain the source of truth.
 
 Two modes run back to back:
 
-### Strict phases (P0–P5)
+### Strict phases (P0–P9)
 
-6 phases × 5 puzzles = 30 introductory plays. Slug-envelope filter
+10 phases × 5 puzzles = 50 introductory plays. Slug-envelope filter
 **plus** a hard requirement that the puzzle contains the phase's
 introducing slug. Source = `1-easy` ∪ `overfilled-easy`.
 
@@ -76,6 +76,13 @@ construction.
 | 3     | 5      | `CC`        | `{FM, PA, NC, CC}`          |
 | 4     | 5      | `RC`        | `{FM, PA, NC, CC, RC}`      |
 | 5     | 5      | `GS`        | `{FM, PA, NC, CC, RC, GS}`  |
+| 6     | 5      | `EY`        | `{…, EY}`                   |
+| 7     | 5      | `DF`        | `{…, EY, DF}`               |
+| 8     | 5      | `LT`        | `{…, EY, DF, LT}`           |
+| 9     | 5      | `QA`        | `{…, EY, DF, LT, QA}`       |
+
+(Each `allowed` set is cumulative: every prior introducing slug plus
+the phase's own.)
 
 The two conditions of the original `puzzleEligibleForPhase` predicate
 (allow-envelope + introducing-slug-present) are expressed as a visible
@@ -116,7 +123,7 @@ completed puzzle, so the playlist never uses stale phase presets when
 the phase transitions. A cross-session guard in `loadPuzzlesFile`
 handles the edge case where the app is closed at a phase boundary.
 
-### Soft-filter mode (post-P5)
+### Soft-filter mode (post-P9)
 
 The corpus doesn't easily sustain strict phases for the remaining
 slugs (the seven in `OnboardingPhase.postStrictDiscoveryOrder` —
@@ -124,13 +131,12 @@ currently `RT, SY, SH, CH, CT, GC, MJ`, derived from
 `constraintRegistry`): too few puzzles whose declared rules sit
 cleanly inside a narrow envelope.
 
-The post-P5 model is also expressed as a filter preset, via
+The post-P9 model is also expressed as a filter preset, via
 `_softFilterRecommendation()`:
 
-- The player can explore **every level collection** (the user-level
-  filter still drives the sampler).
 - The recommendation **elects** the first slug in
-  `postStrictDiscoveryOrder` that the player has not yet met. While
+  `postStrictDiscoveryOrder` that the player has not yet met
+  (exposed as `Database.electedSoftSlug`). While
   ≥ 2 slugs are still unseen, the preset is `wantedRules = {}`,
   `bannedRules = (unseen \ {elected})` — puzzles with 0 new slugs
   pass (refresh) AND the elected slug can surface (single new rule),
@@ -139,6 +145,37 @@ The post-P5 model is also expressed as a filter preset, via
 - **Terminal case** (one unseen slug left): the preset flips to
   `wantedRules = {elected}`, `bannedRules = {}` so the OpenPage
   banner references a real chip and the missing slug surfaces faster.
+
+#### Surfacing the elected rule (cadenced injection + widening)
+
+The filter preset alone is not enough: the soft-discovery slugs are
+so rare in the entry catalog that the weighted sampler almost never
+draws one — the abundant 0-new-rule "refresh" puzzles win every slot,
+and a player who stays on the entry collection would loop forever
+without ever meeting them. Two mechanisms in `Database` fix this:
+
+- **Cadenced injection** (`_injectElectedSoftRule`, called by
+  `getPuzzlesByLevel`). `notePuzzleCompleted` counts soft-phase plays
+  in `_softPlaysSinceElectedChange`, reset whenever discovery advances.
+  Once it reaches `softElectedInjectPeriod` (10) — or the filtered
+  batch is empty, as in the terminal single-slug case — one
+  elected-rule puzzle is spliced into a random slot of the upcoming
+  batch. With the 5-puzzle batch granularity this surfaces a new rule
+  roughly every 10–15 plays: not every batch (too rushed), not never
+  (the stall).
+- **Bounded widening** (`_refreshSoftDiscoveryPool`, Axe B). The entry
+  collection alone is too thin for the scarcest slugs (`RT`, `CT`), so
+  the pool is pre-loaded — when soft mode becomes active — with
+  soft-slug puzzles from the **next level collection(s) up**, capped at
+  `softDiscoveryMaxLevelsAbove` (1) so a beginner meets a rule on a
+  `2-player` puzzle, never a `6-mad` one. Entry (`1-easy` +
+  `overfilled-easy`, already in `puzzles`) plus the next level holds
+  ≥ a dozen eligible puzzles for every soft slug. The injection draws
+  from the current collection first and falls back to this pool only
+  when the collection offers fewer than `softElectedMinInCollection`
+  (8) eligible puzzles. Pool puzzles still pass `_matchesFilters` (the
+  predicate extracted from `filter()`), so the envelope/flag/size
+  gates hold.
 - The soft filter becomes a no-op once
   `progress.firstSeen.length == OnboardingPhase.allKnownSlugs.length`
   (every known slug encountered). At that point `_softFilterActive`
@@ -276,8 +313,8 @@ In the player settings:
 
 ## Code landing zones
 
-- **`lib/getsomepuzzle/model/onboarding.dart`** — 6 strict
-  `OnboardingPhase` entries (FM, NC, PA, CC, RC, GS),
+- **`lib/getsomepuzzle/model/onboarding.dart`** — 10 strict
+  `OnboardingPhase` entries (FM, NC, PA, CC, RC, GS, EY, DF, LT, QA),
   `phaseLength = 5`, `phaseForCompletions(Map<String, int>)`
   selector, `puzzleEligibleForPhase` helper. The soft-filter
   predicate is expressed as a filter preset
@@ -293,28 +330,34 @@ In the player settings:
     when `currentPhase != null` and persists fire-and-forget. It
     also syncs `currentFilters` with `recommendedOnboardingFilters`
     whenever they diverge after the increment, keeping the playlist
-    in step with the current phase.
+    in step with the current phase. In soft mode it advances
+    `_softPlaysSinceElectedChange` (the injection cadence) and, on the
+    play that graduates the strict phases, triggers
+    `_refreshSoftDiscoveryPool`.
   - `skipOnboarding` and `resetOnboardingProgress` both persist
     immediately to avoid the
     "loadPuzzlesFile-rebuilds-from-prefs-and-drops-the-update"
     regression.
   - `recommendedOnboardingFilters` returns the
     `(wantedRules, bannedRules)` preset for the current state
-    (`_strictPhaseRecommendation` for P0–P5,
+    (`_strictPhaseRecommendation` for P0–P9,
     `_softFilterRecommendation` for the post-strict discovery), or
     `null` once onboarding is over. `maybeApplyOnboardingFilterDefaults`
     runs this once per launch, behind the `onboardingFiltersApplied`
     prefs flag, and writes the result into `currentFilters`.
-  - `preparePlaylist` does not carry an onboarding-specific path —
-    once the preset is applied to `currentFilters`, the standard
-    `getPuzzlesByLevel(playerLevel)` pipeline (which consults
-    `filter()`) does the gating for free.
+  - `getPuzzlesByLevel(playerLevel)` does the strict-phase gating for
+    free once the preset is applied to `currentFilters` (it consults
+    `filter()`). For soft mode it additionally runs
+    `_injectElectedSoftRule` to splice the elected rule into the batch
+    on its cadence, drawing from `_softDiscoveryPool` (Axe B) when the
+    current collection is too thin.
   - `loadPuzzlesFile` runs an unconditional sync of `currentFilters`
     with `recommendedOnboardingFilters` after
-    `maybeApplyOnboardingFilterDefaults`. This covers the
-    cross-session edge case where the previous session exited at a
-    phase boundary and the fire-and-forget filter-save from
-    `notePuzzleCompleted` may not have completed.
+    `maybeApplyOnboardingFilterDefaults`, then `_refreshSoftDiscoveryPool`
+    before `preparePlaylist`. The filter sync covers the cross-session
+    edge case where the previous session exited at a phase boundary and
+    the fire-and-forget filter-save from `notePuzzleCompleted` may not
+    have completed.
 - **`firstSeen`** map in `SharedPreferences` under
   `constraintFirstSeen` (`slug → ISO date` serialisation) drives the
   explanation modal.
@@ -340,7 +383,7 @@ In the player settings:
   or a re-sort of `1-easy` doesn't invalidate the phase sequencing.
 - `bin/check_phase_coverage.dart` — per-phase coverage on the
   current corpus. Flags:
-  - no flag: strict coverage (P0–P5) on `1-easy ∪ overfilled-easy`.
+  - no flag: strict coverage (P0–P9) on `1-easy ∪ overfilled-easy`.
   - `--per-level`: where phase-eligible puzzles land in each
     collection (useful after a generation run).
   - `--soft`: soft-filter coverage (≤ 1 unseen slug) at various
