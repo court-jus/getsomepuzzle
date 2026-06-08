@@ -646,18 +646,54 @@ class Database {
     );
   }
 
+  /// True when [candidate] should supersede [incumbent] as the
+  /// representative play of a puzzle. A finished play always beats an
+  /// unfinished one; between two finished (or two unfinished) plays the
+  /// later timestamp wins. ISO-8601 stamps compare correctly as strings.
+  static bool _isMoreRecentPlay(StatEntry candidate, StatEntry incumbent) {
+    final candFinished = candidate.finished;
+    final incFinished = incumbent.finished;
+    if ((candFinished != null) != (incFinished != null)) {
+      return candFinished != null;
+    }
+    if (candFinished != null && incFinished != null) {
+      return candFinished.compareTo(incFinished) > 0;
+    }
+    // Both unfinished: prefer the more recent skip, else keep the incumbent.
+    final candSkipped = candidate.skipped;
+    final incSkipped = incumbent.skipped;
+    if (candSkipped != null && incSkipped != null) {
+      return candSkipped.compareTo(incSkipped) > 0;
+    }
+    return candSkipped != null && incSkipped == null;
+  }
+
   void loadStats(List<String> rawStats) {
     log.finest("loadStats");
     // Index by canonical key (identity-only): old stats lines that embed
     // a stale complexity score or constraint order still match the current
     // puzzle line. See lib/getsomepuzzle/model/canonical.dart.
+    //
+    // The stats file now keeps the *full* play history (multiple rows per
+    // puzzle — see writeStats). Phase 1 collapses that history back to one
+    // entry per puzzle (the most recent finished play) so every downstream
+    // counter behaves exactly as it did when the file held a single row per
+    // puzzle: we surface the latest play, not an inflated replay count.
     final Map<String, StatEntry> solvedPuzzles = {};
-    int usablePlays = 0;
-    _playCountBySlug.clear();
     for (final line in rawStats) {
       final entry = StatEntry.parse(line);
       if (entry == null) continue;
-      solvedPuzzles[canonicalPuzzleKey(entry.puzzleLine)] = entry;
+      final key = canonicalPuzzleKey(entry.puzzleLine);
+      final existing = solvedPuzzles[key];
+      if (existing == null || _isMoreRecentPlay(entry, existing)) {
+        solvedPuzzles[key] = entry;
+      }
+    }
+    // Phase 2: derive counters from the per-puzzle entries (not the raw
+    // history) so replays don't inflate them.
+    int usablePlays = 0;
+    _playCountBySlug.clear();
+    for (final entry in solvedPuzzles.values) {
       if (entry.finished != null && entry.skipped == null) {
         usablePlays++;
         final slugs = ConstraintProgress.slugsFromLine(entry.puzzleLine);
@@ -893,27 +929,61 @@ class Database {
   /// wiping every other collection's play history.
   ///
   /// Instead we read **every** existing stat line from storage (canonical
-  /// stats files + any imported file), dedupe by canonical puzzle key, and
+  /// stats files + any imported file), dedupe by `(canonical key, finished)`
+  /// so each *distinct play* of a puzzle is kept (the full history), and
   /// overlay the current session's plays on top so they win on conflict.
   /// The result is written back to the canonical `stats.txt` (or the
   /// `"stats"` `SharedPreferences` key on web). Legacy / imported stat
-  /// files are left untouched — the canonical-key dedupe at load time
-  /// keeps everything coherent, and the redundancy survives a `clearAllStats`
-  /// because that helper deletes every `stats*` file outright.
+  /// files are left untouched — the dedupe at load time keeps everything
+  /// coherent, and the redundancy survives a `clearAllStats` because that
+  /// helper deletes every `stats*` file outright.
+  ///
+  /// Keying on the completion timestamp (not the canonical key alone) is
+  /// what preserves replays: two plays of the same puzzle have different
+  /// `finished` stamps → two rows, while the periodic 60 s flush re-emits
+  /// the in-progress play with the *same* stamp → a single row. Unfinished
+  /// plays (skips, abandoned attempts) collapse to one row per puzzle and
+  /// are dropped once a finished play exists for that puzzle, mirroring the
+  /// old "completion replaces the attempt" behaviour and keeping the file
+  /// free of noise the analysis pipeline ignores anyway.
   Future<void> writeStats() async {
+    // A play is identified by its completion timestamp. Unfinished plays
+    // (finished == null) share a single per-puzzle slot.
+    String historyKey(StatEntry entry) {
+      final canonical = canonicalPuzzleKey(entry.puzzleLine);
+      return '${entry.finished ?? "unfinished"}|$canonical';
+    }
+
     final raw = await _readRawStatsFromStorage();
     final Map<String, String> byKey = {};
     for (final line in raw) {
       final entry = StatEntry.parse(line);
       if (entry == null) continue;
-      byKey[canonicalPuzzleKey(entry.puzzleLine)] = line;
+      byKey[historyKey(entry)] = line;
     }
     final fromSession = getStats();
     for (final line in fromSession) {
       final entry = StatEntry.parse(line);
       if (entry == null) continue;
-      byKey[canonicalPuzzleKey(entry.puzzleLine)] = line;
+      byKey[historyKey(entry)] = line;
     }
+    // Drop the lone unfinished row of any puzzle that also has a finished
+    // play: the completion supersedes the in-progress attempt / skip.
+    final finishedCanonicalKeys = <String>{};
+    for (final line in byKey.values) {
+      final entry = StatEntry.parse(line);
+      if (entry?.finished != null) {
+        finishedCanonicalKeys.add(canonicalPuzzleKey(entry!.puzzleLine));
+      }
+    }
+    byKey.removeWhere((key, line) {
+      if (!key.startsWith('unfinished|')) return false;
+      final entry = StatEntry.parse(line);
+      if (entry == null) return false;
+      return finishedCanonicalKeys.contains(
+        canonicalPuzzleKey(entry.puzzleLine),
+      );
+    });
     final merged = byKey.values.toList()..sort();
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();

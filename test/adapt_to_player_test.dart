@@ -502,11 +502,20 @@ void main() {
     // loaded `puzzles` list), so a returning player who has played 100
     // puzzles in another collection still sees the badge as soon as
     // they switch collections — no need to grind 10 plays again.
-    List<String> nFinishedStatLines(int n) => List.generate(
-      n,
-      (i) =>
-          '2026-01-0${(i % 9) + 1}T12:00:00 30s 0f v2_12_4x4_0000000000000000_FM:1_0:0_$i',
-    );
+    //
+    // Each line must be a genuinely distinct puzzle: `loadStats` now
+    // collapses the full play history to one entry per canonical key, so
+    // lines that differ only by the trailing complexity field (which
+    // `canonicalPuzzleKey` drops) would all fold into a single play. We
+    // vary the grid height instead — a structural field that survives
+    // canonicalization and can't alias another via rotation (rotation
+    // preserves the {w, h} set).
+    List<String> nFinishedStatLines(int n) => List.generate(n, (i) {
+      final height = i + 4;
+      final prefill = '0' * (4 * height);
+      return '2026-01-0${(i % 9) + 1}T12:00:00 30s 0f '
+          'v2_12_4x${height}_${prefill}_FM:1_0:0_$i';
+    });
 
     const enough = 40;
 
