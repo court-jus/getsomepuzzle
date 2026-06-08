@@ -171,7 +171,7 @@ void main() {
       );
       for (var i = 0; i < live.cells.length; i++) {
         if (live.cells[i].readonly) continue; // given cell, already set
-        final taps = solution![i]; // 2-colour: 1 or 2
+        final taps = solution![i].index; // free=0, black=1, white=2
         for (var t = 0; t < taps; t++) {
           await tester.tap(find.byType(CellWidget).at(i));
           await tester.pump();
