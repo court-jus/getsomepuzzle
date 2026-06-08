@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/utils/share_outcome.dart';
 import 'package:getsomepuzzle/utils/share_stub.dart'
@@ -38,9 +39,17 @@ class _StatsPageState extends State<StatsPage> {
     final next = scope == _StatsScope.current
         ? widget.database.getStats()
         : await widget.database.getAllStats();
+    // Most recent play first for display (the persisted file stays sorted
+    // ascending). Decorate-sort-undecorate so each line is parsed once;
+    // unfinished rows (no completion stamp) sink to the bottom.
+    final decorated = [
+      for (final line in next) (StatEntry.parse(line)?.finished ?? '', line),
+    ];
+    decorated.sort((a, b) => b.$1.compareTo(a.$1));
+    final ordered = [for (final d in decorated) d.$2];
     if (!mounted) return;
     setState(() {
-      stats = next;
+      stats = ordered;
       loading = false;
     });
   }

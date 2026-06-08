@@ -199,5 +199,23 @@ void main() {
       db.notePuzzleCompleted(PuzzleData(_twoColourLine));
       expect(db.postOnboardingCompletions, 2);
     });
+
+    test('replaying a puzzle does not inflate postOnboardingCompletions', () {
+      // The stats file now keeps every play (keep-history), but the
+      // post-onboarding counter must still reflect distinct puzzles, not
+      // replays. loadStats collapses the history per canonical key
+      // (Phase 1) before counting (Phase 2), so five finished plays of one
+      // puzzle backfill the counter to 1, not 5.
+      final db = Database(playerLevel: 0);
+      db.onboardingCompletedAt = DateTime(2026, 1, 1);
+      db.postOnboardingCompletions = 0;
+      final replays = [
+        for (var i = 0; i < 5; i++)
+          '2026-02-0${i + 1}T12:00:00 30s 0f $_twoColourLine'
+              ' - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg',
+      ];
+      db.loadStats(replays);
+      expect(db.postOnboardingCompletions, 1);
+    });
   });
 }

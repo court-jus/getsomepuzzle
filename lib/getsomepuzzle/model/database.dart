@@ -1274,7 +1274,13 @@ class Database {
   /// are dropped once a finished play exists for that puzzle, mirroring the
   /// old "completion replaces the attempt" behaviour and keeping the file
   /// free of noise the analysis pipeline ignores anyway.
-  Future<void> writeStats() async {
+  /// Build the deduplicated stat history shared by [writeStats] (persisted
+  /// back to disk) and [getAllStats] (shown / exported in the stats page):
+  /// every stored line plus the current session's plays, keyed by
+  /// `(canonical key, completion stamp)` so each distinct play survives,
+  /// with the lone unfinished row of a puzzle dropped once it has a
+  /// finished play. The session is folded in last so it wins on conflict.
+  Future<List<String>> _mergedStatHistory() async {
     // A play is identified by its completion timestamp. Unfinished plays
     // (finished == null) share a single per-puzzle slot.
     String historyKey(StatEntry entry) {
@@ -1312,7 +1318,11 @@ class Database {
         canonicalPuzzleKey(entry.puzzleLine),
       );
     });
-    final merged = byKey.values.toList()..sort();
+    return byKey.values.toList()..sort();
+  }
+
+  Future<void> writeStats() async {
+    final merged = await _mergedStatHistory();
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList("stats", merged);
@@ -2153,29 +2163,19 @@ class Database {
     return validLines.length;
   }
 
-  /// Every persisted stat line across **all** collections, deduplicated by
-  /// canonical puzzle key (the same key used by [loadStats] so legacy lines
-  /// embedding a stale `cplx` still collapse with the current line).
+  /// Every persisted stat line across **all** collections — the full play
+  /// history, deduplicated by `(canonical key, completion stamp)` via the
+  /// shared [_mergedStatHistory] (the same set [writeStats] persists). So
+  /// viewing / exporting the "all" scope surfaces every play of a puzzle,
+  /// not just the latest — that's the channel a mobile player uses to get
+  /// their history out for analysis.
   ///
   /// In-session plays from the currently-loaded collection are folded in
   /// last so they take precedence over any older snapshot still on disk —
   /// otherwise viewing or sharing right after finishing a puzzle would
   /// surface its previous entry (or nothing) instead of the just-recorded
   /// timings.
-  Future<List<String>> getAllStats() async {
-    final raw = await _readRawStatsFromStorage();
-    final Map<String, String> byKey = {};
-    for (final line in raw) {
-      final entry = StatEntry.parse(line);
-      if (entry == null) continue;
-      byKey[canonicalPuzzleKey(entry.puzzleLine)] = line;
-    }
-    for (final puz in puzzles.where((p) => p.played)) {
-      byKey[canonicalPuzzleKey(puz.lineRepresentation)] = puz.getStat();
-    }
-    final result = byKey.values.toList()..sort();
-    return result;
-  }
+  Future<List<String>> getAllStats() => _mergedStatHistory();
 
   String _playlistFileName(String slug) =>
       slug == 'custom' ? 'custom.txt' : 'playlist_$slug.txt';

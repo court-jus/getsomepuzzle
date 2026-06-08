@@ -204,5 +204,29 @@ void main() {
         expect(puz.finished, DateTime(2026, 5, 11, 17, 55, 49));
       },
     );
+
+    test('getAllStats exposes the full history, not one row per puzzle', () async {
+      // The "all" scope of the stats page (view + share) must surface every
+      // play of a puzzle — that is the channel a mobile player uses to get
+      // their preserved history out for analysis. Two finished plays of the
+      // same puzzle on disk must both come back.
+      const puzzleLine =
+          'v2_12_3x3_000020020_FM:1.1;GS:0.1;PA:3.right;PA:8.left_1:122221122_8';
+      const play1 =
+          '2025-01-01T00:00:00 99s 9f $puzzleLine - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg';
+      const play2 =
+          '2026-05-11T17:55:49 17s 0f $puzzleLine - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg';
+      statsFile.writeAsStringSync('$play1\n$play2');
+
+      final db = Database(playerLevel: 50);
+      db.collection = '1-easy';
+      db.puzzles = []; // nothing in memory: pure on-disk history readback
+
+      final all = await db.getAllStats();
+      final lines = all.where((l) => l.contains(puzzleLine)).toList();
+      expect(lines, hasLength(2));
+      expect(lines.any((l) => l.contains('99s 9f')), isTrue);
+      expect(lines.any((l) => l.contains('17s 0f')), isTrue);
+    });
   });
 }
