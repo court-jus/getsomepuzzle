@@ -536,12 +536,13 @@ void main() {
     });
 
     test('returns recommended key when it differs from current', () {
-      // playerLevel 80 → mad ('6-mad'). Player is in '2-player'.
+      // playerLevel 80 → mad, but the player is in '2-player' (index 1).
+      // The ±1 gradual clamp caps the suggestion one tier up → '3-advanced'.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
       db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
       db.loadStats(nFinishedStatLines(enough));
-      expect(db.recommendedCollectionKey, '6-mad');
+      expect(db.recommendedCollectionKey, '3-advanced');
     });
 
     test('counts plays globally — the loaded `puzzles` list is irrelevant', () {
@@ -555,7 +556,8 @@ void main() {
       db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
       db.puzzles = []; // nothing loaded in memory
       db.loadStats(nFinishedStatLines(enough));
-      expect(db.recommendedCollectionKey, '6-mad');
+      // playerLevel 80 → mad, clamped to one tier above '2-player'.
+      expect(db.recommendedCollectionKey, '3-advanced');
     });
 
     test('notePuzzleCompleted clears the gate during a session', () {
@@ -583,27 +585,49 @@ void main() {
         db.notePuzzleCompleted(puz);
       }
       expect(db.currentPhase, null);
-      expect(db.recommendedCollectionKey, '6-mad');
+      // playerLevel 80 → mad, clamped to one tier above '2-player'.
+      expect(db.recommendedCollectionKey, '3-advanced');
     });
 
     test('null while still in a strict onboarding phase', () {
-      // A fast learner could otherwise see a "try 6-mad" suggestion at
-      // the end of their first batch even though they've barely met
-      // FM. The recommendation is suppressed for the whole strict
-      // window (P0-P3) regardless of how high `playerLevel` climbs.
+      // A fast learner could otherwise see a level-up suggestion at the
+      // end of their first batch even though they've barely met FM. The
+      // recommendation is suppressed for the whole strict window (P0-P3)
+      // regardless of how high `playerLevel` climbs.
       final db = Database(playerLevel: 80);
       db.collection = '1-easy';
       db.loadStats(nFinishedStatLines(enough));
-      // When the onboarding is not done, even though player level says 6-mad.
+      // When the onboarding is not done, even though player level says mad.
       db.onboardingCompletions = {
         ...strictCompletionsUpTo(5),
         "RC": 4,
         "GS": 2,
       };
       expect(db.recommendedCollectionKey, isNull);
-      // Once across the strict boundary, recommendation resumes.
+      // Once across the strict boundary, recommendation resumes — but the
+      // ±1 clamp caps it one tier above '1-easy' → '2-player'.
       db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
-      expect(db.recommendedCollectionKey, '6-mad');
+      expect(db.recommendedCollectionKey, '2-player');
+    });
+
+    test('gradual clamp limits the suggestion to one tier up or down', () {
+      // The recommendation never jumps more than one tier from the
+      // currently played playlist, so a player climbs/descends gradually.
+      // Up: a very fast player on '1-easy' (playerLevel 80 → mad) is only
+      // nudged to '2-player', not straight to '6-mad'.
+      final up = Database(playerLevel: 80);
+      up.collection = '1-easy';
+      up.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+      up.loadStats(nFinishedStatLines(enough));
+      expect(up.recommendedCollectionKey, '2-player');
+
+      // Down: a slow player on '6-mad' (playerLevel 0 → beginner) is only
+      // stepped down to '5-expert', not straight to '1-easy'.
+      final down = Database(playerLevel: 0);
+      down.collection = '6-mad';
+      down.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+      down.loadStats(nFinishedStatLines(enough));
+      expect(down.recommendedCollectionKey, '5-expert');
     });
   });
 }

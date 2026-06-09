@@ -265,6 +265,23 @@ player lands on the `avance` / `balaise` boundary — half the time the
 suggestion will rotate them between those two paliers, which is the
 intended steady state for the typical user.
 
+### Gradual ±1 clamp
+
+`recommendedLevelFor` is a pure mapping and may return any palier; the
+gradual clamp lives in `recommendedCollectionKey` because only that
+getter knows the active collection. The recommendation is bounded to
+one tier above or below the currently played playlist: a very fast
+player on `1-easy` is nudged to `2-player`, never sent straight to
+`6-mad`. Because the getter is re-evaluated at every batch boundary
+and `playerLevel` is refreshed each time, a consistently fast player
+still climbs one palier per batch up to their natural level — the
+progression is gradual rather than a single large jump.
+
+The reference tier comes from `playableCollectionKeyToLevel[collection]`.
+When the active collection is not a playable level (`custom`, `user_*`,
+or the tutorial) there is no reference palier, so the unclamped
+recommendation is kept.
+
 A "closest median" rule was considered but rejected: corpus medians
 for `avance` (36), `balaise` (39), and `expert` (37) are not
 monotonic, so a closest-median assignment would flip erratically in

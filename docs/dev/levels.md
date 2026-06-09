@@ -220,8 +220,10 @@ The six tiers tie into the adaptation system described in
   user playlists are not capped.
 - **Recommendation**: `Database.recommendedCollectionKey` maps
   `playerLevel` (0..100, anchored at 50) to a tier via fixed thresholds
-  (`recommendedLevelFor` in `level.dart`). Surfaced as a star in the
-  `open_page` dropdown and as a "Try X" button in `EndOfPlaylist`.
+  (`recommendedLevelFor` in `level.dart`), then clamps the result to one
+  tier above or below the currently played playlist so the suggestion
+  only ever moves the player ±1 level at a time. Surfaced as a star in
+  the `open_page` dropdown and as a "Try X" button in `EndOfPlaylist`.
 - **Continue / Switch**: at every batch end, `EndOfPlaylist` offers
   continuing in the current collection (a new batch of 20) or
   switching to the recommended one. The player keeps control — the app

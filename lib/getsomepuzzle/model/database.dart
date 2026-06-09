@@ -1316,7 +1316,27 @@ class Database {
   String? get recommendedCollectionKey {
     if (currentPhase != null) return null;
     if (_globalUsablePlays < _minPlaysForRecommendation) return null;
-    final level = recommendedLevelFor(playerLevel);
+
+    var level = recommendedLevelFor(playerLevel);
+
+    // Gradual progression: never suggest a jump of more than one level above
+    // or below the currently played playlist. Without this clamp a fast
+    // player on 1-easy could be sent straight to 6-mad. Since this getter is
+    // re-evaluated at every end-of-batch, a consistently fast player still
+    // climbs one tier per batch up to their natural level. The clamp lives
+    // here (not in the pure `recommendedLevelFor`) because only this getter
+    // knows the current collection. When the active collection is not a
+    // playable level (custom/user_*/tutorial) there is no reference tier, so
+    // the unclamped recommendation is kept.
+    final currentLevel = playableCollectionKeyToLevel[collection];
+    if (currentLevel != null) {
+      final clampedIndex = level.index.clamp(
+        currentLevel.index - 1,
+        currentLevel.index + 1,
+      );
+      level = PuzzleLevel.values[clampedIndex];
+    }
+
     final key = levelToPlayableCollectionKey[level];
     return (key == null || key == collection) ? null : key;
   }
