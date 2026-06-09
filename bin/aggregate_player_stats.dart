@@ -36,6 +36,7 @@
 import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
@@ -123,7 +124,7 @@ void main(List<String> args) {
         pf[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
         pf[6] = '${puzzle.cachedComplexity}';
         if (puzzle.cachedSolution != null) {
-          pf[5] = '1:${puzzle.cachedSolution!.join('')}';
+          pf[5] = '1:${puzzle.cachedSolution!.map(cellValueToString).join('')}';
         }
         puzzleLine = pf.join('_');
         recomputed++;

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
@@ -231,7 +232,9 @@ void _processFile(
       // fields 5/6 from the post-sort computation.
       fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
       final sol = puzzle.cachedSolution;
-      fields[5] = sol != null ? '1:${sol.join('')}' : '0:0';
+      fields[5] = sol != null
+          ? '1:${sol.map(cellValueToString).join('')}'
+          : '0:0';
       fields[6] = '$newCplx';
       output.add(fields.join('_'));
 
@@ -499,7 +502,9 @@ void _routeFiles({
 
         fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
         final sol = puzzle.cachedSolution;
-        fields[5] = sol != null ? '1:${sol.join('')}' : '0:0';
+        fields[5] = sol != null
+            ? '1:${sol.map(cellValueToString).join('')}'
+            : '0:0';
         fields[6] = '${puzzle.cachedComplexity}';
         final outLine = fields.join('_');
 

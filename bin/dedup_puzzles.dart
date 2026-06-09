@@ -15,6 +15,7 @@
 import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
@@ -88,7 +89,9 @@ void _processFile(String path, String? outputPath) {
       // Re-emit field 4 from the in-memory sorted constraint list;
       // replace fields 5/6 from the fresh complexity computation.
       fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
-      fields[5] = sol != null ? '1:${sol.join('')}' : '0:0';
+      fields[5] = sol != null
+          ? '1:${sol.map(cellValueToString).join('')}'
+          : '0:0';
       fields[6] = '${puzzle.cachedComplexity}';
       output.add(fields.join('_'));
       kept++;

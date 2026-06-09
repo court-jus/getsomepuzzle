@@ -48,7 +48,7 @@ void _printGrid(Puzzle p) {
     final row = <String>[];
     for (int c = 0; c < p.width; c++) {
       final v = p.cellValues[r * p.width + c];
-      row.add(v == CellValue.free ? '.' : v.toString());
+      row.add(v == CellValue.free ? '.' : cellValueToString(v));
     }
     print('  ${row.join(' ')}');
   }
