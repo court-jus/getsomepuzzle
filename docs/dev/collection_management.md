@@ -16,8 +16,13 @@ records design decisions about the corpus as a whole.
 | `assets/4-strong.txt`         | Strong — complex complicities (tier ≥ 4), no force                |
 | `assets/5-expert.txt`         | Expert — exactly 1 force round, depth ≤ 5                         |
 | `assets/6-mad.txt`            | Mad — ≥ 2 force rounds or depth > 5                               |
-| `assets/overfilled-easy.txt`  | Beginner-by-trace puzzles whose prefill ratio > 30 %              |
-| `assets/overfilled.txt`       | Higher-tier puzzles whose prefill ratio > 30 %                    |
+| `assets/1-easy-overfilled.txt`     | Beginner-by-trace puzzles whose prefill ratio > 30 %         |
+| `assets/2-player-overfilled.txt`   | Player-by-trace, prefill > 30 %                              |
+| `assets/3-advanced-overfilled.txt` | Advanced-by-trace, prefill > 30 %                            |
+| `assets/4-strong-overfilled.txt`   | Strong-by-trace, prefill > 30 %                              |
+| `assets/5-expert-overfilled.txt`   | Expert-by-trace, prefill > 30 %                              |
+| `assets/6-mad-overfilled.txt`      | Mad-by-trace, prefill > 30 %                                 |
+| `assets/overfilled.txt`            | Legacy bucket (pre-split); redistributed by `--route`        |
 
 Routing is by `classifyTrace` (`lib/getsomepuzzle/level.dart`), not by
 declared slugs. See `levels.md` for the cascade.
@@ -28,16 +33,17 @@ declared slugs. See `levels.md` for the cascade.
 |---------------------------------------|--------------------------------------------------------------|
 | `bin/generate.dart`                   | Generate new puzzles, validate / re-validate existing ones   |
 | `bin/maintain.dart`                   | Full periodic-maintenance pipeline (6 steps, apply mode)     |
-| `bin/recompute.dart`                  | Re-sort constraints, refresh stored cplx, re-route by level  |
+| `bin/recompute.dart`                  | Re-sort constraints, refresh stored cplx, re-route by level; writes `solve_traces.tsv` |
 | `bin/dedup_puzzles.dart`              | Drop puzzles that are exact duplicates (canonical key match) |
 | `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated / MJ-border-conflict puzzles |
-| `bin/vectorize_puzzles.dart`          | Produce per-puzzle feature vector CSV                        |
+| `bin/vectorize_puzzles.dart`          | Produce per-puzzle feature vector CSV (reads `solve_traces.tsv`) |
 | `bin/cluster_puzzles.dart`            | Find near-duplicate pairs/clusters (report or --apply mode)  |
 | `bin/extract_onboarding.dart`         | Build a diverse onboarding bank from 1-easy                  |
-| `bin/classify_difficulty.dart`        | Classify each puzzle into the level cascade                  |
+| `bin/classify_difficulty.dart`        | Classify each puzzle into the level cascade (reads `solve_traces.tsv`) |
 | `bin/aggregate_player_stats.dart`     | Merge per-player stats files, dedup, refresh cplx            |
 | `bin/analyze_stats.dart`              | OLS regression on log(duration), per-bucket stats            |
-| `bin/remark_scenarios.dart`           | Tag legacy v2 lines with `_scenario:<name>` (one-shot fix)   |
+| `bin/remark_scenarios.dart`           | Tag legacy v2 lines with `_scenario:<name>` (reads `solve_traces.tsv`) |
+| `bin/trace_score.dart`                | Score puzzles by trace quality (reads `solve_traces.tsv`)    |
 | `bin/query_corpus.dart`               | Ad-hoc filtered queries over `assets/*.txt` (read-only)      |
 | `bin/plot_vectors.py`                 | 2-D PCA projection of the vectors (matplotlib + numpy)       |
 
@@ -122,6 +128,62 @@ so an interrupted `--route` can be resumed by simply re-launching.
 useful to see how a new complexity tweak would shift the cascade
 before committing to it.
 
+## Solve trace cache (`solve_traces.tsv`)
+
+Running `solveExplained()` is the most expensive operation in the maintenance
+pipeline — it is called once per puzzle per tool, adding up to 6× per full
+`bin/maintain.dart` run. `solve_traces.tsv` is a local sidecar file that
+caches the post-sort solving trace of every puzzle so that all consumer tools
+can skip the solver entirely.
+
+### Format
+
+Tab-separated, three columns, no header:
+
+```
+puzzle_hash<TAB>canonical_key<TAB>trace
+```
+
+* **`puzzle_hash`** — FNV-1a 32-bit hash (7 base-36 chars) of
+  `domain_dims_prefill_sortedConstraints`. Changes automatically when the
+  puzzle identity or constraint set changes, invalidating the cached trace.
+* **`canonical_key`** — human-readable label (the `canonicalPuzzleKey` of the
+  post-sort v2 line). Not used for lookup; kept for debugging.
+* **`trace`** — semicolon-separated steps. Each step:
+  `type|cellIdx|val|tier|cp|fd|constraint`  
+  where `type ∈ {S, R, s, r}` (uppercase = propagation, lowercase = force;
+  S/s = SetValue, R/r = RemoveOption).
+
+### Writer: `bin/recompute.dart`
+
+`recompute` is the **only** writer of `solve_traces.tsv`. After sorting a
+puzzle's constraints it computes the hash and either reads the cached trace
+(cache hit → second `solveExplained()` skipped) or runs the solver and stores
+the result. The file is saved atomically once per run.
+
+### Consumers (read-only)
+
+`bin/vectorize_puzzles.dart`, `bin/cleanup_collections.dart` (`--boring`),
+`bin/classify_difficulty.dart`, `bin/remark_scenarios.dart`,
+`bin/trace_score.dart`, and `bin/dedup_puzzles.dart` all read the cache at
+startup. On a cache hit, `solveExplained()` is skipped entirely. On a miss
+they fall back to solving (except `dedup_puzzles.dart`, which trusts that
+`recompute` ran first and keeps the line verbatim with a warning).
+
+### Lifecycle
+
+The file is gitignored. Delete it to force a full re-solve:
+
+```bash
+rm -f solve_traces.tsv
+dart run bin/recompute.dart assets/*.txt   # repopulate
+```
+
+After a code change that alters the solver or complexity formula, deleting
+the cache ensures fresh traces. The hash-based invalidation handles
+per-puzzle identity changes automatically, but does **not** detect global
+formula changes — those require a manual `rm`.
+
 ## Pruning the corpus
 
 The cleanup pipeline has three layers, each independent.
@@ -146,7 +208,7 @@ its own flag, all run when none is passed):
   puzzles that appear with a `__D` (disliked) marker.
 * `--boring` — solve each puzzle, flag those where ≥ 90 % of moves
   are deduced by 1×2 / 2×1 FM constraints (the trivial-saturation
-  variants, weight 0 in `complexity.md`). 1-easy and overfilled-easy
+  variants, weight 0 in `complexity.md`). 1-easy and 1-easy-overfilled
   are exempt — the trivial saturation is *the lesson* there.
 * `--mj-conflict` — flag puzzles with two Majority (MJ) zones whose
   dashed borders would overlap visually (a shared flush edge with
@@ -193,7 +255,7 @@ n_constraints, cells, and prefill_ratio. Z-scored across the pool,
 clipped at ±5.
 
 The clustering empirically concentrates on `1-easy.txt` (~10 % at
-ε = 0.3) and `overfilled-easy.txt` (~5 %), with NC-only and
+ε = 0.3) and `1-easy-overfilled.txt` (~5 %), with NC-only and
 FM-only puzzles dominating the dropped clusters — see the
 "Why redundancy concentrates in the easy tier" section below.
 
@@ -554,7 +616,7 @@ dart run bin/cluster_puzzles.dart --top-k 1000 --output similar_pairs.txt
 ## Why redundancy concentrates in the easy tier
 
 Empirically, `--apply --max-distance 0.3` removes about 9 % of
-1-easy and 5 % of overfilled-easy, while every other collection
+1-easy and 5 % of 1-easy-overfilled, while every other collection
 loses well under 1 %. 4-strong has *zero* removals.
 
 The cause is structural, not a generator bug. The slug-axis target
@@ -564,7 +626,7 @@ GS (52 %) and NC (49 %) — NC is fourth, not the worst. But:
 
 * NC produces only tier-0 moves (counting neighbours is local), so
   every NC-heavy puzzle has an "easy" trace and is routed to
-  1-easy / overfilled-easy.
+  1-easy / 1-easy-overfilled.
 * A puzzle with one slug and tier-0 moves has a sparse vector — 1
   non-zero share out of 78. With many similar puzzles, the few
   non-zero dimensions can't keep them apart.

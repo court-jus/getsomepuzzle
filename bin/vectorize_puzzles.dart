@@ -35,6 +35,8 @@ import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
+import '_trace_cache.dart';
+
 const _collections = [
   'assets/1-easy.txt',
   'assets/2-player.txt',
@@ -42,8 +44,13 @@ const _collections = [
   'assets/4-strong.txt',
   'assets/5-expert.txt',
   'assets/6-mad.txt',
-  'assets/overfilled-easy.txt',
+  'assets/1-easy-overfilled.txt',
   'assets/overfilled.txt',
+  'assets/2-player-overfilled.txt',
+  'assets/3-advanced-overfilled.txt',
+  'assets/4-strong-overfilled.txt',
+  'assets/5-expert-overfilled.txt',
+  'assets/6-mad-overfilled.txt',
 ];
 
 // Stable, alphabetical slug list — defines the CSV column order so two
@@ -82,8 +89,13 @@ const Map<PuzzleLevel, int> _levelOrdinal = {
   PuzzleLevel.expert: 4,
   PuzzleLevel.mad: 5,
   PuzzleLevel.overfilledEasy: 6,
-  PuzzleLevel.overfilled: 7,
-  PuzzleLevel.undetermined: 8,
+  PuzzleLevel.overfilledPlayer: 7,
+  PuzzleLevel.overfilledAdvanced: 8,
+  PuzzleLevel.overfilledStrong: 9,
+  PuzzleLevel.overfilledExpert: 10,
+  PuzzleLevel.overfilledMad: 11,
+  PuzzleLevel.overfilled: 12,
+  PuzzleLevel.undetermined: 13,
 };
 
 void main(List<String> args) {
@@ -163,14 +175,32 @@ Options:
   final out = File(outputPath).openWrite();
   out.writeln(_csvHeader());
 
+  final cache = TraceCache.load(kTraceCachePath);
+  if (cache.isEmpty) {
+    stderr.writeln(
+      '  warn: no solve_traces.tsv found — run bin/recompute.dart first '
+      'to populate the cache and speed up vectorization.',
+    );
+  } else {
+    stderr.writeln('  Trace cache loaded: ${cache.size} entries');
+  }
+
   int processed = 0;
   int errors = 0;
   int unsolved = 0;
+  int cacheHits = 0;
   final sw = Stopwatch()..start();
 
   for (final entry in entries) {
     try {
-      final vec = _vectorize(entry, timeoutMs: timeoutMs);
+      final traceKey = traceKeyFromLine(entry.line);
+      final cachedSteps = cache.lookup(traceKey);
+      if (cachedSteps != null) cacheHits++;
+      final vec = _vectorize(
+        entry,
+        timeoutMs: timeoutMs,
+        cachedSteps: cachedSteps,
+      );
       if (vec == null) {
         unsolved++;
         if (verbose) stderr.writeln('  unsolved: ${entry.canonicalKey}');
@@ -192,7 +222,7 @@ Options:
   }
   stderr.writeln(
     '\r  done in ${sw.elapsed.inSeconds}s: '
-    '$processed processed, $errors errors, $unsolved unsolved      ',
+    '$processed processed, $cacheHits cache hits, $errors errors, $unsolved unsolved      ',
   );
 
   out.flush().then((_) => out.close());
@@ -250,7 +280,14 @@ class _Vector {
 
 /// Build a [_Vector] for one puzzle, or null if the puzzle can't be
 /// solved by propagation+force (it needs backtracking — out of scope).
-_Vector? _vectorize(_Entry entry, {required int timeoutMs}) {
+///
+/// [cachedSteps] — pre-computed trace from [TraceCache]. When non-null,
+/// `puzzle.solveExplained()` is skipped entirely.
+_Vector? _vectorize(
+  _Entry entry, {
+  required int timeoutMs,
+  List<SolveStep>? cachedSteps,
+}) {
   final puzzle = Puzzle(entry.line);
 
   // Static fields.
@@ -270,8 +307,8 @@ _Vector? _vectorize(_Entry entry, {required int timeoutMs}) {
   // field [6], so reading the cache is enough — no need to re-solve.
   final storedCplx = puzzle.cachedComplexity ?? -1;
 
-  // Trace.
-  final steps = puzzle.solveExplained(timeoutMs: timeoutMs);
+  // Trace — use cached steps when available.
+  final steps = cachedSteps ?? puzzle.solveExplained(timeoutMs: timeoutMs);
 
   // Tally per-(slug, tier) counts. Use the synthetic `CX` slug for
   // complicity steps — the `step.constraint` they carry is the slug of

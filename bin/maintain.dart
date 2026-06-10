@@ -16,7 +16,15 @@ const _playableLevels = [
   'assets/6-mad.txt',
 ];
 
-const _offCascade = ['assets/overfilled-easy.txt', 'assets/overfilled.txt'];
+const _offCascade = [
+  'assets/1-easy-overfilled.txt',
+  'assets/overfilled.txt',
+  'assets/2-player-overfilled.txt',
+  'assets/3-advanced-overfilled.txt',
+  'assets/4-strong-overfilled.txt',
+  'assets/5-expert-overfilled.txt',
+  'assets/6-mad-overfilled.txt',
+];
 
 const _allCollections = [..._playableLevels, ..._offCascade];
 

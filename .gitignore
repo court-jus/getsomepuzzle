@@ -71,3 +71,4 @@ backup
 docs/dev/devdocs.pdf
 tmp
 puzzle_vectors.csv
+solve_traces.tsv

@@ -9,14 +9,20 @@
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 /// Difficulty tier. The numeric ordering is meaningful only inside
-/// the "valid" range (beginner → mad); `overfilledEasy`,
-/// `overfilled` and `undetermined` are out-of-cascade buckets.
+/// the "valid" range (beginner → mad); the `overfilled*` and
+/// `undetermined` values are out-of-cascade buckets.
 ///
 /// `overfilledEasy` is the prefill-bucketed sibling of `beginner`:
 /// puzzles whose prefill ratio exceeds the cap but whose trace shape
 /// would otherwise put them in `beginner`. We split them out so the
 /// onboarding system can mix them into the entry-level catalog
 /// without pulling in genuinely-hard overfilled puzzles.
+///
+/// Each other in-cascade level has a corresponding `overfilled*`
+/// bucket (e.g. `overfilledPlayer` for player-by-trace puzzles whose
+/// prefill ratio exceeds the cap). `overfilled` is kept as a legacy
+/// fallback for entries already in the old `overfilled.txt` file;
+/// `--route` redistributes them into the per-level buckets.
 enum PuzzleLevel {
   beginner,
   player,
@@ -25,6 +31,11 @@ enum PuzzleLevel {
   expert,
   mad,
   overfilledEasy,
+  overfilledPlayer,
+  overfilledAdvanced,
+  overfilledStrong,
+  overfilledExpert,
+  overfilledMad,
   overfilled,
   undetermined,
 }
@@ -38,7 +49,12 @@ const Map<PuzzleLevel, String> levelFilenames = {
   PuzzleLevel.strong: '4-strong.txt',
   PuzzleLevel.expert: '5-expert.txt',
   PuzzleLevel.mad: '6-mad.txt',
-  PuzzleLevel.overfilledEasy: 'overfilled-easy.txt',
+  PuzzleLevel.overfilledEasy: '1-easy-overfilled.txt',
+  PuzzleLevel.overfilledPlayer: '2-player-overfilled.txt',
+  PuzzleLevel.overfilledAdvanced: '3-advanced-overfilled.txt',
+  PuzzleLevel.overfilledStrong: '4-strong-overfilled.txt',
+  PuzzleLevel.overfilledExpert: '5-expert-overfilled.txt',
+  PuzzleLevel.overfilledMad: '6-mad-overfilled.txt',
   PuzzleLevel.overfilled: 'overfilled.txt',
   PuzzleLevel.undetermined: 'undetermined.txt',
 };
@@ -75,7 +91,12 @@ const Map<PuzzleLevel, String> levelLabels = {
   PuzzleLevel.expert: 'Expert',
   PuzzleLevel.mad: 'Mad',
   PuzzleLevel.overfilledEasy: 'Overfilled (beginner)',
-  PuzzleLevel.overfilled: 'Overfilled',
+  PuzzleLevel.overfilledPlayer: 'Overfilled (player)',
+  PuzzleLevel.overfilledAdvanced: 'Overfilled (advanced)',
+  PuzzleLevel.overfilledStrong: 'Overfilled (strong)',
+  PuzzleLevel.overfilledExpert: 'Overfilled (expert)',
+  PuzzleLevel.overfilledMad: 'Overfilled (mad)',
+  PuzzleLevel.overfilled: 'Overfilled (legacy)',
   PuzzleLevel.undetermined: 'Undetermined',
 };
 
@@ -138,13 +159,19 @@ PuzzleLevel classifyTrace({
   }
 
   // Second pass: route puzzles past the prefill cap to the appropriate
-  // out-of-cascade bucket. Beginner-by-trace puzzles end up in
-  // `overfilledEasy` (mixed into onboarding); everything else ends up
-  // in plain `overfilled`.
+  // per-level overfilled bucket. Beginner-by-trace → overfilledEasy
+  // (mixed into onboarding); every other level gets its own bucket so
+  // the corpus can be split meaningfully for offline analysis.
   if (prefillRatio > maxPrefill) {
-    return traceLevel == PuzzleLevel.beginner
-        ? PuzzleLevel.overfilledEasy
-        : PuzzleLevel.overfilled;
+    return switch (traceLevel) {
+      PuzzleLevel.beginner => PuzzleLevel.overfilledEasy,
+      PuzzleLevel.player => PuzzleLevel.overfilledPlayer,
+      PuzzleLevel.advanced => PuzzleLevel.overfilledAdvanced,
+      PuzzleLevel.strong => PuzzleLevel.overfilledStrong,
+      PuzzleLevel.expert => PuzzleLevel.overfilledExpert,
+      PuzzleLevel.mad => PuzzleLevel.overfilledMad,
+      _ => PuzzleLevel.overfilled,
+    };
   }
   return traceLevel;
 }

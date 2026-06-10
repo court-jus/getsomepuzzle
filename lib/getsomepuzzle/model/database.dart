@@ -322,6 +322,13 @@ class CollectionLabels {
 
 class Database {
   List<PuzzleData> puzzles = [];
+
+  /// Fallback pool for the current collection: puzzles from the matching
+  /// `X-level-overfilled.txt` file. Populated by [_loadOverfilledFallback]
+  /// at every [loadPuzzlesFile] call. Never mixed into [puzzles] — only
+  /// consulted by [getPuzzlesByLevel] when the main pool is exhausted.
+  List<PuzzleData> _overfilledPuzzles = [];
+
   String collection = entryCollectionKey;
   Filters currentFilters = Filters();
   bool shouldShuffle = false;
@@ -336,6 +343,17 @@ class Database {
     '5-expert',
     '6-mad',
     'custom',
+  };
+
+  /// Maps each built-in level collection key to the filename of its
+  /// overfilled fallback asset. Used by [_loadOverfilledFallback].
+  static const _overfilledFilename = {
+    '1-easy': '1-easy-overfilled.txt',
+    '2-player': '2-player-overfilled.txt',
+    '3-advanced': '3-advanced-overfilled.txt',
+    '4-strong': '4-strong-overfilled.txt',
+    '5-expert': '5-expert-overfilled.txt',
+    '6-mad': '6-mad-overfilled.txt',
   };
 
   /// Slug of the entry-level collection — the default landing collection
@@ -791,14 +809,14 @@ class Database {
     preparePlaylist();
   }
 
-  /// Mix in puzzles from `assets/overfilled-easy.txt` into the catalog
+  /// Mix in puzzles from `assets/1-easy-overfilled.txt` into the catalog
   /// while the player is in onboarding on the entry-level collection.
   ///
   /// Why: phases 4 (DF) and 5 (CC) — and likely later phases — are
   /// extremely thin in `1-easy` because the generator naturally
   /// produces simple-rule, small-grid puzzles with high prefill (they
   /// classify as `overfilled` even when their solving trace is
-  /// beginner-level). `overfilled-easy.txt` holds exactly those
+  /// beginner-level). `1-easy-overfilled.txt` holds exactly those
   /// puzzles: `overfilled` by prefill ratio, `beginner` by trace
   /// shape — pedagogically appropriate for onboarding (high prefill
   /// = the rule does most of the work).
@@ -806,7 +824,7 @@ class Database {
   /// The split is decided at generation time by `classifyTrace`
   /// (cf. `lib/getsomepuzzle/level.dart`), so the runtime doesn't
   /// have to second-guess
-  /// classification on every load — anything in `overfilled-easy.txt`
+  /// classification on every load — anything in `1-easy-overfilled.txt`
   /// has been pre-filtered.
   ///
   /// Once the player graduates past the last defined phase
@@ -818,10 +836,10 @@ class Database {
     if (collection != entryCollectionKey) return;
     String content;
     try {
-      content = await rootBundle.loadString('assets/overfilled-easy.txt');
+      content = await rootBundle.loadString('assets/1-easy-overfilled.txt');
     } catch (e) {
       log.fine(
-        'overfilled-easy.txt missing, skipping onboarding augmentation: $e',
+        '1-easy-overfilled.txt missing, skipping onboarding augmentation: $e',
       );
       return;
     }
@@ -838,8 +856,39 @@ class Database {
       }
     }
     log.fine(
-      'Augmented onboarding catalog with $added overfilled-easy puzzles',
+      'Augmented onboarding catalog with $added 1-easy-overfilled puzzles',
     );
+  }
+
+  /// Load the overfilled fallback pool for the current collection.
+  /// Called at every [loadPuzzlesFile] so [_overfilledPuzzles] is always
+  /// in sync with [collection].
+  ///
+  /// The pool is left empty when:
+  /// - the collection has no overfilled mirror (custom, user_*, etc.)
+  /// - we are in the onboarding phase of `1-easy` (the mirror is already
+  ///   mixed into [puzzles] by [_augmentWithOverfilledIfOnboarding])
+  Future<void> _loadOverfilledFallback() async {
+    _overfilledPuzzles = [];
+    final filename = _overfilledFilename[collection];
+    if (filename == null) return;
+    if (collection == entryCollectionKey && currentPhase != null) return;
+    try {
+      final content = await rootBundle.loadString('assets/$filename');
+      for (final line in content.split('\n')) {
+        final t = line.trim();
+        if (t.isEmpty || t.startsWith('#')) continue;
+        try {
+          _overfilledPuzzles.add(PuzzleData(t));
+        } catch (_) {}
+      }
+      log.fine(
+        'Loaded ${_overfilledPuzzles.length} overfilled fallback puzzles '
+        'from $filename',
+      );
+    } catch (_) {
+      // Asset absent (new collection not yet populated) — no fallback.
+    }
   }
 
   /// Axe B (soft-discovery widening): when the player has cleared the strict
@@ -862,7 +911,7 @@ class Database {
     for (final entry in playableCollectionKeyToLevel.entries) {
       final lvl = entry.value.index;
       // Only the next level(s) up: the current collection (and its
-      // overfilled-easy augmentation) is already in [puzzles], and we must
+      // 1-easy-overfilled augmentation) is already in [puzzles], and we must
       // not serve a beginner a far-harder puzzle just to introduce a rule.
       if (lvl <= currentLevel.index ||
           lvl > currentLevel.index + softDiscoveryMaxLevelsAbove) {
@@ -1017,7 +1066,7 @@ class Database {
       _persistPostOnboardingCompletions();
     }
     log.finest("solved $solvedPuzzles");
-    for (final puz in puzzles) {
+    for (final puz in [...puzzles, ..._overfilledPuzzles]) {
       final entry = solvedPuzzles[canonicalPuzzleKey(puz.lineRepresentation)];
       if (entry == null) continue;
       puz.played = true;
@@ -1168,6 +1217,7 @@ class Database {
     }
     load(assetContent.split("\n"));
     await _augmentWithOverfilledIfOnboarding();
+    await _loadOverfilledFallback();
     await currentFilters.load();
     final stats = await _readRawStatsFromStorage();
     loadStats(stats);
@@ -1882,7 +1932,16 @@ class Database {
   List<PuzzleData> getPuzzlesByLevel(int level) {
     final mu = level + selectionOffset;
     final twoSigmaSq = 2 * selectionSigma * selectionSigma;
-    final filtered = filter().toList();
+    var filtered = filter().toList();
+
+    // Fallback: if the main collection is exhausted (all played, skipped, or
+    // filtered out), draw from the overfilled mirror — same filters apply so
+    // user preferences (rule bans, dimensions, etc.) are still honoured.
+    if (filtered.isEmpty && _overfilledPuzzles.isNotEmpty) {
+      filtered = _overfilledPuzzles.where(_matchesFilters).toList();
+    }
+
+    if (filtered.isEmpty) return const [];
     final varietyStats = _buildRecencyWeightedStats(filtered);
     // Only demote trivial GS puzzles while GS is the rule being introduced.
     final demoteTrivialGs = currentPhase?.introducing == 'GS';

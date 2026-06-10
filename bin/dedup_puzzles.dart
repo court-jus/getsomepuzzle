@@ -5,18 +5,20 @@
 // constraint set (ignoring order, exact-string duplicates, version
 // prefix, and the trailing solution / complexity / play-state fields).
 //
-// On collision we keep the first occurrence and drop the rest. The
-// kept line is re-solved and re-scored before being written, so the
-// output file's solution cache and complexity field reflect the current
-// algorithm — same role as `bin/recompute.dart`, combined here with
-// dedup so a single pass migrates a file fully.
+// On collision we keep the first occurrence and drop the rest.
+//
+// This tool assumes `bin/recompute.dart` has already been run: it does
+// not re-solve, re-sort, or re-score kept lines. It only removes
+// within-constraint-field duplicates via `dedupAndSortConstraints`
+// (a cheap string operation). If `solve_traces.tsv` is absent a warning
+// is emitted, but the tool proceeds — the output will lack re-sorting.
 //
 // Comments and blank lines are preserved verbatim (cf. `recompute.dart`).
 import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+
+import '_trace_cache.dart';
 
 void main(List<String> args) {
   String? outputPath;
@@ -48,6 +50,14 @@ void _processFile(String path, String? outputPath) {
     stderr.writeln('File not found: $path');
     exit(1);
   }
+  final cache = TraceCache.load(kTraceCachePath);
+  if (cache.isEmpty) {
+    stderr.writeln(
+      'warn: no solve_traces.tsv found — run bin/recompute.dart first. '
+      'Lines will not be re-sorted or re-scored.',
+    );
+  }
+
   final lines = file.readAsLinesSync();
   final output = <String>[];
   final sw = Stopwatch()..start();
@@ -69,30 +79,10 @@ void _processFile(String path, String? outputPath) {
       continue;
     }
     try {
-      // Dedup the constraints string (TX strip + exact duplicates),
-      // parse, then reorder by real-trace cplx before emitting. The
-      // intermediate lex order from `dedupAndSortConstraints` is
-      // harmless: it gets overwritten by the in-memory sort below.
+      // Remove duplicate constraint entries within the constraint field —
+      // cheap string operation, no solve needed.
       final fields = line.split('_');
       fields[4] = dedupAndSortConstraints(fields[4]);
-      final puzzle = Puzzle(fields.join('_'));
-      // Single trace fed to the sort; `computeComplexity` does its
-      // own internal solve, so the total cost here is two solves
-      // per puzzle — acceptable for a one-shot maintenance tool.
-      final sortSteps = puzzle.solveExplained();
-      puzzle.sortConstraintsByDifficulty(sortSteps);
-      // `force: true` ignores the value the Puzzle constructor loaded
-      // from the v2 line — we just sorted the constraints, so the
-      // stored cplx is stale.
-      puzzle.computeComplexity(force: true);
-      final sol = puzzle.cachedSolution;
-      // Re-emit field 4 from the in-memory sorted constraint list;
-      // replace fields 5/6 from the fresh complexity computation.
-      fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
-      fields[5] = sol != null
-          ? '1:${sol.map(cellValueToString).join('')}'
-          : '0:0';
-      fields[6] = '${puzzle.cachedComplexity}';
       output.add(fields.join('_'));
       kept++;
       if (kept % 100 == 0) {

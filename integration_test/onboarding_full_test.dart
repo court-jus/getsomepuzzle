@@ -20,7 +20,7 @@ import 'helpers/harness.dart';
 /// Boots `MyApp` from a clean install (no locale, no `constraintFirstSeen`)
 /// and plays exactly what a brand-new beginner sees: the language chooser,
 /// the welcome modal, then puzzle after puzzle on the genuine onboarding
-/// corpus (the app loads its own `1-easy` collection + the `overfilled-easy`
+/// corpus (the app loads its own `1-easy` collection + the `1-easy-overfilled`
 /// augmentation — we do **not** inject a corpus, and we never switch to
 /// another collection). Each puzzle is solved in-game by tapping its cells
 /// to the unique solution the hint engine deduces (`Puzzle.solve`), and every

@@ -5,6 +5,8 @@ import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
+import '_trace_cache.dart';
+
 void main(List<String> args) {
   final positional = <String>[];
   int? sample;
@@ -29,6 +31,8 @@ void main(List<String> args) {
     }
   }
 
+  final cache = TraceCache.load(kTraceCachePath);
+
   if (route) {
     // --route default: redistribute every puzzle from the six
     // playable-level files into the file matching its post-sort
@@ -40,18 +44,27 @@ void main(List<String> args) {
       sample: sample,
       verbose: verbose,
       sources: positional,
+      cache: cache,
     );
+    cache.save(kTraceCachePath);
     return;
   }
 
-  if (positional.isEmpty) {
-    _printUsage();
-    exit(1);
-  }
+  final targets = positional.isEmpty ? _allDefaultPaths : positional;
 
-  for (final path in positional) {
-    _processFile(path, sample: sample, dryRun: dryRun, verbose: verbose);
+  for (final path in targets) {
+    _processFile(
+      path,
+      sample: sample,
+      dryRun: dryRun,
+      verbose: verbose,
+      cache: cache,
+    );
   }
+  cache.save(kTraceCachePath);
+  stderr.writeln(
+    'Trace cache: ${cache.size} entries saved to $kTraceCachePath',
+  );
 }
 
 const _playableLevelPaths = [
@@ -63,13 +76,35 @@ const _playableLevelPaths = [
   'assets/6-mad.txt',
 ];
 
+// Default set: the 6 playable levels interleaved with their overfilled
+// counterparts, used when recompute is invoked with no positional args.
+final _allDefaultPaths = [
+  PuzzleLevel.beginner,
+  PuzzleLevel.overfilledEasy,
+  PuzzleLevel.player,
+  PuzzleLevel.overfilledPlayer,
+  PuzzleLevel.advanced,
+  PuzzleLevel.overfilledAdvanced,
+  PuzzleLevel.strong,
+  PuzzleLevel.overfilledStrong,
+  PuzzleLevel.expert,
+  PuzzleLevel.overfilledExpert,
+  PuzzleLevel.mad,
+  PuzzleLevel.overfilledMad,
+].map((l) => 'assets/${levelFilenames[l]!}').toList();
+
 void _printUsage() {
   stderr.writeln('''
-Usage: dart run bin/recompute.dart [options] <file1> [file2] ...
+Usage: dart run bin/recompute.dart [options] [file1 [file2 ...]]
 
 For each puzzle line: dedup constraints, re-parse, sort constraints
 by real-trace min cplx (`Puzzle.sortConstraintsByDifficulty`),
 re-compute the complexity score, and emit the result.
+
+If no files are given, all 12 default files are processed in order:
+  assets/1-easy.txt, assets/1-easy-overfilled.txt,
+  assets/2-player.txt, assets/2-player-overfilled.txt, …
+  assets/6-mad.txt,  assets/6-mad-overfilled.txt
 
 Options:
   --sample N    Process only the first N non-empty puzzles per file.
@@ -110,6 +145,7 @@ void _processFile(
   int? sample,
   required bool dryRun,
   required bool verbose,
+  required TraceCache cache,
 }) {
   final file = File(path);
   if (!file.existsSync()) {
@@ -173,11 +209,19 @@ void _processFile(
       fields[4] = dedupedConstraintsField;
       final puzzle = Puzzle(fields.join('_'));
 
-      // Step 2 — pre-sort trace. We classify it now so we can later
-      // attribute level changes specifically to the sort (vs to any
-      // other codebase shift, which would already show up here vs the
-      // file's expected level).
-      final preSortSteps = puzzle.solveExplained();
+      // Step 2 — pre-sort trace. Check the cache first (key is computed before
+      // the sort mutates the constraint order). We classify it now so we can
+      // later attribute level changes specifically to the sort.
+      final preSortHash = traceKeyFromPuzzle(puzzle);
+      final cachedPreSort = cache.lookup(preSortHash);
+      final preSortSteps = cachedPreSort ?? puzzle.solveExplained();
+      if (cachedPreSort == null) {
+        cache.update(
+          preSortHash,
+          canonicalPuzzleKey(fields.join('_')),
+          preSortSteps,
+        );
+      }
       final prefillRatio =
           puzzle.cells.where((c) => c.readonly).length / puzzle.cells.length;
       final preSortLevel = classifyTrace(
@@ -187,20 +231,28 @@ void _processFile(
       );
 
       // Step 3 — sort (reusing the pre-sort trace as the signal) and
-      // re-classify on the post-sort trace.
+      // re-classify on the post-sort trace. After sorting, the
+      // constraint order is canonical — compute the trace key now and
+      // skip the second solve if the cache already has the answer.
       puzzle.sortConstraintsByDifficulty(preSortSteps);
-      final postSortSteps = puzzle.solveExplained();
+      final postSortHash = traceKeyFromPuzzle(puzzle);
+      final cachedPostSort = cache.lookup(postSortHash);
+      final postSortSteps = cachedPostSort ?? puzzle.solveExplained();
+      if (cachedPostSort == null) {
+        cache.update(
+          postSortHash,
+          canonicalPuzzleKey(fields.join('_')),
+          postSortSteps,
+        );
+      }
       final postSortLevel = classifyTrace(
         steps: postSortSteps,
         prefillRatio: prefillRatio,
         solved: true,
       );
 
-      // Step 4 — recompute the cplx score. Single internal solve.
-      // `force: true` bypasses the cached value the Puzzle constructor
-      // loaded from the line's field [6] — recompute's entire purpose
-      // is to re-derive that value from scratch.
-      puzzle.computeComplexity(force: true);
+      // Step 4 — recompute the cplx score from the cached trace (no extra solve).
+      puzzle.computeComplexityFromSteps(postSortSteps);
       final newCplx = puzzle.cachedComplexity ?? -1;
 
       processed++;
@@ -238,8 +290,9 @@ void _processFile(
       fields[6] = '$newCplx';
       output.add(fields.join('_'));
 
-      if (processed % 100 == 0) {
+      if (processed % 2000 == 0) {
         stderr.write('\r$path: $processed puzzles processed...');
+        cache.save(kTraceCachePath);
       }
     } catch (e) {
       stderr.writeln('\nError on line ${i + 1}: $e');
@@ -297,6 +350,11 @@ String _fmtHistogram(Map<PuzzleLevel, int> hist) {
     PuzzleLevel.expert,
     PuzzleLevel.mad,
     PuzzleLevel.overfilledEasy,
+    PuzzleLevel.overfilledPlayer,
+    PuzzleLevel.overfilledAdvanced,
+    PuzzleLevel.overfilledStrong,
+    PuzzleLevel.overfilledExpert,
+    PuzzleLevel.overfilledMad,
     PuzzleLevel.overfilled,
     PuzzleLevel.undetermined,
   ];
@@ -335,6 +393,7 @@ void _routeFiles({
   int? sample,
   required bool verbose,
   List<String> sources = const [],
+  required TraceCache cache,
 }) {
   // When [sources] is non-empty, we route from an arbitrary feed
   // (not one of the six level files). In that mode, verbatim noise
@@ -481,7 +540,16 @@ void _routeFiles({
         fields[4] = dedupAndSortConstraints(fields[4]);
         final puzzle = Puzzle(fields.join('_'));
 
-        final preSortSteps = puzzle.solveExplained();
+        final preSortHash = traceKeyFromPuzzle(puzzle);
+        final cachedPreSort2 = cache.lookup(preSortHash);
+        final preSortSteps = cachedPreSort2 ?? puzzle.solveExplained();
+        if (cachedPreSort2 == null) {
+          cache.update(
+            preSortHash,
+            canonicalPuzzleKey(fields.join('_')),
+            preSortSteps,
+          );
+        }
         final prefillRatio =
             puzzle.cells.where((c) => c.readonly).length / puzzle.cells.length;
         final preSortLevel = classifyTrace(
@@ -491,14 +559,23 @@ void _routeFiles({
         );
 
         puzzle.sortConstraintsByDifficulty(preSortSteps);
-        final postSortSteps = puzzle.solveExplained();
+        final postSortHash = traceKeyFromPuzzle(puzzle);
+        final cachedPostSort = cache.lookup(postSortHash);
+        final postSortSteps = cachedPostSort ?? puzzle.solveExplained();
+        if (cachedPostSort == null) {
+          cache.update(
+            postSortHash,
+            canonicalPuzzleKey(fields.join('_')),
+            postSortSteps,
+          );
+        }
         final postSortLevel = classifyTrace(
           steps: postSortSteps,
           prefillRatio: prefillRatio,
           solved: true,
         );
 
-        puzzle.computeComplexity(force: true);
+        puzzle.computeComplexityFromSteps(postSortSteps);
 
         fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
         final sol = puzzle.cachedSolution;
@@ -542,8 +619,9 @@ void _routeFiles({
         processedThisFile++;
         stats.processed++;
         newlyProcessed++;
-        if (stats.processed % 100 == 0) {
+        if (stats.processed % 2000 == 0) {
           stderr.write('\r$srcPath: ${stats.processed} new processed...');
+          cache.save(kTraceCachePath);
         }
       } catch (e) {
         if (external) continue;
@@ -632,6 +710,11 @@ List<String> _allPossibleTmpPaths() {
   // Off-cascade destinations from `levelFilenames`.
   for (final lvl in [
     PuzzleLevel.overfilledEasy,
+    PuzzleLevel.overfilledPlayer,
+    PuzzleLevel.overfilledAdvanced,
+    PuzzleLevel.overfilledStrong,
+    PuzzleLevel.overfilledExpert,
+    PuzzleLevel.overfilledMad,
     PuzzleLevel.overfilled,
     PuzzleLevel.undetermined,
   ]) {

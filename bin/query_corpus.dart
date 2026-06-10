@@ -31,8 +31,13 @@ const _rejectFiles = [
   'assets/cancelled.txt',
   'assets/noCandidates.txt',
   'assets/notUnique.txt',
-  'assets/overfilled-easy.txt',
+  'assets/1-easy-overfilled.txt',
   'assets/overfilled.txt',
+  'assets/2-player-overfilled.txt',
+  'assets/3-advanced-overfilled.txt',
+  'assets/4-strong-overfilled.txt',
+  'assets/5-expert-overfilled.txt',
+  'assets/6-mad-overfilled.txt',
   'assets/ratioTooHigh.txt',
 ];
 

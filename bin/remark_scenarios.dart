@@ -36,6 +36,8 @@ import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
+import '_trace_cache.dart';
+
 const List<String> _kStandardCollections = [
   'assets/1-easy.txt',
   'assets/2-player.txt',
@@ -43,8 +45,13 @@ const List<String> _kStandardCollections = [
   'assets/4-strong.txt',
   'assets/5-expert.txt',
   'assets/6-mad.txt',
-  'assets/overfilled-easy.txt',
+  'assets/1-easy-overfilled.txt',
   'assets/overfilled.txt',
+  'assets/2-player-overfilled.txt',
+  'assets/3-advanced-overfilled.txt',
+  'assets/4-strong-overfilled.txt',
+  'assets/5-expert-overfilled.txt',
+  'assets/6-mad-overfilled.txt',
 ];
 
 class _Thresholds {
@@ -160,6 +167,13 @@ void main(List<String> args) {
     timeoutMs: timeoutMs,
   );
 
+  final cache = TraceCache.load(kTraceCachePath);
+  if (cache.isEmpty) {
+    stderr.writeln(
+      'warn: no solve_traces.tsv — run bin/recompute.dart first to speed up scenario inference.',
+    );
+  }
+
   for (final input in effectiveInputs) {
     _processFile(
       input,
@@ -167,6 +181,7 @@ void main(List<String> args) {
       thresholds: thresholds,
       dryRun: dryRun,
       verbose: verbose,
+      cache: cache,
     );
   }
 }
@@ -208,6 +223,7 @@ void _processFile(
   required _Thresholds thresholds,
   required bool dryRun,
   required bool verbose,
+  required TraceCache cache,
 }) {
   final file = File(path);
   if (!file.existsSync()) {
@@ -252,7 +268,7 @@ void _processFile(
       continue;
     }
 
-    final result = _inferScenario(trimmed, thresholds);
+    final result = _inferScenario(trimmed, thresholds, cache: cache);
     switch (result.outcome) {
       case _Outcome.sh:
         markedSh++;
@@ -359,7 +375,11 @@ class _InferResult {
   });
 }
 
-_InferResult _inferScenario(String fullLine, _Thresholds t) {
+_InferResult _inferScenario(
+  String fullLine,
+  _Thresholds t, {
+  required TraceCache cache,
+}) {
   final topo = _parseTopology(fullLine);
   if (topo == null) return const _InferResult(_Outcome.classicTopo);
   if (topo.hasSh) return const _InferResult(_Outcome.sh);
@@ -374,7 +394,7 @@ _InferResult _inferScenario(String fullLine, _Thresholds t) {
     return const _InferResult(_Outcome.classicTopo);
   }
 
-  final metrics = _traceMetrics(fullLine, timeoutMs: t.timeoutMs);
+  final metrics = _traceMetrics(fullLine, timeoutMs: t.timeoutMs, cache: cache);
   if (metrics == null) {
     return const _InferResult(_Outcome.traceFailed);
   }
@@ -515,13 +535,23 @@ class _TraceMetrics {
 /// "interesting" counts in one pass. Returns null if the puzzle needs
 /// backtracking (mirrors `extract_path_like.dart:_traceMetrics`) or if
 /// the constructor / solver throws.
-_TraceMetrics? _traceMetrics(String line, {required int timeoutMs}) {
+_TraceMetrics? _traceMetrics(
+  String line, {
+  required int timeoutMs,
+  required TraceCache cache,
+}) {
   try {
     final puzzle = Puzzle(line);
-    final probe = puzzle.clone();
-    if (!probe.solve()) return null;
+    final traceKey = traceKeyFromLine(line);
+    final cachedSteps = cache.lookup(traceKey);
 
-    final steps = puzzle.solveExplained(timeoutMs: timeoutMs);
+    if (cachedSteps == null) {
+      // No cache — check for backtracking before paying the full solve cost.
+      final probe = puzzle.clone();
+      if (!probe.solve()) return null;
+    }
+
+    final steps = cachedSteps ?? puzzle.solveExplained(timeoutMs: timeoutMs);
     int totalProp = 0;
     int ltProp = 0;
     int syProp = 0;

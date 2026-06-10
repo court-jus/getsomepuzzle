@@ -68,6 +68,11 @@ bool _isStepTooHardFor(SolveStep step, PuzzleLevel target) {
       return step.method == SolveMethod.force && step.forceDepth > 5;
     case PuzzleLevel.mad:
     case PuzzleLevel.overfilledEasy:
+    case PuzzleLevel.overfilledPlayer:
+    case PuzzleLevel.overfilledAdvanced:
+    case PuzzleLevel.overfilledStrong:
+    case PuzzleLevel.overfilledExpert:
+    case PuzzleLevel.overfilledMad:
     case PuzzleLevel.overfilled:
     case PuzzleLevel.undetermined:
       return false;
@@ -1093,6 +1098,84 @@ class Puzzle {
     final forceScore = trace.effort.clamp(0, 90);
     cachedComplexity = (forceScore + ruleDiversity + emptiness).clamp(0, 100);
     return cachedComplexity!;
+  }
+
+  /// Compute [cachedComplexity] (and [cachedSolution]) directly from a
+  /// pre-existing solve trace, without running the solver again.
+  ///
+  /// Equivalent to [computeComplexity] but reuses [steps] instead of calling
+  /// [_solveEffort]. Use this in tools that already hold the post-sort trace
+  /// (e.g. from the solve-trace cache) to avoid a redundant solve.
+  void computeComplexityFromSteps(List<SolveStep> steps) {
+    final size = width * height;
+    final totalFree = freeCells().length;
+    if (totalFree == 0) {
+      cachedSolution = cellValues;
+      cachedComplexity = 0;
+      return;
+    }
+
+    // Replay the trace on a clone to verify completeness and recover the solution.
+    final test = clone();
+    bool failed = false;
+    outer:
+    for (final s in steps) {
+      switch (s) {
+        case SetValueStep(:final cellIdx, :final value):
+          test.setValue(cellIdx, value);
+        case RemoveOptionStep(:final cellIdx, :final option):
+          if (!test.removeOption(cellIdx, option)) {
+            failed = true;
+            break outer;
+          }
+      }
+    }
+
+    if (failed || !test.complete) {
+      cachedComplexity = 100;
+      return;
+    }
+    cachedSolution = test.cellValues;
+
+    // Accumulate effort using the same weights as _solveEffort.
+    int effort = 0;
+    for (final s in steps) {
+      switch (s) {
+        case SetValueStep(:final complexity):
+          effort += complexity;
+        case RemoveOptionStep(
+          :final complexity,
+          :final method,
+          :final forceDepth,
+        ):
+          effort += method == SolveMethod.force
+              ? (5 + 5 * forceDepth)
+              : complexity;
+      }
+    }
+
+    // Rule diversity and emptiness — same formulas as computeComplexity.
+    final ruleTypes = constraints
+        .map((c) => c.serialize().split(':').first)
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .length;
+    final int ruleDiversity;
+    if (ruleTypes <= 1) {
+      ruleDiversity = 0;
+    } else if (ruleTypes <= 3) {
+      ruleDiversity = ruleTypes - 1;
+    } else if (ruleTypes <= 5) {
+      ruleDiversity = 3;
+    } else {
+      ruleDiversity = 4;
+    }
+
+    final emptiness = (totalFree / size * 6).round();
+    cachedComplexity = (effort.clamp(0, 90) + ruleDiversity + emptiness).clamp(
+      0,
+      100,
+    );
   }
 
   /// Solve a clone with `findAMove` (propagation + force) and accumulate the

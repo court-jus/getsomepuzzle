@@ -1090,6 +1090,11 @@ class PuzzleGenerator {
       final target = config.targetLevel!;
       if (level == PuzzleLevel.overfilled ||
           level == PuzzleLevel.overfilledEasy ||
+          level == PuzzleLevel.overfilledPlayer ||
+          level == PuzzleLevel.overfilledAdvanced ||
+          level == PuzzleLevel.overfilledStrong ||
+          level == PuzzleLevel.overfilledExpert ||
+          level == PuzzleLevel.overfilledMad ||
           level == PuzzleLevel.undetermined) {
         onReject?.call(GenerationRejectReason.targetOutOfCascade, pu);
         return null;

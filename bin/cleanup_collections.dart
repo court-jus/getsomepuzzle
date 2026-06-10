@@ -45,6 +45,8 @@ import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
+import '_trace_cache.dart';
+
 const _collections = [
   'assets/1-easy.txt',
   'assets/2-player.txt',
@@ -52,14 +54,22 @@ const _collections = [
   'assets/4-strong.txt',
   'assets/5-expert.txt',
   'assets/6-mad.txt',
-  'assets/overfilled-easy.txt',
+  'assets/1-easy-overfilled.txt',
   'assets/overfilled.txt',
+  'assets/2-player-overfilled.txt',
+  'assets/3-advanced-overfilled.txt',
+  'assets/4-strong-overfilled.txt',
+  'assets/5-expert-overfilled.txt',
+  'assets/6-mad-overfilled.txt',
 ];
 
 // Collections exempt from the "boring" pass by default: beginners are
 // the audience these trivial-FM puzzles are written for, removing them
 // here would gut the onboarding catalog.
-const _exemptedFromBoring = {'assets/1-easy.txt', 'assets/overfilled-easy.txt'};
+const _exemptedFromBoring = {
+  'assets/1-easy.txt',
+  'assets/1-easy-overfilled.txt',
+};
 
 // Trivial-FM serializations: every 1×2 and 2×1 forbidden motif (two
 // cells side-by-side or stacked). Weight 0 in the complexity scale —
@@ -147,6 +157,16 @@ void main(List<String> args) {
     '  ${byKey.length} unique puzzles across ${byFile.length} collections',
   );
 
+  final cache = TraceCache.load(kTraceCachePath);
+  if (cache.isEmpty) {
+    stderr.writeln(
+      '  warn: no solve_traces.tsv found — boring pass will re-solve each puzzle. '
+      'Run bin/recompute.dart first to avoid this.',
+    );
+  } else {
+    stderr.writeln('  Trace cache loaded: ${cache.size} entries');
+  }
+
   // Each pass populates this set with canonical keys to drop. Applied
   // together at the end so a puzzle flagged by either pass is removed
   // exactly once.
@@ -166,7 +186,7 @@ void main(List<String> args) {
   if (a.runBoring) {
     stderr.writeln('');
     stderr.writeln('=== PASS 2: trivial-FM-dominated puzzles ===');
-    _reportAndCollectBoring(byKey, a, toRemove, reasons);
+    _reportAndCollectBoring(byKey, a, toRemove, reasons, cache: cache);
   }
 
   if (a.runMJConflict) {
@@ -320,8 +340,9 @@ void _reportAndCollectBoring(
   Map<String, _PuzzleLoc> byKey,
   _Args args,
   Set<String> toRemove,
-  Map<String, String> reasons,
-) {
+  Map<String, String> reasons, {
+  required TraceCache cache,
+}) {
   // Pre-filter by constraint slug: a puzzle with no trivial-FM
   // constraint can't be trivial-FM dominated, no need to solve it.
   final candidates = <String>[];
@@ -348,7 +369,7 @@ void _reportAndCollectBoring(
 
   for (final key in candidates) {
     final loc = byKey[key]!;
-    final ratio = _trivialFMRatio(loc.line, args);
+    final ratio = _trivialFMRatio(loc.line, args, cache: cache);
     processed++;
     if (ratio == null) {
       // Skipped: too few moves or solve failed. Not flagged.
@@ -458,10 +479,13 @@ bool _hasTrivialFM(String line) {
 /// attributed to a trivial-FM slug. Returns `null` when the puzzle
 /// has too few propagation moves to be meaningful, or when the
 /// solver couldn't finish — in both cases we don't flag the puzzle.
-double? _trivialFMRatio(String line, _Args args) {
+double? _trivialFMRatio(String line, _Args args, {required TraceCache cache}) {
   try {
     final puzzle = Puzzle(line);
-    final steps = puzzle.solveExplained(timeoutMs: args.timeoutMs);
+    final traceKey = traceKeyFromLine(line);
+    final steps =
+        cache.lookup(traceKey) ??
+        puzzle.solveExplained(timeoutMs: args.timeoutMs);
     int propMoves = 0;
     int trivialMoves = 0;
     for (final s in steps) {
@@ -539,7 +563,7 @@ Options:
                           "boring" (default 0.9)
   --boring-min-moves N    Skip puzzles with fewer propagation moves
                           (default 5) — too short to be meaningful
-  --no-exempt-easiest     Include 1-easy.txt and overfilled-easy.txt
+  --no-exempt-easiest     Include 1-easy.txt and 1-easy-overfilled.txt
                           in the boring pass (off by default — those
                           puzzles are *meant* to teach trivial-FM)
   --sample N              Cap the boring pass to N candidates (dev aid)

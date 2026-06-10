@@ -39,8 +39,13 @@ const _collections = [
   'assets/4-strong.txt',
   'assets/5-expert.txt',
   'assets/6-mad.txt',
-  'assets/overfilled-easy.txt',
+  'assets/1-easy-overfilled.txt',
   'assets/overfilled.txt',
+  'assets/2-player-overfilled.txt',
+  'assets/3-advanced-overfilled.txt',
+  'assets/4-strong-overfilled.txt',
+  'assets/5-expert-overfilled.txt',
+  'assets/6-mad-overfilled.txt',
 ];
 
 const _slugs = [

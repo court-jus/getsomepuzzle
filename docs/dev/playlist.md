@@ -103,7 +103,7 @@ Three observations matter:
 ### 3.1 New player, never touched filters — built-in `1-easy`, onboarding P0
 
 - `loadPuzzlesFile` loads `assets/1-easy.txt`, then augments with
-  `assets/overfilled-easy.txt` because `currentPhase != null` and
+  `assets/1-easy-overfilled.txt` because `currentPhase != null` and
   `collection == entryCollectionKey`. See
   `_augmentWithOverfilledIfOnboarding`.
 - `currentFilters` loaded from prefs, defaulting to

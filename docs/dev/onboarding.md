@@ -56,16 +56,16 @@ Two modes run back to back:
 
 10 phases × 5 puzzles = 50 introductory plays. Slug-envelope filter
 **plus** a hard requirement that the puzzle contains the phase's
-introducing slug. Source = `1-easy` ∪ `overfilled-easy`.
+introducing slug. Source = `1-easy` ∪ `1-easy-overfilled`.
 
-`overfilled-easy.txt` collects puzzles whose prefill exceeds
+`1-easy-overfilled.txt` collects puzzles whose prefill exceeds
 `defaultMaxPrefill` (30 %) **but** whose solving trace would be
 *beginner* — i.e. pedagogically simple puzzles that just happen to
 have many pre-filled cells. The distinction is decided by
 `classifyTrace` at generation time: depending on whether the puzzle's
 `traceLevel` is *beginner* or not, it is routed to
-`overfilled-easy.txt` or `overfilled.txt`. Every line in
-`overfilled-easy.txt` is therefore pedagogically appropriate by
+`1-easy-overfilled.txt` or `overfilled.txt`. Every line in
+`1-easy-overfilled.txt` is therefore pedagogically appropriate by
 construction.
 
 | Phase | Length | Introducing | Allowed slugs               |
@@ -169,7 +169,7 @@ without ever meeting them. Two mechanisms in `Database` fix this:
   soft-slug puzzles from the **next level collection(s) up**, capped at
   `softDiscoveryMaxLevelsAbove` (1) so a beginner meets a rule on a
   `2-player` puzzle, never a `6-mad` one. Entry (`1-easy` +
-  `overfilled-easy`, already in `puzzles`) plus the next level holds
+  `1-easy-overfilled`, already in `puzzles`) plus the next level holds
   ≥ a dozen eligible puzzles for every soft slug. The injection draws
   from the current collection first and falls back to this pool only
   when the collection offers fewer than `softElectedMinInCollection`
@@ -383,7 +383,7 @@ In the player settings:
   or a re-sort of `1-easy` doesn't invalidate the phase sequencing.
 - `bin/check_phase_coverage.dart` — per-phase coverage on the
   current corpus. Flags:
-  - no flag: strict coverage (P0–P9) on `1-easy ∪ overfilled-easy`.
+  - no flag: strict coverage (P0–P9) on `1-easy ∪ 1-easy-overfilled`.
   - `--per-level`: where phase-eligible puzzles land in each
     collection (useful after a generation run).
   - `--soft`: soft-filter coverage (≤ 1 unseen slug) at various

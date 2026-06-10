@@ -11,6 +11,8 @@ import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
+import '_trace_cache.dart';
+
 class TraceMetrics {
   final String line;
   final int totalSteps;
@@ -56,36 +58,43 @@ class TraceMetrics {
   bool get startOk => startPropSteps >= 1;
 }
 
-TraceMetrics scorePuzzle(String line, {int timeoutMs = 15000}) {
+TraceMetrics scorePuzzle(
+  String line, {
+  int timeoutMs = 15000,
+  TraceCache? cache,
+}) {
   final puzzle = Puzzle(line);
   final totalConstraints = puzzle.constraints.length;
 
-  // First, determine whether the puzzle is solvable by propagation+force
-  // alone. If not, it needs backtracking → disqualified.
-  final probe = puzzle.clone();
-  final solvedWithoutBT = probe.solve();
+  final traceKey = traceKeyFromLine(line);
+  final cachedSteps = cache?.lookup(traceKey);
 
-  if (!solvedWithoutBT) {
-    return TraceMetrics(
-      line: line,
-      totalSteps: 0,
-      propSteps: 0,
-      forceSteps: 0,
-      switches: 0,
-      maxCascade: 0,
-      distinctConstraints: 0,
-      totalConstraints: totalConstraints,
-      startPropSteps: 0,
-      forceDepthSum: 0,
-      forceDepthMax: 0,
-      needsBacktrack: true,
-      solved: false,
-      score: -100.0,
-      constraintUsage: const {},
-    );
+  if (cachedSteps == null) {
+    // No cache — determine whether the puzzle is solvable without backtracking.
+    final probe = puzzle.clone();
+    final solvedWithoutBT = probe.solve();
+    if (!solvedWithoutBT) {
+      return TraceMetrics(
+        line: line,
+        totalSteps: 0,
+        propSteps: 0,
+        forceSteps: 0,
+        switches: 0,
+        maxCascade: 0,
+        distinctConstraints: 0,
+        totalConstraints: totalConstraints,
+        startPropSteps: 0,
+        forceDepthSum: 0,
+        forceDepthMax: 0,
+        needsBacktrack: true,
+        solved: false,
+        score: -100.0,
+        constraintUsage: const {},
+      );
+    }
   }
 
-  final steps = puzzle.solveExplained(timeoutMs: timeoutMs);
+  final steps = cachedSteps ?? puzzle.solveExplained(timeoutMs: timeoutMs);
 
   int propSteps = 0;
   int forceSteps = 0;
@@ -216,6 +225,13 @@ void main(List<String> args) {
       .toList();
   stderr.writeln('Loaded ${allLines.length} puzzles from $filePath');
 
+  final cache = TraceCache.load(kTraceCachePath);
+  if (cache.isEmpty) {
+    stderr.writeln(
+      'warn: no solve_traces.tsv — run bin/recompute.dart first to speed up scoring.',
+    );
+  }
+
   final rng = Random(seed);
   final shuffled = List<String>.from(allLines)..shuffle(rng);
   final sampleLines = shuffled.take(sample).toList();
@@ -225,7 +241,9 @@ void main(List<String> args) {
   final sw = Stopwatch()..start();
   for (int i = 0; i < sampleLines.length; i++) {
     try {
-      results.add(scorePuzzle(sampleLines[i], timeoutMs: timeoutMs));
+      results.add(
+        scorePuzzle(sampleLines[i], timeoutMs: timeoutMs, cache: cache),
+      );
     } catch (e) {
       stderr.writeln('  ERROR on puzzle ${i + 1}: $e');
     }

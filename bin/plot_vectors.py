@@ -17,6 +17,11 @@ Coloring strategies (`--color-by`):
 * `level` — color by the ordinal level (beginner=0…undetermined=8).
 * `complexity` — continuous colormap on `complexity`. Shows the
   difficulty gradient.
+* `labeled` — binary highlight: puzzles whose `canonical_key` matches
+  `--label-regex` (optionally filtered by `--even-only` for even grid
+  dimensions) are drawn in red; the rest in translucent grey.
+  A separation report is printed to stderr: count, top-5 discriminating
+  features, and how well the two groups separate on PC1/PC2.
 
 The points are alpha-blended (default 0.3) and the per-class centroids
 are annotated so the eye finds them in a dense scatter.
@@ -24,7 +29,8 @@ are annotated so the eye finds them in a dense scatter.
 Usage:
     python3 bin/plot_vectors.py [--input puzzle_vectors.csv]
                                  [--output puzzle_pca.png]
-                                 [--color-by file|dominant_slug|level|complexity]
+                                 [--color-by file|dominant_slug|level|complexity|labeled]
+                                 [--label-regex REGEX] [--even-only]
                                  [--sample N] [--alpha A] [--seed S]
 """
 
@@ -62,9 +68,19 @@ def parse_args():
     p.add_argument("--output", default="puzzle_pca.png", help="Output PNG path")
     p.add_argument(
         "--color-by",
-        choices=["file", "dominant_slug", "level", "complexity"],
+        choices=["file", "dominant_slug", "level", "complexity", "labeled"],
         default="file",
         help="Categorical or continuous coloring scheme",
+    )
+    p.add_argument(
+        "--label-regex",
+        default=r"SH:(11\.11|22\.22)",
+        help="Regex matched against canonical_key to select the labeled group (used with --color-by labeled)",
+    )
+    p.add_argument(
+        "--even-only",
+        action="store_true",
+        help="With --color-by labeled: restrict the label to puzzles whose width AND height are both even",
     )
     p.add_argument("--sample", type=int, default=None, help="Random sub-sample size (for faster plots / less crowding)")
     p.add_argument("--seed", type=int, default=42, help="RNG seed for --sample")
@@ -167,6 +183,58 @@ def color_palette(n):
     return [base[i % len(base)] for i in range(n)]
 
 
+def build_labeled_mask(rows, label_regex, even_only):
+    """Return a boolean array: True where canonical_key matches label_regex.
+    If even_only, also require width and height to both be even.
+    """
+    import re
+    pattern = re.compile(label_regex)
+    mask = np.zeros(len(rows), dtype=bool)
+    for i, row in enumerate(rows):
+        key = row.get("canonical_key", "")
+        if not pattern.search(key):
+            continue
+        if even_only:
+            try:
+                w = int(row.get("width", 0) or 0)
+                h = int(row.get("height", 0) or 0)
+            except ValueError:
+                continue
+            if w % 2 != 0 or h % 2 != 0:
+                continue
+        mask[i] = True
+    return mask
+
+
+def report_separation(mask, Xn, feature_cols, coords):
+    """Print a cluster separation report to stderr."""
+    n_labeled = mask.sum()
+    n_total = len(mask)
+    sys.stderr.write(f"\n  Labeled: {n_labeled} / {n_total} ({100*n_labeled/n_total:.1f}%)\n")
+
+    if n_labeled == 0:
+        sys.stderr.write("  No labeled puzzles found — check --label-regex and --even-only.\n")
+        return
+
+    # Mean z-score difference per feature.
+    diff = Xn[mask].mean(axis=0) - Xn[~mask].mean(axis=0)
+    ranked = sorted(enumerate(feature_cols), key=lambda x: abs(diff[x[0]]), reverse=True)
+    sys.stderr.write("  Top-10 discriminating features (mean z-score labeled - rest):\n")
+    for rank, (fi, fname) in enumerate(ranked[:10], 1):
+        sign = "+" if diff[fi] >= 0 else ""
+        sys.stderr.write(f"    {rank:2d}. {fname:<35s}  {sign}{diff[fi]:.3f}\n")
+
+    # PCA separation.
+    pc1_labeled = coords[mask, 0]
+    pc1_rest = coords[~mask, 0]
+    pc2_labeled = coords[mask, 1]
+    pc2_rest = coords[~mask, 1]
+    sys.stderr.write(
+        f"\n  PC1 centroid — labeled: {pc1_labeled.mean():+.3f}  rest: {pc1_rest.mean():+.3f}\n"
+        f"  PC2 centroid — labeled: {pc2_labeled.mean():+.3f}  rest: {pc2_rest.mean():+.3f}\n"
+    )
+
+
 def main():
     args = parse_args()
 
@@ -199,7 +267,38 @@ def main():
 
     fig, ax = plt.subplots(figsize=tuple(args.figsize))
 
-    if args.color_by == "complexity":
+    if args.color_by == "labeled":
+        mask = build_labeled_mask(rows, args.label_regex, args.even_only)
+        report_separation(mask, Xn, feature_cols, coords)
+
+        # Background: all unlabeled in grey.
+        rest_idx = np.where(~mask)[0]
+        ax.scatter(
+            coords[rest_idx, 0], coords[rest_idx, 1],
+            c="lightgrey", s=args.size, alpha=max(args.alpha * 0.6, 0.05),
+            linewidths=0, label=f"other ({(~mask).sum()})",
+        )
+        # Foreground: labeled in red with cross marker.
+        lab_idx = np.where(mask)[0]
+        if len(lab_idx):
+            ax.scatter(
+                coords[lab_idx, 0], coords[lab_idx, 1],
+                c="crimson", marker="x", s=args.size * 4,
+                alpha=min(args.alpha * 3, 1.0), linewidths=0.8,
+                label=f"labeled ({mask.sum()})",
+                zorder=5,
+            )
+        ax.legend(loc="upper right", fontsize=9, frameon=True)
+        if not args.no_centroids and len(lab_idx):
+            cx = coords[lab_idx, 0].mean()
+            cy = coords[lab_idx, 1].mean()
+            ax.annotate(
+                "cluster", (cx, cy),
+                fontsize=9, fontweight="bold", color="crimson",
+                ha="center", va="bottom", xytext=(0, 8), textcoords="offset points",
+            )
+
+    elif args.color_by == "complexity":
         # Continuous scalar coloring — colormap with colorbar.
         vals = np.array([float(r.get("complexity", 0) or 0) for r in rows])
         sc = ax.scatter(
@@ -257,9 +356,13 @@ def main():
 
     ax.set_xlabel(f"PC1 ({var_ratio[0]*100:.1f}% variance)")
     ax.set_ylabel(f"PC2 ({var_ratio[1]*100:.1f}% variance)")
+    if args.color_by == "labeled":
+        title_suffix = f"labeled: {args.label_regex}" + (" (even dims)" if args.even_only else "")
+    else:
+        title_suffix = f"colored by {args.color_by}"
     ax.set_title(
         f"PCA projection of {len(rows)} puzzle vectors  "
-        f"(colored by {args.color_by})"
+        f"({title_suffix})"
     )
     ax.grid(True, linestyle=":", linewidth=0.5, alpha=0.5)
 
