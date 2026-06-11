@@ -1,3 +1,7 @@
-Première version publique.
+Nouveautés :
 
-Get Some Puzzle est un jeu de puzzles logiques sur grille qui combine quinze familles de contraintes. Gratuit, open source, sans publicité, sans pistage, sans collecte de données.
+- Couleurs plus claires : le bleu indique une case obligatoire, le violet une case interdite. Les contraintes résolues estompent leur fond tout en gardant leurs symboles lisibles.
+- Les contraintes de parité redondantes fusionnent désormais en une seule pour des grilles plus nettes.
+- La lettre « I », source de confusion, a été retirée des groupes de lettres.
+- Les contraintes de chaîne s'estompent dès qu'elles sont satisfaites.
+- Corrections de bugs et améliorations de stabilité.

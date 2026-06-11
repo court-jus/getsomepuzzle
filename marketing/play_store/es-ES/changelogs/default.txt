@@ -1,3 +1,7 @@
-Primera versión pública.
+Novedades:
 
-Get Some Puzzle es un juego de puzles lógicos en cuadrícula que combina quince familias de restricciones. Gratuito, de código abierto, sin anuncios, sin rastreo, sin recolección de datos.
+- Colores más claros: el azul indica una casilla obligatoria y el morado una prohibida. Las restricciones resueltas atenúan su fondo pero mantienen sus símbolos legibles.
+- Las restricciones de paridad redundantes ahora se fusionan en una sola para cuadrículas más limpias.
+- Se eliminó la confusa letra «I» de los grupos de letras.
+- Las restricciones de cadena se atenúan en cuanto se cumplen.
+- Corrección de errores y mejoras de estabilidad.
