@@ -113,21 +113,22 @@ Options:
                 Combined with --sample, gives a fast read on whether
                 the sort / recent code changes shift cplx or
                 classified level.
-  --route       Redistribute puzzles into <dest>.tmp files matching
-                their post-sort classification. Without positional
-                args, the source set is the six playable-level files
+  --route       Redistribute puzzles into the file matching their
+                post-sort classification, then overwrite the originals
+                in-place. Without positional args, the source set is
+                the six playable-level files
                 (assets/1-easy.txt … assets/6-mad.txt). With positional
                 args, those files are used as sources instead —
                 useful to ventilate an unsorted feed (e.g.
                 /tmp/path6.txt) into the cascade. Out-of-cascade
                 puzzles (overfilled, undetermined) go to their
-                dedicated files. Writes to `<dest>.tmp` (append
-                mode); **never modifies source files**. The user
-                migrates manually with `mv <dest>.tmp <dest>` when
-                satisfied. Re-runs are idempotent: puzzles already
-                emitted to a `.tmp` (by `canonicalPuzzleKey`) are
-                skipped, so an interrupted `--route` can be resumed
-                by simply re-launching the command.
+                dedicated files. Writes to `<dest>.tmp` first (append
+                mode); renames each `.tmp` → original only at the
+                very end, after all writes succeed. An interrupted run
+                leaves `.tmp` files on disk; simply re-launch to
+                resume — puzzles already in a `.tmp` (by
+                `canonicalPuzzleKey`) are skipped. Add `--dry-run` to
+                preview routing without touching any file.
   -v, --verbose Emit a per-puzzle diff line whenever the stored cplx,
                 the pre-sort level, or the post-sort level changes.
   -h, --help    Show this help.
@@ -384,6 +385,9 @@ String _fmtHistogram(Map<PuzzleLevel, int> hist) {
 ///      comments/blanks.
 ///   4. Destinations not in [_playableLevelPaths] (overfilled, etc.)
 ///      get created from scratch — they have no `keepInPlace`.
+///   5. After all writes succeed, rename each `<dest>.tmp` → `<dest>`
+///      in-place. An interrupted run leaves `.tmp` files on disk and
+///      is resumable by re-launching (idempotence via canonical key).
 ///
 /// Idempotency: a second `--route` run on the post-routing files
 /// shouldn't move anything (modulo small numeric drift from the
@@ -638,24 +642,35 @@ void _routeFiles({
     );
   }
 
-  // Close handles. No rename, no delete — the `.tmp` files remain
-  // on disk for the user to inspect.
+  // Close handles before any rename.
   for (final raf in destFiles.values) {
     raf.closeSync();
   }
 
   stderr.writeln('');
-  final action = dryRun ? '(dry-run, no files written)' : 'appended';
+  final action = dryRun ? '(dry-run, no files written)' : 'written';
   for (final destPath in destStats.keys.toList()..sort()) {
     final s = destStats[destPath]!;
     final total = s.verbatim + s.stayed + s.newcomers;
     if (total == 0) continue;
     stderr.writeln(
-      '$destPath.tmp: $total lines $action — '
+      '$destPath: $total lines $action — '
       '${s.verbatim} verbatim, '
       '${s.stayed} recomputed-and-stayed, '
       '${s.newcomers} recomputed-and-arrived',
     );
+  }
+
+  // Rename .tmp → original now that all writes succeeded.
+  if (!dryRun) {
+    stderr.writeln('');
+    for (final destPath in destFiles.keys.toList()..sort()) {
+      final tmp = File('$destPath.tmp');
+      if (tmp.existsSync()) {
+        tmp.renameSync(destPath);
+        stderr.writeln('  renamed: $destPath.tmp → $destPath');
+      }
+    }
   }
 
   stderr.writeln('');
@@ -668,20 +683,10 @@ void _routeFiles({
   );
   if (newlyProcessed == 0 && alreadyProcessed > 0) {
     stderr.writeln('');
-    if (external) {
-      stderr.writeln(
-        'All source puzzles are already routed. Review the .tmp files '
-        'under assets/ and migrate them when satisfied.',
-      );
-    } else {
-      stderr.writeln(
-        'All source puzzles are present in the .tmp files. '
-        'You can review them, then migrate with:',
-      );
-      for (final p in _playableLevelPaths) {
-        stderr.writeln('  mv $p.tmp $p');
-      }
-    }
+    stderr.writeln(
+      'All source puzzles were already processed on a previous run '
+      '(matched via canonical key). Nothing new to route.',
+    );
   }
   stderr.writeln('');
   for (final srcPath in srcPaths) {

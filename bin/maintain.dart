@@ -69,39 +69,15 @@ Future<int> _runScript(String script, List<String> args) async {
   return proc.exitCode;
 }
 
-/// Move `<path><suffix>` over `<path>` if the staging file exists.
-/// Used to apply the `.tmp` / `.deduped` / `.cleanup` outputs the
-/// sub-scripts produce.
-bool _applyStaging(String path, String suffix) {
-  final src = File('$path$suffix');
-  if (!src.existsSync()) return false;
-  final dst = File(path);
-  if (dst.existsSync()) dst.deleteSync();
-  src.renameSync(path);
-  return true;
-}
-
-/// Delete pre-existing staging files so the run starts on a clean
-/// slate. `recompute --route` is idempotent against existing `.tmp`
-/// files (it would resume from them), which would mask a stale state
-/// from an aborted previous run.
-void _clearStaging(String suffix, Iterable<String> paths) {
-  for (final p in paths) {
-    final f = File('$p$suffix');
-    if (f.existsSync()) f.deleteSync();
-  }
-}
-
 // ─── Step 1: recompute --route ─────────────────────────────────────
 
 Future<StepResult> _stepRecompute() async {
   stderr.writeln('\n━━━ STEP 1/6: recompute --route ━━━');
   final sw = Stopwatch()..start();
 
-  _clearStaging('.tmp', _allCollections);
   final code = await _runScript('bin/recompute.dart', ['--route', '-v']);
+  sw.stop();
   if (code != 0) {
-    sw.stop();
     return StepResult(
       name: 'recompute --route',
       duration: sw.elapsed,
@@ -109,96 +85,13 @@ Future<StepResult> _stepRecompute() async {
       error: 'exit $code',
     );
   }
-
-  final moved = <String>[];
-  for (final f in _allCollections) {
-    if (_applyStaging(f, '.tmp')) moved.add(f);
-  }
-
-  sw.stop();
-  return StepResult(
-    name: 'recompute --route',
-    duration: sw.elapsed,
-    ok: true,
-    notes: ['applied: ${moved.length} files'],
-  );
+  return StepResult(name: 'recompute --route', duration: sw.elapsed, ok: true);
 }
 
-// ─── Step 2: dedup_puzzles per collection ──────────────────────────
-
-Future<StepResult> _stepDedup() async {
-  stderr.writeln('\n━━━ STEP 2/6: dedup_puzzles ━━━');
-  final sw = Stopwatch()..start();
-  final notes = <String>[];
-
-  for (final f in _allCollections) {
-    if (!File(f).existsSync()) continue;
-    final code = await _runScript('bin/dedup_puzzles.dart', [
-      '-o',
-      '$f.deduped',
-      f,
-    ]);
-    if (code != 0) {
-      sw.stop();
-      return StepResult(
-        name: 'dedup_puzzles',
-        duration: sw.elapsed,
-        ok: false,
-        error: '$f: exit $code',
-      );
-    }
-    final applied = _applyStaging(f, '.deduped');
-    if (applied) notes.add('deduped $f');
-  }
-
-  sw.stop();
-  return StepResult(
-    name: 'dedup_puzzles',
-    duration: sw.elapsed,
-    ok: true,
-    notes: notes,
-  );
-}
-
-// ─── Step 3: cleanup_collections --apply ───────────────────────────
-
-Future<StepResult> _stepCleanup() async {
-  stderr.writeln('\n━━━ STEP 3/6: cleanup_collections --apply ━━━');
-  final sw = Stopwatch()..start();
-
-  _clearStaging('.cleanup', _allCollections);
-  final code = await _runScript('bin/cleanup_collections.dart', [
-    '--apply',
-    '-v',
-  ]);
-  if (code != 0) {
-    sw.stop();
-    return StepResult(
-      name: 'cleanup_collections',
-      duration: sw.elapsed,
-      ok: false,
-      error: 'exit $code',
-    );
-  }
-
-  final moved = <String>[];
-  for (final f in _allCollections) {
-    if (_applyStaging(f, '.cleanup')) moved.add(f);
-  }
-
-  sw.stop();
-  return StepResult(
-    name: 'cleanup_collections',
-    duration: sw.elapsed,
-    ok: true,
-    notes: ['applied: ${moved.length} files'],
-  );
-}
-
-// ─── Step 4: vectorize_puzzles ─────────────────────────────────────
+// ─── Step 2: vectorize_puzzles ─────────────────────────────────────
 
 Future<StepResult> _stepVectorize() async {
-  stderr.writeln('\n━━━ STEP 4/6: vectorize_puzzles ━━━');
+  stderr.writeln('\n━━━ STEP 2/6: vectorize_puzzles ━━━');
   final sw = Stopwatch()..start();
   final code = await _runScript('bin/vectorize_puzzles.dart', ['-v']);
   sw.stop();
@@ -219,13 +112,62 @@ Future<StepResult> _stepVectorize() async {
   );
 }
 
+// ─── Step 3: dedup_puzzles per collection ──────────────────────────
+
+Future<StepResult> _stepDedup() async {
+  stderr.writeln('\n━━━ STEP 3/6: dedup_puzzles ━━━');
+  final sw = Stopwatch()..start();
+
+  for (final f in _allCollections) {
+    if (!File(f).existsSync()) continue;
+    final code = await _runScript('bin/dedup_puzzles.dart', [f]);
+    if (code != 0) {
+      sw.stop();
+      return StepResult(
+        name: 'dedup_puzzles',
+        duration: sw.elapsed,
+        ok: false,
+        error: '$f: exit $code',
+      );
+    }
+  }
+
+  sw.stop();
+  return StepResult(name: 'dedup_puzzles', duration: sw.elapsed, ok: true);
+}
+
+// ─── Step 4: cleanup_collections --apply ───────────────────────────
+
+Future<StepResult> _stepCleanup() async {
+  stderr.writeln('\n━━━ STEP 4/6: cleanup_collections --apply ━━━');
+  final sw = Stopwatch()..start();
+
+  final code = await _runScript('bin/cleanup_collections.dart', [
+    '--apply',
+    '-v',
+  ]);
+  sw.stop();
+  if (code != 0) {
+    return StepResult(
+      name: 'cleanup_collections',
+      duration: sw.elapsed,
+      ok: false,
+      error: 'exit $code',
+    );
+  }
+  return StepResult(
+    name: 'cleanup_collections',
+    duration: sw.elapsed,
+    ok: true,
+  );
+}
+
 // ─── Step 5: cluster_puzzles --apply ───────────────────────────────
 
 Future<StepResult> _stepCluster() async {
   stderr.writeln('\n━━━ STEP 5/6: cluster_puzzles --apply ━━━');
   final sw = Stopwatch()..start();
 
-  _clearStaging('.cleanup', _allCollections);
   final code = await _runScript('bin/cluster_puzzles.dart', [
     '--apply',
     '--max-distance',
@@ -236,8 +178,8 @@ Future<StepResult> _stepCluster() async {
     _onboardingBank,
     '-v',
   ]);
+  sw.stop();
   if (code != 0) {
-    sw.stop();
     return StepResult(
       name: 'cluster_puzzles --apply',
       duration: sw.elapsed,
@@ -245,18 +187,10 @@ Future<StepResult> _stepCluster() async {
       error: 'exit $code',
     );
   }
-
-  final moved = <String>[];
-  for (final f in _allCollections) {
-    if (_applyStaging(f, '.cleanup')) moved.add(f);
-  }
-
-  sw.stop();
   return StepResult(
     name: 'cluster_puzzles --apply',
     duration: sw.elapsed,
     ok: true,
-    notes: ['applied: ${moved.length} files'],
   );
 }
 
@@ -349,17 +283,20 @@ writes back to assets/*.txt directly — inspect via `git diff` before
 committing). Fail-fast: the first failing step aborts the rest.
 
 Pipeline:
-  1. recompute --route      Refresh stored cplx, re-sort constraints,
-                            re-route each puzzle to its classified level.
-  2. dedup_puzzles          Drop exact-duplicate puzzles per file
+  1. recompute --route      Refresh stored cplx + cached solutions, re-sort
+                            constraints, re-route each puzzle to its level.
+  2. vectorize_puzzles      Build puzzle_vectors.csv from the freshly
+                            recomputed corpus (trace shares + solution
+                            geometry). Feeds steps 4 and 5.
+  3. dedup_puzzles          Drop exact-duplicate puzzles per file
                             (defence-in-depth — --route already enforces).
-  3. cleanup_collections    Drop disliked + boring (≥90 % trivial-FM) +
-                            overlapping-MJ-border puzzles (--apply mode).
-  4. vectorize_puzzles      Refresh puzzle_vectors.csv from the cleaned
-                            corpus.
+  4. cleanup_collections    Drop disliked + boring (≥90 % trivial-FM) +
+                            overlapping-MJ-border + regular-pattern puzzles
+                            (--apply mode; regular patterns read from the CSV).
   5. cluster_puzzles        --apply with --max-distance 0.15 and
                             --keep-per-cluster 1, protecting the current
-                            onboarding bank.
+                            onboarding bank. Skips CSV rows whose puzzle was
+                            removed in steps 3-4 (stale-row guard).
   6. extract_onboarding     Refresh assets/1-easy_onboarding.txt
                             (300 puzzles per phase) from the post-
                             cleanup corpus.
@@ -382,11 +319,17 @@ Future<void> main(List<String> args) async {
   final tracked = [..._allCollections, _onboardingBank, _vectorCsv];
   final before = _snapshot(tracked);
 
+  // Order matters: recompute refreshes the cached solutions and re-routes
+  // puzzles to their levels, then vectorize builds puzzle_vectors.csv from that
+  // fresh corpus. The maintenance steps that consume the CSV run afterwards —
+  // cleanup reads the solution-geometry columns, cluster reads the full vector.
+  // cluster filters out keys removed by dedup/cleanup so the one-vectorize
+  // ordering never deletes a whole near-duplicate family via a stale row.
   final steps = <Future<StepResult> Function()>[
     _stepRecompute,
+    _stepVectorize,
     _stepDedup,
     _stepCleanup,
-    _stepVectorize,
     _stepCluster,
     _stepOnboarding,
   ];

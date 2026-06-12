@@ -1,5 +1,5 @@
 // Identify and (optionally) remove low-value puzzles from the playable
-// collections. Three independent passes, each gated by its own flag:
+// collections. Four independent passes, each gated by its own flag:
 //
 //   --disliked   Drop puzzles that appear with a `disliked` timestamp
 //                in stats_aggregated/*.txt. Cross-reference is done
@@ -19,32 +19,43 @@
 //                overlapping perpendicular extent — see
 //                MajorityConstraint.conflictsWith).
 //
+//   --regular-patterns Drop puzzles with checkerboard or stripe patterns,
+//                keeping only a small fraction (--keep-ratio, default 0.1).
+//                Checkerboard: perfect k×k monochrome blocks alternating.
+//                Stripes: one axis entirely constant (period = 1).
+//
 // Without --apply the script just prints what *would* be removed. With
-// --apply each modified collection is rewritten to `<path>.cleanup`;
-// the user mv's it into place after reviewing the diff.
+// --apply each modified collection is rewritten in-place (via a
+// `<path>.cleanup` staging file that is immediately renamed over the
+// original).
 //
 // Usage:
 //   dart run bin/cleanup_collections.dart [--disliked] [--boring]
-//                                          [--mj-conflict]
+//                                          [--mj-conflict] [--regular-patterns]
 //                                          [--apply]
 //                                          [--min-dislikes N]
 //                                          [--boring-threshold X]
 //                                          [--boring-min-moves N]
 //                                          [--no-exempt-easiest]
+//                                          [--keep-ratio X]
+//                                          [--random-seed N]
 //                                          [--sample N]
 //                                          [--timeout-ms MS]
 //                                          [--stats-dir DIR]
 //                                          [--verbose]
 //
-// If none of --disliked / --boring / --mj-conflict is passed, all run.
+// If none of --disliked / --boring / --mj-conflict / --regular-patterns
+// is passed, all run.
 
 import 'dart:io';
+import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
+import '_csv.dart';
 import '_trace_cache.dart';
 
 const _collections = [
@@ -91,15 +102,19 @@ class _Args {
   bool runDisliked = false;
   bool runBoring = false;
   bool runMJConflict = false;
+  bool runRegularPatterns = false;
   bool apply = false;
   bool verbose = false;
   bool exemptEasiest = true;
   int minDislikes = 1;
   double boringThreshold = 0.9;
   int boringMinMoves = 5;
+  double keepRatio = 0.1;
+  int? randomSeed;
   int? sample;
   int timeoutMs = 15000;
   String statsDir = 'stats_aggregated';
+  String vectorsFile = 'puzzle_vectors.csv';
 }
 
 void main(List<String> args) {
@@ -113,6 +128,8 @@ void main(List<String> args) {
         a.runBoring = true;
       case '--mj-conflict':
         a.runMJConflict = true;
+      case '--regular-patterns':
+        a.runRegularPatterns = true;
       case '--apply':
         a.apply = true;
       case '-v':
@@ -126,12 +143,18 @@ void main(List<String> args) {
         a.boringThreshold = double.parse(args[++i]);
       case '--boring-min-moves':
         a.boringMinMoves = int.parse(args[++i]);
+      case '--keep-ratio':
+        a.keepRatio = double.parse(args[++i]);
+      case '--random-seed':
+        a.randomSeed = int.parse(args[++i]);
       case '--sample':
         a.sample = int.parse(args[++i]);
       case '--timeout-ms':
         a.timeoutMs = int.parse(args[++i]);
       case '--stats-dir':
         a.statsDir = args[++i];
+      case '--vectors-file':
+        a.vectorsFile = args[++i];
       case '-h':
       case '--help':
         _printUsage();
@@ -144,10 +167,14 @@ void main(List<String> args) {
   }
 
   // Default: run all passes.
-  if (!a.runDisliked && !a.runBoring && !a.runMJConflict) {
+  if (!a.runDisliked &&
+      !a.runBoring &&
+      !a.runMJConflict &&
+      !a.runRegularPatterns) {
     a.runDisliked = true;
     a.runBoring = true;
     a.runMJConflict = true;
+    a.runRegularPatterns = true;
   }
 
   stderr.writeln('Loading collections...');
@@ -193,6 +220,12 @@ void main(List<String> args) {
     stderr.writeln('');
     stderr.writeln('=== PASS 3: overlapping MJ borders ===');
     _reportAndCollectMJConflict(byKey, a, toRemove, reasons);
+  }
+
+  if (a.runRegularPatterns) {
+    stderr.writeln('');
+    stderr.writeln('=== PASS 4: regular patterns (checkerboard/stripes) ===');
+    _reportAndCollectRegularPatterns(byKey, a, toRemove, reasons);
   }
 
   stderr.writeln('');
@@ -500,6 +533,134 @@ double? _trivialFMRatio(String line, _Args args, {required TraceCache cache}) {
   }
 }
 
+/// Solution-geometry predicates read from the vector CSV, per canonical_key.
+typedef _Geom = ({int checkerK, int periodX, int periodY});
+
+/// Load the designer-confirmed solution-geometry predicate columns from the
+/// vector CSV, keyed by canonical_key: `checker_block_k` (> 0 ⇒ a perfect
+/// damier) and `period_x` / `period_y` (== 1 ⇒ a fully constant axis ⇒ colour
+/// bars). These are exact structural predicates — unlike the old `auto_band`
+/// proxy they do not fire on low-ink / sparse solutions. Returns empty (pass
+/// skipped) if the file or those columns are absent.
+Map<String, _Geom> _loadVectors(String csvPath) {
+  final vectors = <String, _Geom>{};
+  final file = File(csvPath);
+  if (!file.existsSync()) {
+    stderr.writeln(
+      '  warn: $csvPath not found, skipping regular patterns pass',
+    );
+    return vectors;
+  }
+
+  final lines = file.readAsLinesSync();
+  if (lines.isEmpty) return vectors;
+
+  // Parse header.
+  final headers = parseCsvLine(lines[0]);
+  final checkerIdx = headers.indexOf('checker_block_k');
+  final periodXIdx = headers.indexOf('period_x');
+  final periodYIdx = headers.indexOf('period_y');
+  final keyIdx = headers.indexOf('canonical_key');
+
+  if (checkerIdx < 0 || periodXIdx < 0 || periodYIdx < 0 || keyIdx < 0) {
+    stderr.writeln(
+      '  warn: missing solution-geometry columns in CSV '
+      '(checker_block_k / period_x / period_y) — re-run vectorize_puzzles',
+    );
+    return vectors;
+  }
+
+  final maxIdx = [
+    checkerIdx,
+    periodXIdx,
+    periodYIdx,
+    keyIdx,
+  ].reduce((a, b) => a > b ? a : b);
+
+  for (int i = 1; i < lines.length; i++) {
+    try {
+      final row = parseCsvLine(lines[i]);
+      if (row.length <= maxIdx) continue;
+      vectors[row[keyIdx].trim()] = (
+        checkerK: int.parse(row[checkerIdx]),
+        periodX: int.parse(row[periodXIdx]),
+        periodY: int.parse(row[periodYIdx]),
+      );
+    } catch (_) {
+      continue;
+    }
+  }
+
+  return vectors;
+}
+
+void _reportAndCollectRegularPatterns(
+  Map<String, _PuzzleLoc> byKey,
+  _Args args,
+  Set<String> toRemove,
+  Map<String, String> reasons,
+) {
+  final vectors = _loadVectors(args.vectorsFile);
+  if (vectors.isEmpty) {
+    stderr.writeln('  skipped: no vector data');
+    return;
+  }
+
+  // Designer-confirmed easy patterns (working doc §6.1/§8.1): a perfect damier
+  // (checker_block_k > 0) or colour bars (one axis fully constant ⇒ period 1).
+  // Both are exact structural predicates, so — unlike the former auto_band ≥
+  // threshold proxy — neither flags low-ink / sparse solutions as regular.
+  bool isStripes(_Geom v) => v.periodX == 1 || v.periodY == 1;
+  final candidates = <String>[];
+  for (final key in byKey.keys) {
+    final v = vectors[key];
+    if (v == null) continue;
+    if (v.checkerK > 0 || isStripes(v)) candidates.add(key);
+  }
+
+  final nChecker = candidates.where((k) => vectors[k]!.checkerK > 0).length;
+  stderr.writeln(
+    '  ${candidates.length} regular-pattern puzzles '
+    '($nChecker checker, ${candidates.length - nChecker} stripes)',
+  );
+
+  if (candidates.isEmpty) return;
+
+  // Select which ones to keep (based on keep-ratio)
+  final rng = Random(args.randomSeed ?? 0);
+  candidates.shuffle(rng);
+  final keepCount = (candidates.length * args.keepRatio).ceil();
+  final toKeep = candidates.sublist(0, keepCount).toSet();
+
+  int flagged = 0;
+  final perFile = <String, int>{};
+
+  for (final key in candidates) {
+    if (toKeep.contains(key)) continue;
+    final loc = byKey[key]!;
+    toRemove.add(key);
+    final v = vectors[key]!;
+    final tag = v.checkerK > 0
+        ? 'checker k=${v.checkerK}'
+        : 'stripes period ${v.periodX == 1 ? 'x' : 'y'}=1';
+    reasons[key] = 'regular pattern ($tag)';
+    perFile.update(loc.file, (n) => n + 1, ifAbsent: () => 1);
+    flagged++;
+    if (args.verbose) {
+      stderr.writeln('    ${loc.file}: regular pattern  ${_preview(loc.line)}');
+    }
+  }
+
+  stderr.writeln(
+    '  keeping $keepCount / ${candidates.length} (${(args.keepRatio * 100).toStringAsFixed(0)}%), '
+    'removing $flagged',
+  );
+  for (final path in _collections) {
+    final n = perFile[path] ?? 0;
+    if (n > 0) stderr.writeln('    $path: $n');
+  }
+}
+
 void _writeCleanupFiles(
   Map<String, List<String>> byFile,
   Set<String> toRemove,
@@ -534,9 +695,10 @@ void _writeCleanupFiles(
       kept.add(line);
     }
     if (dropped == 0) continue;
-    final outPath = '$path.cleanup';
-    File(outPath).writeAsStringSync('${kept.join('\n')}\n');
-    stderr.writeln('  $outPath: $dropped removed, ${kept.length} kept');
+    final tmpPath = '$path.cleanup';
+    File(tmpPath).writeAsStringSync('${kept.join('\n')}\n');
+    File(tmpPath).renameSync(path);
+    stderr.writeln('  $path: $dropped removed, ${kept.length} kept (in-place)');
   }
 }
 
@@ -554,10 +716,14 @@ Passes (all run by default):
                           moves come from trivial-FM constraints
   --mj-conflict           Flag puzzles with two MJ zones whose dashed
                           borders would overlap visually
+  --regular-patterns      Flag puzzles whose solved grid is a perfect damier
+                          (checker_block_k > 0) or colour bars (period_x or
+                          period_y == 1), read from puzzle_vectors.csv, and
+                          keep a small fraction (--keep-ratio, default 0.1)
 
 Options:
-  --apply                 Write <path>.cleanup files. Without it, only
-                          report what would be removed.
+  --apply                 Overwrite each modified collection in-place.
+                          Without it, only report what would be removed.
   --min-dislikes N        Drop puzzles disliked >= N times (default 1)
   --boring-threshold X    Trivial-FM share above which a puzzle is
                           "boring" (default 0.9)
@@ -566,6 +732,10 @@ Options:
   --no-exempt-easiest     Include 1-easy.txt and 1-easy-overfilled.txt
                           in the boring pass (off by default — those
                           puzzles are *meant* to teach trivial-FM)
+  --keep-ratio X          Fraction to keep in regular patterns pass
+                          (0.0-1.0, default 0.1 = 10%)
+  --random-seed N         Seed for reproducible random selection
+  --vectors-file FILE     Path to puzzle_vectors.csv (default puzzle_vectors.csv)
   --sample N              Cap the boring pass to N candidates (dev aid)
   --timeout-ms MS         Per-puzzle solver timeout (default 15000)
   --stats-dir DIR         Stats directory (default stats_aggregated)

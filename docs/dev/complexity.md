@@ -71,7 +71,6 @@ After any change to the scoring formula or to any constraint's
 
 ```bash
 dart run bin/recompute.dart --route assets/*.txt
-for f in assets/*.txt.new; do mv "$f" "${f%.new}"; done
 ```
 
 and commit the diff — otherwise the in-app sorter and level filter will

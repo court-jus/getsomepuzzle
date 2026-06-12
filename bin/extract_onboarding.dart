@@ -37,6 +37,8 @@ import 'dart:typed_data';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 
+import '_csv.dart';
+
 const _slugs = [
   'CC',
   'CH',
@@ -394,7 +396,7 @@ _CsvData _loadCsvVectors(String path) {
     exit(1);
   }
 
-  final header = _parseCsvLine(lines.first);
+  final header = parseCsvLine(lines.first);
   final colIdx = <String, int>{};
   for (int i = 0; i < header.length; i++) {
     colIdx[header[i]] = i;
@@ -430,7 +432,7 @@ _CsvData _loadCsvVectors(String path) {
   for (int li = 1; li < lines.length; li++) {
     final raw = lines[li];
     if (raw.trim().isEmpty) continue;
-    final fields = _parseCsvLine(raw);
+    final fields = parseCsvLine(raw);
     if (fields.length < header.length) continue;
     final key = fields[keyIdx];
     final vec = Float64List(featureCols.length);
@@ -440,38 +442,4 @@ _CsvData _loadCsvVectors(String path) {
     vectors[key] = vec;
   }
   return _CsvData(featureNames, vectors);
-}
-
-/// Minimal CSV parser identical to the one in `cluster_puzzles.dart` —
-/// double-quoted fields with `""` escapes.
-List<String> _parseCsvLine(String line) {
-  final out = <String>[];
-  final buf = StringBuffer();
-  bool inQuotes = false;
-  for (int i = 0; i < line.length; i++) {
-    final ch = line[i];
-    if (inQuotes) {
-      if (ch == '"') {
-        if (i + 1 < line.length && line[i + 1] == '"') {
-          buf.write('"');
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        buf.write(ch);
-      }
-    } else {
-      if (ch == ',') {
-        out.add(buf.toString());
-        buf.clear();
-      } else if (ch == '"' && buf.isEmpty) {
-        inQuotes = true;
-      } else {
-        buf.write(ch);
-      }
-    }
-  }
-  out.add(buf.toString());
-  return out;
 }

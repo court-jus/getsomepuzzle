@@ -35,7 +35,7 @@ declared slugs. See `levels.md` for the cascade.
 | `bin/maintain.dart`                   | Full periodic-maintenance pipeline (6 steps, apply mode)     |
 | `bin/recompute.dart`                  | Re-sort constraints, refresh stored cplx, re-route by level; writes `solve_traces.tsv` |
 | `bin/dedup_puzzles.dart`              | Drop puzzles that are exact duplicates (canonical key match) |
-| `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated / MJ-border-conflict puzzles |
+| `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated / MJ-border-conflict / regular-pattern puzzles |
 | `bin/vectorize_puzzles.dart`          | Produce per-puzzle feature vector CSV (reads `solve_traces.tsv`) |
 | `bin/cluster_puzzles.dart`            | Find near-duplicate pairs/clusters (report or --apply mode)  |
 | `bin/extract_onboarding.dart`         | Build a diverse onboarding bank from 1-easy                  |
@@ -45,7 +45,8 @@ declared slugs. See `levels.md` for the cascade.
 | `bin/remark_scenarios.dart`           | Tag legacy v2 lines with `_scenario:<name>` (reads `solve_traces.tsv`) |
 | `bin/trace_score.dart`                | Score puzzles by trace quality (reads `solve_traces.tsv`)    |
 | `bin/query_corpus.dart`               | Ad-hoc filtered queries over `assets/*.txt` (read-only)      |
-| `bin/plot_vectors.py`                 | 2-D PCA projection of the vectors (matplotlib + numpy)       |
+| `bin/plot_vectors.py`                 | 2-D PCA projection + supervised separability of the vectors (matplotlib + numpy) |
+| `bin/detect_regular_solutions.dart`   | Diagnose globally-regular solutions (damier / colour bars) over-rated by the trace (read-only report + optional CSV) |
 
 ## Generation
 
@@ -118,11 +119,11 @@ their post-sort classification. Two modes:
   dart run bin/recompute.dart --route /tmp/path6.txt
   ```
 
-Both modes write to `<dest>.tmp` in append mode and never touch the
-source files; the user migrates with `mv assets/<lvl>.txt.tmp
-assets/<lvl>.txt` when satisfied. Re-runs are idempotent: puzzles
-already emitted to a `.tmp` (by `canonicalPuzzleKey`) are skipped,
-so an interrupted `--route` can be resumed by simply re-launching.
+Both modes accumulate output into `<dest>.tmp` (append mode,
+idempotent via `canonicalPuzzleKey`) and rename each `.tmp` →
+original in-place at the very end, once all writes have succeeded.
+An interrupted `--route` leaves `.tmp` files on disk; simply
+re-launch to resume — already-processed puzzles are skipped.
 
 `--dry-run` reports the level transitions without writing any file —
 useful to see how a new complexity tweak would shift the cascade
@@ -196,12 +197,16 @@ canonicalised). Catches reruns of the generator that hit the same
 identity.
 
 ```bash
+# In-place (default — overwrites the file directly)
+dart run bin/dedup_puzzles.dart assets/1-easy.txt
+
+# Explicit output path (preserves the original)
 dart run bin/dedup_puzzles.dart -o deduped.txt assets/1-easy.txt
 ```
 
-### 2. Drop disliked, trivial-FM-dominated, or MJ-border-conflict puzzles
+### 2. Drop disliked, trivial-FM-dominated, MJ-border-conflict, or regular-pattern puzzles
 
-`bin/cleanup_collections.dart` runs three passes (each gated by
+`bin/cleanup_collections.dart` runs four passes (each gated by
 its own flag, all run when none is passed):
 
 * `--disliked` — cross-reference `stats_aggregated/*.txt` and flag
@@ -216,12 +221,22 @@ its own flag, all run when none is passed):
   and `majority.md`). Cheap pre-filter (≥ 2 `MJ:` tokens) gates the parse.
   The generator already refuses such pairs, so this only catches legacy
   corpus puzzles.
+* `--regular-patterns` — flag puzzles whose solved grid is a globally-regular
+  geometry the local trace over-rates, using the designer-confirmed predicates
+  (working doc §6.1/§8.1): a perfect damier (`checker_block_k > 0`) or colour
+  bars (one axis fully constant, `period_x == 1 || period_y == 1`). These are
+  exact structural predicates — unlike an `auto_band` magnitude threshold they
+  never flag low-ink / sparse solutions. Reads `checker_block_k` / `period_x` /
+  `period_y` from `puzzle_vectors.csv` (`--vectors-file`); skips silently if the
+  file or those columns are absent. Of the flagged puzzles only a random
+  `--keep-ratio` (default 0.1) is kept — selection seeded by `--random-seed`
+  for reproducibility.
 
 ```bash
 # Dry-run report
 dart run bin/cleanup_collections.dart -v
 
-# Apply (writes <file>.cleanup files for the user to mv into place)
+# Apply — overwrites each modified collection in-place
 dart run bin/cleanup_collections.dart --apply
 ```
 
@@ -251,8 +266,21 @@ dart run bin/cluster_puzzles.dart \
 The vector includes 78 trace-share columns (`share_<slug>_t<tier>`
 for the 13 slugs × 6 complexity tiers) plus complexity, force_rounds,
 max_force_depth, avg_move_complexity, distinct_constraints_used,
-n_constraints, cells, and prefill_ratio. Z-scored across the pool,
-clipped at ±5.
+n_constraints, cells, and prefill_ratio. It also carries 13
+solution-geometry columns — the geometry of the solved grid, so
+globally-regular solutions (damier, colour bars) the trace shares cannot
+tell apart become separable. Eight are translation- and colour-swap-invariant
+transforms: five from the power spectrum |F(u,v)|² (`spec_peak_frac`,
+`spec_xbars_frac`, `spec_ybars_frac`, `spec_checker_frac`,
+`spec_concentration`) and three from its parity-robust autocorrelation dual
+(`auto_band`, `auto_checker`, `auto_tile`), which catch a 2×2 damier even
+on odd block counts (4×6, 6×6) where the fixed Nyquist spectral bin
+collapses. Five are interpretable scalars (the designer-confirmed predicates):
+`period_x` / `period_y` (smallest translation period per axis — period 1 = a
+fully constant axis ⇒ colour bars), `checker_block_k` (smallest k for a k×k
+alternating damier, 0 if none), `n_symmetries` (dihedral invariances), and
+`rle_ratio` (run density, a low-ink proxy). All thirteen are defined in
+`bin/_solution_geometry.dart`. Z-scored across the pool, clipped at ±5.
 
 The clustering empirically concentrates on `1-easy.txt` (~10 % at
 ε = 0.3) and `1-easy-overfilled.txt` (~5 %), with NC-only and
@@ -418,12 +446,34 @@ python3 bin/plot_vectors.py --color-by dominant_slug -o puzzle_pca_slugs.png
 
 # Continuous gradient on complexity.
 python3 bin/plot_vectors.py --color-by complexity -o puzzle_pca_cplx.png
+
+# Highlight a sub-population: by constraint (regex on canonical_key) …
+python3 bin/plot_vectors.py --color-by labeled \
+    --label-regex '(?=.*SH:11\.11)(?=.*SH:22\.22)' --even-only
+
+# … or by solution geometry (numeric column ≥ threshold).
+python3 bin/plot_vectors.py --color-by labeled \
+    --label-col auto_checker --label-threshold 0.9
+
+# Supervised separability: is the highlighted group actually separable?
+python3 bin/plot_vectors.py --separation \
+    --label-regex '(?=.*SH:11\.11)(?=.*SH:22\.22)' --even-only
 ```
 
 Reads `puzzle_vectors.csv`. Linear PCA via numpy SVD — no sklearn
 dependency. Used to sanity-check that the level cascade carves the
 corpus into visually-distinct lobes (it does, modulo overlap in the
 middle tiers).
+
+`--color-by labeled` highlights a sub-population — chosen by `--label-regex`
+(matched against `canonical_key`) or by a numeric `--label-col ≥
+--label-threshold` (e.g. colour by the `auto_checker` geometry rather than the
+constraint that encodes it) — and prints a per-feature discrimination report
+(mean z-score gap + univariate AUC). Because PCA is unsupervised, a 0.1%
+minority never drives a top component, so a flat scatter is **not** evidence of
+inseparability. `--separation` answers that question directly: a shrinkage-
+regularized Fisher LDA, cross-validated (both needed since features ≫
+positives), reporting the out-of-fold ROC-AUC and a score-distribution figure.
 
 ## Player stats
 
@@ -539,18 +589,24 @@ dart run bin/maintain.dart
 Pipeline (each step applies directly; the next step sees the updated
 `assets/`):
 
-1. **`recompute --route`** — refresh stored cplx, re-sort
-   constraints, redistribute each puzzle to its classified level.
-2. **`dedup_puzzles`** — drop exact duplicates per file
+1. **`recompute --route`** — refresh stored cplx + cached solutions,
+   re-sort constraints, redistribute each puzzle to its classified level.
+2. **`vectorize_puzzles`** — build `puzzle_vectors.csv` from the freshly
+   recomputed corpus (trace shares + solution geometry). Runs early so the
+   later passes that consume the CSV — `cleanup` (regular patterns) and
+   `cluster` — see geometry computed from the current solutions.
+3. **`dedup_puzzles`** — drop exact duplicates per file
    (defence-in-depth: `--route` already enforces canonical-key
    uniqueness, but this catches anything that slipped through).
-3. **`cleanup_collections --apply`** — drop disliked, boring
-   (≥ 90 % trivial-FM), and overlapping-MJ-border puzzles.
-4. **`vectorize_puzzles`** — refresh `puzzle_vectors.csv` from the
-   cleaned corpus.
+4. **`cleanup_collections --apply`** — drop disliked, boring
+   (≥ 90 % trivial-FM), overlapping-MJ-border, and regular-pattern
+   (damier / colour-bar) puzzles. The regular-patterns pass reads the
+   geometry columns from `puzzle_vectors.csv`.
 5. **`cluster_puzzles --apply`** — drop near-duplicates
    (`--max-distance 0.15`, `--keep-per-cluster 1`), protecting the
-   current onboarding bank.
+   current onboarding bank. Because the vector predates steps 3-4, it
+   first drops CSV rows whose puzzle is no longer in any collection, so a
+   stale row can never be picked as the representative that survives.
 6. **`extract_onboarding`** — refresh `assets/1-easy_onboarding.txt`
    (300 per phase) from the post-cleanup corpus.
 
@@ -579,20 +635,18 @@ mv new.txt.new new.txt
 
 # 3. Merge into the existing files via classification routing
 cat new.txt >> assets/undetermined.txt
-dart run bin/recompute.dart --route
+dart run bin/recompute.dart --route   # renames in-place at the end
 
 # 4. Drop the inevitable near-duplicates
 dart run bin/vectorize_puzzles.dart
 dart run bin/cluster_puzzles.dart --apply --max-distance 0.15 \
   --protect-from assets/1-easy_onboarding.txt -v
-for f in assets/*.cleanup; do mv "$f" "${f%.cleanup}"; done
 ```
 
 ### "The complexity formula changed, refresh the corpus"
 
 ```bash
 dart run bin/recompute.dart --route -v
-for f in assets/*.txt.new; do mv "$f" "${f%.new}"; done
 ```
 
 `--route` re-classifies every puzzle through `classifyTrace`, so a

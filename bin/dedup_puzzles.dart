@@ -95,10 +95,19 @@ void _processFile(String path, String? outputPath) {
     }
   }
 
-  final outPath = outputPath ?? '$path.deduped';
-  File(outPath).writeAsStringSync('${output.join('\n')}\n');
-  stderr.writeln(
-    '\r$path: ${lines.length} lines in, $kept kept, $dropped duplicates '
-    'dropped, $errors errors, ${sw.elapsed.inSeconds}s -> $outPath',
-  );
+  if (outputPath != null) {
+    File(outputPath).writeAsStringSync('${output.join('\n')}\n');
+    stderr.writeln(
+      '\r$path: ${lines.length} lines in, $kept kept, $dropped duplicates '
+      'dropped, $errors errors, ${sw.elapsed.inSeconds}s -> $outputPath',
+    );
+  } else {
+    final tmpPath = '$path.deduped';
+    File(tmpPath).writeAsStringSync('${output.join('\n')}\n');
+    File(tmpPath).renameSync(path);
+    stderr.writeln(
+      '\r$path: ${lines.length} lines in, $kept kept, $dropped duplicates '
+      'dropped, $errors errors, ${sw.elapsed.inSeconds}s (in-place)',
+    );
+  }
 }

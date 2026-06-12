@@ -23,6 +23,23 @@
 //   divided by #total_prop_moves. CX = complicity (multi-constraint
 //   deduction). Most cells are 0 — vector is wide but sparse.
 //
+// Solution geometry block — translation- and colour-swap-invariant
+// descriptors of the solved grid (the black mask, ±1). They capture the
+// global regularity a player reads at a glance but the local-deduction trace
+// cannot see (damier, colour bars). Two complementary views:
+//   * Power spectrum |F(u,v)|² (per-bin fractions): spec_peak_frac,
+//     spec_xbars_frac, spec_ybars_frac, spec_checker_frac, spec_concentration.
+//     See `spectralFeatures`. Sharp but parity-fragile (a fixed Nyquist bin
+//     only catches even block counts).
+//   * Autocorrelation peaks (parity-robust): auto_band, auto_checker,
+//     auto_tile. See `autocorrelationFeatures`. The spatial-domain dual,
+//     summarised by peak so a 2×2 damier reads as a damier on 4×4, 4×6 and 6×6.
+//   * Interpretable scalars: period_x, period_y (smallest translation period
+//     per axis; period 1 = a fully constant axis ⇒ colour bars),
+//     checker_block_k (smallest k for a k×k alternating damier, 0 if none),
+//     n_symmetries (dihedral invariances), rle_ratio (run density, a low-ink
+//     proxy). All defined in bin/_solution_geometry.dart.
+//
 // Usage:
 //   dart run bin/vectorize_puzzles.dart [--output PATH] [--sample N]
 //                                        [--timeout-ms MS] [--verbose]
@@ -35,6 +52,7 @@ import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
+import '_solution_geometry.dart';
 import '_trace_cache.dart';
 
 const _collections = [
@@ -256,6 +274,24 @@ class _Vector {
   // (slug, tier) -> share. Stored as a flat map so the CSV writer can
   // iterate `_slugs × _tiers` in fixed column order.
   final Map<String, double> shares;
+  // Solution-geometry (power-spectrum) descriptors — see `spectralFeatures`.
+  final double specPeakFrac;
+  final double specXbarsFrac;
+  final double specYbarsFrac;
+  final double specCheckerFrac;
+  final double specConcentration;
+  // Solution-geometry (autocorrelation) descriptors — see
+  // `autocorrelationFeatures`. Parity-robust companions to the spectral block.
+  final double autoBand;
+  final double autoChecker;
+  final double autoTile;
+  // Solution-geometry (interpretable scalars) — see bin/_solution_geometry.dart.
+  // Period 1 on an axis = colour bars; checkerBlockK > 0 = damier of that maille.
+  final int periodX;
+  final int periodY;
+  final int checkerBlockK;
+  final int nSymmetries;
+  final double rleRatio;
 
   _Vector({
     required this.entry,
@@ -275,6 +311,19 @@ class _Vector {
     required this.maxCascade,
     required this.avgMoveComplexity,
     required this.shares,
+    required this.specPeakFrac,
+    required this.specXbarsFrac,
+    required this.specYbarsFrac,
+    required this.specCheckerFrac,
+    required this.specConcentration,
+    required this.autoBand,
+    required this.autoChecker,
+    required this.autoTile,
+    required this.periodX,
+    required this.periodY,
+    required this.checkerBlockK,
+    required this.nSymmetries,
+    required this.rleRatio,
   });
 }
 
@@ -371,6 +420,15 @@ _Vector? _vectorize(
   final solved = replay.complete && replay.check(saveResult: false).isEmpty;
   if (!solved) return null;
 
+  // Solution geometry: spectral + autocorrelation transforms plus the
+  // interpretable scalars (period / checker / symmetry / RLE), all on the
+  // solved grid. `replay` is the verified full solution, so we read its cell
+  // values directly (no dependency on the line's cached `1:` field). The
+  // scalars are computed inline at construction below.
+  final solGrid = [for (final c in replay.cells) c.value];
+  final spec = spectralFeatures(solGrid, width, height);
+  final auto = autocorrelationFeatures(solGrid, width, height);
+
   final level = classifyTrace(
     steps: steps,
     prefillRatio: prefillRatio,
@@ -406,6 +464,19 @@ _Vector? _vectorize(
     maxCascade: maxCascade,
     avgMoveComplexity: nProp > 0 ? complexitySum / nProp : 0.0,
     shares: shares,
+    specPeakFrac: spec.peak,
+    specXbarsFrac: spec.xbars,
+    specYbarsFrac: spec.ybars,
+    specCheckerFrac: spec.checker,
+    specConcentration: spec.concentration,
+    autoBand: auto.band,
+    autoChecker: auto.checker,
+    autoTile: auto.tile,
+    periodX: periodX(solGrid, width, height),
+    periodY: periodY(solGrid, width, height),
+    checkerBlockK: checkerBlockK(solGrid, width, height),
+    nSymmetries: countSymmetries(solGrid, width, height),
+    rleRatio: rleRatio(solGrid, width, height),
   );
 }
 
@@ -444,6 +515,23 @@ String _csvHeader() {
       cols.add('share_${s}_t$t');
     }
   }
+  // Solution-geometry block, appended last so existing column indices are
+  // stable for any positional reader (consumers select by name).
+  cols.addAll([
+    'spec_peak_frac',
+    'spec_xbars_frac',
+    'spec_ybars_frac',
+    'spec_checker_frac',
+    'spec_concentration',
+    'auto_band',
+    'auto_checker',
+    'auto_tile',
+    'period_x',
+    'period_y',
+    'checker_block_k',
+    'n_symmetries',
+    'rle_ratio',
+  ]);
   return cols.join(',');
 }
 
@@ -474,6 +562,19 @@ String _csvRow(_Vector v) {
       cols.add(v.shares['${s}_t$t']!.toStringAsFixed(4));
     }
   }
+  cols.add(v.specPeakFrac.toStringAsFixed(4));
+  cols.add(v.specXbarsFrac.toStringAsFixed(4));
+  cols.add(v.specYbarsFrac.toStringAsFixed(4));
+  cols.add(v.specCheckerFrac.toStringAsFixed(4));
+  cols.add(v.specConcentration.toStringAsFixed(4));
+  cols.add(v.autoBand.toStringAsFixed(4));
+  cols.add(v.autoChecker.toStringAsFixed(4));
+  cols.add(v.autoTile.toStringAsFixed(4));
+  cols.add('${v.periodX}');
+  cols.add('${v.periodY}');
+  cols.add('${v.checkerBlockK}');
+  cols.add('${v.nSymmetries}');
+  cols.add(v.rleRatio.toStringAsFixed(4));
   return cols.join(',');
 }
 
