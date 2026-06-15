@@ -204,6 +204,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLiveCheckTypeComplete => 'Wait';
 
   @override
+  String get settingGrayoutEnabled => 'Gray out completed constraints';
+
+  @override
   String get settingHintType => 'Hints';
 
   @override

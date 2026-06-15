@@ -141,6 +141,22 @@ class _SettingsPageState extends State<SettingsPage> {
                           );
                         }),
                       ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(l10n.settingGrayoutEnabled),
+                          Switch(
+                            value: widget.settings.grayoutEnabled,
+                            onChanged: (newValue) {
+                              setState(() {
+                                widget.onSettingsChange(
+                                  ChangeableSettings(grayoutEnabled: newValue),
+                                );
+                              });
+                            },
+                          ),
+                        ],
+                      ),
                       _EnumSettingRow<IdleTimeout>(
                         label: l10n.settingIdleTimeout,
                         value: widget.settings.idleTimeout,

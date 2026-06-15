@@ -466,6 +466,12 @@ abstract class AppLocalizations {
   /// **'Wait'**
   String get settingsLiveCheckTypeComplete;
 
+  /// Setting toggle label: when off, constraints stay at full opacity (skips the per-tap completeness scan, useful on large boards).
+  ///
+  /// In en, this message translates to:
+  /// **'Gray out completed constraints'**
+  String get settingGrayoutEnabled;
+
   /// Setting label for hint mode
   ///
   /// In en, this message translates to:

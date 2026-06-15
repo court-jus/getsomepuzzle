@@ -205,6 +205,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsLiveCheckTypeComplete => 'Attendre';
 
   @override
+  String get settingGrayoutEnabled => 'Griser les contraintes complètes';
+
+  @override
   String get settingHintType => 'Astuces';
 
   @override

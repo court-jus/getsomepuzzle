@@ -19,6 +19,7 @@ class ChangeableSettings {
   IdleTimeout? idleTimeout;
   int? playerLevel;
   bool? autoLevel;
+  bool? grayoutEnabled;
 
   ChangeableSettings({
     this.validateType,
@@ -28,11 +29,12 @@ class ChangeableSettings {
     this.idleTimeout,
     this.playerLevel,
     this.autoLevel,
+    this.grayoutEnabled,
   });
 
   @override
   String toString() {
-    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}";
+    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}; GrayoutOn: $grayoutEnabled";
   }
 }
 
@@ -44,6 +46,7 @@ class Settings {
   IdleTimeout idleTimeout;
   int playerLevel;
   bool autoLevel;
+  bool grayoutEnabled;
 
   final log = Logger("Settings");
 
@@ -55,6 +58,7 @@ class Settings {
     this.idleTimeout = IdleTimeout.disabled,
     this.playerLevel = 0,
     this.autoLevel = true,
+    this.grayoutEnabled = true,
   });
 
   @override
@@ -127,6 +131,7 @@ class Settings {
     );
     playerLevel = prefs.getInt("settingsPlayerLevel") ?? 0;
     autoLevel = prefs.getBool("settingsAutoLevel") ?? true;
+    grayoutEnabled = prefs.getBool("settingsGrayoutEnabled") ?? true;
   }
 
   Future<void> save() async {
@@ -138,6 +143,7 @@ class Settings {
     prefs.setString("settingsIdleTimeout", idleTimeout.name);
     prefs.setInt("settingsPlayerLevel", playerLevel);
     prefs.setBool("settingsAutoLevel", autoLevel);
+    prefs.setBool("settingsGrayoutEnabled", grayoutEnabled);
   }
 
   void change(ChangeableSettings newValue) {
@@ -161,6 +167,9 @@ class Settings {
     }
     if (newValue.autoLevel != null) {
       autoLevel = newValue.autoLevel!;
+    }
+    if (newValue.grayoutEnabled != null) {
+      grayoutEnabled = newValue.grayoutEnabled!;
     }
     save();
   }

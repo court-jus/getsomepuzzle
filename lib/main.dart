@@ -366,7 +366,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     // The `addConstraint` hint search is deferred to the first hint tap
     // (`GameModel.onHintTap`), not run eagerly on open — it is expensive and,
     // on web, runs on the main thread.
+    _applyGrayoutSetting();
     _surfaceNewConstraintsIfAny(puz);
+  }
+
+  void _applyGrayoutSetting() {
+    final p = game.currentPuzzle;
+    if (p == null) return;
+    p.grayoutEnabled = settings.grayoutEnabled;
+    p.updateConstraintStatus();
+    game.refresh();
   }
 
   /// If the puzzle declares constraint slugs the player has never
@@ -1155,6 +1164,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   if (newValue.idleTimeout != null) {
                     game.idleTimeoutDuration = settings.idleTimeoutDuration;
                     game.rearmIdleTimer();
+                  }
+                  if (newValue.grayoutEnabled != null) {
+                    _applyGrayoutSetting();
+                    setState(() {});
                   }
                   // Recompute immediately when auto is toggled on, so
                   // the player doesn't have to finish a puzzle first.

@@ -250,6 +250,10 @@
     "@settingsLiveCheckTypeComplete": {
         "description": "The player wants to wait until puzzle completion to see errors"
     },
+    "settingGrayoutEnabled": "Gray out completed constraints",
+    "@settingGrayoutEnabled": {
+        "description": "Setting toggle label: when off, constraints stay at full opacity (skips the per-tap completeness scan, useful on large boards)."
+    },
     "settingHintType": "Hints",
     "@settingHintType": {
         "description": "Setting label for hint mode"

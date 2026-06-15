@@ -68,6 +68,7 @@
     "settingsLiveCheckTypeAll": "Tiempo real",
     "settingsLiveCheckTypeCount": "Recuento",
     "settingsLiveCheckTypeComplete": "Esperar",
+    "settingGrayoutEnabled": "Atenuar las restricciones completas",
     "settingHintType": "Pistas",
     "settingHintTypeDeducibleCell": "Celda deducible",
     "settingHintTypeAddConstraint": "Añadir restricción",

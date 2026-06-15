@@ -659,7 +659,15 @@ class Puzzle {
     return result;
   }
 
+  bool grayoutEnabled = true;
+
   void updateConstraintStatus() {
+    if (!grayoutEnabled) {
+      for (final constraint in constraints) {
+        constraint.isComplete = false;
+      }
+      return;
+    }
     for (final constraint in constraints) {
       constraint.isComplete = constraint.isCompleteFor(this);
     }
