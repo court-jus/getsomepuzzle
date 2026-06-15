@@ -67,9 +67,16 @@ Complete when the indexed group is fully bordered (no empty neighbors) AND has r
 
 #### 2.3 `LetterGroup`
 
-**File:** `lib/getsomepuzzle/constraints/groups.dart`
+**File:** `lib/getsomepuzzle/constraints/letter_group.dart`
 
-Complete when all indexed cells are filled with the same color, forming a connected group, AND the group has no free neighbors (fully bordered).
+Complete when all indexed cells are filled with the same color, forming a
+single connected group, AND no foreign-letter cell is still reachable from that
+group through cells that could join it (a flood over `{groupColor ∪ free}`).
+Once the members are connected and no other letter can ever merge in, no `apply`
+branch can fire again. Free neighbours are allowed as long as they cannot reach
+a foreign letter — the flood's traversable set only shrinks as cells are
+coloured, so the criterion is monotone and grays out as soon as the letters are
+linked and isolated from other letters.
 
 #### 2.4 `SymmetryConstraint`
 

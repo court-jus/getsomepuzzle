@@ -250,12 +250,29 @@ class LetterGroup extends CellsCentricConstraint {
           grp.toSet().intersection(indices.toSet()).length == indices.length,
     );
     if (myGroup == null) return false;
-    for (final member in myGroup) {
-      final freeNeighbors = puzzle
-          .getNeighbors(member)
-          .where((nei) => puzzle.cellValues[nei] == CellValue.free);
-      if (freeNeighbors.isNotEmpty) return false;
-    }
-    return true;
+    // The members are connected in a single group. The only remaining way for
+    // apply to fire is another letter merging into that group (branches 2/5).
+    // That stays possible iff a foreign-letter cell is still reachable from the
+    // group through cells that could become part of it — i.e. cells already
+    // myColor or still free. Flood over {myColor ∪ free}: if it reaches no
+    // foreign-letter cell, no future move can ever trigger apply again.
+    // The traversable set only shrinks as cells are coloured, so this criterion
+    // is monotone — once complete, it stays complete.
+    final myColor = puzzle.cellValues[myGroup.first];
+    final otherLetterIndices = puzzle.constraints
+        .whereType<LetterGroup>()
+        .where((c) => c.letter != letter)
+        .expand((c) => c.indices)
+        .toSet();
+    final conflictPossible = canReach(
+      puzzle,
+      myGroup,
+      otherLetterIndices.contains,
+      (i) {
+        final v = puzzle.cellValues[i];
+        return v == myColor || v == CellValue.free;
+      },
+    );
+    return !conflictPossible;
   }
 }

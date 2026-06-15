@@ -61,8 +61,13 @@ a regression test in `test/generator_test.dart`.
      members must take the group colour (complexity 4).
   5. Free neighbours of the group that also touch another letter's
      same-colour cells cannot take the group colour.
-- **`isCompleteFor(Puzzle)`** — `verify` holds, all members are coloured,
-  they form a single group, and that group has no free neighbour left.
+- **`isCompleteFor(Puzzle)`** — `verify` holds, all members are coloured and
+  form a single group, and no foreign-letter cell is reachable from that group
+  through cells of value `groupColor` or `free` (a `canReach` flood). Once the
+  members are linked and no other letter can still be bridged in, no `apply`
+  branch can fire again; the flood's traversable set only shrinks as cells are
+  coloured, so the criterion is monotone. Free neighbours no longer block
+  grayout as long as they cannot reach another letter.
 - **`generateAllParameters(width, height, domain, excludedIndices)`** — emits
   two-cell `letter.idx1.idx2` triples for every ordered cell pair and every
   letter `0..maxLetters-1` (`maxLetters = max(1, size ~/ 5)`), skipping the
