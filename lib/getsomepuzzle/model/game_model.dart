@@ -872,7 +872,11 @@ class GameModel extends ChangeNotifier {
         hintText = texts.hintCellDeducible;
       case RemoveOption(:final idx):
         currentPuzzle!.cells[idx].isHighlighted = true;
-        hintText = texts.hintCellOptionRemovable;
+        // In a 2-colour domain, removing one option ≡ choosing the other, so
+        // present the move as a cell deduction rather than an option removal.
+        hintText = currentPuzzle!.domain.length == 2
+            ? texts.hintCellDeducible
+            : texts.hintCellOptionRemovable;
       case Impossible():
         // A contradiction has no single deducible cell to highlight at this
         // stage; tap 3 (_revealCellAndConstraint) surfaces it as
@@ -899,11 +903,16 @@ class GameModel extends ChangeNotifier {
         hintIsError = true;
       case RemoveOption(:final idx, :final isForce, :final givenBy):
         currentPuzzle!.cells[idx].isHighlighted = true;
+        // In a 2-colour domain, removing one option ≡ choosing the other, so
+        // present it with the cell-deduction phrasing instead of option removal.
+        final domain2 = currentPuzzle!.domain.length == 2;
         if (isForce) {
-          hintText = texts.hintForceRemoveOption;
+          hintText = domain2 ? texts.hintForce : texts.hintForceRemoveOption;
         } else {
           if (givenBy is Constraint) givenBy.isHighlighted = true;
-          hintText = texts.hintRemoveOptionDeducedFrom(givenBy);
+          hintText = domain2
+              ? texts.hintDeducedFrom(givenBy)
+              : texts.hintRemoveOptionDeducedFrom(givenBy);
         }
         hintIsError = false;
       case SetValue(:final idx, :final givenBy):

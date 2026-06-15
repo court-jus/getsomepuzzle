@@ -38,6 +38,15 @@ work as they want for themselves.
    the constraint to the cell.
 4. **Apply.** Apply the move and reset the cycle.
 
+The move from `findAMove` is either a `SetValue` ("this cell is X") or a
+`RemoveOption` ("this cell is not X"), and each has its own wording. In a
+2-colour domain (`puzzle.domain.length == 2`) the two are equivalent —
+removing one option leaves exactly one — so a `RemoveOption` is surfaced with
+the `SetValue` wording at every tap (cell-deduction phrasing on taps 2 and 3),
+in `GameModel._revealCellOnly` / `_revealCellAndConstraint`. The
+option-removal wording is reserved for 3-colour domains, where a pruned option
+still leaves the cell free.
+
 ### Implementation
 
 **Entry point:** `_MyHomePageState.showHelpMove()` in `lib/main.dart`,

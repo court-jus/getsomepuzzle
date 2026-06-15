@@ -463,6 +463,66 @@ void main() {
     });
   });
 
+  group(
+    'Hint flow — RemoveOption phrasing depends on domain size (issue 19)',
+    () {
+      // A `removeOption` deduction attributed to a constraint. We assign
+      // `helpMove` directly rather than mine a fixture whose `findAMove`
+      // happens to return a removeOption: the routing under test is purely
+      // (domain size × move type), and a hand-built move makes both branches
+      // deterministic. Cell 4 is free in both fixtures; cell 0 is the given.
+      RemoveOption removeOptionOnCell4() =>
+          RemoveOption(4, CellValue.black, createConstraint('LT', 'A.0.4')!);
+
+      test('domain-2: removeOption is surfaced as a cell deduction', () {
+        // With only two colours, pruning one option ≡ choosing the other, so
+        // every tap must read like a setValue deduction — not "an option can
+        // be removed".
+        final game = GameModel();
+        final settings = Settings(hintType: HintType.deducibleCell);
+        game.openPuzzle(PuzzleData('v2_12_3x3_100000000_LT:A.0.4_0:0_0'), 1);
+        game.helpMove = removeOptionOnCell4();
+
+        game.onHintTap(settings, _texts); // stage 0 → 1: errors pass
+        game.onHintTap(settings, _texts); // stage 1 → 2: cell-only reveal
+        expect(
+          game.hintText,
+          'cell deducible',
+          reason: 'domain 2 tap 2 must use the setValue phrasing',
+        );
+        expect(game.currentPuzzle!.cells[4].isHighlighted, isTrue);
+
+        game.onHintTap(settings, _texts); // stage 2 → 3: cell + constraint
+        expect(
+          game.hintText,
+          'deduced from LT',
+          reason: 'domain 2 tap 3 must also use the setValue phrasing',
+        );
+
+        game.dispose();
+      });
+
+      test('domain-3: removeOption keeps the option-removal phrasing', () {
+        // Regression guard: with three colours a pruned option leaves the cell
+        // genuinely free, so the original "an option can be removed" wording
+        // must stay — the domain-2 shortcut must not leak into domain 3.
+        final game = GameModel();
+        final settings = Settings(hintType: HintType.deducibleCell);
+        game.openPuzzle(PuzzleData('v2_123_3x3_100000000_LT:A.0.4_0:0_0'), 1);
+        game.helpMove = removeOptionOnCell4();
+
+        game.onHintTap(settings, _texts); // stage 0 → 1
+        game.onHintTap(settings, _texts); // stage 1 → 2
+        expect(game.hintText, 'cell option removable');
+
+        game.onHintTap(settings, _texts); // stage 2 → 3
+        expect(game.hintText, 'remove option from LT');
+
+        game.dispose();
+      });
+    },
+  );
+
   group('Hint flow — debounce-race safety', () {
     test('tapping before the help debounce fires is a graceful no-op', () {
       // Tap 4 times in a row immediately after openPuzzle. `_helpDebounce`
