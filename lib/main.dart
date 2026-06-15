@@ -174,6 +174,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // 3+ colour puzzles: on a 2-colour domain the cycle collapses to a
   // setValue and the button stays hidden.
   bool _removeOptionMode = false;
+  // True while the restart confirmation overlay is shown (topbar restart was
+  // tapped). It pauses the game and turns the pause overlay into a two-button
+  // confirm screen, guarding against accidental restarts (issue 21).
+  bool _confirmingRestart = false;
   Timer? _saveTimer;
   final log = Logger("HomePage");
 
@@ -675,6 +679,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   void togglePause() {
     if (game.paused) {
+      // Resuming also cancels a pending restart confirmation.
+      _confirmingRestart = false;
       game.resume();
       if (game.currentPuzzle == null) {
         loadPuzzle();
@@ -682,6 +688,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     } else {
       game.pause();
     }
+  }
+
+  /// Confirms the restart requested from the topbar: reset the grid and resume
+  /// on the fresh puzzle.
+  void _confirmRestart() {
+    setState(() {
+      _confirmingRestart = false;
+      game.restart();
+      game.resume();
+    });
   }
 
   void _onDrawerChanged(bool isOpened) {
@@ -1007,7 +1023,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             IconButton(
               icon: Icon(Icons.restart_alt_outlined),
               tooltip: AppLocalizations.of(context)!.restart,
-              onPressed: game.history.isEmpty ? null : game.restart,
+              // Don't restart immediately: pause and show the confirmation
+              // overlay to guard against accidental taps (issue 21).
+              onPressed: game.history.isEmpty
+                  ? null
+                  : () => setState(() {
+                      _confirmingRestart = true;
+                      game.pause();
+                    }),
             ),
           if (database != null && !shouldChooseLocale)
             IconButton(
@@ -1226,6 +1249,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                 else if (game.paused)
                                   PauseOverlay(
                                     onResume: togglePause,
+                                    onRestart: _confirmingRestart
+                                        ? _confirmRestart
+                                        : null,
+                                    restartLabel: AppLocalizations.of(
+                                      context,
+                                    )!.restart,
                                     width: contextWidth,
                                     height: contextHeight,
                                     iconSize: cellSize * 3,
