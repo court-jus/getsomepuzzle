@@ -636,21 +636,13 @@
     "@constraintGroupCount": {
         "description": "Name of the group count constraint"
     },
-    "constraintColumnCount": "cells per column",
-    "@constraintColumnCount": {
-        "description": "Name of the column count constraint"
+    "constraintLineCount": "cells per line",
+    "@constraintLineCount": {
+        "description": "Name of the line count constraint (merged row/column count)"
     },
-    "constraintRowCount": "cells per row",
-    "@constraintRowCount": {
-        "description": "Name of the row count constraint"
-    },
-    "constraintRowTransition": "row transition",
-    "@constraintRowTransition": {
-        "description": "Name of the row transition constraint"
-    },
-    "constraintColumnTransition": "column transition",
-    "@constraintColumnTransition": {
-        "description": "Name of the column transition constraint"
+    "constraintTransition": "transition",
+    "@constraintTransition": {
+        "description": "Name of the transition constraint (merged row/column transition)"
     },
     "constraintShape": "shape",
     "@constraintShape": {
@@ -774,21 +766,13 @@
     "@constraintExplainDF": {
         "description": "Body of the new-constraint explanation modal for the Different From (DF) constraint"
     },
-    "constraintExplainCC": "A circled number above a column tells how many cells of that color must appear in this specific column.",
-    "@constraintExplainCC": {
-        "description": "Body of the new-constraint explanation modal for the Column Count (CC) constraint"
+    "constraintExplainLineCount": "A circled number beside a row or column tells how many cells of that color must appear in that line.",
+    "@constraintExplainLineCount": {
+        "description": "Body of the new-constraint explanation modal for the merged line count constraint (CC/RC)"
     },
-    "constraintExplainRC": "A circled number to the left of a row tells how many cells of that color must appear in this specific row.",
-    "@constraintExplainRC": {
-        "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
-    },
-    "constraintExplainRT": "A square wave with a number beside a row tells how many color changes (transitions) must appear in that row. Each step of the wave is one change; a flat wave with 0 means the whole row is a single color.",
-    "@constraintExplainRT": {
-        "description": "Body of the new-constraint explanation modal for the Row Transition (RT) constraint"
-    },
-    "constraintExplainCT": "A square wave with a number above a column tells how many color changes (transitions) must appear in that column. Each step of the wave is one change; a flat wave with 0 means the whole column is a single color.",
-    "@constraintExplainCT": {
-        "description": "Body of the new-constraint explanation modal for the Column Transition (CT) constraint"
+    "constraintExplainTransition": "A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.",
+    "@constraintExplainTransition": {
+        "description": "Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)"
     },
     "constraintExplainGC": "A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.",
     "@constraintExplainGC": {

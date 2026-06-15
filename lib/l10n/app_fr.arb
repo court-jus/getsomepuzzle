@@ -175,21 +175,13 @@
     "constraintExplainQA": "Un indice numérique sur fond bleu au-dessus du puzzle indique combien de cases de cette couleur la solution doit contenir au total.",
     "constraintExplainSY": "Lorsqu'une case contient l'un de ces symboles (⟍, |, ⟋, ―, 🞋), le groupe dont elle fait partie doit respecter la symétrie associée. La symétrie centrale (🞋) équivaut à une rotation d'un demi-tour.",
     "constraintExplainDF": "Lorsque deux cellules sont séparées par le symbole ≠, elles doivent être de couleurs différentes.",
-    "constraintExplainCC": "Un nombre dans un cercle au-dessus d'une colonne indique combien de cellules de cette couleur doivent apparaître dans cette colonne précise.",
-    "@constraintExplainCC": {
-        "description": "Body of the new-constraint explanation modal for the Column Count (CC) constraint"
+    "constraintExplainLineCount": "Un nombre dans un cercle à côté d'une ligne ou d'une colonne indique combien de cellules de cette couleur doivent apparaître dans cette ligne.",
+    "@constraintExplainLineCount": {
+        "description": "Body of the new-constraint explanation modal for the merged line count constraint (CC/RC)"
     },
-    "constraintExplainRC": "Un nombre dans un cercle à gauche d'une ligne indique combien de cellules de cette couleur doivent apparaître dans cette ligne précise.",
-    "@constraintExplainRC": {
-        "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
-    },
-    "constraintExplainRT": "Une onde carrée avec un nombre à côté d'une ligne indique combien de changements de couleur doivent apparaître dans cette ligne. Chaque marche de l'onde est un changement ; une onde plate avec 0 signifie que toute la ligne est d'une seule couleur.",
-    "@constraintExplainRT": {
-        "description": "Body of the new-constraint explanation modal for the Row Transition (RT) constraint"
-    },
-    "constraintExplainCT": "Une onde carrée avec un nombre au-dessus d'une colonne indique combien de changements de couleur doivent apparaître dans cette colonne. Chaque marche de l'onde est un changement ; une onde plate avec 0 signifie que toute la colonne est d'une seule couleur.",
-    "@constraintExplainCT": {
-        "description": "Body of the new-constraint explanation modal for the Column Transition (CT) constraint"
+    "constraintExplainTransition": "Une onde carrée avec un nombre à côté d'une ligne ou d'une colonne indique combien de changements de couleur doivent apparaître dans cette ligne. Chaque marche de l'onde est un changement ; une onde plate avec 0 signifie que toute la ligne est d'une seule couleur.",
+    "@constraintExplainTransition": {
+        "description": "Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)"
     },
     "constraintExplainNC": "Une case affichée sous forme de croix contenant un chiffre doit avoir exactement ce nombre de voisins orthogonaux de la couleur indiquée.",
     "@constraintExplainNC": {
@@ -257,21 +249,13 @@
     "endOfPlaylistSuggestedHint": "D'après ton niveau, tu pourrais aimer cette collection.",
     "endOfPlaylistOnboardingNote": "Tu n'as pas encore croisé toutes les règles — continue à jouer pour les découvrir une par une.",
     "endOfPlaylistPickAnother": "Choisir une autre collection",
-    "constraintColumnCount": "cellules par colonne",
-    "@constraintColumnCount": {
-        "description": "Name of the column count constraint"
+    "constraintLineCount": "cellules par ligne",
+    "@constraintLineCount": {
+        "description": "Name of the line count constraint (merged row/column count)"
     },
-    "constraintRowCount": "cellules par ligne",
-    "@constraintRowCount": {
-        "description": "Name of the row count constraint"
-    },
-    "constraintRowTransition": "transition par ligne",
-    "@constraintRowTransition": {
-        "description": "Name of the row transition constraint"
-    },
-    "constraintColumnTransition": "transition par colonne",
-    "@constraintColumnTransition": {
-        "description": "Name of the column transition constraint"
+    "constraintTransition": "transition",
+    "@constraintTransition": {
+        "description": "Name of the transition constraint (merged row/column transition)"
     },
     "complicityOtherConstraint": "une autre contrainte",
     "settingReplayOnboarding": "Rejouer l'onboarding",

@@ -188,7 +188,7 @@ void main() {
       final db = Database(playerLevel: 0)..samplingRandom = math.Random(42);
       // Reach phase P5 (introducing GS): every earlier phase's slug cleared,
       // GS still below the threshold.
-      db.onboardingCompletions = strictCompletionsUpTo(5);
+      db.onboardingCompletions = strictCompletionsUpTo(4);
       expect(db.currentPhase?.introducing, 'GS');
       final trivial = gsPuz(1);
       final nonTrivial = gsPuz(3);
@@ -577,7 +577,7 @@ void main() {
         "GS": 4,
       };
       expect(db.recommendedCollectionKey, null);
-      expect(db.currentPhase?.index, 5);
+      expect(db.currentPhase?.index, 4);
       // Synthesize a played puzzle that contains the last constraint that has not been fully onboarded yet.
       // We play it enough times so the recommendation thinks we played enough puzzles
       final puz = PuzzleData('v2_12_3x3_000020000_GS:0.1__');

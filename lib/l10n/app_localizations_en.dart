@@ -578,16 +578,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintGroupCount => 'group count';
 
   @override
-  String get constraintColumnCount => 'cells per column';
+  String get constraintLineCount => 'cells per line';
 
   @override
-  String get constraintRowCount => 'cells per row';
-
-  @override
-  String get constraintRowTransition => 'row transition';
-
-  @override
-  String get constraintColumnTransition => 'column transition';
+  String get constraintTransition => 'transition';
 
   @override
   String get constraintShape => 'shape';
@@ -697,20 +691,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Two cells separated by a ≠ symbol must be of different colors.';
 
   @override
-  String get constraintExplainCC =>
-      'A circled number above a column tells how many cells of that color must appear in this specific column.';
+  String get constraintExplainLineCount =>
+      'A circled number beside a row or column tells how many cells of that color must appear in that line.';
 
   @override
-  String get constraintExplainRC =>
-      'A circled number to the left of a row tells how many cells of that color must appear in this specific row.';
-
-  @override
-  String get constraintExplainRT =>
-      'A square wave with a number beside a row tells how many color changes (transitions) must appear in that row. Each step of the wave is one change; a flat wave with 0 means the whole row is a single color.';
-
-  @override
-  String get constraintExplainCT =>
-      'A square wave with a number above a column tells how many color changes (transitions) must appear in that column. Each step of the wave is one change; a flat wave with 0 means the whole column is a single color.';
+  String get constraintExplainTransition =>
+      'A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.';
 
   @override
   String get constraintExplainGC =>

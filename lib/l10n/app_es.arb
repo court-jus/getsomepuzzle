@@ -175,21 +175,13 @@
     "constraintExplainQA": "Un indicador numérico sobre fondo azul encima del puzzle señala cuántas casillas de ese color debe contener la solución en total.",
     "constraintExplainSY": "Cuando una casilla contiene uno de estos símbolos (⟍, |, ⟋, ―, 🞋), el grupo del que forma parte debe respetar la simetría asociada. La simetría central (🞋) equivale a un giro de media vuelta.",
     "constraintExplainDF": "Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.",
-    "constraintExplainCC": "Un número dentro de un círculo sobre una columna indica cuántas celdas de ese color deben aparecer en esa columna específica.",
-    "@constraintExplainCC": {
-        "description": "Body of the new-constraint explanation modal for the Column Count (CC) constraint"
+    "constraintExplainLineCount": "Un número dentro de un círculo al lado de una fila o columna indica cuántas celdas de ese color deben aparecer en esa línea.",
+    "@constraintExplainLineCount": {
+        "description": "Body of the new-constraint explanation modal for the merged line count constraint (CC/RC)"
     },
-    "constraintExplainRC": "Un número dentro de un círculo a la izquierda de una fila indica cuántas celdas de ese color deben aparecer en esa fila específica.",
-    "@constraintExplainRC": {
-        "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
-    },
-    "constraintExplainRT": "Una onda cuadrada con un número al lado de una fila indica cuántos cambios de color deben aparecer en esa fila. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la fila es de un solo color.",
-    "@constraintExplainRT": {
-        "description": "Body of the new-constraint explanation modal for the Row Transition (RT) constraint"
-    },
-    "constraintExplainCT": "Una onda cuadrada con un número sobre una columna indica cuántos cambios de color deben aparecer en esa columna. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la columna es de un solo color.",
-    "@constraintExplainCT": {
-        "description": "Body of the new-constraint explanation modal for the Column Transition (CT) constraint"
+    "constraintExplainTransition": "Una onda cuadrada con un número al lado de una fila o columna indica cuántos cambios de color deben aparecer en esa línea. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la línea es de un solo color.",
+    "@constraintExplainTransition": {
+        "description": "Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)"
     },
     "constraintExplainNC": "Una casilla mostrada como una cruz que contiene un número debe tener exactamente ese número de vecinos ortogonales del color indicado.",
     "@constraintExplainNC": {
@@ -257,21 +249,13 @@
     "endOfPlaylistSuggestedHint": "Según tu nivel, podría gustarte esta colección.",
     "endOfPlaylistOnboardingNote": "Aún no has visto todas las reglas — sigue jugando para descubrirlas una a una.",
     "endOfPlaylistPickAnother": "Elegir otra colección",
-    "constraintColumnCount": "células por columna",
-    "@constraintColumnCount": {
-        "description": "Name of the column count constraint"
+    "constraintLineCount": "células por línea",
+    "@constraintLineCount": {
+        "description": "Name of the line count constraint (merged row/column count)"
     },
-    "constraintRowCount": "células por fila",
-    "@constraintRowCount": {
-        "description": "Name of the row count constraint"
-    },
-    "constraintRowTransition": "transición por fila",
-    "@constraintRowTransition": {
-        "description": "Name of the row transition constraint"
-    },
-    "constraintColumnTransition": "transición por columna",
-    "@constraintColumnTransition": {
-        "description": "Name of the column transition constraint"
+    "constraintTransition": "transición",
+    "@constraintTransition": {
+        "description": "Name of the transition constraint (merged row/column transition)"
     },
     "complicityOtherConstraint": "otra restricción",
     "settingReplayOnboarding": "Repetir la introducción",

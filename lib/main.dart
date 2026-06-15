@@ -449,6 +449,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       } else {
         for (final slug in newSlugs) {
           progress.noteSeen(slug, now);
+          // Merged families: CC↔RC and RT↔CT share the same onboarding
+          // explanation. Mark the paired slug as seen too so the soft
+          // filter doesn't re-introduce it later as a separate discovery.
+          if (slug == 'CC' || slug == 'RC') {
+            progress.noteSeen('RC', now);
+            progress.noteSeen('CC', now);
+          } else if (slug == 'RT' || slug == 'CT') {
+            progress.noteSeen('RT', now);
+            progress.noteSeen('CT', now);
+          }
         }
       }
       // Persist whatever new slugs were dismissed; failing silently
@@ -761,9 +771,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       case 'DF':
         return l10n.constraintDifferentFrom;
       case 'CC':
-        return l10n.constraintColumnCount;
       case 'RC':
-        return l10n.constraintRowCount;
+        return l10n.constraintLineCount;
       case 'GC':
         return l10n.constraintGroupCount;
       case 'NC':
@@ -771,9 +780,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       case 'EY':
         return l10n.constraintEyes;
       case 'RT':
-        return l10n.constraintRowTransition;
       case 'CT':
-        return l10n.constraintColumnTransition;
+        return l10n.constraintTransition;
       case '*':
         return l10n.complicityOtherConstraint;
       default:

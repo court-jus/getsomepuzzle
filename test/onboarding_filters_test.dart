@@ -33,8 +33,8 @@ void main() {
       );
     });
 
-    test('P3 wants CC, bans every slug not in {FM, PA, NC, CC}', () {
-      // P3 introduces CC and allows {FM, PA, NC, CC}. Anything else in
+    test('P3 wants CC, bans every slug not in {FM, PA, NC, CC, RC}', () {
+      // P3 introduces CC and allows {FM, PA, NC, CC, RC}. Anything else in
       // the registry must be banned so the catalog narrows to that
       // envelope, and the puzzle must contain CC (wantedRules).
       final db = Database(playerLevel: 50, progress: ConstraintProgress());
@@ -46,23 +46,35 @@ void main() {
       expect(reco.wantedRules, {'CC'});
       expect(
         reco.bannedRules,
-        OnboardingPhase.allKnownSlugs.difference({'FM', 'PA', 'NC', 'CC'}),
+        OnboardingPhase.allKnownSlugs.difference({
+          'FM',
+          'PA',
+          'NC',
+          'CC',
+          'RC',
+        }),
       );
     });
 
-    test('P9 (last strict phase) wants QA, bans only post-strict slugs', () {
-      // P9 introduces QA and allows {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF', 'LT', 'QA'}. The banned
-      // set narrows to the post-strict tail (SY, SH, GC, MJ)
+    test('P8 (last strict phase) wants QA, bans only post-strict slugs', () {
+      // P8 introduces QA and allows {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF', 'LT', 'QA'}. The banned
+      // set narrows to the post-strict tail (RC, RT, SY, SH, CH, CT, GC, MJ)
       // — exactly what postStrictDiscoveryOrder will manage next.
       final db = Database(playerLevel: 50, progress: ConstraintProgress());
-      db.onboardingCompletions = strictCompletionsUpTo(9);
+      db.onboardingCompletions = strictCompletionsUpTo(8);
       final phase = db.currentPhase!;
       expect(phase.introducing, 'QA');
       final reco = db.recommendedOnboardingFilters!;
       expect(reco.wantedRules, {'QA'});
+      // RC shares the CC phase and is in every strict phase's allowed set
+      // (propagated from the merged P3), so it is not banned. The remaining
+      // post-strict slugs (SY, SH, CH, GC, MJ) plus CT and RT make up the
+      // full banned set.
       expect(
         reco.bannedRules,
-        OnboardingPhase.postStrictDiscoveryOrder.toSet(),
+        OnboardingPhase.postStrictDiscoveryOrder.toSet().difference(
+          phase.allowed,
+        ),
       );
     });
   });
@@ -186,7 +198,13 @@ void main() {
       expect(db.currentFilters.wantedRules, {'CC'});
       expect(
         db.currentFilters.bannedRules,
-        OnboardingPhase.allKnownSlugs.difference({'FM', 'PA', 'NC', 'CC'}),
+        OnboardingPhase.allKnownSlugs.difference({
+          'FM',
+          'PA',
+          'NC',
+          'CC',
+          'RC',
+        }),
       );
       expect(prefs.getBool('onboardingFiltersApplied'), isTrue);
     });

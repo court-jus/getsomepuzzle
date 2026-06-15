@@ -59,7 +59,7 @@ void main() {
 
   group('OnboardingPhase.postStrictDiscoveryOrder', () {
     test('contains exactly the slugs not introduced by any strict phase', () {
-      // Strict phases introduce {FM, NC, PA, CC, RC, GS}; everything
+      // Strict phases introduce {FM, NC, PA, CC, GS}; everything
       // else from the registry must end up in the post-strict
       // discovery list so the soft filter has a slug to elect for
       // every remaining unseen rule.
@@ -82,6 +82,7 @@ void main() {
       // predictable and reviewable; if someone reorders the registry,
       // the order test fails and we revisit it intentionally.
       expect(OnboardingPhase.postStrictDiscoveryOrder, [
+        'RC',
         'RT',
         'SY',
         'SH',

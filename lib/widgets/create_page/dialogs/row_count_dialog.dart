@@ -13,7 +13,7 @@ Future<RowCountConstraint?> showRowCountDialog(
   final ridx = cellIdx ~/ width;
   final result = await showColorCountDialog(
     context,
-    title: loc.constraintRowCount,
+    title: loc.constraintLineCount,
     initialCount: width,
     minCount: 1,
     maxCount: width,

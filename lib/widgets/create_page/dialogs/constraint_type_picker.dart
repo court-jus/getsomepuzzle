@@ -184,11 +184,10 @@ String _labelGroupSize(AppLocalizations l) => l.constraintGroupSize;
 String _labelLetterGroup(AppLocalizations l) => l.constraintLetterGroup;
 String _labelMajority(AppLocalizations l) => l.constraintMajority;
 String _labelQuantity(AppLocalizations l) => l.constraintQuantity;
-String _labelColumnCount(AppLocalizations l) => l.constraintColumnCount;
-String _labelRowCount(AppLocalizations l) => l.constraintRowCount;
-String _labelRowTransition(AppLocalizations l) => l.constraintRowTransition;
-String _labelColumnTransition(AppLocalizations l) =>
-    l.constraintColumnTransition;
+String _labelColumnCount(AppLocalizations l) => l.constraintLineCount;
+String _labelRowCount(AppLocalizations l) => l.constraintLineCount;
+String _labelRowTransition(AppLocalizations l) => l.constraintTransition;
+String _labelColumnTransition(AppLocalizations l) => l.constraintTransition;
 String _labelGroupCount(AppLocalizations l) => l.constraintGroupCount;
 String _labelNeighborCount(AppLocalizations l) => l.constraintNeighborCount;
 String _labelShape(AppLocalizations l) => l.constraintShape;

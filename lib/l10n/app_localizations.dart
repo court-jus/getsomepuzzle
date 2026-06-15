@@ -1156,29 +1156,17 @@ abstract class AppLocalizations {
   /// **'group count'**
   String get constraintGroupCount;
 
-  /// Name of the column count constraint
+  /// Name of the line count constraint (merged row/column count)
   ///
   /// In en, this message translates to:
-  /// **'cells per column'**
-  String get constraintColumnCount;
+  /// **'cells per line'**
+  String get constraintLineCount;
 
-  /// Name of the row count constraint
+  /// Name of the transition constraint (merged row/column transition)
   ///
   /// In en, this message translates to:
-  /// **'cells per row'**
-  String get constraintRowCount;
-
-  /// Name of the row transition constraint
-  ///
-  /// In en, this message translates to:
-  /// **'row transition'**
-  String get constraintRowTransition;
-
-  /// Name of the column transition constraint
-  ///
-  /// In en, this message translates to:
-  /// **'column transition'**
-  String get constraintColumnTransition;
+  /// **'transition'**
+  String get constraintTransition;
 
   /// Name of the shape constraint
   ///
@@ -1348,29 +1336,17 @@ abstract class AppLocalizations {
   /// **'Two cells separated by a ≠ symbol must be of different colors.'**
   String get constraintExplainDF;
 
-  /// Body of the new-constraint explanation modal for the Column Count (CC) constraint
+  /// Body of the new-constraint explanation modal for the merged line count constraint (CC/RC)
   ///
   /// In en, this message translates to:
-  /// **'A circled number above a column tells how many cells of that color must appear in this specific column.'**
-  String get constraintExplainCC;
+  /// **'A circled number beside a row or column tells how many cells of that color must appear in that line.'**
+  String get constraintExplainLineCount;
 
-  /// Body of the new-constraint explanation modal for the Row Count (RC) constraint
+  /// Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)
   ///
   /// In en, this message translates to:
-  /// **'A circled number to the left of a row tells how many cells of that color must appear in this specific row.'**
-  String get constraintExplainRC;
-
-  /// Body of the new-constraint explanation modal for the Row Transition (RT) constraint
-  ///
-  /// In en, this message translates to:
-  /// **'A square wave with a number beside a row tells how many color changes (transitions) must appear in that row. Each step of the wave is one change; a flat wave with 0 means the whole row is a single color.'**
-  String get constraintExplainRT;
-
-  /// Body of the new-constraint explanation modal for the Column Transition (CT) constraint
-  ///
-  /// In en, this message translates to:
-  /// **'A square wave with a number above a column tells how many color changes (transitions) must appear in that column. Each step of the wave is one change; a flat wave with 0 means the whole column is a single color.'**
-  String get constraintExplainCT;
+  /// **'A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.'**
+  String get constraintExplainTransition;
 
   /// Body of the new-constraint explanation modal for the Group Count (GC) constraint
   ///

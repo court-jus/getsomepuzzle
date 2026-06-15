@@ -36,40 +36,35 @@ class OnboardingPhase {
     OnboardingPhase(
       index: 3,
       introducing: 'CC',
-      allowed: {'FM', 'PA', 'NC', 'CC'},
-    ),
-    OnboardingPhase(
-      index: 4,
-      introducing: 'RC',
       allowed: {'FM', 'PA', 'NC', 'CC', 'RC'},
     ),
     OnboardingPhase(
-      index: 5,
+      index: 4,
       introducing: 'GS',
       allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS'},
     ),
     OnboardingPhase(
-      index: 6,
+      index: 5,
       introducing: 'EY',
       allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY'},
     ),
     OnboardingPhase(
-      index: 7,
+      index: 6,
       introducing: 'DF',
       allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF'},
     ),
     OnboardingPhase(
-      index: 8,
+      index: 7,
       introducing: 'LT',
       allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF', 'LT'},
     ),
     OnboardingPhase(
-      index: 9,
+      index: 8,
       introducing: 'QA',
       allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF', 'LT', 'QA'},
     ),
-    // Phases for the remaining slugs (SY, SH, GC)
-    // are not fixed as strict envelopes any more. After phase 9
+    // Phases for the remaining slugs (SY, SH, GC, RT, CT, CH, MJ)
+    // are not fixed as strict envelopes any more. After phase 8
     // the player enters [softFilter] mode: any level collection opens
     // up but the playlist filters out puzzles introducing more than
     // one new constraint at a time. The modal still fires per first
@@ -122,10 +117,15 @@ class OnboardingPhase {
 /// collection, ≤1 unseen slug per puzzle).
 OnboardingPhase? phaseForCompletions(Map<String, int> completions) {
   for (var phase in OnboardingPhase.phases) {
-    final slug = phase.introducing;
-    final completed = completions[slug];
-    if (completed == null || completed < OnboardingPhase.phaseLength) {
-      // The player has not played enough puzzle with this slug
+    final int completed;
+    if (phase.introducing == 'CC') {
+      // CC and RC share a single merged phase: combine completions
+      completed = (completions['CC'] ?? 0) + (completions['RC'] ?? 0);
+    } else {
+      completed = completions[phase.introducing] ?? 0;
+    }
+    if (completed < OnboardingPhase.phaseLength) {
+      // The player has not played enough puzzle with this concept
       return phase;
     }
   }
@@ -155,6 +155,11 @@ bool puzzleEligibleForPhase(
     if (s.isEmpty || s == 'TX') continue;
     if (!phase.allowed.contains(s)) return false;
     if (s == phase.introducing) containsIntroducing = true;
+    // CC and RC share a merged phase: either slug satisfies the
+    // introducing condition so puzzle rotation doesn't break eligibility.
+    if (phase.introducing == 'CC' && (s == 'CC' || s == 'RC')) {
+      containsIntroducing = true;
+    }
   }
   return containsIntroducing;
 }

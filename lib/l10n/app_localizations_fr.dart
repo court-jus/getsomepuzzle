@@ -583,16 +583,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintGroupCount => 'nombre de groupes';
 
   @override
-  String get constraintColumnCount => 'cellules par colonne';
+  String get constraintLineCount => 'cellules par ligne';
 
   @override
-  String get constraintRowCount => 'cellules par ligne';
-
-  @override
-  String get constraintRowTransition => 'transition par ligne';
-
-  @override
-  String get constraintColumnTransition => 'transition par colonne';
+  String get constraintTransition => 'transition';
 
   @override
   String get constraintShape => 'forme';
@@ -702,20 +696,12 @@ class AppLocalizationsFr extends AppLocalizations {
       'Lorsque deux cellules sont séparées par le symbole ≠, elles doivent être de couleurs différentes.';
 
   @override
-  String get constraintExplainCC =>
-      'Un nombre dans un cercle au-dessus d\'une colonne indique combien de cellules de cette couleur doivent apparaître dans cette colonne précise.';
+  String get constraintExplainLineCount =>
+      'Un nombre dans un cercle à côté d\'une ligne ou d\'une colonne indique combien de cellules de cette couleur doivent apparaître dans cette ligne.';
 
   @override
-  String get constraintExplainRC =>
-      'Un nombre dans un cercle à gauche d\'une ligne indique combien de cellules de cette couleur doivent apparaître dans cette ligne précise.';
-
-  @override
-  String get constraintExplainRT =>
-      'Une onde carrée avec un nombre à côté d\'une ligne indique combien de changements de couleur doivent apparaître dans cette ligne. Chaque marche de l\'onde est un changement ; une onde plate avec 0 signifie que toute la ligne est d\'une seule couleur.';
-
-  @override
-  String get constraintExplainCT =>
-      'Une onde carrée avec un nombre au-dessus d\'une colonne indique combien de changements de couleur doivent apparaître dans cette colonne. Chaque marche de l\'onde est un changement ; une onde plate avec 0 signifie que toute la colonne est d\'une seule couleur.';
+  String get constraintExplainTransition =>
+      'Une onde carrée avec un nombre à côté d\'une ligne ou d\'une colonne indique combien de changements de couleur doivent apparaître dans cette ligne. Chaque marche de l\'onde est un changement ; une onde plate avec 0 signifie que toute la ligne est d\'une seule couleur.';
 
   @override
   String get constraintExplainGC =>

@@ -583,16 +583,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintGroupCount => 'número de grupos';
 
   @override
-  String get constraintColumnCount => 'células por columna';
+  String get constraintLineCount => 'células por línea';
 
   @override
-  String get constraintRowCount => 'células por fila';
-
-  @override
-  String get constraintRowTransition => 'transición por fila';
-
-  @override
-  String get constraintColumnTransition => 'transición por columna';
+  String get constraintTransition => 'transición';
 
   @override
   String get constraintShape => 'forma';
@@ -702,20 +696,12 @@ class AppLocalizationsEs extends AppLocalizations {
       'Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.';
 
   @override
-  String get constraintExplainCC =>
-      'Un número dentro de un círculo sobre una columna indica cuántas celdas de ese color deben aparecer en esa columna específica.';
+  String get constraintExplainLineCount =>
+      'Un número dentro de un círculo al lado de una fila o columna indica cuántas celdas de ese color deben aparecer en esa línea.';
 
   @override
-  String get constraintExplainRC =>
-      'Un número dentro de un círculo a la izquierda de una fila indica cuántas celdas de ese color deben aparecer en esa fila específica.';
-
-  @override
-  String get constraintExplainRT =>
-      'Una onda cuadrada con un número al lado de una fila indica cuántos cambios de color deben aparecer en esa fila. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la fila es de un solo color.';
-
-  @override
-  String get constraintExplainCT =>
-      'Una onda cuadrada con un número sobre una columna indica cuántos cambios de color deben aparecer en esa columna. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la columna es de un solo color.';
+  String get constraintExplainTransition =>
+      'Una onda cuadrada con un número al lado de una fila o columna indica cuántos cambios de color deben aparecer en esa línea. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la línea es de un solo color.';
 
   @override
   String get constraintExplainGC =>

@@ -32,6 +32,9 @@ Database _softDb() {
   for (final p in OnboardingPhase.phases) {
     progress.noteSeen(p.introducing, seen);
   }
+  // RC shares a merged phase with CC — mark it seen too so the first
+  // unseen post-strict slug is RT (the test elects RT).
+  progress.noteSeen('RC', seen);
   final db = Database(playerLevel: 50, progress: progress);
   db.onboardingCompletions = {
     for (final p in OnboardingPhase.phases)

@@ -103,7 +103,8 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
     case 'PA':
       return l.constraintParity;
     case 'RC':
-      return l.constraintRowCount;
+    case 'CC':
+      return l.constraintLineCount;
     case 'GS':
       return l.constraintGroupSize;
     case 'LT':
@@ -118,8 +119,6 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintDifferentFrom;
     case 'SH':
       return l.constraintShape;
-    case 'CC':
-      return l.constraintColumnCount;
     case 'GC':
       return l.constraintGroupCount;
     case 'CH':
@@ -128,6 +127,9 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintNeighborCount;
     case 'EY':
       return l.constraintEyes;
+    case 'RT':
+    case 'CT':
+      return l.constraintTransition;
     default:
       return slug;
   }
@@ -142,7 +144,8 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
     case 'PA':
       return l.constraintExplainPA;
     case 'RC':
-      return l.constraintExplainRC;
+    case 'CC':
+      return l.constraintExplainLineCount;
     case 'GS':
       return l.constraintExplainGS;
     case 'LT':
@@ -157,8 +160,6 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainDF;
     case 'SH':
       return l.constraintExplainSH;
-    case 'CC':
-      return l.constraintExplainCC;
     case 'GC':
       return l.constraintExplainGC;
     case 'CH':
@@ -167,6 +168,9 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainNC;
     case 'EY':
       return l.constraintExplainEY;
+    case 'RT':
+    case 'CT':
+      return l.constraintExplainTransition;
     default:
       return slug;
   }
