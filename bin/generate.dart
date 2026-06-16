@@ -68,6 +68,8 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final focusAxisName = parsed['focusAxis'] as String?;
   final strategies = parsed['strategy'] as List<GenerationStrategy>;
   final maxStall = parsed['maxStall'] as int;
+  final pathRetries = parsed['pathRetries'] as int;
+  final winding = parsed['winding'] as double;
   if (logDir != null) {
     final dir = Directory(logDir);
     if (!dir.existsSync()) dir.createSync(recursive: true);
@@ -376,6 +378,8 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       easingBudget: Duration(seconds: easingBudget),
       pathBasedScenario: scenarioPathBased,
       syBasedScenario: scenarioSyBased,
+      pathWindingProb: winding,
+      pathMaxRetries: pathRetries,
       domain: domain,
       strategy: workerStrategy,
       maxStall: Duration(seconds: maxStall),
@@ -554,6 +558,22 @@ const _statsColumns = [
   // last so rows written before the domain axis stay position-compatible;
   // `readPersistentBlacklist` treats their missing column as 2.
   'domain',
+  // Path-based per-attempt diagnostics (empty for non-path attempts). Appended
+  // last for position-compatibility with rows written before this change.
+  // `path_retries`: preFillPath retries consumed; `path_routing_calls`: DPLL
+  // completion invocations; `path_routing_ms_max`/`_total`: completion wall-time;
+  // `path_prefill_ms`: total preFillPath time. Calibrate --path-retries from
+  // their distributions.
+  'path_retries',
+  'path_routing_calls',
+  'path_routing_ms_max',
+  'path_routing_ms_total',
+  'path_prefill_ms',
+  // Largest inter-accept gap (ms) in the iterative loop. For successful
+  // attempts this is the peak the no-progress watchdog reached — use its
+  // distribution across successes to calibrate `--max-stall`. Appended last
+  // for position-compatibility with rows written before this change.
+  'max_accept_gap_ms',
 ];
 
 String _statsHeader() => _statsColumns.join(',');
@@ -596,6 +616,12 @@ String _statsRow(GeneratorAttemptMessage m, String commitHash) {
     _csvField(m.puzzleLine ?? ''),
     _csvField(deficitField),
     '${m.domainSize}',
+    m.pathRetries?.toString() ?? '',
+    m.pathRoutingCalls?.toString() ?? '',
+    m.pathRoutingMsMax?.toString() ?? '',
+    m.pathRoutingMsTotal?.toString() ?? '',
+    m.pathPrefillMs?.toString() ?? '',
+    m.maxAcceptGapMs?.toString() ?? '',
   ];
   return fields.join(',');
 }
@@ -1719,6 +1745,10 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'domain': null,
     'strategy': <GenerationStrategy>[GenerationStrategy.phaseGate],
     'maxStall': 15,
+    // Path-based tunables (forwarded to preFillPath). Defaults match
+    // GeneratorConfig so omitting the flags preserves current behaviour.
+    'pathRetries': 30,
+    'winding': 0.5,
   };
 
   for (int i = 0; i < args.length; i++) {
@@ -1799,6 +1829,10 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['jobs'] = int.parse(args[++i]);
       case '--log-dir':
         result['logDir'] = args[++i];
+      case '--path-retries':
+        result['pathRetries'] = int.parse(args[++i]);
+      case '--winding':
+        result['winding'] = double.parse(args[++i]);
       case '--debug':
         result['debug'] = true;
       case '--domain':
@@ -1960,6 +1994,13 @@ Generation options:
                           one worker burns the entire budget on a single
                           plateaued attempt. Default 15 s. Pass 0 to
                           disable.
+      --path-retries N    Max retries inside preFillPath before giving up
+                          (default: 30). Watch path_retries in
+                          generator_stats.csv.
+      --winding P         Path sinuosity for --scenario path-based
+                          (0..1, default: 0.5). 0 ≈ shortest path (easy,
+                          regions trivially separated); higher ≈ winding
+                          snakes (harder LT deductions).
       --focus-axis AXIS   Restrict equilibrium targets to a single axis.
                           Valid values: ${Axis.values.map((a) => a.name).join(', ')}.
                           Default: all axes active.

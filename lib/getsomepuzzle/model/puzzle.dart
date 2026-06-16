@@ -1357,13 +1357,26 @@ class Puzzle {
   /// deductively solvable. Iterates from last to first; if removing a
   /// constraint still leaves `isDeductivelyUnique()` true, that constraint
   /// was redundant for the in-game solver and stays removed.
-  void removeUselessRules() {
-    if (!isDeductivelyUnique()) return;
+  ///
+  /// Constraints whose slug is in [preserveSlugs] are never removed, even
+  /// when redundant. The `path-constructive` scenario uses this to keep its
+  /// LT backbone intact (LT presence is the puzzle's structural identity).
+  void removeUselessRules({
+    Set<String> preserveSlugs = const {},
+    bool Function()? shouldStop,
+  }) {
+    if (!isDeductivelyUnique(shouldStop: shouldStop)) return;
     int i = constraints.length;
     while (i > 0) {
       i--;
+      // Each iteration runs a full `isDeductivelyUnique` solve; on a large
+      // grid with many constraints the cumulative cost can blow past the
+      // per-attempt deadline. Bail out when the budget is hit — the
+      // constraints left in place are still valid (at worst redundant).
+      if (shouldStop?.call() == true) return;
+      if (preserveSlugs.contains(constraints[i].slug)) continue;
       final removed = removeConstraintAt(i);
-      if (!isDeductivelyUnique()) {
+      if (!isDeductivelyUnique(shouldStop: shouldStop)) {
         // Constraint was needed, put it back. We bypass aggregation
         // here because the constraint set is already in the post-
         // aggregation shape — re-aggregating would be a no-op but
@@ -1474,7 +1487,7 @@ class Puzzle {
     candidates.sort((a, b) => a.serialize().compareTo(b.serialize()));
 
     final prefillRatio = cells.where((c) => c.readonly).length / cells.length;
-    var currentSteps = solveExplained();
+    var currentSteps = solveExplained(shouldStop: shouldStop);
     var currentLevel = _classifyFromSteps(currentSteps, prefillRatio);
     var additions = 0;
 
@@ -1517,7 +1530,9 @@ class Puzzle {
         // dominant constraint's moves. `prependConstraint` also
         // preserves the LetterGroup aggregation contract.
         exploreClone.prependConstraint(c);
-        final exploreSteps = exploreClone.solveExplained();
+        final exploreSteps = exploreClone.solveExplained(
+          shouldStop: shouldStop,
+        );
         final newLevel = _classifyFromSteps(exploreSteps, prefillRatio);
         if (newLevel.index < exploreLevel.index) {
           // Cascade transition triggered. Even if `newLevel` is still
@@ -1541,7 +1556,7 @@ class Puzzle {
       // when the original constraint can also fire on the same cell.
       prependConstraint(indispensable);
       candidates.removeAt(indispensableIdx);
-      currentSteps = solveExplained();
+      currentSteps = solveExplained(shouldStop: shouldStop);
       currentLevel = _classifyFromSteps(currentSteps, prefillRatio);
       additions++;
       onStep?.call(indispensable, currentLevel, focusCell);

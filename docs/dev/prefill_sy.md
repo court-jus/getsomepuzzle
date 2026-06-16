@@ -82,9 +82,13 @@ The trace shape we aim for:
 ## Pipeline
 
 `preFillSy` plugs in as the fourth pre-fill mode alongside
-`preFillRegular`, `preFillSh`, and `preFillPath`. Downstream stages
-(candidate enumeration, greedy cherry-pick, finalisation, easing,
-polish) are unchanged.
+`preFillRegular`, `preFillSh`, and `preFillPath`. Unlike
+`preFillRegular`/`preFillSh`/`preFillPath` — which all feed a solved
+grid to candidate enumeration + greedy cherry-pick — it builds the
+complete puzzle itself, so `generateOne` **bypasses candidate enumeration
+and greedy cherry-pick** and `return`s through `_finalize` directly. Only
+the shared finalisation tail (validity replay, classification, easing,
+polish, domain auto-shrink) runs.
 
 The pipeline runs five stages.
 
@@ -170,7 +174,7 @@ When every island is frozen, each island is painted in its own colour
 
 ### 5. Bipartite disambiguation
 
-Same cascade structure as [`path_based.md`](path_based.md) § 4.4 with
+Same cascade structure as the SY pre-fill's own bipartite step, with
 SY-aligned priorities:
 
 | # | Action | Accept iff |

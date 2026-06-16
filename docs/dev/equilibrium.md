@@ -168,7 +168,7 @@ split between the three themed pre-fills.
 | ----------- | ------------ | ----------------------------------------------------- |
 | `classic`   | 85 %         | `preFillRegular` (random grid + greedy cherry-pick)   |
 | `sh`        | 5 %          | `preFillSh` (seeded Shape motif)                      |
-| `pathBased` | 5 %          | `preFillPath` (LT topology + bipartite desambiguation, cf. `path_based.md`) |
+| `pathBased` | 5 %          | `preFillPath` (constructive LT topology, cf. [`path_based.md`](path_based.md)) |
 | `syBased`   | 5 %          | `preFillSy` (symmetric island growth, cf. `prefill_sy.md`) |
 
 Tunable via `kTargetProfile`.
@@ -225,8 +225,7 @@ than reject after the fact.
   composition differs, but the `allowedSlugs` restriction prevents
   cross-family drift.
 - **Domain**: resolved on **every** iteration, in priority order:
-  a path-based or sy-based scenario (CLI flag or `ProfileTarget`) forces
-  domain 2 (those pre-fills are intrinsically binary); a `DomainTarget`
+  a `DomainTarget`
   pins its `size`; the warm-up uses the domain drawn by
   `pickWarmupConfig`; every other case draws via
   `pickWeightedDomain(allowedDomains, domainCounts, rng)` — weighted by
@@ -306,6 +305,30 @@ For per-attempt audit, `worker_io.dart` serialises the deficit snapshot
 `generator_stats.csv`, as a `slug:gap|slug:gap|…` string. Slugs at zero
 gap are omitted to keep the column compact; the column is empty during
 warm-up.
+
+**`generator_stats.csv` columns summary.** The full schema is documented in
+[`feasibility.md`](feasibility.md). Columns relevant to the equilibrium
+mechanism:
+
+| Column | Meaning |
+|---|---|
+| `target_key` | `Target.key` of the equilibrium target picked for this attempt |
+| `phase` | `warmup` / `equilibrium` / `fixed` |
+| `domain` | Colour-domain size requested for the attempt (2 or 3) — intent, not the emitted line |
+| `slug_deficits` | `slug:gap\|…` deficit snapshot that drove the secondary sort for this attempt |
+| `path_retries` | (`preFillPath` attempts only) retry iterations consumed by `preFillPath` |
+| `path_routing_calls` | (`preFillPath` attempts only) total DPLL background-completion calls across all retries |
+| `path_routing_ms_max` | (`preFillPath` attempts only) wall time of the slowest single background-completion call (ms) |
+| `path_routing_ms_total` | (`preFillPath` attempts only) cumulative background-completion wall time (ms) |
+| `path_prefill_ms` | (`preFillPath` attempts only) total wall time of the `preFillPath` call (ms) |
+
+The five `path_*` columns are appended last in the row for backward
+compatibility; non-path-based rows emit empty strings there. They are
+populated on both success and failure rows, enabling calibration of
+`--path-retries` and `--winding` from the winning-attempt distribution
+as well as from failures. Source: `PathPrefillStats` in
+`lib/getsomepuzzle/generator/prefill/path.dart`; see
+[`path_based.md`](path_based.md) for details.
 
 **Worked example.** Suppose the corpus has 500 puzzles, `NC` appears in
 40 of them (`observedShare = 0.08`), and with 11 allowed slugs and
@@ -410,9 +433,11 @@ Sources of each trigger:
   `preferredSlugs` for that iteration. In both cases SH lands in
   `prioritySlugs = requiredRules ∪ preferredSlugs`, which is what
   `generateOne` checks to enable the SH pre-fill.
-- **Path-based / SY-based**: only equilibrium can set these flags, via
-  the profile axis (`ProfileCategory.pathBased`, `ProfileCategory.syBased`).
-  See `path_based.md` and `prefill_sy.md` for the algorithms.
+- **Path-based / SY-based**: only equilibrium can set these flags via the
+  profile axis (`ProfileCategory.pathBased`, `ProfileCategory.syBased`); the
+  CLI flag `--scenario path-based` / `--scenario sy-based` also forces 100 %.
+  See [`path_based.md`](path_based.md) and [`prefill_sy.md`](prefill_sy.md)
+  for the algorithms.
 
 The dispatch is the only puzzle-flow-level branching in `generateOne`;
 each pre-fill function is otherwise self-contained.

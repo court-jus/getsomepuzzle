@@ -29,7 +29,7 @@ grid, then collects the constraints that characterise it best.
    emitted v2 line and may exit early with `pathPrefillFailed` /
    `syPrefillFailed` if it can't converge within its retry budget.
    See `equilibrium.md` "Pre-fill scenarios" for the dispatch table
-   and `docs/dev/path_based.md` / `docs/dev/prefill_sy.md` for the
+   and [`path_based.md`](path_based.md) / [`prefill_sy.md`](prefill_sy.md) for the
    themed algorithms.
 
 2. **Pre-fill a few cells.** A random ratio in `[0.75, 1.0]` decides what
@@ -162,7 +162,12 @@ When a `generateOne` attempt returns `null`, the generator now reports
 | `targetTooEasy`       | `--target-collection` set and the puzzle classified strictly easier than the target (can't be made harder by adding constraints). |
 | `targetEasingFailed`  | `--target-collection` set and `Puzzle.simplify` couldn't reach the target within `--easing-budget`. |
 | `cancelled`           | The caller's `shouldStop` callback fired between candidates, mid-`solve()`, or during the finalisation `solveExplained()`. |
-| `pathPrefillFailed`   | `preFillPath` exhausted its retry budget without producing a deductively-unique puzzle. |
+| `attemptTimeout`      | The per-attempt wall-clock budget (`maxAttemptTime`) was exceeded. Distinct from `cancelled` for post-run analysis. |
+| `attemptStalled`      | The no-progress watchdog (`maxStall`) fired: iterative loop ran for `maxStall` without accepting any new candidate. |
+| `pathPrefillFailed`   | `preFillPath` exhausted its retry budget without producing a valid puzzle (catch-all when `dominantCause` is null). |
+| `pathPlacementFailed` | `preFillPath` could not place at least 2 anchors for some letter in the residual graph (all retries failed at region construction). |
+| `pathRoutingTimeout`  | `preFillPath`'s DPLL background completion hit the `completionTimeoutMs` wall-clock budget. |
+| `pathRoutingInfeasible` | `preFillPath`'s DPLL background completion proved the current backbone infeasible (search exhausted). |
 | `syPrefillFailed`     | `preFillSy` exhausted its retry budget without producing a deductively-unique puzzle.  |
 
 The worker (`worker_io.dart`) persists every rejected puzzle to

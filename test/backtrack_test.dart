@@ -75,7 +75,9 @@ void main() {
       pu.addConstraint(LetterGroup('A.0.20'));
       pu.addConstraint(LetterGroup('B.4.24'));
 
-      final solution = findOneSolutionByDpll(pu, timeoutMs: 5000);
+      final routed = findOneSolutionByDpll(pu, timeoutMs: 5000);
+      final solution = routed.solution;
+      expect(routed.timedOut, isFalse);
       expect(solution, isNotNull);
       expect(solution![0], equals(CellValue.black));
       expect(solution[20], equals(CellValue.black));
@@ -111,8 +113,12 @@ void main() {
       pu.addConstraint(LetterGroup('A.0.24'));
       pu.addConstraint(LetterGroup('B.4.20'));
 
-      final solution = findOneSolutionByDpll(pu, timeoutMs: 10000);
-      expect(solution, isNull);
+      final routed = findOneSolutionByDpll(pu, timeoutMs: 10000);
+      expect(routed.solution, isNull);
+      // Genuine infeasibility, not a timeout: the search exhausted the tree
+      // well within the budget. This is the signal preFillPath maps to
+      // pathRoutingInfeasible rather than pathRoutingTimeout.
+      expect(routed.timedOut, isFalse);
     });
 
     test('returns null for an immediately violated configuration', () {
@@ -133,8 +139,46 @@ void main() {
       pu.addConstraint(LetterGroup('A.0'));
       pu.addConstraint(LetterGroup('B.1'));
 
-      final solution = findOneSolutionByDpll(pu, timeoutMs: 5000);
-      expect(solution, isNull);
+      final routed = findOneSolutionByDpll(pu, timeoutMs: 5000);
+      expect(routed.solution, isNull);
+      expect(routed.timedOut, isFalse);
+    });
+
+    test('flags timedOut when the deadline has already elapsed', () {
+      // A 0 ms budget makes the deadline fire at the very first node (the
+      // check sits at the top of the recursion, before any propagation), so
+      // the result is null AND timedOut. This is the signal preFillPath uses
+      // to classify a retry as pathRoutingTimeout instead of infeasible —
+      // distinguishing the two is the whole point of the record return.
+      final pu = Puzzle.empty(5, 5, defaultDomain);
+      pu.cells[0].setForSolver(CellValue.black);
+      pu.cells[0].readonly = true;
+      pu.cells[20].setForSolver(CellValue.black);
+      pu.cells[20].readonly = true;
+      pu.cells[4].setForSolver(CellValue.white);
+      pu.cells[4].readonly = true;
+      pu.cells[24].setForSolver(CellValue.white);
+      pu.cells[24].readonly = true;
+      pu.addConstraint(LetterGroup('A.0.20'));
+      pu.addConstraint(LetterGroup('B.4.24'));
+
+      final routed = findOneSolutionByDpll(pu, timeoutMs: 0);
+      expect(routed.solution, isNull);
+      expect(routed.timedOut, isTrue);
+    });
+
+    test('branches over a free cell\'s remaining options, not the domain', () {
+      // 3-colour regression: a free cell can keep a strict subset of the
+      // domain after pruning. The backtracker must branch over the cell's
+      // options, not puzzle.domain — otherwise it calls setValue with a pruned
+      // colour (here black, the domain's first value) and throws. Cannot happen
+      // in 2 colours: a 1-option cell is force-set and never branched.
+      final pu = Puzzle.empty(1, 1, fullDomain);
+      pu.removeOption(0, CellValue.black); // free cell, options [white, purple]
+
+      final routed = findOneSolutionByDpll(pu);
+      expect(routed.solution, isNotNull);
+      expect(routed.solution!.first, isNot(CellValue.black));
     });
   });
 }

@@ -1,13 +1,14 @@
-# Path-based puzzles — generation by routing
+# Path-based puzzles — constructive generation
 
 Pipeline lives in `lib/getsomepuzzle/generator/prefill/path.dart`,
-wired through `generator.dart` via `pathBasedScenario` and selectable
-either via the CLI flag `--scenario path-based` (forces 100 %) or by
-the equilibrium's `profile` axis picking `ProfileCategory.pathBased`.
+wired through `generator.dart` via `GeneratorConfig.pathBasedScenario`
+and selectable either via the CLI flag `--scenario path-based` (forces
+100 %) or by the equilibrium's `profile` axis picking
+`ProfileCategory.pathBased`.
 
-This is the concrete instance of *theme-first* generation referenced
-in [`generator.md`](generator.md): build the topology first, collect
-the constraints later.
+This is the concrete instance of *theme-first* generation referenced in
+[`generator.md`](generator.md): build the topology first, collect the
+constraints later.
 
 ## What a path-based puzzle is
 
@@ -15,39 +16,43 @@ A path-based puzzle is dominated by the **LT** (LetterGroup) constraint.
 The intellectual work for the player is no longer "counting / guessing
 cells" but **routing** each letter through the grid:
 
-- Each letter `A`, `B`, `C`… defines a set of anchors that must all end
+- Each letter `Z`, `Y`, `X`… defines a set of anchors that must all end
   up in the same connected group of one colour.
-- Two distinct letters can never share a group, so their paths repel
-  each other.
-- Other constraints (`PA`, `GS`, `QA`, `CC`, `RC`, `NC`, …) act as
-  **guardrails**: they break ties between several a priori valid
-  routings.
+- Two distinct letters sharing the same colour can never occupy the same
+  connected component, so their paths repel each other.
+- Other constraints (`PA`, `GS`, `QA`, `CC`, `NC`, …) act as
+  **guardrails**: they break ties between several a priori valid routings.
 
-In spirit this is Number Link / Flow Free on top of a bicolouring: a
-path is a chain of cells of a given colour that interleaves with the
-opposing path rather than just avoiding its neighbours.
+In spirit this resembles Number Link / Flow Free layered on top of an
+N-colouring: a path is a chain of cells of a given colour that interleaves
+with opposing paths rather than merely avoiding their neighbours.
 
-> **2-colour by design.** The whole routing model (bipartite anchor
-> colouring, opposing-path interleaving) is intrinsically binary, so
-> `preFillPath` always builds a `defaultDomain` (black/white) grid and
-> ignores `GeneratorConfig.domain`. A `--domain 3` run that lands on
-> this scenario still produces a valid 2-colour puzzle; the generator's
-> auto-shrink relabels its exported line as `v2_12_...`. There is no
-> 3-colour variant of path-based generation.
+> **Domain-aware generation.** `preFillPath` accepts a `domain` parameter
+> and propagates it through `Puzzle.empty`. On a domain of ≥ 3 colours
+> every colour is guaranteed to be owned by at least one letter
+> (see "Colour assignment" below), so the routed solution is genuinely
+> N-colour and survives `autoShrinkDomain`. The LT constraint itself is
+> colour-agnostic — it enforces monochrome connectivity of each letter's
+> anchors but is blind to colours not belonging to its own letter. Without
+> the full-coverage guarantee, `autoShrinkDomain` would relabel the puzzle
+> back to 2 colours.
 
 ### Why this design
 
-- **Strong aesthetic identity** — the player immediately knows what to
-  do ("connect the A's, the B's, …") before reading the rest of the
-  constraints. The puzzle has a visible *intent*.
-- **Lifts a limitation of the grid-first generator** — random 50/50
-  grids rarely produce long snakes or distant anchors, so LT is
-  under-used in the classic flow. Building topology first makes
-  topologically rich LT puzzles tractable.
-- **New deduction style** — surfaces LT-specific deductions
-  (articulation points, virtual groups, blocking-disconnects from
-  `letter_group.dart`) at the centre of the trace rather than buried
-  in an FM cascade. Trace shape we aim for:
+- **Strong aesthetic identity** — the player immediately knows what to do
+  ("connect the Z's, the Y's, …") before reading the remaining constraints.
+  The puzzle has a visible intent.
+- **Lifts a limitation of the grid-first generator** — random 50/50 grids
+  rarely produce long snakes or distant anchors, so LT is under-used in
+  the classic flow. Building topology first makes topologically rich LT
+  puzzles tractable.
+- **Feasibility by construction** — regions are placed incrementally in
+  a residual graph; routing feasibility is maintained at every step. A
+  failure is detected in O(grid cells) via a BFS, never via exponential
+  search.
+- **New deduction style** — surfaces LT-specific deductions (articulation
+  points, virtual groups, blocking-disconnects from `letter_group.dart`)
+  at the centre of the trace. Desired trace shape:
   - high `switch_ratio` (alternation LT ↔ guardrail);
   - low `cascade_ratio` (no totalitarian FM);
   - moderate `force_depth` (articulation points are shallow forces).
@@ -57,144 +62,203 @@ opposing path rather than just avoiding its neighbours.
 5×5 puzzle with two letters:
 
 ```
-. . . . A
+. . . . Z
 . . . . .
-B . . . .
+Y . . . .
 . . . . .
-A . . . B
+Z . . . Y
 ```
 
-The player knows the two A's share a colour, the two B's share a
-colour (possibly the same as A's), and the two paths don't touch.
-Without further constraints the routing is ambiguous; guardrails
-(`QA:8`, `PA:12.right`, `GS:7.3`, …) disambiguate.
+The player knows the two Z's share a colour and the two Y's share a
+colour (possibly the same as Z's), and that same-colour paths must stay in
+disjoint connected components. Without further constraints the routing is
+ambiguous; guardrails (`QA:8`, `PA:12.right`, `GS:7.3`, …) disambiguate.
 
-## Pipeline
+## Algorithmic overview
 
-The path-based scenario plugs into the generator as a **third pre-fill
-mode**, alongside `preFillRegular` (random grid) and `preFillSh`
-(SH-seeded). All three live in
-`lib/getsomepuzzle/generator/prefill/`. The rest of `generateOne`
-(candidate enumeration, greedy cherry-pick, finalisation,
-classification, easing, polish) is unchanged: the scenario simply
-feeds a different solved grid into the existing pipeline.
+`preFillPath` runs up to `maxRetries` (default 30) attempts. Each attempt
+calls `buildPathBackbone` and, on success, `_completeBackground`.
 
-`preFillPath` orchestrates five stages.
+### Step 1 — Colour assignment (`assignColors`)
 
-### 1. Anchor placement — `sample_anchors`
+`assignColors` is public and exercised directly by
+`test/prefill_path_test.dart` (mirroring how `pickIslandColors` is tested
+for the SY pre-fill).
 
-Places `L × K` anchors on the grid (default `L=2`, `K ∈ {2, 3}`)
-respecting separation rules, **preferring interior positions** (col
-∈ [1, W-2] and row ∈ [1, H-2]). Two reasons:
+The function has two branches depending on domain size.
 
-- More gameplay depth: an interior path must *go around* its neighbour
-  rather than hugging the edge. LT articulation points (rule 4 of
-  `LetterGroup.apply`, complexity 4) become frequent.
-- Dodges the Jordan-curve trap: Jordan's theorem only constrains
-  bipartitions for points on the boundary. Interior anchors keep every
-  colour configuration topologically reachable.
+**Domain ≥ 3 colours.** Every colour must be owned by at least one letter;
+this is the condition that makes the routed grid genuinely N-colour (LT
+only enforces monochrome connectivity — without full coverage
+`autoShrinkDomain` would collapse the puzzle to fewer colours).
+Implementation: a list `[...domain, <surplus random colours>]` is
+shuffled, then mapped letter-by-letter. Surplus letters (L > |domain|)
+receive a random colour from the domain, producing same-colour letter
+pairs — the hard separation case where two letters of the same colour must
+remain in disjoint components.
 
-Separation rules:
+**Domain 2 colours.**
+- `L = 2`: a Bernoulli `sameColorProb` (default 0.5) chooses between
+  *same colour* (both letters share one colour; harder, as their components
+  of the same colour must stay disjoint) and *different colour* (easier).
+- `L ≥ 3`: each letter draws a colour independently (by pigeonhole at
+  least one same-colour pair is always present).
 
-- `min_same_letter = max(2, ⌈min(W, H) / 2⌉)` between two anchors of
-  the same letter — prevents trivial routing.
-- Manhattan distance > 1 between anchors of *different* letters — the
-  only condition of immediate infeasibility derivable from
-  `letter_group.dart` (two 4-adjacent letters can never live in
-  separate groups).
+**Letter-count floor.** `numLetters` is nullable. When not supplied, the
+count is computed as:
 
-If the interior is too small (`|interior| < 2·L·K`, typically on grids
-≤ 4 wide) the placement falls back to the full grid. In that fallback
-the alternating-anchor Jordan trap can re-appear; the routing stage
-(below) will detect it, but late.
+```dart
+final maxExtra = domain.length >= 3 ? 1 : 2;
+final nLetters = numLetters ?? domain.length + rng.nextInt(maxExtra + 1);
+```
 
-### 2. Colour assignment
+This floors `L` at `domain.length` (ensuring full colour coverage) and
+adds a random surplus: domain 2 → L ∈ {2, 3, 4}; domain 3 → L ∈ {3, 4}.
 
-For `L = 2`, a Bernoulli `sameColorProb` (default 0.5) chooses between:
+### Step 2 — Letter namespace (`pathLetterNames`)
 
-- **Same colour** — both letters share one colour. More demanding:
-  they must live in separate components of the same colour. Failures
-  at the routing stage retreat to a new topology, which de facto
-  biases the observed distribution toward different-colour.
-- **Different colour** — easier.
+The backbone letters are drawn from a namespace **disjoint** from the
+names `LetterGroup.generateAllParameters` emits for greedy candidates
+(which uses A, B, C… upward, skipping 'I'). The backbone takes Z, Y, X…
+downward, also skipping 'I'. The function `pathLetterNames(n)` produces
+this list.
 
-### 3. Routing — `find_one_routing`
+The disjointness invariant means greedy-added LT candidates can never
+accidentally reference a backbone letter's name and merge into a backbone
+region.
 
-Given the anchors + colours, looks for **one** complete grid solution
-satisfying the `L` LT constraints, ignoring other constraints (they
-get added later by the greedy).
+### Step 3 — Region construction per letter (`_buildRegion`)
 
-Implemented as a DPLL-style search composed from existing primitives:
+`buildPathBackbone` iterates over letters in order and calls `_buildRegion`
+for each. The grid is modified in place; `owner[idx]` tracks which letter
+owns each cell (null = background).
 
-1. Place anchors as readonly with their colour, attach the `L`
-   `LetterGroup` constraints.
-2. Recurse: `solve()` (propagation + force) to fix what is forced;
-   pick the first free cell; branch on each domain value; if
-   `check()` is clean, recurse; bail on a per-call `timeoutMs` budget
-   (default 3 s).
+**Residual graph traversability.** A cell is traversable for letter L of
+colour C if and only if:
 
-Propagation between branches exploits `LetterGroup.apply`
-(articulation points, virtual groups, blocks), which collapses the
-search to a handful of branches at our target sizes. A timeout signals
-the topology is unhealthy and we should resample anchors.
+1. It is free (not owned by another letter), AND
+2. None of its 4-neighbours are owned by a *different* letter AND coloured C.
 
-This is distinct from `_enumerateSolutions` in `bin/generate.dart`,
-which does check-then-recurse without propagation between branches —
-intentional for uniqueness verification on a quasi-complete puzzle
-but a poor fit for routing search on a quasi-empty one.
+Condition 2 is the one-cell moat rule: it prevents two regions of the same
+colour from becoming 4-adjacent, which would make them indistinguishable
+to LT and constitute a forbidden same-colour merge. Regions of *different*
+colours may be adjacent without restriction.
 
-### 4. Bipartite disambiguation
+**First anchor.** A traversable free cell is chosen with a soft bias toward
+the grid interior (tournament selection over 4 random candidates, scored by
+`min(distance_to_top, distance_to_bottom, distance_to_left,
+distance_to_right)`). Interior placement gives paths more room to wind.
 
-After stage 3 we have the solution grid and the `L` LT constraints,
-but **no anchors are readonly**. The puzzle typically has several
-solutions; the bipartite cascade adds context until uniqueness is
-reached while keeping LT dominant in the final trace.
+**Subsequent anchors** (k − 1 more, k ∈ {kMin..kMax}, default 2..3):
 
-The cascade biases toward LT-aligned actions because reveals **don't
-contribute propagation steps** to the `solveExplained` trace, so the
-`lt-share` denominator stays small. Four levers, ordered by LT
-alignment:
+1. BFS flood-fill (`floodFill` from `utils/groups.dart`) from the current
+   region under the traversability predicate identifies all reachable free
+   cells.
+2. Reachable candidates must satisfy Manhattan distance ≥
+   `minSameLetter = max(2, ⌈min(W, H) / 2⌉)` from every existing anchor.
+3. A target cell `dst` is drawn uniformly from that set.
+4. `_connect` builds a self-avoiding winding walk from `dst` toward the
+   existing region.
 
-| # | Action | Accept iff |
-|---|---|---|
-| 1 | **Anchor reveal** — mark an LT anchor `readonly` with its solution colour (cascade via LT rule 1) | `freeCells.length` drops by ≥ 2 after `solve()` (propagation **beyond** the revealed cell) |
-| 2 | **Path cell reveal** — mark a non-anchor cell on the letter's intended path `readonly` | same as step 1 |
-| 3 | **GC or QA (50/50)** — capped at one constraint per `(slug, color)` pair (≤ 4 total) | `puzzle.computeRatio()` drops |
-| 4 | **Any other guardrail** — PA, GS, CC, RC, NC, DF, SY, EY, FM | `puzzle.computeRatio()` drops |
+**Failure semantics.** If no reachable candidate exists for the mandatory
+second anchor, the entire attempt is dead (`_buildRegion` returns null →
+`buildPathBackbone` returns null → `preFillPath` increments the retry
+counter with `PathFailCause.placement`). A missing *third* anchor
+(k = 3 attempt) degrades gracefully to k = 2 rather than failing.
+`_buildRegion` returns null when fewer than 2 anchors were successfully
+placed; the caller treats this as a placement failure.
 
-GC and QA share a single dedicated step because both are
-topologically aligned with LT (GC explicitly, QA arithmetically with
-colour alignment). The cap prevents either from dominating the trace.
+### Step 4 — Winding self-avoiding walk (`_connect`)
 
-**Intended-path memory**: after routing, the connected component of
-each letter's colour is computed once (BFS over 4-connected cells of
-`solution[anchor_0]` starting from any anchor, minus the anchor set)
-and persisted through the bipartite — see `_computeIntendedPaths` in
-`path.dart`.
+`_connect` walks from a new anchor `dst` toward the existing region by
+alternating between "step toward region" and "step away from region"
+based on `windingProb`:
 
-**Cascade behaviour**: failed-but-still-eligible candidates stay in the
-pool — an anchor that didn't propagate this iteration may propagate
-after a step 3/4 guardrail unlocks the deduction. Each iteration
-restarts at step 1.
+```
+for each step:
+  candidates = free neighbours of cur that are traversable AND
+               can still reach the region without passing through cur
+               (canReach BFS excluding the already-walked path)
+  sort candidates by Manhattan distance to the nearest region cell
+  if rng.nextDouble() < windingProb AND |candidates| > 1:
+      step = farthest candidate   (winding)
+  else:
+      step = nearest candidate    (converging)
+  add step to path
+```
 
-**Reveal cap**: `bipartiteMaxReveals` (default = total number of
-anchors) is shared between anchor and path-cell reveals; beyond it
-the cascade can only act through steps 3 and 4.
+The `canReach` guard prevents dead ends: the walk only steps to a cell
+from which the region is still reachable via the remaining traversable
+cells. This ensures the walk terminates in O(W × H) steps without
+exponential backtracking.
 
-### 5. Orchestration — `preFillPath`
+`windingProb = 0` produces near-shortest paths (easy puzzles; regions are
+trivially separated). `windingProb = 1` produces snaking paths that wind
+around each other, creating the topological tension that generates harder
+LT deductions.
 
-Loops stages 1–4 with retry on failure (default `maxRetries = 30`),
-returning a `PathPrefillResult` carrying `puzzle` (player state with
-LT + guardrails + reveals), `solution` (complete values, index-ordered),
-and counters for anchor / path / guardrail reveals.
+### Step 5 — Background completion (`_completeBackground`)
 
-Failure modes surfaced to the caller as
-`GenerationRejectReason.pathPrefillFailed`:
+After all letter regions are placed, the background cells (those with
+`owner[i] == null`) are still free. `_completeBackground`:
 
-- anchor placement never converged;
-- routing infeasible;
-- routing exceeded `routingTimeoutMs`;
-- bipartite exhausted without reaching uniqueness (rare in practice).
+1. Builds the `LetterGroup` constraints from each letter's anchor list
+   (e.g. `LetterGroup('Z.0.7.23')` for letter Z with anchors at indices
+   0, 7, 23).
+2. Clones `backbone.solved` and attaches the LT constraints to the clone
+   only (`solved` itself receives no constraints and is returned pure).
+3. Calls `findOneSolutionByDpll(copy, timeoutMs: completionTimeoutMs)` on
+   the clone.
+
+Because the regions are placed feasibly-by-construction, the background
+completion is almost always solved in a handful of DPLL branches —
+near-instant in practice. A timeout (default 2000 ms) or a
+proven-infeasible result causes the attempt to fail with
+`PathFailCause.routingTimeout` or `PathFailCause.routingInfeasible`
+respectively.
+
+The DPLL result is applied back to `backbone.solved` (only the free
+background cells need updating; the region cells already carry their
+colours). The function returns a `PathPrefillResult`.
+
+## Data structures
+
+### `PathBackbone`
+
+Represents the intermediate state after region construction, before
+background completion. Public so tests can verify structural invariants —
+same-colour non-merge, monochrome connectivity, colour coverage — on the
+construction alone without running the DPLL completion.
+
+```dart
+class PathBackbone {
+  final Puzzle solved;                     // regions painted, background free
+  final List<String?> owner;               // cell index → owning letter, or null
+  final Map<String, List<int>> anchors;    // letter → list of anchor indices
+  final Map<String, CellValue> colors;     // letter → assigned colour
+  int get backboneCells;                   // count of cells owned by any letter
+}
+```
+
+### `PathPrefillResult`
+
+The output returned to the caller.
+
+```dart
+class PathPrefillResult {
+  final Puzzle solved;                  // pure coloured grid, NO constraints
+  final List<LetterGroup> letterGroups; // backbone LTs, to seed into `pu`
+  final int backboneCells;              // cells in built regions (diagnostic)
+}
+```
+
+`solved` carries no constraints by design. The candidate enumeration in
+the classic greedy branch reads `solved.cellValues` and enumerates
+`verify(solved)` candidates. If backbone LTs were attached to `solved`,
+candidates for letters not in the backbone namespace could accidentally
+merge with them. Keeping `solved` pure avoids the invariant violation
+documented in `generator.dart` ("same-letter LT merge" comment at the
+candidate loop).
 
 ## API
 
@@ -202,123 +266,240 @@ Failure modes surfaced to the caller as
 PathPrefillResult? preFillPath(
   int width,
   int height,
+  List<CellValue> domain,
   Random rng, {
-  int numLetters = 2,
+  int? numLetters,
   int kMin = 2,
   int kMax = 3,
   double sameColorProb = 0.5,
+  double windingProb = 0.5,
   int maxRetries = 30,
-  int routingTimeoutMs = 3000,
-  bool preferInterior = true,
-  int? bipartiteMaxReveals,
+  int completionTimeoutMs = 2000,
+  PathPrefillStats? stats,
+  bool Function()? shouldStop,
 })
+```
 
-class PathPrefillResult {
-  final Puzzle puzzle;
-  final List<int> solution;
-  final int anchorRevealedCount;
-  final int pathRevealedCount;
-  final int guardRailCount;
-  int get revealedCount => anchorRevealedCount + pathRevealedCount;
+### `PathPrefillStats`
+
+An optional diagnostics object passed in by the caller (typically
+`generateOne`). Populated on both success and failure so calibration
+tooling can observe the distribution from winning attempts as well as
+failures.
+
+```dart
+class PathPrefillStats {
+  final Map<PathFailCause, int> causeCounts; // tally of per-retry failure causes
+  int retriesUsed;       // loop iterations consumed (1 on first-try success)
+  int routingCalls;      // total DPLL background-completion calls
+  int routingMsMax;      // wall time of the slowest single completion (ms)
+  int routingMsTotal;    // cumulative completion wall time (ms)
+  int prefillMs;         // total wall time of the preFillPath call (ms)
+  PathFailCause? get dominantCause; // most frequent cause, null if none
 }
 ```
+
+`retriesUsed` counts *attempted* iterations, including the successful one
+on a win; a value of 1 indicates the construction succeeded and the
+background completed on the first try.
+
+`routingMsMax` and `routingMsTotal` cover only the DPLL background
+completion step (stage 5); construction time (stages 2–4) is folded into
+`prefillMs`.
 
 ## Integration with `generator.dart`
 
 `GeneratorConfig.pathBasedScenario` (bool, default `false`) gates the
-dispatch in `generateOne`:
+dispatch in `generateOne`. When true, `generateOne` calls `preFillPath`,
+seeds the backbone LTs into the player puzzle, and proceeds through the
+standard greedy loop and `_finalize` tail. The key integration points are:
+
+**Backbone seeding.** After `pu.addAllConstraints(solved.constraints)`
+(a no-op when `solved` is pure), the backbone LTs are seeded explicitly:
 
 ```dart
-if (config.pathBasedScenario) {
-  final result = preFillPath(width, height, _rng);
-  if (result == null) {
-    onReject?.call(GenerationRejectReason.pathPrefillFailed, ...);
-    return null;
-  }
-  final pu = result.puzzle;
-  pu.cachedSolution = result.solution;
-  return _finalize(pu, config, onReject: onReject, shouldStop: shouldStop);
+for (final lt in constructiveLts) {
+  pu.addConstraint(lt);
 }
-// SH / Regular flow continues otherwise.
 ```
+
+This places the backbone LTs in `pu` before the greedy loop runs, so they
+appear in the puzzle regardless of whether the greedy would have selected
+them. They are never candidates in the greedy loop (their letter namespace
+is disjoint from what `generateAllParameters` emits).
+
+**QA/GC deprioritization.** When `pathBasedScenario` is true, the greedy
+sets `deprioritizedSlugs = {'QA', 'GC'}`. These slugs are placed at the
+tail of both the initial candidate sort and the post-accept resort:
+
+```dart
+final aDep = deprioritizedSlugs.contains(sa) ? 1 : 0;
+final bDep = deprioritizedSlugs.contains(sb) ? 1 : 0;
+if (aDep != bDep) return aDep.compareTo(bDep);
+```
+
+QA and GC count cells by colour globally. When the backbone already
+determines the colour of most non-background cells, a single QA constraint
+pins the background count and can close the puzzle in one step — a
+"= background" degeneracy where the player just fills in the remaining
+cells of one colour without any path-routing reasoning. The
+deprioritization keeps QA and GC available as a last resort but pushes
+them to the back of every sort order so path-relevant constraints (NC, PA,
+GS, …) are tried first.
+
+**`removeUselessRules` with `preserveSlugs: {'LT'}`.** Post-loop cleanup
+calls `pu.removeUselessRules(preserveSlugs: const {'LT'})`. This prevents
+any backbone LT from being removed regardless of redundancy — removing it
+would strip the puzzle's structural identity even if the remaining
+guardrails happen to close it.
+
+**Generation scenario stamp.** `pu.generationScenario = 'pathBased'` is
+written into the v2 line's `scenario:pathBased` suffix. `detectPuzzleProfile`
+in `equilibrium.dart` reads this suffix to classify puzzles for the
+profile axis.
+
+**Reject reason mapping.** `_pathRejectReason(stats)` translates
+`stats.dominantCause` into the shared `GenerationRejectReason` taxonomy:
+
+| `PathFailCause` | `GenerationRejectReason` |
+|---|---|
+| `placement` | `pathPlacementFailed` |
+| `routingTimeout` | `pathRoutingTimeout` |
+| `routingInfeasible` | `pathRoutingInfeasible` |
+| `bipartite` (unused) | `pathPrefillFailed` |
+| `null` | `pathPrefillFailed` |
 
 `pathBasedScenario` is set by:
 
 - the CLI flag `--scenario path-based` (forces 100 %);
 - the equilibrium when it picks `ProfileTarget(ProfileCategory.pathBased)`.
 
-`pathBasedScenario = cliFlag || equilibriumPick` — OR logic, so the
-CLI flag is a short-circuit override.
+`pathBasedScenario = cliFlag || equilibriumPick` — OR logic, so the CLI
+flag is a short-circuit override.
 
-**Easing**: when `pathBasedScenario` is active, `_finalize` passes
+### Calibration parameters
+
+Two parameters are forwarded from `GeneratorConfig` to `preFillPath` and
+exposed as CLI flags:
+
+| `GeneratorConfig` field | Default | CLI flag | Effect |
+|---|---|---|---|
+| `pathMaxRetries` | 30 | `--path-retries N` | Maximum loop iterations in `preFillPath` before it returns null. |
+| `pathWindingProb` | 0.5 | `--winding <0..1>` | Path sinuosity. 0 ≈ shortest path (easy puzzles, regions trivially separated); 1 ≈ maximum sinuosity (harder LT deductions). |
+
+Both defaults are identical to the hardcoded values used before these
+parameters were exposed; omitting the CLI flags preserves prior behaviour.
+
+**Easing.** When `pathBasedScenario` is active, `_finalize` passes
 `allowedSlugs ∖ {LT}` to `Puzzle.simplify` so easing can't add more
 letters during the easing loop.
 
-## Anchor readonly status is dynamic
+## Worked example: 4×4 grid with two letters
 
-The bipartite decides how many anchors to reveal — no explicit
-parameter. In practice we observe three families of puzzles:
+Letters Z (black) and Y (white), each with 2 anchors:
 
-- **0 anchors revealed** — routing + guardrails sufficed. The player
-  deduces every letter's colour entirely from constraints.
-- **1–2 anchors revealed** — pattern seen on user hand-built puzzles
-  (cf. `playlist_path_based.txt`). A starting point fixes one
-  letter's colour; the rest is deduced. Prefill ratio
-  `revealed / (W·H)` ≪ 0.25.
-- **Many anchors revealed** — the bipartite couldn't reach uniqueness
-  otherwise. Beyond `bipartiteMaxReveals` we reject the puzzle rather
-  than degrade it into "not really path-based".
+```
+Construction after Step 3:
 
-LT semantics are unchanged. No special flag in the solver or
-serialiser.
+  . . . Z       Z  = first anchor of letter Z, painted black
+  Z . . .       *  = cells painted during _connect walks
+  . . . Y       Y  = first anchor of letter Y, painted white
+  . Y . .
+
+After _completeBackground (DPLL fills . cells):
+
+  1 0 0 Z       1 = black, 0 = white
+  Z 1 0 0       Z cells: black (LT: Z.0.4 = connected black group)
+  0 0 1 Y       Y cells: white (LT: Y.11.13 = connected white group)
+  0 Y 1 1
+```
+
+The LT constraints `Z.0.4` and `Y.11.13` are seeded into `pu`; the greedy
+then adds guardrails (PA, NC, GS, …) until the routing is deductively
+unique.
+
+## Worked invariant: same-colour moat
+
+Consider two letters Z and X, both assigned colour black. After Z's region
+is placed at cells {0, 1, 4}, cell 5 has a neighbour (cell 4) owned by Z
+with colour black. The traversability predicate for X excludes cell 5:
+
+```
+canTraverse(5) for letter X:
+  owner[5] == null → ok (cell is free)
+  getNeighbors(5) = [1, 4, 6, 9]
+  owner[4] == 'Z' AND owner[4] != 'X' AND solved.cellValues[4] == black → FAIL
+  → cell 5 is not traversable for X
+```
+
+X's region can touch Z's region only via cells of a *different* colour.
+This makes the two black regions permanently non-adjacent in the residual
+graph, satisfying LT's requirement that they stay in disjoint components.
 
 ## Profile axis integration
 
 The equilibrium carries a `profile` axis (`kTargetProfile` in
-`equilibrium.dart`) with targets `{classic: 0.85, sh: 0.05,
-pathBased: 0.05, syBased: 0.05}`. Pre-existing corpus puzzles are
-classified heuristically by `detectPuzzleProfile(v2Line)`: `scenario:`
-suffix when present, else SH in constraints → `sh`, otherwise
-`classic`. Path-based puzzles are **only** identified by the explicit
-`scenario:pathBased` suffix — there is no LT-pattern heuristic. The
-heuristic is fallible but the equilibrium self-corrects over runs.
+`equilibrium.dart`) with targets `{classic: 0.85, sh: 0.05, pathBased:
+0.05, syBased: 0.05}`. Path-based puzzles are identified by the explicit
+`scenario:pathBased` suffix on the v2 line — there is no LT-pattern
+heuristic. Lines without a recognised suffix fall back to `classic`.
 
-When the picker yields `ProfileTarget(pathBased)`, `_resolveTarget`
-in `worker_io.dart` flips `pathBasedScenario = true` for that
-iteration. Each generated path-based puzzle is fed back into
+When the picker yields `ProfileTarget(pathBased)`, `_resolveTarget` in
+`worker_io.dart` flips `pathBasedScenario = true` for that iteration.
+Each generated path-based puzzle is fed back into
 `EquilibriumStats.withPuzzle(..., profile: detectPuzzleProfile(line))`.
 
-The v2 line carries no path-based marker — heuristic detection serves
-both the equilibrium and `bin/extract_path_like.dart`. Any future
-explicit marker would be a separate breaking change.
+## Per-attempt telemetry in `generator_stats.csv`
+
+`worker_io.dart` appends five columns to every row of
+`generator_stats.csv` for path-based attempts; non-path attempts emit
+empty strings. The columns are added at the end of the row for backward
+compatibility.
+
+| Column | Type | Source field | Meaning |
+|---|---|---|---|
+| `path_retries` | int | `PathPrefillStats.retriesUsed` | Iterations consumed by `preFillPath` (includes the winning iteration on success). |
+| `path_routing_calls` | int | `PathPrefillStats.routingCalls` | DPLL background-completion invocations across all retries. |
+| `path_routing_ms_max` | int | `PathPrefillStats.routingMsMax` | Wall time of the slowest single background completion (ms). |
+| `path_routing_ms_total` | int | `PathPrefillStats.routingMsTotal` | Cumulative background-completion wall time across all retries (ms). |
+| `path_prefill_ms` | int | `PathPrefillStats.prefillMs` | Total wall time of the `preFillPath` call (ms). |
+
+These values are emitted on both `SUCCESS` and `FAILURE` rows so
+calibration of `--path-retries` and `--winding` can be informed by the
+distribution of successful attempts as well as failed ones.
+
+Worker log lines also include a condensed path-stats suffix on the
+`SUCCESS`/`FAILURE` entry:
+
+```
+result: SUCCESS in 412ms (tried=7/22) [path retries=2 routingMaxMs=134 routingTotalMs=246 prefillMs=380]
+```
 
 ## Tunable parameters
 
 | Parameter | Default | Effect |
 |---|---|---|
-| `W × H` | 4×4 to 8×8 | Below 4×4: no room for two paths. Above 8×8: routing combinatorics explode. |
-| Letter count `L` | 2 | The pipeline is structured to extend to 3–4 letters without rewriting; only stage 2 (colour assignment) needs generalising. |
-| Anchors per letter `K` | 2 or 3 (70/30 bias) | 2 = linear "Number Link" path. 3 = Steiner tree, topologically richer. |
-| Min distance between anchors | `⌈min(W, H) / 2⌉` | Avoids trivial LT routings. |
-| Placement zone | interior by default; full grid fallback if too small | Forces paths to navigate, dodges the Jordan trap. |
-| Colour pairing | both | Same-colour and different-colour both allowed; natural difficulty knob at `L = 2`. |
-| Guardrail count | bounded by bipartite | Steps 3 + 4 stop adding once uniqueness is reached. |
+| `W × H` | 4×4 to 8×8 | Below 4×4: no room for two paths. Above 8×8: construction combinatorics grow large. |
+| Letter count `L` | domain 2 → {2,3,4}; domain 3 → {3,4} | Nullable `numLetters`; floored at `domain.length` to guarantee full colour coverage. Same-colour letter pairs are the harder routing case. |
+| Anchors per letter `K` | 2 or 3 | 2 = linear "Number Link" path. 3 = Steiner tree, topologically richer. |
+| Min distance between anchors | `max(2, ⌈min(W, H) / 2⌉)` | Avoids trivial LT routings. |
+| `windingProb` | 0.5 | Controls path sinuosity (0 = shortest, 1 = maximum winding). |
+| Colour pairing | see `assignColors` | On 2-colour domain: same-colour and different-colour both allowed (difficulty knob). On ≥ 3-colour domain: every colour owned by ≥ 1 letter; surplus letters draw a random colour, producing same-colour pairs. |
 
 ## Caveats
 
-- **The "exterior" is not defined.** Cells outside the letter paths
-  can themselves form multiple groups. That's fine as long as no
-  constraint mandates otherwise. A non-letter cell can land in the
-  same group as a letter cell — `LetterGroup.verify` tolerates it.
-- **DPLL routing cost.** `solve()` propagation between branches keeps
-  the search in the hundred-ms range on 6×6–7×7 with `L = 2`,
-  `K = 2–3`. If a routing exceeds `routingTimeoutMs` the topology is
-  resampled.
-- **Over-determination.** If the bipartite needs too many guardrails
-  to reach uniqueness, the puzzle loses its path-based identity.
-  Observable via the `lt-share` of the final trace
-  (`bin/extract_path_like.dart`); the bipartite's cascade order keeps
-  this in check by spending its early budget on reveals (zero-prop
-  contribution to the trace) before guardrails.
-- **Dashboard.** `bin/generate.dart`'s live dashboard does not yet
-  display `profileCounts` (only slug / ntypes / size / pair).
+- **The "exterior" is not defined.** Cells outside the letter paths can
+  form multiple groups. A non-letter cell can land in the same group as a
+  letter cell — `LetterGroup.verify` tolerates it, provided the cell's
+  colour matches.
+- **Background completion cost.** By-construction feasibility keeps the
+  DPLL step near-instant in typical cases. The defensive `completionTimeoutMs`
+  (default 2000 ms) protects against degenerate topologies where the
+  background becomes tightly constrained. The `path_routing_ms_max` column
+  in `generator_stats.csv` identifies whether the timeout is ever binding.
+- **Over-determination.** If the greedy needs too many guardrails to reach
+  uniqueness, the puzzle loses its path-based identity. Observable via the
+  `lt-share` of the final trace; the QA/GC deprioritization keeps this in
+  check by prioritising path-relevant guardrails.
+- **Dashboard.** `bin/generate.dart`'s live dashboard does not yet display
+  `profileCounts` (only slug / ntypes / size / pair).

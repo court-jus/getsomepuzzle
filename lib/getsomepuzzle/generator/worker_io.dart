@@ -9,6 +9,7 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/feasibility.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/path.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 
@@ -102,6 +103,8 @@ class GeneratorWorker {
         easingBudgetMs: config.easingBudget.inMilliseconds,
         pathBasedScenario: config.pathBasedScenario,
         syBasedScenario: config.syBasedScenario,
+        pathMaxRetries: config.pathMaxRetries,
+        pathWindingProb: config.pathWindingProb,
         // No explicit list → freeze the domain to the config's: legacy
         // callers (in-app generator) keep their exact behaviour.
         allowedDomains: allowedDomains ?? [config.domain.length],
@@ -175,6 +178,12 @@ class GeneratorWorker {
               puzzleLevelIndex: message['puzzleLevel'] as int?,
               puzzleLine: message['puzzleLine'] as String?,
               slugDeficitScores: deficits,
+              pathRetries: message['pathRetries'] as int?,
+              pathRoutingCalls: message['pathRoutingCalls'] as int?,
+              pathRoutingMsMax: message['pathRoutingMsMax'] as int?,
+              pathRoutingMsTotal: message['pathRoutingMsTotal'] as int?,
+              pathPrefillMs: message['pathPrefillMs'] as int?,
+              maxAcceptGapMs: message['maxAcceptGapMs'] as int?,
             ),
           );
         } else if (type == 'reject') {
@@ -218,6 +227,11 @@ class _IsolateParams {
   final int easingBudgetMs;
   final bool pathBasedScenario;
   final bool syBasedScenario;
+
+  /// Path-based tunables forwarded to `preFillPath` (see `GeneratorConfig`
+  /// / `docs/dev/path_based.md`): retry budget and path sinuosity.
+  final int pathMaxRetries;
+  final double pathWindingProb;
 
   /// Colour-domain sizes this run may emit. A singleton freezes the domain
   /// (CLI `--domain N`, or any caller without an explicit list); `[2, 3]`
@@ -269,6 +283,8 @@ class _IsolateParams {
     required this.easingBudgetMs,
     this.pathBasedScenario = false,
     this.syBasedScenario = false,
+    this.pathMaxRetries = 30,
+    this.pathWindingProb = 0.5,
     this.allowedDomains = const [2],
     required this.strategy,
     this.usageStats,
@@ -440,8 +456,8 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
         params.equilibriumRequested && estimatedCorpus < kEquilibriumWarmupSize;
 
     // Colour-domain size for this attempt, resolved in priority order
-    // below: warm-up draw → DomainTarget → gap-based draw — then overridden
-    // to 2 when a binary pre-fill (path/sy) is active.
+    // below: warm-up draw → DomainTarget → gap-based draw. Both the path-
+    // and sy-based pre-fills are domain-aware, so neither overrides the draw.
     int attemptDomainSize = 2;
 
     if (inWarmup) {
@@ -547,13 +563,6 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
           ? target.size
           : pickWeightedDomain(params.allowedDomains, domainCounts, rng);
     }
-    if (params.pathBasedScenario || attemptPathBased) {
-      // The path-based pre-fill is 2-colour by design (its colouring is
-      // intrinsically binary) — never hand it a 3-colour domain. The
-      // sy-based pre-fill is domain-aware (per-island colours) and
-      // follows the normal domain draw.
-      attemptDomainSize = 2;
-    }
 
     // Tell the UI what this worker is currently chasing so the dashboard can
     // show per-worker progress. We always report the 5 axes (size, domain,
@@ -655,6 +664,8 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       syBasedScenario: params.syBasedScenario || attemptSyBased,
       slugDeficitScores: slugDeficitMap,
       domain: attemptDomainSize == 3 ? fullDomain : defaultDomain,
+      pathMaxRetries: params.pathMaxRetries,
+      pathWindingProb: params.pathWindingProb,
       strategy: params.strategy,
       maxStall: Duration(milliseconds: params.maxStallMs),
     );
@@ -681,6 +692,14 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
     // so the callback fires at most once per attempt. Reset every
     // iteration so a previous attempt's reason doesn't leak forward.
     GenerationRejectReason? lastReject;
+    // Path-based per-attempt diagnostics (retries, routing timings, failure
+    // cause tally). Filled on success and failure; null for non-path attempts.
+    PathPrefillStats? lastPathStats;
+    // Largest inter-accept gap (ms) seen in the iterative loop. Used to
+    // calibrate `maxStall`: any successful attempt had every gap below the
+    // configured `maxStall`, so the distribution of this across successes
+    // is the safe floor for lowering it.
+    int? lastMaxGapMs;
     // Set inside `shouldStop` when the per-attempt deadline (not the
     // global maxTime) is what triggered the abort. Used after the
     // attempt to relabel the reject from `cancelled` to `attemptTimeout`.
@@ -691,6 +710,8 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       result = PuzzleGenerator.generateOne(
         config,
         usageStats: usageStats,
+        onPathStats: (s) => lastPathStats = s,
+        onStallStats: (g) => lastMaxGapMs = g,
         onTimings: (micros, calls) {
           // One message per attempt. The CLI aggregates both maps
           // additively across workers and attempts so `total_micros /
@@ -784,17 +805,23 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
     final rejectReason = result != null
         ? null
         : (lastReject?.name ?? 'unknown');
+    // Path-based diagnostics suffix for the log (empty for non-path attempts).
+    final ps = lastPathStats;
+    final pathStatsLog = ps == null
+        ? ''
+        : ' [path retries=${ps.retriesUsed} routingMaxMs=${ps.routingMsMax} '
+              'routingTotalMs=${ps.routingMsTotal} prefillMs=${ps.prefillMs}]';
     if (result != null) {
       log(
         '  result: SUCCESS in ${attemptDurationMs}ms '
-        '(tried=$lastTried/$lastTotalConstraints)',
+        '(tried=$lastTried/$lastTotalConstraints)$pathStatsLog',
       );
     } else {
       log(
         '  result: FAILURE in ${attemptDurationMs}ms '
         '(tried=$lastTried/$lastTotalConstraints, '
         'lastRatio=${lastRatio.toStringAsFixed(3)}, '
-        'reason=$rejectReason)',
+        'reason=$rejectReason)$pathStatsLog',
       );
     }
 
@@ -827,6 +854,15 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       'puzzleLevel': result?.level.index,
       'puzzleLine': result?.line,
       'slugDeficits': deficitsToReport,
+      // Path-based per-attempt metrics (null for non-path attempts).
+      'pathRetries': lastPathStats?.retriesUsed,
+      'pathRoutingCalls': lastPathStats?.routingCalls,
+      'pathRoutingMsMax': lastPathStats?.routingMsMax,
+      'pathRoutingMsTotal': lastPathStats?.routingMsTotal,
+      'pathPrefillMs': lastPathStats?.prefillMs,
+      // Largest inter-accept gap (ms) in the iterative loop; null when no
+      // accept happened (e.g. prefill-stage failures).
+      'maxAcceptGapMs': lastMaxGapMs,
     });
 
     // Feed the in-session tracker so a combo with K failures and zero

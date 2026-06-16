@@ -94,6 +94,25 @@ class GeneratorAttemptMessage extends GeneratorMessage {
   /// compact.
   final Map<String, double>? slugDeficitScores;
 
+  /// Path-based per-attempt diagnostics, `null` for non-path attempts.
+  /// `pathRetries`: `preFillPath` loop iterations consumed (winning attempt on
+  /// success, `maxRetries` on failure); `pathRoutingCalls`: DPLL routing
+  /// invocations; `pathRoutingMsMax`/`pathRoutingMsTotal`: routing wall-time;
+  /// `pathPrefillMs`: total `preFillPath` time. Feed default tuning of
+  /// `--routing-timeout` / `--path-retries`.
+  final int? pathRetries;
+  final int? pathRoutingCalls;
+  final int? pathRoutingMsMax;
+  final int? pathRoutingMsTotal;
+  final int? pathPrefillMs;
+
+  /// Largest wall-clock gap (ms) between two consecutive constraint accepts
+  /// in the iterative loop (counting setup-to-first-accept). For a successful
+  /// attempt this is the peak the no-progress watchdog counter reached, so the
+  /// distribution across successes is the safe floor for lowering `maxStall`.
+  /// Null when no accept happened (e.g. prefill-stage failures).
+  final int? maxAcceptGapMs;
+
   GeneratorAttemptMessage({
     required this.workerIndex,
     required this.inWarmup,
@@ -111,6 +130,12 @@ class GeneratorAttemptMessage extends GeneratorMessage {
     required this.puzzleLevelIndex,
     required this.puzzleLine,
     this.slugDeficitScores,
+    this.pathRetries,
+    this.pathRoutingCalls,
+    this.pathRoutingMsMax,
+    this.pathRoutingMsTotal,
+    this.pathPrefillMs,
+    this.maxAcceptGapMs,
   });
 }
 

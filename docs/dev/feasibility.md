@@ -86,7 +86,9 @@ the header row is written only on first creation (detected by checking
 ```
 date, commit, worker, phase, target_key, width, height, ntypes_intended,
 preferred_slugs, allowed_slugs, scenario, outcome, reason, duration_ms,
-level, puzzle_line, slug_deficits, domain
+level, puzzle_line, slug_deficits, domain, path_retries,
+path_routing_calls, path_routing_ms_max, path_routing_ms_total,
+path_prefill_ms, max_accept_gap_ms
 ```
 
 **Column details:**
@@ -111,6 +113,12 @@ level, puzzle_line, slug_deficits, domain
 | `puzzle_line` | string | Full v2 puzzle line on success (allows joining with `puzzle_vectors.csv` via canonical key); empty on failure. Only column that can contain commas — wrapped in `"…"` by `_csvField` when needed |
 | `slug_deficits` | pipe-joined | `slug:gap` pairs that biased the secondary candidate sort (`slugDeficits` snapshot, strictly-positive gaps only, sorted descending). Empty during warm-up and when equilibrium is off. |
 | `domain` | int | Colour-domain size the attempt was *asked* to generate (2 or 3) — intent, not the emitted line's possibly auto-shrunk domain. Absent on rows written before the domain axis existed; readers treat the missing column as 2 (historically exact). |
+| `path_retries` | int or empty | Path-based only: `preFillPath` retries consumed (winning attempt on success, `pathMaxRetries` on failure). Empty for non-path attempts. Calibrate `--path-retries` from its distribution. |
+| `path_routing_calls` | int or empty | Path-based only: DPLL background-completion calls across the retries. Empty for non-path attempts. |
+| `path_routing_ms_max` | int or empty | Path-based only: longest single background-completion call (ms). Calibrate `completionTimeoutMs` from its distribution. Empty for non-path attempts. |
+| `path_routing_ms_total` | int or empty | Path-based only: cumulative background-completion wall-time across the retries (ms). Empty for non-path attempts. |
+| `path_prefill_ms` | int or empty | Path-based only: total `preFillPath` wall-time (ms). Empty for non-path attempts. |
+| `max_accept_gap_ms` | int or empty | Largest wall-clock gap between two consecutive constraint accepts in the iterative loop (counting setup-to-first-accept). For a successful attempt this is the peak the no-progress watchdog reached, so the distribution across successes is the safe floor for lowering `--max-stall`. Empty when no accept happened (e.g. prefill-stage failures). |
 
 **Parsing.** `readPersistentBlacklist` splits each row with a minimal
 quote-aware splitter (`_splitCsvRow`, RFC-4180-ish: `"…"` fields with

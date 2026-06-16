@@ -42,5 +42,21 @@ void main() {
       expect(p.constraints.length, lessThanOrEqualTo(originalLength));
       expect(p.isDeductivelyUnique(), isTrue);
     });
+
+    test(
+      'bails without touching constraints when shouldStop is already set',
+      () {
+        // Budget enforcement: each iteration runs a full isDeductivelyUnique
+        // solve, so on a large grid the cumulative cost can overrun the
+        // per-attempt deadline. When shouldStop fires up front, the cleanup
+        // must abort immediately and leave the (still valid) constraint set
+        // exactly as built — never strip a rule it didn't get to verify.
+        final p = Puzzle('v2_12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top_0:0_0');
+        p.addConstraint(ForbiddenMotif('22'));
+        final lengthBefore = p.constraints.length;
+        p.removeUselessRules(shouldStop: () => true);
+        expect(p.constraints.length, lengthBefore);
+      },
+    );
   });
 }

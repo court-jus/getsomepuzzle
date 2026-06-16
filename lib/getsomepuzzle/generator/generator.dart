@@ -59,9 +59,9 @@ class GeneratorConfig {
   final Duration easingBudget;
 
   /// When true, every `generateOne` invocation routes through
-  /// `preFillPath` (the path-based pre-fill, cf. `docs/dev/path_based.md`).
-  /// LT becomes the structural backbone; other constraints are added via
-  /// the internal bipartite desambiguation, not the regular greedy.
+  /// `preFillPath` (the path-based pre-fill, cf. `docs/dev/path_based.md`):
+  /// LT regions are built feasibly-by-construction, seeded as the backbone,
+  /// then the classic greedy adds garde-fous.
   final bool pathBasedScenario;
 
   /// When true, every `generateOne` invocation routes through
@@ -69,6 +69,14 @@ class GeneratorConfig {
   /// Symmetric islands become the structural backbone; other constraints
   /// are added via the internal bipartite cascade.
   final bool syBasedScenario;
+
+  /// Max retries inside `preFillPath` before it gives up. Tunable via
+  /// `--path-retries`.
+  final int pathMaxRetries;
+
+  /// Path sinuosity for `preFillPath` (0..1). 0 ≈ shortest path (easy),
+  /// higher ≈ winding snakes (harder LT deductions). Tunable via `--winding`.
+  final double pathWindingProb;
 
   /// Per-slug deficit derived from the corpus equilibrium stats (the same
   /// gap that `pickTarget` uses on the slug axis). Higher = more
@@ -116,6 +124,8 @@ class GeneratorConfig {
     this.easingBudget = const Duration(seconds: 30),
     this.pathBasedScenario = false,
     this.syBasedScenario = false,
+    this.pathMaxRetries = 30,
+    this.pathWindingProb = 0.5,
     this.slugDeficitScores,
     this.domain = defaultDomain,
     this.strategy = GenerationStrategy.phaseGate,
@@ -179,10 +189,22 @@ enum GenerationRejectReason {
   attemptTimeout,
 
   /// Path-based pre-fill (`preFillPath`) exhausted its retry budget
-  /// without producing a deductively-unique puzzle. Symptom: random
-  /// topology + colors + DPLL routing + bipartite desambiguation
-  /// couldn't converge for this size.
+  /// without producing a deductively-unique puzzle. Symptom: constructive
+  /// backbone build + DPLL completion couldn't converge for this size.
   pathPrefillFailed,
+
+  /// Refinement of [pathPrefillFailed]: retries failed predominantly at
+  /// backbone placement (no reachable region — e.g. too many letters
+  /// for the grid).
+  pathPlacementFailed,
+
+  /// Refinement of [pathPrefillFailed]: retries failed predominantly because
+  /// the DPLL background completion hit its timeout.
+  pathRoutingTimeout,
+
+  /// Refinement of [pathPrefillFailed]: retries failed predominantly because
+  /// the DPLL background completion proved infeasible.
+  pathRoutingInfeasible,
 
   /// SY-based pre-fill (`preFillSy`) exhausted its retry budget without
   /// producing a deductively-unique puzzle. Symptom: random seeds +
@@ -195,6 +217,20 @@ enum GenerationRejectReason {
   /// equilibrium targets where one attempt would otherwise eat
   /// minutes of CPU at a plateau ratio. See `GeneratorConfig.maxStall`.
   attemptStalled,
+}
+
+/// Map a failed `preFillPath` attempt to its dominant reject
+/// reason, reusing the existing path reject taxonomy (no bipartite phase
+/// here). `null` cause → the generic prefill-failed bucket.
+GenerationRejectReason _pathRejectReason(PathPrefillStats stats) {
+  return switch (stats.dominantCause) {
+    PathFailCause.placement => GenerationRejectReason.pathPlacementFailed,
+    PathFailCause.routingTimeout => GenerationRejectReason.pathRoutingTimeout,
+    PathFailCause.routingInfeasible =>
+      GenerationRejectReason.pathRoutingInfeasible,
+    PathFailCause.bipartite => GenerationRejectReason.pathPrefillFailed,
+    null => GenerationRejectReason.pathPrefillFailed,
+  };
 }
 
 class GeneratorProgress {
@@ -315,6 +351,8 @@ class PuzzleGenerator {
     bool Function()? shouldStop,
     Map<String, int>? usageStats,
     void Function(Map<String, int> micros, Map<String, int> calls)? onTimings,
+    void Function(PathPrefillStats)? onPathStats,
+    void Function(int maxAcceptGapMs)? onStallStats,
   }) {
     // Per-stage timer + invocation counter. Each can be entered/exited
     // multiple times to accumulate (loop stages are entered many times
@@ -340,6 +378,8 @@ class PuzzleGenerator {
         onReject: onReject,
         shouldStop: shouldStop,
         usageStats: usageStats,
+        onPathStats: onPathStats,
+        onStallStats: onStallStats,
         tPrefill: tPrefill,
         tInitConstraints: tInitConstraints,
         tLoopProbe: tLoopProbe,
@@ -401,6 +441,8 @@ class PuzzleGenerator {
     void Function(GenerationRejectReason, Puzzle)? onReject,
     bool Function()? shouldStop,
     Map<String, int>? usageStats,
+    void Function(PathPrefillStats)? onPathStats,
+    void Function(int maxAcceptGapMs)? onStallStats,
     required _StageTimer tPrefill,
     required _StageTimer tInitConstraints,
     required _StageTimer tLoopProbe,
@@ -417,24 +459,6 @@ class PuzzleGenerator {
   }) {
     final width = config.width;
     final height = config.height;
-
-    // Path-based pre-fill is a complete pipeline of its own (topology +
-    // routing + bipartite desambiguation). It bypasses the regular
-    // grid-first / greedy flow and produces a ready-to-finalize puzzle.
-    if (config.pathBasedScenario) {
-      final result = preFillPath(width, height, _rng);
-      if (result == null) {
-        onReject?.call(
-          GenerationRejectReason.pathPrefillFailed,
-          Puzzle.empty(width, height, config.domain),
-        );
-        return null;
-      }
-      final pu = result.puzzle;
-      pu.cachedSolution = result.solution;
-      pu.generationScenario = 'pathBased';
-      return _finalize(pu, config, onReject: onReject, shouldStop: shouldStop);
-    }
 
     if (config.syBasedScenario) {
       final result = preFillSy(
@@ -483,9 +507,36 @@ class PuzzleGenerator {
     // by user or pushed by an equilibrium / warm-up target), the pre-fill
     // paints a valid Shape motif so the SH constraint is satisfiable.
     final hasSH = prioritySlugs.contains("SH");
-    final solved = hasSH
-        ? preFillSh(width, height, domain, _rng)
-        : preFillRegular(width, height, domain, _rng);
+    List<LetterGroup> constructiveLts = const [];
+    final Puzzle solved;
+    if (config.pathBasedScenario) {
+      final stats = PathPrefillStats();
+      final result = preFillPath(
+        width,
+        height,
+        domain,
+        _rng,
+        windingProb: config.pathWindingProb,
+        maxRetries: config.pathMaxRetries,
+        stats: stats,
+        shouldStop: shouldStop,
+      );
+      onPathStats?.call(stats);
+      if (result == null) {
+        tPrefill.exit();
+        onReject?.call(
+          _pathRejectReason(stats),
+          Puzzle.empty(width, height, domain),
+        );
+        return null;
+      }
+      solved = result.solved;
+      constructiveLts = result.letterGroups;
+    } else {
+      solved = hasSH
+          ? preFillSh(width, height, domain, _rng)
+          : preFillRegular(width, height, domain, _rng);
+    }
     final solvedValues = solved.cellValues;
 
     // 2. Create puzzle with some pre-filled cells
@@ -500,6 +551,12 @@ class PuzzleGenerator {
 
     // Force the SH constraint in the puzzle if it was added by the preFill
     pu.addAllConstraints(solved.constraints);
+    // Seed the constructive LT backbone explicitly. `solved` is kept pure (no
+    // constraints) so candidate enumeration reads a neutral grid; the backbone
+    // is injected here, into the player puzzle only.
+    for (final lt in constructiveLts) {
+      pu.addConstraint(lt);
+    }
     tPrefill.exit();
 
     tInitConstraints.enter();
@@ -594,9 +651,20 @@ class PuzzleGenerator {
     //   same slug repeatedly.
     final usage = usageStats ?? <String, int>{};
     final deficits = config.slugDeficitScores ?? const <String, double>{};
+    // `path-constructive`: relegate counting garde-fous (QA/GC) to the tail of
+    // every candidate sort. They pin the background *count*, closing the puzzle
+    // by counting once the paths are deduced — the "= background" degeneracy we
+    // want to avoid. Kept available (never banned), chosen only when no local
+    // garde-fou closes the puzzle. Dominant criterion (ahead of priority).
+    final deprioritizedSlugs = config.pathBasedScenario
+        ? const {'QA', 'GC'}
+        : const <String>{};
     allConstraints.sort((a, b) {
       final sa = a.slug;
       final sb = b.slug;
+      final aDep = deprioritizedSlugs.contains(sa) ? 1 : 0;
+      final bDep = deprioritizedSlugs.contains(sb) ? 1 : 0;
+      if (aDep != bDep) return aDep.compareTo(bDep);
       final aPriority = prioritySlugs.contains(sa) ? -1 : 0;
       final bPriority = prioritySlugs.contains(sb) ? -1 : 0;
       if (aPriority != bPriority) return aPriority.compareTo(bPriority);
@@ -687,6 +755,12 @@ class PuzzleGenerator {
     // out within maxStall, not maxStall + setup.
     final attemptSw = Stopwatch()..start();
     int lastAcceptMs = 0;
+    // Largest wall-clock gap between two consecutive accepts (counting the
+    // setup-to-first-accept window). This is exactly the peak the no-progress
+    // watchdog counter reaches before each reset — so for an attempt that
+    // succeeded, `maxStall` must be ≥ this value or the attempt would have
+    // been killed. Surfaced via `onStallStats` to calibrate `maxStall`.
+    int maxAcceptGapMs = 0;
     final maxStallMs = config.maxStall.inMilliseconds;
     final watchdogEnabled = maxStallMs > 0;
     // Candidates that didn't improve against the *current* `pu` state.
@@ -844,6 +918,11 @@ class PuzzleGenerator {
           // regardless of which phase produced it (a cheap phase-1
           // accept that doesn't move `currentRatio` still proves the
           // loop is finding useful constraints).
+          final gap = attemptSw.elapsedMilliseconds - lastAcceptMs;
+          if (gap > maxAcceptGapMs) {
+            maxAcceptGapMs = gap;
+            onStallStats?.call(maxAcceptGapMs);
+          }
           lastAcceptMs = attemptSw.elapsedMilliseconds;
           pu.addConstraint(constraint);
           // Per-line uniqueness: at most one CC per column and one RC
@@ -938,6 +1017,9 @@ class PuzzleGenerator {
         localUsage[s] = (localUsage[s] ?? 0) + 1;
       }
       allConstraints.sort((a, b) {
+        final aDep = deprioritizedSlugs.contains(a.slug) ? 1 : 0;
+        final bDep = deprioritizedSlugs.contains(b.slug) ? 1 : 0;
+        if (aDep != bDep) return aDep.compareTo(bDep);
         final aTargeted = targetedKeys.contains(a.serialize()) ? -1 : 0;
         final bTargeted = targetedKeys.contains(b.serialize()) ? -1 : 0;
         if (aTargeted != bTargeted) return aTargeted.compareTo(bTargeted);
@@ -1007,7 +1089,11 @@ class PuzzleGenerator {
     // pre-fill didn't find a valid motif, the flow falls back to
     // classic.
     final shAttached = pu.constraints.any((c) => c.slug == 'SH');
-    pu.generationScenario = (hasSH && shAttached) ? 'sh' : 'classic';
+    pu.generationScenario = config.pathBasedScenario
+        ? 'pathBased'
+        : (hasSH && shAttached)
+        ? 'sh'
+        : 'classic';
 
     // Post-loop cleanup: the cheap-tier accept signal in phase 1 is
     // laxer than the strict `ratioAfter < ratioBefore` check, so the
@@ -1021,7 +1107,13 @@ class PuzzleGenerator {
     // criterion throughout, so over-accept is structurally impossible
     // and the N-solves cleanup would be pure overhead.
     if (config.strategy != GenerationStrategy.singleTier) {
-      pu.removeUselessRules();
+      // Preserve the constructive LT backbone: those LTs are the puzzle's
+      // structural identity and must survive even when made redundant by
+      // greedy-added garde-fous.
+      pu.removeUselessRules(
+        preserveSlugs: config.pathBasedScenario ? const {'LT'} : const {},
+        shouldStop: shouldStop,
+      );
     }
 
     return _finalize(pu, config, onReject: onReject, shouldStop: shouldStop);

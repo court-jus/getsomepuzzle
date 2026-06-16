@@ -55,8 +55,15 @@ List<List<CellValue>> enumerateSolutions(Puzzle puzzle, {int limit = 2}) {
 /// 7×7 grid.
 ///
 /// If [timeoutMs] is set and elapses before a solution is found,
-/// returns `null`.
-List<CellValue>? findOneSolutionByDpll(Puzzle puzzle, {int? timeoutMs}) {
+/// `solution` is `null`. The returned [timedOut] distinguishes a search
+/// aborted by the deadline (`true`) from one that genuinely exhausted the
+/// tree without a completion (`false`); it is only meaningful when
+/// `solution == null`. Callers use it to separate routing-timeout from
+/// routing-infeasibility (see `preFillPath` instrumentation).
+({List<CellValue>? solution, bool timedOut}) findOneSolutionByDpll(
+  Puzzle puzzle, {
+  int? timeoutMs,
+}) {
   final deadline = timeoutMs != null
       ? DateTime.now().add(Duration(milliseconds: timeoutMs))
       : null;
@@ -70,7 +77,11 @@ List<CellValue>? findOneSolutionByDpll(Puzzle puzzle, {int? timeoutMs}) {
       return false; // stop at the first solution
     },
   );
-  return result;
+  // A null result past the deadline means the search was cut short by the
+  // timeout rather than proving infeasibility.
+  final timedOut =
+      result == null && deadline != null && DateTime.now().isAfter(deadline);
+  return (solution: result, timedOut: timedOut);
 }
 
 /// Shared backtracking backbone. Returns `true` to continue searching,
@@ -96,8 +107,16 @@ bool _backtrack(
   if (propagate) {
     // `solve()` runs the propagation + force loop. It may complete the
     // puzzle, dead-end, or stop short of completion — we re-check
-    // consistency below in either case.
-    puzzle.solve();
+    // consistency below in either case. The deadline is forwarded as a
+    // `shouldStop` so a single propagation pass can't overrun the routing
+    // budget: without it the deadline is only checked between backtrack
+    // nodes, and one `solve()` on a large 3-colour grid can run for tens of
+    // seconds past a 3 s budget.
+    puzzle.solve(
+      shouldStop: deadline == null
+          ? null
+          : () => DateTime.now().isAfter(deadline),
+    );
   }
   if (puzzle.check(saveResult: false).isNotEmpty) {
     return true; // dead branch, keep searching elsewhere
@@ -111,7 +130,12 @@ bool _backtrack(
     // puzzle is in a strange state. Treat as dead branch.
     return true;
   }
-  for (final v in puzzle.domain) {
+  // Branch over the cell's remaining options, not the full puzzle domain: in a
+  // 3-colour domain a free cell can keep a strict subset of the domain after
+  // pruning, and setValue throws on an out-of-options value. (In 2 colours a
+  // single-option cell is force-set before branching, so options == domain for
+  // every free cell — this is a no-op there.)
+  for (final v in puzzle.cells[freeIdx].options) {
     final branch = puzzle.clone();
     branch.cells[freeIdx].setValue(v);
     if (branch.check(saveResult: false).isNotEmpty) {
