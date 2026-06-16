@@ -23,6 +23,7 @@ class QuantityWidget extends StatelessWidget {
     required this.oppositeActual,
     required this.oppositeTotal,
     required this.cellSize,
+    this.domainLength = 2,
   });
 
   final QuantityConstraint constraint;
@@ -30,6 +31,7 @@ class QuantityWidget extends StatelessWidget {
   final int oppositeActual;
   final int oppositeTotal;
   final double cellSize;
+  final int domainLength;
 
   @override
   Widget build(BuildContext context) {
@@ -56,17 +58,18 @@ class QuantityWidget extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Positioned(
-              bottom: 0,
-              left: 8,
-              child: Text(
-                oppositeText,
-                style: TextStyle(
-                  fontSize: smallFontSize,
-                  color: oppositeColors[constraint.color],
+            if (domainLength == 2)
+              Positioned(
+                bottom: 0,
+                left: 8,
+                child: Text(
+                  oppositeText,
+                  style: TextStyle(
+                    fontSize: smallFontSize,
+                    color: oppositeColors[constraint.color],
+                  ),
                 ),
               ),
-            ),
             if (actualCount > 0)
               Positioned(
                 top: 0,

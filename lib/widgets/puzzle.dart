@@ -350,6 +350,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                   widget.currentPuzzle.height) -
                               constraint.count,
                           cellSize: topBarConstraintsSize,
+                          domainLength: widget.currentPuzzle.domain.length,
                         )
                       else if (constraint is GroupCountConstraint)
                         GroupCountWidget(
