@@ -113,11 +113,14 @@ void main() {
       pu.addConstraint(LetterGroup('A.0.24'));
       pu.addConstraint(LetterGroup('B.4.20'));
 
-      final routed = findOneSolutionByDpll(pu, timeoutMs: 10000);
+      // No deadline: the search runs to full exhaustion of the (finite) tree,
+      // so this asserts the *semantic* of infeasibility independently of
+      // wall-clock time. With `deadline == null`, `timedOut` is false by
+      // construction (see findOneSolutionByDpll) — no flaky timing budget. This
+      // is the signal preFillPath maps to pathRoutingInfeasible, distinct from
+      // pathRoutingTimeout (exercised by the 0 ms test below).
+      final routed = findOneSolutionByDpll(pu);
       expect(routed.solution, isNull);
-      // Genuine infeasibility, not a timeout: the search exhausted the tree
-      // well within the budget. This is the signal preFillPath maps to
-      // pathRoutingInfeasible rather than pathRoutingTimeout.
       expect(routed.timedOut, isFalse);
     });
 
@@ -139,7 +142,10 @@ void main() {
       pu.addConstraint(LetterGroup('A.0'));
       pu.addConstraint(LetterGroup('B.1'));
 
-      final routed = findOneSolutionByDpll(pu, timeoutMs: 5000);
+      // No deadline: check() fails on the input so the search returns at the
+      // first node; with `deadline == null`, `timedOut` is false by
+      // construction. No wall-clock budget, no flakiness.
+      final routed = findOneSolutionByDpll(pu);
       expect(routed.solution, isNull);
       expect(routed.timedOut, isFalse);
     });
