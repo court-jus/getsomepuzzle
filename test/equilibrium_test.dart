@@ -513,35 +513,36 @@ void main() {
       );
     });
 
-    test('legacy line with only p: resolves to classic', () {
-      // Saved puzzles from before the scenario field are stamped as
-      // `classic`. No heuristic, no guessing.
+    test('legacy line with only p: now detects local (FM-dominant)', () {
+      // The base line has FM:11 as the only constraint. The new emergent
+      // detection sees FM in the `local` group ({DF, FM}) at 1.0 ≥ kEmergentThreshold
+      // and classifies it as `local` instead of `classic`.
       expect(
         detectPuzzleProfile('${base}_p:000000000'),
-        ProfileCategory.classic,
+        ProfileCategory.local,
       );
     });
 
-    test('legacy line without any suffix resolves to classic', () {
-      // Bare 7-field corpus line: classic by definition.
-      expect(detectPuzzleProfile(base), ProfileCategory.classic);
+    test('legacy line without any suffix now detects local (FM-dominant)', () {
+      // Same reasoning: FM:11 alone crosses the 80 % threshold for the `local`
+      // emergent bucket. Puzzles whose slugs are all from {DF, FM} are `local`.
+      expect(detectPuzzleProfile(base), ProfileCategory.local);
     });
 
     test('two well-spread LT constraints alone are no longer pathBased', () {
-      // Regression on the old heuristic: a classic puzzle with two
-      // distant LT pairs must be classified `classic`, not `pathBased`.
-      // The new logic ignores constraint shape entirely.
+      // Regression on the old heuristic: LT is not in any emergent group, so
+      // the puzzle resolves to `classic`.
       const ltLine =
           'v2_12_4x4_2210000010000000_LT:A.0.5;LT:B.10.15_1:1212121212121212_2';
       expect(detectPuzzleProfile(ltLine), ProfileCategory.classic);
     });
 
-    test('unknown scenario name falls back to classic', () {
-      // Defensive: if a future writer emits a scenario name we don't yet
-      // know, the equilibrium must not crash — treat it as classic.
+    test('unknown scenario name runs emergent detection (FM→local)', () {
+      // `scenario:martian` is not pathBased/syBased/sh, so the function does
+      // NOT court-circuit. Emergent detection runs and FM:11 triggers `local`.
       expect(
         detectPuzzleProfile('${base}_scenario:martian'),
-        ProfileCategory.classic,
+        ProfileCategory.local,
       );
     });
   });

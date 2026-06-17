@@ -843,4 +843,66 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get onboardingCompleteBody =>
       'You\'ve learned all the rules currently available! You can now play freely. When new rules are added to the game, you\'ll be notified.';
+
+  @override
+  String get scenarioFilterLabel => 'Scenario';
+
+  @override
+  String get scenarioAny => 'Any scenario';
+
+  @override
+  String get scenarioClassic => 'Classic';
+
+  @override
+  String get scenarioExplainClassic =>
+      'General logic puzzle with no dominant gameplay style.';
+
+  @override
+  String get scenarioSh => 'Shape';
+
+  @override
+  String get scenarioExplainSh =>
+      'At least one shape constraint defines exact form for a group.';
+
+  @override
+  String get scenarioPathBased => 'Path';
+
+  @override
+  String get scenarioExplainPathBased =>
+      'Letter groups route across the grid — find the path.';
+
+  @override
+  String get scenarioSyBased => 'Symmetry';
+
+  @override
+  String get scenarioExplainSyBased =>
+      'Symmetry constraints mirror groups across axes.';
+
+  @override
+  String get scenarioMinesweeper => 'Minesweeper';
+
+  @override
+  String get scenarioExplainMinesweeper =>
+      'Neighbor counts and eye constraints — play it like Minesweeper.';
+
+  @override
+  String get scenarioNonogram => 'Nonogram';
+
+  @override
+  String get scenarioExplainNonogram =>
+      'Column and row counts — classic hanjie-style deduction.';
+
+  @override
+  String get scenarioLocal => 'Local';
+
+  @override
+  String get scenarioExplainLocal =>
+      'Forbidden patterns and different-from constraints define local rules.';
+
+  @override
+  String get scenarioGroup => 'Group';
+
+  @override
+  String get scenarioExplainGroup =>
+      'Group sizes and group counts focus on connected-component topology.';
 }

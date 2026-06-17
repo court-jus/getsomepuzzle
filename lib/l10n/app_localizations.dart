@@ -1599,6 +1599,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You\'ve learned all the rules currently available! You can now play freely. When new rules are added to the game, you\'ll be notified.'**
   String get onboardingCompleteBody;
+
+  /// Label of the scenario filter dropdown in the advanced filters section.
+  ///
+  /// In en, this message translates to:
+  /// **'Scenario'**
+  String get scenarioFilterLabel;
+
+  /// Dropdown option meaning 'no scenario filter' — show every scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Any scenario'**
+  String get scenarioAny;
+
+  /// Label for the Classic user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic'**
+  String get scenarioClassic;
+
+  /// Description of the Classic user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'General logic puzzle with no dominant gameplay style.'**
+  String get scenarioExplainClassic;
+
+  /// Label for the Shape (SH) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Shape'**
+  String get scenarioSh;
+
+  /// Description of the Shape user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'At least one shape constraint defines exact form for a group.'**
+  String get scenarioExplainSh;
+
+  /// Label for the Path-based (LT) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get scenarioPathBased;
+
+  /// Description of the Path-based user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter groups route across the grid — find the path.'**
+  String get scenarioExplainPathBased;
+
+  /// Label for the Symmetry (SY) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Symmetry'**
+  String get scenarioSyBased;
+
+  /// Description of the Symmetry user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Symmetry constraints mirror groups across axes.'**
+  String get scenarioExplainSyBased;
+
+  /// Label for the Minesweeper-like user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Minesweeper'**
+  String get scenarioMinesweeper;
+
+  /// Description of the Minesweeper user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighbor counts and eye constraints — play it like Minesweeper.'**
+  String get scenarioExplainMinesweeper;
+
+  /// Label for the Nonogram / Hanjie-like user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Nonogram'**
+  String get scenarioNonogram;
+
+  /// Description of the Nonogram user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Column and row counts — classic hanjie-style deduction.'**
+  String get scenarioExplainNonogram;
+
+  /// Label for the Local-pattern (DF/FM) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get scenarioLocal;
+
+  /// Description of the Local user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Forbidden patterns and different-from constraints define local rules.'**
+  String get scenarioExplainLocal;
+
+  /// Label for the Group-topology (GS/GC) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get scenarioGroup;
+
+  /// Description of the Group user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Group sizes and group counts focus on connected-component topology.'**
+  String get scenarioExplainGroup;
 }
 
 class _AppLocalizationsDelegate

@@ -41,6 +41,11 @@ class PuzzleData {
   int filled = 0;
   int cplx = 0;
   List<String> rules = [];
+
+  /// User-facing scenario derived from the constraint slugs. Never
+  /// serialised — recomputed on every construction via
+  /// [equilibrium.detectPuzzleProfile].
+  late final equilibrium.ProfileCategory userScenario;
   // True when at least one GS (group size) constraint targets size 1 — an
   // isolated cell. Such instances are trivial and not very instructive, so
   // the selection sampler demotes them while GS is being introduced during
@@ -93,6 +98,7 @@ class PuzzleData {
     // lines (no `v2_` prefix, no tail — see `normalizeToV2Line`) stop at
     // index 4. Match the same defensiveness as `Puzzle()` (puzzle.dart).
     cplx = attributesStr.length > 6 ? (int.tryParse(attributesStr[6]) ?? 0) : 0;
+    userScenario = equilibrium.detectPuzzleProfile(lineRepresentation);
   }
 
   Puzzle getPuzzle() {
@@ -166,6 +172,9 @@ class Filters {
   Set<String> bannedFlags;
   Set<String> wantedDomains;
   Set<String> bannedDomains;
+
+  /// Scenario filter: null = any scenario. Persisted via `.name`.
+  equilibrium.ProfileCategory? wantedScenario;
   final log = Logger("Filters");
 
   /// Default value of [bannedFlags] for a fresh install or a player who
@@ -214,6 +223,17 @@ class Filters {
           .toSet();
       bannedDomains = (prefs.getStringList("bannedDomainsFilter") ?? ["d3"])
           .toSet();
+      final scenarioStr = prefs.getString("wantedScenarioFilter");
+      equilibrium.ProfileCategory? wanted;
+      if (scenarioStr != null) {
+        for (final p in equilibrium.ProfileCategory.values) {
+          if (p.name == scenarioStr) {
+            wanted = p;
+            break;
+          }
+        }
+      }
+      wantedScenario = wanted;
       // Cleanup of obsolete keys (cplx filter replaced by adaptive player level).
       await prefs.remove("minCplxFilter");
       await prefs.remove("maxCplxFilter");
@@ -238,6 +258,11 @@ class Filters {
     prefs.setStringList("bannedFlagsFilter", bannedFlags.toList());
     prefs.setStringList("wantedDomainsFilter", wantedDomains.toList());
     prefs.setStringList("bannedDomainsFilter", bannedDomains.toList());
+    if (wantedScenario != null) {
+      prefs.setString("wantedScenarioFilter", wantedScenario!.name);
+    } else {
+      prefs.remove("wantedScenarioFilter");
+    }
   }
 }
 
@@ -1142,6 +1167,10 @@ class Database {
           currentFilters.bannedRules
               .intersection(puz.rules.toSet())
               .isNotEmpty) {
+        return false;
+      }
+      if (currentFilters.wantedScenario != null &&
+          puz.userScenario != currentFilters.wantedScenario) {
         return false;
       }
       final domainKey = domainFilterKey(puz.domain.length);

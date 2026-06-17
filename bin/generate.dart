@@ -733,7 +733,7 @@ class _CollectionStats {
       final key = n >= 10 ? '10+' : n.toString();
       nTypes[key] = (nTypes[key] ?? 0) + 1;
 
-      final profile = detectPuzzleProfile(trimmed);
+      final profile = generationBucket(detectPuzzleProfile(trimmed));
       profiles[profile.name] = (profiles[profile.name] ?? 0) + 1;
 
       final comp = compositionOf(rawSlugs);

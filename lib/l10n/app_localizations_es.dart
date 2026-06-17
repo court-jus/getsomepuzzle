@@ -849,4 +849,66 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get onboardingCompleteBody =>
       '¡Has aprendido todas las reglas disponibles! Ahora puedes jugar libremente. Cuando se añadan nuevas reglas al juego, serás notificado.';
+
+  @override
+  String get scenarioFilterLabel => 'Escenario';
+
+  @override
+  String get scenarioAny => 'Cualquier escenario';
+
+  @override
+  String get scenarioClassic => 'Clásico';
+
+  @override
+  String get scenarioExplainClassic =>
+      'Puzzle general sin estilo de juego dominante.';
+
+  @override
+  String get scenarioSh => 'Forma';
+
+  @override
+  String get scenarioExplainSh =>
+      'Al menos una restricción de forma define la forma exacta de un grupo.';
+
+  @override
+  String get scenarioPathBased => 'Ruta';
+
+  @override
+  String get scenarioExplainPathBased =>
+      'Grupos de letras se conectan por la cuadrícula — encuentra el camino.';
+
+  @override
+  String get scenarioSyBased => 'Simetría';
+
+  @override
+  String get scenarioExplainSyBased =>
+      'Restricciones de simetría reflejan grupos a través de ejes.';
+
+  @override
+  String get scenarioMinesweeper => 'Buscaminas';
+
+  @override
+  String get scenarioExplainMinesweeper =>
+      'Conteo de vecinos y ojos — juega como Buscaminas.';
+
+  @override
+  String get scenarioNonogram => 'Nonograma';
+
+  @override
+  String get scenarioExplainNonogram =>
+      'Conteos de columnas y filas — deducción estilo hanjie.';
+
+  @override
+  String get scenarioLocal => 'Local';
+
+  @override
+  String get scenarioExplainLocal =>
+      'Patrones prohibidos y restricciones de diferencia definen reglas locales.';
+
+  @override
+  String get scenarioGroup => 'Grupo';
+
+  @override
+  String get scenarioExplainGroup =>
+      'Tamaños y conteos de grupos enfocados en la topología de componentes conectados.';
 }

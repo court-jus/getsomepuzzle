@@ -9,6 +9,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
@@ -275,6 +276,15 @@ class Puzzle {
   /// values match the `ProfileCategory` enum names: `classic`, `sh`,
   /// `pathBased`, `syBased`.
   String? generationScenario;
+
+  /// User-facing scenario derived from the puzzle's constraint slugs via
+  /// [detectPuzzleProfile]. Never serialised — lazy-initialised on first
+  /// read so that [Puzzle.empty] and [Puzzle.clone] (which share
+  /// [lineRepresentation]) never throw. Distinct from [generationScenario]
+  /// which records the generation pre-fill method.
+  late final ProfileCategory userScenario = detectPuzzleProfile(
+    lineRepresentation,
+  );
 
   List<Cell> get cells => _cells;
   set cells(List<Cell> value) {

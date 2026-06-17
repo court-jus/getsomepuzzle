@@ -337,5 +337,77 @@
     "onboardingCompleteBody": "¡Has aprendido todas las reglas disponibles! Ahora puedes jugar libremente. Cuando se añadan nuevas reglas al juego, serás notificado.",
     "@onboardingCompleteBody": {
         "description": "Body of the onboarding-complete dialog — congratulates the player and mentions future rule additions."
+    },
+    "scenarioFilterLabel": "Escenario",
+    "@scenarioFilterLabel": {
+        "description": "Label of the scenario filter dropdown in the advanced filters section."
+    },
+    "scenarioAny": "Cualquier escenario",
+    "@scenarioAny": {
+        "description": "Dropdown option meaning 'no scenario filter' — show every scenario."
+    },
+    "scenarioClassic": "Clásico",
+    "@scenarioClassic": {
+        "description": "Label for the Classic user scenario."
+    },
+    "scenarioExplainClassic": "Puzzle general sin estilo de juego dominante.",
+    "@scenarioExplainClassic": {
+        "description": "Description of the Classic user scenario."
+    },
+    "scenarioSh": "Forma",
+    "@scenarioSh": {
+        "description": "Label for the Shape (SH) user scenario."
+    },
+    "scenarioExplainSh": "Al menos una restricción de forma define la forma exacta de un grupo.",
+    "@scenarioExplainSh": {
+        "description": "Description of the Shape user scenario."
+    },
+    "scenarioPathBased": "Ruta",
+    "@scenarioPathBased": {
+        "description": "Label for the Path-based (LT) user scenario."
+    },
+    "scenarioExplainPathBased": "Grupos de letras se conectan por la cuadrícula — encuentra el camino.",
+    "@scenarioExplainPathBased": {
+        "description": "Description of the Path-based user scenario."
+    },
+    "scenarioSyBased": "Simetría",
+    "@scenarioSyBased": {
+        "description": "Label for the Symmetry (SY) user scenario."
+    },
+    "scenarioExplainSyBased": "Restricciones de simetría reflejan grupos a través de ejes.",
+    "@scenarioExplainSyBased": {
+        "description": "Description of the Symmetry user scenario."
+    },
+    "scenarioMinesweeper": "Buscaminas",
+    "@scenarioMinesweeper": {
+        "description": "Label for the Minesweeper-like user scenario."
+    },
+    "scenarioExplainMinesweeper": "Conteo de vecinos y ojos — juega como Buscaminas.",
+    "@scenarioExplainMinesweeper": {
+        "description": "Description of the Minesweeper user scenario."
+    },
+    "scenarioNonogram": "Nonograma",
+    "@scenarioNonogram": {
+        "description": "Label for the Nonogram / Hanjie-like user scenario."
+    },
+    "scenarioExplainNonogram": "Conteos de columnas y filas — deducción estilo hanjie.",
+    "@scenarioExplainNonogram": {
+        "description": "Description of the Nonogram user scenario."
+    },
+    "scenarioLocal": "Local",
+    "@scenarioLocal": {
+        "description": "Label for the Local-pattern (DF/FM) user scenario."
+    },
+    "scenarioExplainLocal": "Patrones prohibidos y restricciones de diferencia definen reglas locales.",
+    "@scenarioExplainLocal": {
+        "description": "Description of the Local user scenario."
+    },
+    "scenarioGroup": "Grupo",
+    "@scenarioGroup": {
+        "description": "Label for the Group-topology (GS/GC) user scenario."
+    },
+    "scenarioExplainGroup": "Tamaños y conteos de grupos enfocados en la topología de componentes conectados.",
+    "@scenarioExplainGroup": {
+        "description": "Description of the Group user scenario."
     }
 }

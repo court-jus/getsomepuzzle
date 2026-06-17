@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart'
+    as equilibrium;
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
@@ -33,6 +35,10 @@ class _OpenPageState extends State<OpenPage> {
   bool showAdvanced = false;
   Map<String, bool?> rules = {};
 
+  /// Sentinel for optional applyFilter parameter — null is a valid scenario
+  /// value ("Any"), so we need a different default to detect "not passed".
+  static const _notPassed = Object();
+
   static List<String> get existingRules =>
       constraintRegistry.map((r) => r.slug).toList();
 
@@ -53,6 +59,7 @@ class _OpenPageState extends State<OpenPage> {
     List<String>? newBFlags,
     List<String>? newWDomains,
     List<String>? newBDomains,
+    Object? newScenario = _notPassed,
   }) {
     setState(() {
       bool changed = false;
@@ -121,6 +128,11 @@ class _OpenPageState extends State<OpenPage> {
             .wantedDomains
             .where((d) => !newBDomains.contains(d))
             .toSet();
+        changed = true;
+      }
+      if (newScenario != _notPassed) {
+        widget.database.currentFilters.wantedScenario =
+            newScenario as equilibrium.ProfileCategory?;
         changed = true;
       }
       if (changed) {
@@ -329,7 +341,11 @@ class _OpenPageState extends State<OpenPage> {
           widget.database.currentFilters.wantedRules,
           reco.wantedRules,
         ) &&
-        setEquals(widget.database.currentFilters.bannedRules, reco.bannedRules);
+        setEquals(
+          widget.database.currentFilters.bannedRules,
+          reco.bannedRules,
+        ) &&
+        widget.database.currentFilters.wantedScenario == null;
   }
 
   /// Restore the recommended onboarding filters. Called by the banner
@@ -342,7 +358,57 @@ class _OpenPageState extends State<OpenPage> {
     applyFilter(
       newWRules: reco.wantedRules.toList(),
       newBRules: reco.bannedRules.toList(),
+      newScenario: null,
     );
+  }
+
+  /// Localised label for a scenario dropdown item.
+  String _scenarioLabel(equilibrium.ProfileCategory cat, BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    switch (cat) {
+      case equilibrium.ProfileCategory.classic:
+        return loc.scenarioClassic;
+      case equilibrium.ProfileCategory.sh:
+        return loc.scenarioSh;
+      case equilibrium.ProfileCategory.pathBased:
+        return loc.scenarioPathBased;
+      case equilibrium.ProfileCategory.syBased:
+        return loc.scenarioSyBased;
+      case equilibrium.ProfileCategory.minesweeper:
+        return loc.scenarioMinesweeper;
+      case equilibrium.ProfileCategory.nonogram:
+        return loc.scenarioNonogram;
+      case equilibrium.ProfileCategory.local:
+        return loc.scenarioLocal;
+      case equilibrium.ProfileCategory.group:
+        return loc.scenarioGroup;
+    }
+  }
+
+  /// Localised description (subtitle) for a scenario dropdown item.
+  String _scenarioExplain(
+    equilibrium.ProfileCategory cat,
+    BuildContext context,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    switch (cat) {
+      case equilibrium.ProfileCategory.classic:
+        return loc.scenarioExplainClassic;
+      case equilibrium.ProfileCategory.sh:
+        return loc.scenarioExplainSh;
+      case equilibrium.ProfileCategory.pathBased:
+        return loc.scenarioExplainPathBased;
+      case equilibrium.ProfileCategory.syBased:
+        return loc.scenarioExplainSyBased;
+      case equilibrium.ProfileCategory.minesweeper:
+        return loc.scenarioExplainMinesweeper;
+      case equilibrium.ProfileCategory.nonogram:
+        return loc.scenarioExplainNonogram;
+      case equilibrium.ProfileCategory.local:
+        return loc.scenarioExplainLocal;
+      case equilibrium.ProfileCategory.group:
+        return loc.scenarioExplainGroup;
+    }
   }
 
   @override
@@ -548,6 +614,69 @@ class _OpenPageState extends State<OpenPage> {
                             body: SingleChildScrollView(
                               child: Column(
                                 children: [
+                                  const Divider(),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.scenarioFilterLabel,
+                                      ),
+                                      DropdownButton<
+                                        equilibrium.ProfileCategory?
+                                      >(
+                                        value: widget
+                                            .database
+                                            .currentFilters
+                                            .wantedScenario,
+                                        hint: Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          )!.scenarioAny,
+                                        ),
+                                        items: [
+                                          DropdownMenuItem(
+                                            value: null,
+                                            child: Text(
+                                              AppLocalizations.of(
+                                                context,
+                                              )!.scenarioAny,
+                                            ),
+                                          ),
+                                          for (final p
+                                              in equilibrium
+                                                  .ProfileCategory
+                                                  .values)
+                                            DropdownMenuItem(
+                                              value: p,
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    _scenarioLabel(p, context),
+                                                  ),
+                                                  Text(
+                                                    _scenarioExplain(
+                                                      p,
+                                                      context,
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                        ],
+                                        onChanged: (v) =>
+                                            applyFilter(newScenario: v),
+                                      ),
+                                    ],
+                                  ),
                                   const Divider(),
                                   Text(
                                     AppLocalizations.of(

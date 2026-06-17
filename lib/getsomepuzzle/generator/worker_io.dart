@@ -908,7 +908,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
           slugs: producedSlugs,
           width: w,
           height: h,
-          profile: detectPuzzleProfile(line),
+          profile: generationBucket(detectPuzzleProfile(line)),
           domainSize: emittedDomainSize,
         );
       }
@@ -1120,6 +1120,15 @@ _ResolvedTarget _resolveTarget(
           // island count, axes and topology; slug-level preferences are
           // ignored.
           return const _ResolvedTarget(syBasedScenario: true);
+        case ProfileCategory.minesweeper:
+        case ProfileCategory.nonogram:
+        case ProfileCategory.local:
+        case ProfileCategory.group:
+          // Unreachable: emergent profiles never appear in a ProfileTarget
+          // (kTargetProfile only contains the four pre-fill modes).
+          throw StateError(
+            'Unexpected emergent profile $profile in profile-target switch',
+          );
       }
     case CompositionTarget(:final families):
       // Composition axis fixed. Restrict allowed slugs to the union of

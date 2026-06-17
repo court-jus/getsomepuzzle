@@ -851,4 +851,66 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get onboardingCompleteBody =>
       'Vous avez découvert toutes les règles disponibles ! Vous pouvez désormais jouer librement. Lorsque de nouvelles règles seront ajoutées au jeu, vous serez averti.';
+
+  @override
+  String get scenarioFilterLabel => 'Scénario';
+
+  @override
+  String get scenarioAny => 'Tout scénario';
+
+  @override
+  String get scenarioClassic => 'Classique';
+
+  @override
+  String get scenarioExplainClassic =>
+      'Puzzle général sans style de jeu dominant.';
+
+  @override
+  String get scenarioSh => 'Forme';
+
+  @override
+  String get scenarioExplainSh =>
+      'Au moins une contrainte de forme définit la forme exacte d\'un groupe.';
+
+  @override
+  String get scenarioPathBased => 'Chemin';
+
+  @override
+  String get scenarioExplainPathBased =>
+      'Des groupes de lettres se connectent dans la grille — trouve le chemin.';
+
+  @override
+  String get scenarioSyBased => 'Symétrie';
+
+  @override
+  String get scenarioExplainSyBased =>
+      'Les contraintes de symétrie reflètent les groupes le long d\'axes.';
+
+  @override
+  String get scenarioMinesweeper => 'Démineur';
+
+  @override
+  String get scenarioExplainMinesweeper =>
+      'Comptages de voisins et yeux — joue comme au Démineur.';
+
+  @override
+  String get scenarioNonogram => 'Nonogramme';
+
+  @override
+  String get scenarioExplainNonogram =>
+      'Comptages de colonnes et lignes — déduction façon hanjie.';
+
+  @override
+  String get scenarioLocal => 'Local';
+
+  @override
+  String get scenarioExplainLocal =>
+      'Motifs interdits et contraintes de différence définissent des règles locales.';
+
+  @override
+  String get scenarioGroup => 'Groupe';
+
+  @override
+  String get scenarioExplainGroup =>
+      'Tailles et comptages de groupes axés sur la topologie des composantes connexes.';
 }

@@ -956,5 +956,77 @@
     "onboardingCompleteBody": "You've learned all the rules currently available! You can now play freely. When new rules are added to the game, you'll be notified.",
     "@onboardingCompleteBody": {
         "description": "Body of the onboarding-complete dialog — congratulates the player and mentions future rule additions."
+    },
+    "scenarioFilterLabel": "Scenario",
+    "@scenarioFilterLabel": {
+        "description": "Label of the scenario filter dropdown in the advanced filters section."
+    },
+    "scenarioAny": "Any scenario",
+    "@scenarioAny": {
+        "description": "Dropdown option meaning 'no scenario filter' — show every scenario."
+    },
+    "scenarioClassic": "Classic",
+    "@scenarioClassic": {
+        "description": "Label for the Classic user scenario."
+    },
+    "scenarioExplainClassic": "General logic puzzle with no dominant gameplay style.",
+    "@scenarioExplainClassic": {
+        "description": "Description of the Classic user scenario."
+    },
+    "scenarioSh": "Shape",
+    "@scenarioSh": {
+        "description": "Label for the Shape (SH) user scenario."
+    },
+    "scenarioExplainSh": "At least one shape constraint defines exact form for a group.",
+    "@scenarioExplainSh": {
+        "description": "Description of the Shape user scenario."
+    },
+    "scenarioPathBased": "Path",
+    "@scenarioPathBased": {
+        "description": "Label for the Path-based (LT) user scenario."
+    },
+    "scenarioExplainPathBased": "Letter groups route across the grid — find the path.",
+    "@scenarioExplainPathBased": {
+        "description": "Description of the Path-based user scenario."
+    },
+    "scenarioSyBased": "Symmetry",
+    "@scenarioSyBased": {
+        "description": "Label for the Symmetry (SY) user scenario."
+    },
+    "scenarioExplainSyBased": "Symmetry constraints mirror groups across axes.",
+    "@scenarioExplainSyBased": {
+        "description": "Description of the Symmetry user scenario."
+    },
+    "scenarioMinesweeper": "Minesweeper",
+    "@scenarioMinesweeper": {
+        "description": "Label for the Minesweeper-like user scenario."
+    },
+    "scenarioExplainMinesweeper": "Neighbor counts and eye constraints — play it like Minesweeper.",
+    "@scenarioExplainMinesweeper": {
+        "description": "Description of the Minesweeper user scenario."
+    },
+    "scenarioNonogram": "Nonogram",
+    "@scenarioNonogram": {
+        "description": "Label for the Nonogram / Hanjie-like user scenario."
+    },
+    "scenarioExplainNonogram": "Column and row counts — classic hanjie-style deduction.",
+    "@scenarioExplainNonogram": {
+        "description": "Description of the Nonogram user scenario."
+    },
+    "scenarioLocal": "Local",
+    "@scenarioLocal": {
+        "description": "Label for the Local-pattern (DF/FM) user scenario."
+    },
+    "scenarioExplainLocal": "Forbidden patterns and different-from constraints define local rules.",
+    "@scenarioExplainLocal": {
+        "description": "Description of the Local user scenario."
+    },
+    "scenarioGroup": "Group",
+    "@scenarioGroup": {
+        "description": "Label for the Group-topology (GS/GC) user scenario."
+    },
+    "scenarioExplainGroup": "Group sizes and group counts focus on connected-component topology.",
+    "@scenarioExplainGroup": {
+        "description": "Description of the Group user scenario."
     }
 }

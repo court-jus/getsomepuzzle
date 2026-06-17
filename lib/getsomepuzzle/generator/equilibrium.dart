@@ -81,6 +81,12 @@ const int kEquilibriumWarmupSize = 100;
 /// rejected. Mirrors the constant used by the generator.
 const double kMaxAcceptableRatio = 0.25;
 
+/// Minimum fraction of constraint slugs from a single emergent group
+/// ({NC,EY} / {CC,RC,CT,RT} / {DF,FM} / {GS,GC}) before
+/// [detectPuzzleProfile] classifies a puzzle under that emergent scenario.
+/// 0.80 means ≤20 % of slugs may be "parasites" from other families.
+const double kEmergentThreshold = 0.80;
+
 /// Distribution of #types per puzzle during warm-up. Mono-constraint puzzles
 /// generate fastest; bi-constraint puzzles seed the pair-axis stats so the
 /// equilibrium engine has data on that axis as soon as it kicks in.
@@ -168,6 +174,13 @@ enum Axis { slug, ntypes, pair, size, profile, composition, domain }
 /// determined either at generation time (when `pathBasedScenario` or
 /// `prioritySlugs.contains("SH")` is set) or post-hoc via heuristic
 /// detection on a v2 line (see [detectPuzzleProfile]).
+///
+/// The last four values (`minesweeper`, `nonogram`, `local`, `group`) are
+/// **emergent** gameplay classifications: they describe the dominant
+/// reasoning style of a puzzle regardless of its pre-fill method. They are
+/// never pre-fill modes — only detection outputs. When consumed by the
+/// equilibrium generator they are collapsed into `classic` via
+/// [generationBucket].
 enum ProfileCategory {
   /// Default: regular pre-fill (random grid) followed by the greedy
   /// constraint cherry-pick. The bulk of generated puzzles.
@@ -177,15 +190,30 @@ enum ProfileCategory {
   /// least one SH constraint.
   sh,
 
-  /// Path-based-LT: `preFillPath` builds a topology of LT constraints
-  /// and runs the bipartite desambiguation. LT is the dominant
-  /// deductive driver.
+  /// Path-based: constructive topology built from a residual graph,
+  /// self-avoiding walk and DPLL completion (see `docs/dev/path_based.md`).
   pathBased,
 
   /// SY-themed: `preFillSy` grows symmetric islands and ambiguates via a
   /// bipartite cascade dominated by SY constraints. See
   /// `docs/dev/prefill_sy.md`.
   syBased,
+
+  /// Emergent minesweeper-like: NC (and optionally EY) dominate the
+  /// constraint set. The puzzle plays like Minesweeper.
+  minesweeper,
+
+  /// Emergent nonogram-like: CC / RC / CT / RT dominate. The puzzle
+  /// plays like a Hanjie / nonogram.
+  nonogram,
+
+  /// Emergent local-pattern: DF / FM dominate. The puzzle is about
+  /// forbidden adjacency motifs.
+  local,
+
+  /// Emergent group-topology: GS / GC dominate. The puzzle is about
+  /// group sizes and counts.
+  group,
 }
 
 /// A single target the equilibrium algorithm wants to push next.
@@ -299,30 +327,109 @@ class DomainTarget extends Target {
 /// with `scenario:` is honoured, regardless of position relative to a
 /// `p:` play-state suffix.
 ///
-/// Lines without a `scenario:` suffix fall back to a heuristic for the
-/// legacy corpus: if the line contains an `SH` constraint slug it is
-/// reported as [ProfileCategory.sh]. Lines without SH or a scenario
-/// marker — including the entire legacy corpus — are reported as
-/// [ProfileCategory.classic].
+/// Detection algorithm:
+///
+/// 1. **Authoritative marqueur** — if the `scenario:` value is
+///    `pathBased`, `syBased` or `sh`, return it immediately (court-circuit).
+///    If `classic` or an unknown name → do **not** court-circuit, fall
+///    through to emergent detection so a classic-generated puzzle that is
+///    100 % NC-dominant can reveal itself as `minesweeper`.
+///
+/// 2. **Emergent** — from the multiset of constraint slugs (field [4],
+///    repeats counted). If `SH` is present → `sh`. Otherwise, for each
+///    emergent group, if `count(group) / total >= kEmergentThreshold`:
+///    - `minesweeper`: group `{NC, EY}` **and** `count(NC) ≥ 1`
+///      (pure EY without NC stays `classic`);
+///    - `nonogram`: group `{CC, RC, CT, RT}`;
+///    - `local`: group `{DF, FM}`;
+///    - `group`: group `{GS, GC}`.
+///    If no group matches → `classic`.
+///
+/// Lines without a `scenario:` suffix or with no constraint slugs always
+/// resolve to `classic`.
 ProfileCategory detectPuzzleProfile(String v2Line) {
   final parts = v2Line.split('_');
+
+  // Step 1: Authoritative scenario marqueur.
   for (int i = parts.length - 1; i >= 7; i--) {
     final field = parts[i];
     if (!field.startsWith('scenario:')) continue;
     final name = field.substring('scenario:'.length);
     for (final p in ProfileCategory.values) {
-      if (p.name == name) return p;
+      if (p.name == name) {
+        if (p == ProfileCategory.pathBased ||
+            p == ProfileCategory.sh ||
+            p == ProfileCategory.syBased) {
+          return p;
+        }
+        // classic or unknown → do not court-circuit, fall through.
+        break;
+      }
     }
     break;
   }
-  // Heuristic for legacy corpus: SH slug → sh profile.
+
+  // Step 2: Emergent detection from constraint slugs (field [4]).
   if (parts.length >= 5) {
+    final rawSlugs = <String>[];
     for (final c in parts[4].split(';')) {
       final colon = c.indexOf(':');
-      if (colon > 0 && c.substring(0, colon) == 'SH') return ProfileCategory.sh;
+      if (colon > 0) rawSlugs.add(c.substring(0, colon));
+    }
+
+    if (rawSlugs.isNotEmpty) {
+      final total = rawSlugs.length;
+
+      // SH present → sh (prolongs the legacy heuristic).
+      if (rawSlugs.any((s) => s == 'SH')) return ProfileCategory.sh;
+
+      // minesweeper: {NC, EY} ≥ threshold, NC itself must be present.
+      if (rawSlugs.where((s) => s == 'NC' || s == 'EY').length / total >=
+              kEmergentThreshold &&
+          rawSlugs.any((s) => s == 'NC')) {
+        return ProfileCategory.minesweeper;
+      }
+      // nonogram: {CC, RC, CT, RT} ≥ threshold.
+      if (rawSlugs
+                  .where(
+                    (s) => s == 'CC' || s == 'RC' || s == 'CT' || s == 'RT',
+                  )
+                  .length /
+              total >=
+          kEmergentThreshold) {
+        return ProfileCategory.nonogram;
+      }
+      // local: {DF, FM} ≥ threshold.
+      if (rawSlugs.where((s) => s == 'DF' || s == 'FM').length / total >=
+          kEmergentThreshold) {
+        return ProfileCategory.local;
+      }
+      // group: {GS, GC} ≥ threshold.
+      if (rawSlugs.where((s) => s == 'GS' || s == 'GC').length / total >=
+          kEmergentThreshold) {
+        return ProfileCategory.group;
+      }
     }
   }
+
   return ProfileCategory.classic;
+}
+
+/// Collapse emergent profiles into [ProfileCategory.classic] for
+/// equilibrium-consumption sites (the generator's profile axis only reasons
+/// about the four pre-fill modes: classic, sh, pathBased, syBased).
+/// Emergent classifications (minesweeper, nonogram, local, group) count
+/// toward the `classic` bucket so the generation equilibrium is unchanged.
+ProfileCategory generationBucket(ProfileCategory cat) {
+  switch (cat) {
+    case ProfileCategory.minesweeper:
+    case ProfileCategory.nonogram:
+    case ProfileCategory.local:
+    case ProfileCategory.group:
+      return ProfileCategory.classic;
+    default:
+      return cat;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +527,7 @@ class EquilibriumStats {
         final pair = (sorted[0], sorted[1]);
         pairs[pair] = (pairs[pair] ?? 0) + 1;
       }
-      final profile = detectPuzzleProfile(line);
+      final profile = generationBucket(detectPuzzleProfile(line));
       profiles[profile] = (profiles[profile] ?? 0) + 1;
       final comp = compositionOf(rawSlugs);
       final compKey = comp.join('+');

@@ -337,5 +337,77 @@
     "onboardingCompleteBody": "Vous avez découvert toutes les règles disponibles ! Vous pouvez désormais jouer librement. Lorsque de nouvelles règles seront ajoutées au jeu, vous serez averti.",
     "@onboardingCompleteBody": {
         "description": "Body of the onboarding-complete dialog — congratulates the player and mentions future rule additions."
+    },
+    "scenarioFilterLabel": "Scénario",
+    "@scenarioFilterLabel": {
+        "description": "Label of the scenario filter dropdown in the advanced filters section."
+    },
+    "scenarioAny": "Tout scénario",
+    "@scenarioAny": {
+        "description": "Dropdown option meaning 'no scenario filter' — show every scenario."
+    },
+    "scenarioClassic": "Classique",
+    "@scenarioClassic": {
+        "description": "Label for the Classic user scenario."
+    },
+    "scenarioExplainClassic": "Puzzle général sans style de jeu dominant.",
+    "@scenarioExplainClassic": {
+        "description": "Description of the Classic user scenario."
+    },
+    "scenarioSh": "Forme",
+    "@scenarioSh": {
+        "description": "Label for the Shape (SH) user scenario."
+    },
+    "scenarioExplainSh": "Au moins une contrainte de forme définit la forme exacte d'un groupe.",
+    "@scenarioExplainSh": {
+        "description": "Description of the Shape user scenario."
+    },
+    "scenarioPathBased": "Chemin",
+    "@scenarioPathBased": {
+        "description": "Label for the Path-based (LT) user scenario."
+    },
+    "scenarioExplainPathBased": "Des groupes de lettres se connectent dans la grille — trouve le chemin.",
+    "@scenarioExplainPathBased": {
+        "description": "Description of the Path-based user scenario."
+    },
+    "scenarioSyBased": "Symétrie",
+    "@scenarioSyBased": {
+        "description": "Label for the Symmetry (SY) user scenario."
+    },
+    "scenarioExplainSyBased": "Les contraintes de symétrie reflètent les groupes le long d'axes.",
+    "@scenarioExplainSyBased": {
+        "description": "Description of the Symmetry user scenario."
+    },
+    "scenarioMinesweeper": "Démineur",
+    "@scenarioMinesweeper": {
+        "description": "Label for the Minesweeper-like user scenario."
+    },
+    "scenarioExplainMinesweeper": "Comptages de voisins et yeux — joue comme au Démineur.",
+    "@scenarioExplainMinesweeper": {
+        "description": "Description of the Minesweeper user scenario."
+    },
+    "scenarioNonogram": "Nonogramme",
+    "@scenarioNonogram": {
+        "description": "Label for the Nonogram / Hanjie-like user scenario."
+    },
+    "scenarioExplainNonogram": "Comptages de colonnes et lignes — déduction façon hanjie.",
+    "@scenarioExplainNonogram": {
+        "description": "Description of the Nonogram user scenario."
+    },
+    "scenarioLocal": "Local",
+    "@scenarioLocal": {
+        "description": "Label for the Local-pattern (DF/FM) user scenario."
+    },
+    "scenarioExplainLocal": "Motifs interdits et contraintes de différence définissent des règles locales.",
+    "@scenarioExplainLocal": {
+        "description": "Description of the Local user scenario."
+    },
+    "scenarioGroup": "Groupe",
+    "@scenarioGroup": {
+        "description": "Label for the Group-topology (GS/GC) user scenario."
+    },
+    "scenarioExplainGroup": "Tailles et comptages de groupes axés sur la topologie des composantes connexes.",
+    "@scenarioExplainGroup": {
+        "description": "Description of the Group user scenario."
     }
 }
