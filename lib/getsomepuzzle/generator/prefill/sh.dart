@@ -17,7 +17,7 @@ Puzzle preFillSh(int width, int height, List<CellValue> domain, Random rng) {
   final chosenMotif = _pickShapeMotif(width, height, domain, rng);
   final sc = ShapeConstraint(chosenMotif);
   _placeInitialVariant(solved, sc, rng);
-  _fillRemainingWithOpposite(solved, sc.color, domain);
+  _fillRemainingBackground(solved, sc.color, domain, rng);
   solved.addConstraint(sc);
   _placeAdditionalVariants(solved, rng);
   return solved;
@@ -75,16 +75,18 @@ void _placeInitialVariant(Puzzle solved, ShapeConstraint sc, Random rng) {
   _paintVariant(solved, variant, rowOffset, colOffset);
 }
 
-/// Fill every still-free cell of [solved] with the color opposite [color].
-void _fillRemainingWithOpposite(
+/// Fill every still-free cell of [solved] with a uniformly-random choice
+/// among the non-[color] colours in [domain].
+void _fillRemainingBackground(
   Puzzle solved,
   CellValue color,
   List<CellValue> domain,
+  Random rng,
 ) {
-  final opposite = domain.whereNot((c) => c == color).first;
+  final others = domain.whereNot((c) => c == color).toList();
   for (int i = 0; i < solved.width * solved.height; i++) {
     if (!solved.cells[i].isFree) continue;
-    solved.cells[i].setForSolver(opposite);
+    solved.cells[i].setForSolver(others[rng.nextInt(others.length)]);
   }
 }
 

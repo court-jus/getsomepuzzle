@@ -1923,15 +1923,15 @@ Modes:
   --read-stats DIR        Aggregate play stats, output puzzles sorted by difficulty
 
 Generation options:
-  -n, --count N           Number of puzzles to generate (default: 10)
-  -W, --min-width N       Minimum grid width (default: 4)
-      --max-width N       Maximum grid width (default: 7)
-  -H, --min-height N      Minimum grid height (default: 4)
-      --max-height N      Maximum grid height (default: 8)
-  -T, --max-time S        Maximum generation time (in seconds, default: 60)
+  -n, --count N           Number of puzzles to generate (default: 1000)
+  -W, --min-width N       Minimum grid width (default: 3)
+      --max-width N       Maximum grid width (default: 10)
+  -H, --min-height N      Minimum grid height (default: 3)
+      --max-height N      Maximum grid height (default: 10)
+  -T, --max-time S        Maximum generation time (in seconds, default: 3600)
       --max-attempt-time S
                           Wall-clock cap for a single `generateOne` call (in
-                          seconds, default: 120). Once exceeded the attempt
+                          seconds, default: 360). Once exceeded the attempt
                           is aborted with reason=attemptTimeout. Prevents a
                           single slow combo (e.g. CH alone on a medium grid)
                           from monopolizing the --max-time budget.
@@ -1994,6 +1994,15 @@ Generation options:
                           one worker burns the entire budget on a single
                           plateaued attempt. Default 15 s. Pass 0 to
                           disable.
+      --scenario S        Predefined scenario for the pre-fill phase.
+                          Valid values: path-based, sy-based.
+                          When set, the pre-fill paints a structure matching
+                          the scenario (a path for path-based, symmetry
+                          islands for sy-based) instead of a random grid,
+                          making the corresponding constraints satisfiable.
+                          Without the flag the pre-fill uses the classic
+                          random-grid approach (possibly with SH pre-fill if
+                          SH is in the required/preferred slugs).
       --path-retries N    Max retries inside preFillPath before giving up
                           (default: 30). Watch path_retries in
                           generator_stats.csv.

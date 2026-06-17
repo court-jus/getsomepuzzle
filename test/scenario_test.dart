@@ -100,7 +100,7 @@ void main() {
       expect(detectPuzzleProfile(line), ProfileCategory.classic);
     });
 
-    test('EY pur sans NC → classic', () {
+    test('EY without NC → classic', () {
       const line = 'v2_12_4x4_0000000000000000_EY:3.1.2_1:2222222222222222_0';
       expect(detectPuzzleProfile(line), ProfileCategory.classic);
     });
@@ -131,7 +131,7 @@ void main() {
       expect(detectPuzzleProfile(line), ProfileCategory.group);
     });
 
-    test('SH présent non marqué → sh', () {
+    test('SH unmarked → sh', () {
       // No scenario marker, but SH slug triggers sh.
       const shLine =
           'v2_12_4x4_0000000000000000_SH:3123;LT:A.0.5_'
@@ -139,7 +139,7 @@ void main() {
       expect(detectPuzzleProfile(shLine), ProfileCategory.sh);
     });
 
-    test('LT + SY non marqués → classic (no emergent group matches)', () {
+    test('LT + SY unmarked → classic (no emergent group matches)', () {
       const line =
           'v2_12_4x4_0000000000000000_LT:A.0.5;SY:3.axis_'
           '1:2222222222222222_0';

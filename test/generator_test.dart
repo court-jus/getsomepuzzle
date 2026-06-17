@@ -240,7 +240,7 @@ void main() {
   });
 
   test('generateOne accepts a slugDeficitScores map without crashing', () {
-    // Câblage smoke-test: passing the new deficit map must not break the
+    // Wiring smoke-test: passing the new deficit map must not break the
     // sort path even when the map references slugs not in the candidate
     // pool — generateOne treats unknown entries as zero via `?? 0.0`.
     final result = PuzzleGenerator.generateOne(

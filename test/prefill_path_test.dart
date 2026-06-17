@@ -56,7 +56,7 @@ void main() {
     }
   });
 
-  // "Couleurs partagées": with L > |domain| every colour is still covered
+  // "Shared colours": with L > |domain| every colour is still covered
   // (genuine 3-colour) AND exactly one colour is shared by two letters — the
   // hard same-colour separation case that gives the scenario its richness.
   test('domain 3, L=4: full coverage plus exactly one shared colour', () {

@@ -717,9 +717,9 @@ bool _tryAddGcOrQa(
   // 2 slugs (GC, QA) × one slot per domain colour.
   if (occupied.length >= 2 * puzzle.domain.length) return false;
 
-  // Classic-style consumption: a candidate parcouru est définitivement
-  // retiré de la liste, même s'il n'aide pas. Évite le retest coûteux des
-  // non-helpers à chaque itération de la cascade.
+  // Classic-style consumption: a candidate is permanently removed from the
+  // list even if it doesn't help. Avoids repeatedly re-scanning non-helpers
+  // on every cascade iteration.
   final tryOrder = rng.nextBool() ? ['GC', 'QA'] : ['QA', 'GC'];
   for (final preferredSlug in tryOrder) {
     int i = 0;
@@ -739,7 +739,7 @@ bool _tryAddGcOrQa(
         continue;
       }
       if (occupied.contains((preferredSlug, color))) {
-        // Slot color déjà pris : candidat définitivement inutile.
+        // That (slug, colour) slot is already taken; candidate is useless.
         candidates.removeAt(i);
         continue;
       }
@@ -760,9 +760,9 @@ bool _tryAddOtherGuardrail(
   Puzzle solvedBase,
   bool Function()? shouldStop,
 ) {
-  // Classic-style consumption: chaque non-GC/QA parcouru est retiré, même
-  // s'il n'aide pas. Évite le scan répété des milliers de candidats inutiles
-  // à chaque itération de la cascade.
+  // Classic-style consumption: every non-GC/QA candidate is removed even if
+  // it doesn't help. Avoids repeatedly scanning thousands of useless
+  // candidates on every cascade iteration.
   int i = 0;
   while (i < candidates.length) {
     if (shouldStop?.call() == true) return false;

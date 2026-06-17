@@ -572,6 +572,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       pathBased: params.pathBasedScenario || attemptPathBased,
       syBased: params.syBasedScenario || attemptSyBased,
       preferredSlugs: preferredSlugs,
+      requiredSlugs: requiredSet,
     );
     final resolvedTarget = target;
     // `ntypesIntended` is the explicit target.n when chasing NTypesTarget,
@@ -1181,14 +1182,18 @@ _ResolvedTarget _resolveTarget(
 // Effective pre-fill scenario for one attempt. Priority order matches
 // `PuzzleGenerator.generateOne` dispatch: pathBased / syBased short-circuit
 // the regular flow, and SH pre-fill activates whenever SH ∈ prioritySlugs
-// (cf. generator.dart). When none apply we're in the classic grid-first flow.
+// (= preferred ∪ required, cf. generator.dart). When none apply we're in
+// the classic grid-first flow.
 String _resolveScenario({
   required bool pathBased,
   required bool syBased,
   required Set<String> preferredSlugs,
+  required Set<String> requiredSlugs,
 }) {
   if (pathBased) return 'pathBased';
   if (syBased) return 'syBased';
-  if (preferredSlugs.contains('SH')) return 'sh';
+  if (preferredSlugs.contains('SH') || requiredSlugs.contains('SH')) {
+    return 'sh';
+  }
   return 'classic';
 }

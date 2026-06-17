@@ -517,10 +517,7 @@ void main() {
       // The base line has FM:11 as the only constraint. The new emergent
       // detection sees FM in the `local` group ({DF, FM}) at 1.0 ≥ kEmergentThreshold
       // and classifies it as `local` instead of `classic`.
-      expect(
-        detectPuzzleProfile('${base}_p:000000000'),
-        ProfileCategory.local,
-      );
+      expect(detectPuzzleProfile('${base}_p:000000000'), ProfileCategory.local);
     });
 
     test('legacy line without any suffix now detects local (FM-dominant)', () {

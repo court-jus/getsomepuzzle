@@ -748,7 +748,7 @@ Target? pickTarget(
 /// rest of the universe so the returned set always has size `min(n, nSlugs)`.
 ///
 /// Mirrors the `avgK / nSlugs` expected-share formula used in `_scoreAll`,
-/// so a slug "sous-représenté" here is exactly what the picker thinks.
+/// so a slug "under-represented" here is exactly what the picker thinks.
 Set<String> pickWeightedSlugs(
   EquilibriumStats stats,
   TargetUniverse universe,
@@ -990,7 +990,7 @@ double _share(int count, int total) => total > 0 ? count / total : 0.0;
 /// Per-slug deficit (positive = under-represented vs. the balanced expected
 /// share, zero = at-or-above target). Same arithmetic as the slug axis of
 /// [_scoreAll], exposed so the generator's secondary sort key shares a single
-/// notion of "sous-représenté" with [pickTarget].
+/// notion of "under-represented" with [pickTarget].
 ///
 /// Returned map covers every slug in [universe.allowedSlugs]; slugs with zero
 /// gap are kept (caller can use `?? 0.0` interchangeably).

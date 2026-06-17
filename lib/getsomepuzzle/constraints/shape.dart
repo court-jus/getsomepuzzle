@@ -670,7 +670,7 @@ class ShapeConstraint extends Motif {
     final height = solved.height;
     final sc = solved.constraints.whereType<ShapeConstraint>().first;
     final motifValue = sc.color;
-    final oppositeColor = solved.domain.whereNot((i) => i == motifValue).first;
+    final otherColors = solved.domain.whereNot((i) => i == motifValue).toSet();
 
     final List<((int, int), List<List<CellValue>>)> results = [];
 
@@ -685,7 +685,8 @@ class ShapeConstraint extends Motif {
             for (int vc = 0; vc < variantWidth && canPlace; vc++) {
               final cellValue =
                   solved.cells[(row + vr) * width + (col + vc)].value;
-              if (cellValue != CellValue.free && cellValue != oppositeColor) {
+              if (cellValue != CellValue.free &&
+                  !otherColors.contains(cellValue)) {
                 canPlace = false;
               }
             }
