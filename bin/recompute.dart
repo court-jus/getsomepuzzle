@@ -118,9 +118,13 @@ Options:
                 in-place. Without positional args, the source set is
                 the six playable-level files
                 (assets/1-easy.txt … assets/6-mad.txt). With positional
-                args, those files are used as sources instead —
+                args, those files are used as the feed instead —
                 useful to ventilate an unsorted feed (e.g.
-                /tmp/path6.txt) into the cascade. Out-of-cascade
+                /tmp/path6.txt) into the cascade. In that feed mode the
+                existing destination content is preserved verbatim and
+                the feed puzzles are added (deduped against the corpus
+                by `canonicalPuzzleKey`), never replacing it.
+                Out-of-cascade
                 puzzles (overfilled, undetermined) go to their
                 dedicated files. Writes to `<dest>.tmp` first (append
                 mode); renames each `.tmp` → original only at the
@@ -371,7 +375,9 @@ String _fmtHistogram(Map<PuzzleLevel, int> hist) {
 /// classification. Source defaults to the six playable-level files;
 /// pass [sources] to route from an arbitrary set of files instead
 /// (e.g. an unsorted /tmp/*.txt feed). Off-cascade puzzles land in
-/// their dedicated `overfilled*` / `undetermined` files.
+/// their dedicated `overfilled*` / `undetermined` files. In feed mode
+/// the existing destination content is preserved (seeded into each
+/// `.tmp`) and the feed is added to it, deduped by canonical key.
 ///
 /// Algorithm:
 ///   1. Read every line of every input file.
@@ -400,13 +406,24 @@ void _routeFiles({
   required TraceCache cache,
 }) {
   // When [sources] is non-empty, we route from an arbitrary feed
-  // (not one of the six level files). In that mode, verbatim noise
-  // (blanks, comments, parse failures) is silently dropped instead of
-  // being preserved next to the source — the caller's input file is
-  // a feed, not a destination we want to clone a `.tmp` for.
+  // (not one of the six level files). The feed's own verbatim noise
+  // (blanks, comments, parse failures) is silently dropped — the feed
+  // is an input, not a destination. The existing destination assets,
+  // however, are preserved: their content is seeded into each `.tmp`
+  // (see the seeding pass below and `sinkFor`) so the feed is added to
+  // the corpus rather than replacing it.
   final external = sources.isNotEmpty;
   final srcPaths = external ? sources : _playableLevelPaths;
   final sw = Stopwatch()..start();
+
+  // Which `.tmp` files already exist at startup. A puzzle's `.tmp` that
+  // predates this run means we're resuming an interrupted route: the
+  // preload below rebuilds its idempotence sets from the `.tmp`, and the
+  // external-mode seeding (set population + `sinkFor` copy) must NOT run
+  // for it, or we'd duplicate its content.
+  final preexistingTmp = _allPossibleTmpPaths()
+      .where((p) => File(p).existsSync())
+      .toSet();
 
   // ─── Pre-load: read all existing `.tmp` to build idempotence sets ──
   //
@@ -417,8 +434,9 @@ void _routeFiles({
   // parse-failures) are deduped by exact string content so we don't
   // re-append them on every rerun.
   //
-  // Sources are NEVER read or modified here; only the `.tmp` files
-  // are inspected.
+  // The feed sources are NEVER read or modified here; only the `.tmp`
+  // files are inspected. (In external mode the destination asset files
+  // are additionally read below to seed dedup + preserve their content.)
   final existingCanonical = <String>{};
   final existingVerbatim = <String>{};
   int preloadedPuzzles = 0;
@@ -449,11 +467,40 @@ void _routeFiles({
     );
   }
 
+  // External feed mode: the destination asset files are not part of the
+  // source set, so seed the idempotence sets from each existing
+  // destination. This makes feed puzzles already present in the corpus
+  // skip (dedup) instead of being appended twice — and pairs with the
+  // verbatim copy done lazily in `sinkFor` so the final rename preserves
+  // the existing content. Skip destinations whose `.tmp` already existed
+  // (a resumed run rebuilt those sets from the `.tmp` preload above).
+  if (external) {
+    for (final tmpPath in _allPossibleTmpPaths()) {
+      if (preexistingTmp.contains(tmpPath)) continue;
+      final destPath = tmpPath.substring(0, tmpPath.length - '.tmp'.length);
+      final destFile = File(destPath);
+      if (!destFile.existsSync()) continue;
+      for (final line in destFile.readAsLinesSync()) {
+        if (line.trim().isEmpty || line.startsWith('#')) {
+          existingVerbatim.add(line);
+          continue;
+        }
+        try {
+          existingCanonical.add(canonicalPuzzleKey(line));
+        } catch (_) {
+          existingVerbatim.add(line);
+        }
+      }
+    }
+  }
+
   // ─── Sinks (append mode) ────────────────────────────────────────────
   //
   // Append so multiple runs accumulate without truncating prior work.
-  // No commit / rename / cleanup at the end — the `.tmp` files stay
-  // in place for the user to verify and migrate manually.
+  // Each `.tmp` is renamed over its destination at the very end (see the
+  // commit block after the route loop). In external feed mode the first
+  // open of a destination seeds its `.tmp` with the current asset content
+  // so that rename adds the feed to — rather than replaces — the corpus.
   final destFiles = <String, RandomAccessFile>{};
   final destStats = <String, _DestStats>{};
   final perFileStats = <String, _RouteStats>{};
@@ -464,7 +511,32 @@ void _routeFiles({
       final dir = tmp.parent;
       if (!dir.existsSync()) dir.createSync(recursive: true);
       destStats[destPath] = _DestStats();
-      return tmp.openSync(mode: FileMode.append);
+      final raf = tmp.openSync(mode: FileMode.append);
+      // External feed mode: seed the freshly-opened `.tmp` with the
+      // current destination content so the final rename preserves it
+      // (the asset files are never read as sources in this mode). Skip
+      // when the `.tmp` predates this run (resume: it already holds
+      // seeded + routed content) or when the destination is itself a
+      // feed source (don't clone the input). Only destinations that
+      // actually receive a puzzle are seeded, so untouched assets keep
+      // their `.tmp`-free state and are never rewritten.
+      if (external &&
+          !preexistingTmp.contains('$destPath.tmp') &&
+          !srcPaths.contains(destPath)) {
+        final destFile = File(destPath);
+        if (destFile.existsSync()) {
+          final s = destStats[destPath]!;
+          for (final line in destFile.readAsLinesSync()) {
+            raf.writeStringSync('$line\n');
+            if (line.trim().isEmpty || line.startsWith('#')) {
+              s.verbatim++;
+            } else {
+              s.stayed++;
+            }
+          }
+        }
+      }
+      return raf;
     });
   }
 

@@ -108,12 +108,17 @@ their post-sort classification. Two modes:
   dart run bin/recompute.dart --route
   ```
 
-* **With positional args** — those files replace the source set.
-  Useful to ventilate an unsorted feed (e.g. a fresh `/tmp/path6.txt`
-  produced by an experimental generator) into the existing cascade
-  without merging it into `assets/` first. Verbatim noise (blanks,
-  comments, parse failures) is dropped silently in this mode — the
-  feed is an input, not a destination we want to mirror.
+* **With positional args** — those files are used as the feed
+  instead of the level files. Useful to ventilate an unsorted feed
+  (e.g. a fresh `/tmp/path6.txt` produced by an experimental
+  generator) into the existing cascade. The existing destination
+  content is **preserved**: each touched destination's current content
+  is seeded into its `.tmp` before the feed is appended, so the final
+  rename adds the feed to the corpus rather than replacing it. Feed
+  puzzles already present (by `canonicalPuzzleKey`) are deduped and
+  skipped, so re-running the same feed is a no-op. The feed's own
+  verbatim noise (blanks, comments, parse failures) is dropped
+  silently — the feed is an input, not a destination we mirror.
 
   ```bash
   dart run bin/recompute.dart --route /tmp/path6.txt
