@@ -44,7 +44,6 @@ class CellWidget extends StatelessWidget {
     this.onRightDragEnd,
     this.getCellGroupSize,
     this.zoneHighlightColor,
-    this.optionDots,
   });
 
   // Attributes
@@ -84,14 +83,6 @@ class CellWidget extends StatelessWidget {
   /// When set, draws a low-opacity tinted overlay behind the cell content
   /// (used for MJ zone highlighting).
   final Color? zoneHighlightColor;
-
-  /// One coloured dot per remaining option, drawn at the bottom of the cell.
-  /// Used on 3+ colour puzzles so the player can see why a cell is "narrowed"
-  /// — `Cell.options` drives every deduction now but is otherwise invisible.
-  /// Callers pass `null` when the dots should not be rendered (cell already
-  /// has a value, or domain has 2 colours so option pruning is equivalent to
-  /// setValue and the dots would be redundant).
-  final List<CellValue>? optionDots;
 
   // Build UI
   @override
@@ -210,16 +201,6 @@ class CellWidget extends StatelessWidget {
                       ),
                     ),
                   ),
-                if (optionDots != null && optionDots!.isNotEmpty)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: cellSize * 0.04,
-                    child: _OptionDots(
-                      options: optionDots!,
-                      cellSize: cellSize,
-                    ),
-                  ),
               ],
             ),
           ),
@@ -235,8 +216,8 @@ class CellWidget extends StatelessWidget {
 /// player can map each dot to a colour they have already seen on filled
 /// cells. A subtle outline keeps the white dot visible against the cyan
 /// "free" background.
-class _OptionDots extends StatelessWidget {
-  const _OptionDots({required this.options, required this.cellSize});
+class OptionDots extends StatelessWidget {
+  const OptionDots({super.key, required this.options, required this.cellSize});
 
   final List<CellValue> options;
   final double cellSize;

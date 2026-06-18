@@ -540,6 +540,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                     ),
                                   ),
                                 ),
+                              _buildOptionDotsOverlay(adjustedCellSize),
                             ],
                           ),
                         ),
@@ -565,6 +566,32 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
         );
       },
     );
+  }
+
+  Widget _buildOptionDotsOverlay(double cellSize) {
+    final puzzle = widget.currentPuzzle;
+    if (puzzle.domain.length <= 2) return const SizedBox.shrink();
+
+    final list = <Widget>[];
+    for (var i = 0; i < puzzle.cells.length; i++) {
+      final cell = puzzle.cells[i];
+      if (cell.value != CellValue.free) continue;
+      final col = i % puzzle.width;
+      final row = i ~/ puzzle.width;
+      list.add(
+        Positioned(
+          left: col * cellSize,
+          width: cellSize,
+          bottom: (puzzle.height - row - 1) * cellSize + cellSize * 0.04,
+          child: IgnorePointer(
+            child: OptionDots(options: cell.options, cellSize: cellSize),
+          ),
+        ),
+      );
+    }
+
+    if (list.isEmpty) return const SizedBox.shrink();
+    return Positioned.fill(child: Stack(children: list));
   }
 
   Widget _buildCell(
@@ -634,14 +661,6 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
         return 0;
       },
       zoneHighlightColor: zoneTint,
-      // Option dots are only meaningful on 3+ colour puzzles: with a
-      // 2-colour domain, every `removeOption` collapses to a `setValue`,
-      // so the cell either has all options or none.
-      optionDots:
-          (widget.currentPuzzle.domain.length > 2 &&
-              cell.value == CellValue.free)
-          ? cell.options
-          : null,
     );
   }
 }
