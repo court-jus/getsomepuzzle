@@ -45,7 +45,7 @@ class _GeneratePageState extends State<GeneratePage> {
   Timer? _uiTimer;
 
   static List<(String, String)> get _ruleOptions =>
-      constraintRegistry.map((r) => (r.slug, r.label)).toList();
+      constraintRegistry.map((r) => (r.slug, r.slug)).toList();
 
   @override
   void dispose() {
