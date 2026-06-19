@@ -184,6 +184,9 @@ class ForbiddenMotif extends Motif {
             final gridValue = puzzle.cellValues[gridIdx];
             if (gridValue != CellValue.free && gridValue != motifValue) {
               placementStillPossible = false;
+            } else if (gridValue == CellValue.free &&
+                !puzzle.cells[gridIdx].options.contains(motifValue)) {
+              placementStillPossible = false;
             }
           }
         }

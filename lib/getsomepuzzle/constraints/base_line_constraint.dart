@@ -81,6 +81,15 @@ base class LineCentricConstraint extends Constraint {
   bool isCompleteFor(Puzzle puzzle) {
     if (!verify(puzzle)) return false;
     final line = getLine(puzzle);
-    return line.every((cell) => cell.value != CellValue.free);
+    // RT/CT keep `color == CellValue.free` (they count transitions, not
+    // a specific colour), so the option filter doesn't apply.
+    if (color == CellValue.free) {
+      return line.every((cell) => cell.value != CellValue.free);
+    }
+    return line.every(
+      (cell) =>
+          cell.value != CellValue.free ||
+          (cell.value == CellValue.free && !cell.options.contains(color)),
+    );
   }
 }

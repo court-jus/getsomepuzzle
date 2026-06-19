@@ -720,11 +720,12 @@ class ShapeConstraint extends Motif {
   bool isCompleteFor(Puzzle puzzle) {
     if (!verify(puzzle)) return false;
     // Complete only when no future play can ever trigger `apply()` again.
-    // Even if all current color groups are closed and no valid variant
-    // placement remains, colouring any free cell with `color` creates a
-    // 1-cell group that fails the shape check → apply level 1 fires. So
-    // the only truly permanent state is a fully filled grid.
-    return puzzle.cellValues.every((v) => v != CellValue.free);
+    // Colouring any free cell with `color` creates a 1-cell group that fails
+    // the shape check → apply level 1 fires. So grayout is safe once no
+    // remaining free cell can still take `color`.
+    return puzzle.cells
+        .where((c) => c.value == CellValue.free && c.options.contains(color))
+        .isEmpty;
   }
 }
 

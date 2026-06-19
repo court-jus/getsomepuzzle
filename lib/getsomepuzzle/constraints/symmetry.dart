@@ -333,11 +333,14 @@ class SymmetryConstraint extends CellsCentricConstraint {
     final idx = indices[0];
     final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
     if (myGroup == null) return false;
+    final myValue = puzzle.getValue(idx);
     for (final member in myGroup) {
-      final freeNeighbors = puzzle
-          .getNeighbors(member)
-          .where((nei) => puzzle.cellValues[nei] == CellValue.free);
-      if (freeNeighbors.isNotEmpty) return false;
+      for (final neighbor in puzzle.getNeighbors(member)) {
+        if (puzzle.cellValues[neighbor] == CellValue.free &&
+            puzzle.cells[neighbor].options.contains(myValue)) {
+          return false;
+        }
+      }
     }
     return true;
   }

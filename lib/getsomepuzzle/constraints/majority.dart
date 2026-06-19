@@ -178,7 +178,9 @@ class MajorityConstraint extends Constraint {
   bool isCompleteFor(Puzzle puzzle) {
     if (!verify(puzzle)) return false;
     final indices = indicesFor(puzzle.width);
-    return indices.every((i) => puzzle.cellValues[i] != CellValue.free);
+    return indices
+        .where((i) => puzzle.cellValues[i] == CellValue.free)
+        .every((i) => !puzzle.cells[i].options.contains(targetColor));
   }
 
   /// Two MJ zones conflict when their dashed borders would overlap visually:

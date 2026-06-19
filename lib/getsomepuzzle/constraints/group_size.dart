@@ -297,11 +297,14 @@ class GroupSize extends CellsCentricConstraint {
     final idx = indices[0];
     final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
     if (myGroup == null) return false;
+    final myColor = puzzle.cellValues[myGroup.first];
     for (var member in myGroup) {
-      final freeNeighbors = puzzle
-          .getNeighbors(member)
-          .where((nei) => puzzle.cellValues[nei] == CellValue.free);
-      if (freeNeighbors.isNotEmpty) return false;
+      for (final nei in puzzle.getNeighbors(member)) {
+        if (puzzle.cellValues[nei] == CellValue.free &&
+            puzzle.cells[nei].options.contains(myColor)) {
+          return false;
+        }
+      }
     }
     return myGroup.length == size;
   }

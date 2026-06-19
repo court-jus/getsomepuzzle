@@ -162,7 +162,14 @@ class DifferentFromConstraint extends CellsCentricConstraint {
     if (!verify(puzzle)) return false;
     final idx = indices.first;
     final nidx = getNeighborIndex(puzzle.width);
-    return puzzle.cellValues[idx] != CellValue.free &&
-        puzzle.cellValues[nidx] != CellValue.free;
+    final colorA = puzzle.cellValues[idx];
+    final colorB = puzzle.cellValues[nidx];
+    final optionsA = colorA != CellValue.free
+        ? {colorA}
+        : puzzle.cells[idx].options.toSet();
+    final optionsB = colorB != CellValue.free
+        ? {colorB}
+        : puzzle.cells[nidx].options.toSet();
+    return optionsA.intersection(optionsB).isEmpty;
   }
 }
