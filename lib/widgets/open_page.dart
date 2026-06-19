@@ -14,6 +14,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/plusminus.dart';
 import 'package:getsomepuzzle/widgets/flags_selector.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 
 class OpenPage extends StatefulWidget {
   final Database database;
@@ -41,6 +42,15 @@ class _OpenPageState extends State<OpenPage> {
 
   static List<String> get existingRules =>
       constraintRegistry.map((r) => r.slug).toList();
+
+  Widget? _rulePreview(String slug) {
+    for (final r in constraintUIRegistry) {
+      if (r.slug == slug) {
+        return r.buildPreview(Theme.of(context).colorScheme.onSurface, 24);
+      }
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -856,6 +866,7 @@ class _OpenPageState extends State<OpenPage> {
                                               .database
                                               .currentFilters
                                               .bannedRules,
+                                          iconBuilder: _rulePreview,
                                           apply: (value) => {
                                             applyFilter(
                                               newWRules: value.$1.toList(),

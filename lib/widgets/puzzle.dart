@@ -17,15 +17,15 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
-import 'package:getsomepuzzle/widgets/chain.dart';
-import 'package:getsomepuzzle/widgets/column_count.dart';
-import 'package:getsomepuzzle/widgets/row_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/chain.dart';
+import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
-import 'package:getsomepuzzle/widgets/group_count.dart';
-import 'package:getsomepuzzle/widgets/majority.dart';
-import 'package:getsomepuzzle/widgets/motif.dart';
-import 'package:getsomepuzzle/widgets/quantity.dart';
-import 'package:getsomepuzzle/widgets/transition.dart';
+import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/majority.dart';
+import 'package:getsomepuzzle/widgets/constraints/motif.dart';
+import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
+import 'package:getsomepuzzle/widgets/constraints/transition.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
 
 class PuzzleWidget extends StatefulWidget {

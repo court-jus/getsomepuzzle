@@ -135,7 +135,7 @@ itself.
 
 ### Widget
 
-**Location**: `lib/widgets/neighbor_count.dart`
+**Location**: `lib/widgets/constraints/neighbor_count.dart`
 
 The constraint is rendered as a cross over the target cell, with the
 background color matching the constraint color and the border in the

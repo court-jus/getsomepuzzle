@@ -63,6 +63,79 @@ directly in the code):
 - [`majority.md`](constraints/majority.md) — `MJ`: strict majority of one colour
   in a rectangle.
 
+## Adding a new constraint
+
+Checklist of every file to touch when introducing a new constraint
+slug. Steps marked **auto** require no manual action but are listed
+for completeness.
+
+1. **Constraint class** → `lib/getsomepuzzle/constraints/<name>.dart`
+   - Extend the appropriate base (`CellsCentricConstraint`,
+     `LineCentricConstraint`, or `Constraint` directly).
+   - Implement `slug`, `verify()`, `apply()`, `isCompleteFor()`,
+     `serialize()`, `toHuman()`, `rotated()`, `conflictsWith()`
+     if needed, and static `generateAllParameters()`.
+
+2. **Engine registry** → `lib/getsomepuzzle/constraints/registry.dart`
+   - Import the new class and add an entry to `constraintRegistry`
+     (alphabetical order by slug).
+
+3. **Family mapping** → `lib/getsomepuzzle/constraints/families.dart`
+   - Add the slug → family entry in `kConstraintFamily`.
+
+4. **Rotation coverage** → **auto** — `test/rotation_test.dart`
+   will fail if `rotated()` is missing or broken.
+
+5. **Constraint widget** → `lib/widgets/constraints/<name>.dart`
+   - Create a widget that renders the constraint indicator. Used in
+     the UI registry for previews and by `to_flutter.dart` / `puzzle.dart`
+     for in-grid rendering.
+
+6. **UI registry** → `lib/widgets/constraints/registry.dart`
+   - Import the widget and add an entry to `constraintUIRegistry`
+     with a `buildPreview` callback.
+   - Add a `case 'XX':` to `constraintNameForSlug()` returning the
+     localized name from `AppLocalizations`.
+
+7. **Flutter bridge** → `lib/getsomepuzzle/constraints/to_flutter.dart`
+   - If the constraint renders inside grid cells, add
+     `if (constraint is MyConstraint) return _myWidget(...)`.
+
+8. **Grid widget** → `lib/widgets/puzzle.dart`
+   - If the constraint has a sidebar or overlay display (e.g. left-side
+     bar for RC), add the rendering here.
+
+9. **Editor switch** → `lib/widgets/create_page/create_page.dart`
+   - Add `case 'XX':` to the `_pickConstraintParameters` switch.
+
+10. **Explanation text** → `lib/widgets/new_constraint_dialog.dart`
+    - Add a `case 'XX':` to `constraintExplanationForSlug()`.
+
+11. **Localization** → `lib/l10n/app_en.arb`, `app_fr.arb`, `app_es.arb`
+    - Add a `"constraint<Name>"` key for the localized display name
+      (or reuse an existing one if the constraint is an alias like
+      RC → `constraintLineCount`).
+    - Add `"constraintExplain<Slug>"` key for help text.
+    - Run `flutter gen-l10n` to regenerate bindings.
+
+12. **Generator** → **auto** — the generator calls
+    `generateAllParameters` through the registry; no manual step
+    needed.
+
+13. **Tests** → `test/<name>_test.dart`
+    - Reachable-incomplete state → `verify == true`.
+    - Unreachable-incomplete state → `verify == false`.
+    - `apply` forces cells when remaining count matches need.
+    - `apply` returns `isImpossible` on contradiction.
+    - `isCompleteFor` returns `true` when satisfied.
+    - `serialize` round-trips correctly.
+    - `generateAllParameters` returns valid parameters.
+
+14. **Analyze** → run `flutter analyze` and fix any issues.
+
+Once done, add an entry to `test/constraints_test.dart` if the new
+constraint introduces a novel `verify` contract pattern.
+
 ## Player & experience
 
 - [`adapt_to_player.md`](adapt_to_player.md) — Player-level inference

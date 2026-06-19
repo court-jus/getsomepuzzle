@@ -69,7 +69,7 @@ a puzzle with both CC and CT on the same column.
 
 ### Widget
 
-**Location**: `lib/widgets/column_count.dart`
+**Location**: `lib/widgets/constraints/column_count.dart`
 
 `ColumnCountWidget` renders the digit inside a `mandatoryColor` circle, with
 text color matching the constraint color (black for 1, white for 2 — same

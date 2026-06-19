@@ -15,7 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'package:getsomepuzzle/main.dart' as app;
-import 'package:getsomepuzzle/widgets/quantity.dart';
+import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 
 import 'helpers/harness.dart';

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 
 /// Modal shown the first time the player encounters one or more
 /// constraint slugs. Body text per slug is fetched from the localised
@@ -92,46 +93,6 @@ class NewConstraintDialog extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-/// Localised display name for a constraint slug.
-String constraintNameForSlug(AppLocalizations l, String slug) {
-  switch (slug) {
-    case 'FM':
-      return l.constraintForbiddenPattern;
-    case 'PA':
-      return l.constraintParity;
-    case 'RC':
-    case 'CC':
-      return l.constraintLineCount;
-    case 'GS':
-      return l.constraintGroupSize;
-    case 'LT':
-      return l.constraintLetterGroup;
-    case 'MJ':
-      return l.constraintMajority;
-    case 'QA':
-      return l.constraintQuantity;
-    case 'SY':
-      return l.constraintSymmetry;
-    case 'DF':
-      return l.constraintDifferentFrom;
-    case 'SH':
-      return l.constraintShape;
-    case 'GC':
-      return l.constraintGroupCount;
-    case 'CH':
-      return l.constraintChain;
-    case 'NC':
-      return l.constraintNeighborCount;
-    case 'EY':
-      return l.constraintEyes;
-    case 'RT':
-    case 'CT':
-      return l.constraintTransition;
-    default:
-      return slug;
   }
 }
 

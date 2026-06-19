@@ -74,7 +74,7 @@ diversity score to avoid over-awarding rule_diversity when both are present.
 
 ### ✅ 4. Display widget (left-side bar)
 
-**File**: `lib/widgets/row_count.dart` (new)
+**File**: `lib/widgets/constraints/row_count.dart` (new)
 
 - `RowCountWidget` created, mirrors `ColumnCountWidget` style exactly
 - Displays digit in `mandatoryColor` circle, color matches constraint color

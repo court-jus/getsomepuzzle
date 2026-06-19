@@ -192,7 +192,7 @@ From `lib/getsomepuzzle/utils/groups.dart`:
 
 ### Widget
 
-**Location**: `lib/widgets/group_count.dart`
+**Location**: `lib/widgets/constraints/group_count.dart`
 
 Renders as a box with:
 - Link icon (representing connected groups)

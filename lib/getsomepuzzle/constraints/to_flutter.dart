@@ -13,13 +13,13 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
-import 'package:getsomepuzzle/widgets/chain.dart';
-import 'package:getsomepuzzle/widgets/eyes.dart';
-import 'package:getsomepuzzle/widgets/neighbor_count.dart';
-import 'package:getsomepuzzle/widgets/row_count.dart';
-import 'package:getsomepuzzle/widgets/symmetry.dart';
-import 'package:getsomepuzzle/widgets/group_size.dart';
-import 'package:getsomepuzzle/widgets/transition.dart';
+import 'package:getsomepuzzle/widgets/constraints/chain.dart';
+import 'package:getsomepuzzle/widgets/constraints/eyes.dart';
+import 'package:getsomepuzzle/widgets/constraints/neighbor_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/symmetry.dart';
+import 'package:getsomepuzzle/widgets/constraints/group_size.dart';
+import 'package:getsomepuzzle/widgets/constraints/transition.dart';
 
 // Arrows for the parity constraint appear smaller so we add a zoom factor
 const _parityFontSizeRatio = 40.0 / 36.0;

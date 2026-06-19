@@ -53,10 +53,9 @@ MJ is rendered exclusively as a grid overlay; it does **not** appear in
 the top constraint bar. The hint arrow originates from the **centre of
 the zone** when MJ is highlighted.
 
-The editor's constraint-type picker previews MJ as a single cell with a
-dotted border (a size-1 majority zone) — see
-`_MajorityPreviewPainter` in
-`lib/widgets/create_page/dialogs/constraint_type_picker.dart`.
+The editor's constraint-type picker previews MJ as a simple bordered
+square — see `previewForSlug('MJ', …)` in
+`lib/widgets/constraints/registry.dart`.
 
 ## Border conflicts
 
@@ -167,7 +166,7 @@ Two common states produce no deduction:
 - **`lib/getsomepuzzle/constraints/registry.dart`** — registered
   between GC and NC.
 
-- **`lib/widgets/majority.dart`** — `MajorityZonePainter` (a
+- **`lib/widgets/constraints/majority.dart`** — `MajorityZonePainter` (a
   `CustomPainter`) renders the dotted rectangle. Base inset 6 px,
   `strokeWidth` matching the readonly cell border, dashed path effect.
   MJ widgets live in the grid's `Stack` layer on top of the grid but

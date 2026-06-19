@@ -23,6 +23,7 @@ import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
 import 'package:getsomepuzzle/widgets/learning_page.dart';
 import 'package:getsomepuzzle/widgets/main_drawer.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 import 'package:getsomepuzzle/widgets/new_constraint_dialog.dart';
 import 'package:getsomepuzzle/widgets/onboarding_complete_dialog.dart';
 import 'package:getsomepuzzle/widgets/third_color_suggestion_dialog.dart';
@@ -743,59 +744,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // Hint (l10n resolved here, state mutation in GameModel)
   // ---------------------------------------------------------------------------
 
-  /// Localized name for a single constraint identified by its registry
-  /// slug. Single source of truth for the constraint → l10n mapping;
-  /// callers that hold a constraint instance route through the
-  /// instance's `slug` getter.
-  String _constraintNameBySlug(String slug) {
-    final l10n = AppLocalizations.of(context)!;
-    switch (slug) {
-      case 'CH':
-        return l10n.constraintChain;
-      case 'FM':
-        return l10n.constraintForbiddenPattern;
-      case 'SH':
-        return l10n.constraintShape;
-      case 'GS':
-        return l10n.constraintGroupSize;
-      case 'LT':
-        return l10n.constraintLetterGroup;
-      case 'MJ':
-        return l10n.constraintMajority;
-      case 'PA':
-        return l10n.constraintParity;
-      case 'QA':
-        return l10n.constraintQuantity;
-      case 'SY':
-        return l10n.constraintSymmetry;
-      case 'DF':
-        return l10n.constraintDifferentFrom;
-      case 'CC':
-      case 'RC':
-        return l10n.constraintLineCount;
-      case 'GC':
-        return l10n.constraintGroupCount;
-      case 'NC':
-        return l10n.constraintNeighborCount;
-      case 'EY':
-        return l10n.constraintEyes;
-      case 'RT':
-      case 'CT':
-        return l10n.constraintTransition;
-      case '*':
-        return l10n.complicityOtherConstraint;
-      default:
-        // Hard fail in debug so the omission is caught in tests; keep
-        // a graceful fallback in release rather than crashing the UI.
-        assert(false, 'Unmapped constraint slug "$slug"');
-        return slug;
-    }
-  }
-
   String _constraintName(CanApply givenBy) {
-    if (givenBy is Constraint) return _constraintNameBySlug(givenBy.slug);
-    // Unreachable for known sources (Complicity is handled at the call
-    // site and routes through `slugs` instead).
+    final l10n = AppLocalizations.of(context)!;
+    if (givenBy is Constraint) return constraintNameForSlug(l10n, givenBy.slug);
     assert(false, 'Unexpected hint source ${givenBy.runtimeType}');
     return givenBy.serialize();
   }
@@ -813,11 +764,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         if (c is Complicity) {
           final (s1, s2) = c.slugs;
           if (s1 == s2) {
-            return l10n.hintComplicityTwin(_constraintNameBySlug(s1));
+            return l10n.hintComplicityTwin(constraintNameForSlug(l10n, s1));
           }
           return l10n.hintComplicity(
-            _constraintNameBySlug(s1),
-            _constraintNameBySlug(s2),
+            constraintNameForSlug(l10n, s1),
+            constraintNameForSlug(l10n, s2),
           );
         }
         return l10n.hintDeducedFrom(_constraintName(c));
@@ -838,12 +789,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           final (s1, s2) = c.slugs;
           if (s1 == s2) {
             return l10n.hintRemoveOptionComplicityTwin(
-              _constraintNameBySlug(s1),
+              constraintNameForSlug(l10n, s1),
             );
           }
           return l10n.hintRemoveOptionComplicity(
-            _constraintNameBySlug(s1),
-            _constraintNameBySlug(s2),
+            constraintNameForSlug(l10n, s1),
+            constraintNameForSlug(l10n, s2),
           );
         }
         return l10n.hintRemoveOptionDeducedFrom(_constraintName(c));

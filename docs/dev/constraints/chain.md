@@ -133,7 +133,7 @@ by `generateAllParameters`.
 
 ## Display
 
-**File**: `lib/widgets/chain.dart`
+**File**: `lib/widgets/constraints/chain.dart`
 
 CH is displayed in the top bar (like QA, GC) as a square containing a fixed 6×6 mini-grid
 with a predefined path drawn without internal borders.

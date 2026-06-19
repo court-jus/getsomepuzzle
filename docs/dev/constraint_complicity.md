@@ -108,9 +108,10 @@ three localized templates:
   constraint types (currently only `GSAllComplicity`). EN: *"This
   cell can be deduced by combining the {c} constraint with another"*.
 
-`_constraintNameBySlug(slug)` in `main.dart` is the **single** source
-of truth for the constraint → l10n mapping. The switch asserts in
-debug if it ever sees an unmapped slug.
+`constraintNameForSlug(l, slug)` in
+`lib/widgets/constraints/registry.dart` is the single source of truth
+for the constraint → l10n mapping. It asserts in debug if it ever
+sees an unmapped slug.
 
 `GSAllComplicity` records the slug of every constraint that rejected
 at least one candidate sealing during `apply`. When all rejections

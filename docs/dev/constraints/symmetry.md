@@ -88,7 +88,7 @@ rotated through `rotateIdx90CW`.
 
 ## Display
 
-**File**: `lib/widgets/symmetry.dart`
+**File**: `lib/widgets/constraints/symmetry.dart`
 
 Rendered as the axis icon (`⟍`, `|`, `⟋`, `―`, `🞋`) drawn with `CustomPainter` inside the
 anchor cell, with a border indicating validity state (green/transparent, deepOrange on

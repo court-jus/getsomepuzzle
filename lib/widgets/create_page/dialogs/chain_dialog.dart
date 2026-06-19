@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
-import 'package:getsomepuzzle/widgets/chain.dart';
+import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 
 Future<ChainConstraint?> showChainDialog(BuildContext context) async {
   final loc = AppLocalizations.of(context)!;

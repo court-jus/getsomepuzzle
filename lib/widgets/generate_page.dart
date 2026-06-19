@@ -7,6 +7,7 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/flags_selector.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 
 class GeneratePage extends StatefulWidget {
   final Database database;
@@ -45,7 +46,16 @@ class _GeneratePageState extends State<GeneratePage> {
   Timer? _uiTimer;
 
   static List<(String, String)> get _ruleOptions =>
-      constraintRegistry.map((r) => (r.slug, r.slug)).toList();
+      constraintUIRegistry.map((r) => (r.slug, r.slug)).toList();
+
+  Widget? _rulePreview(String slug) {
+    for (final r in constraintUIRegistry) {
+      if (r.slug == slug) {
+        return r.buildPreview(Theme.of(context).colorScheme.onSurface, 24);
+      }
+    }
+    return null;
+  }
 
   @override
   void dispose() {
@@ -212,6 +222,7 @@ class _GeneratePageState extends State<GeneratePage> {
                 choices: _ruleOptions,
                 wanted: _requiredRules,
                 banned: _excludedRules,
+                iconBuilder: _rulePreview,
                 apply: (value) {
                   setState(() {
                     _requiredRules.clear();

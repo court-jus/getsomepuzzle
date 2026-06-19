@@ -17,17 +17,17 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
-import 'package:getsomepuzzle/widgets/chain.dart';
-import 'package:getsomepuzzle/widgets/majority.dart';
+import 'package:getsomepuzzle/widgets/constraints/chain.dart';
+import 'package:getsomepuzzle/widgets/constraints/majority.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/eyes_dialog.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
-import 'package:getsomepuzzle/widgets/motif.dart';
-import 'package:getsomepuzzle/widgets/quantity.dart';
-import 'package:getsomepuzzle/widgets/group_count.dart';
-import 'package:getsomepuzzle/widgets/column_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/motif.dart';
+import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
+import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/cell_actions_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/chain_dialog.dart';
@@ -46,8 +46,8 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/quantity_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/row_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/symmetry_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/transition_dialog.dart';
-import 'package:getsomepuzzle/widgets/row_count.dart';
-import 'package:getsomepuzzle/widgets/transition.dart';
+import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/transition.dart';
 
 export 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
 
@@ -418,103 +418,103 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Future<void> _pickAndAddConstraint(int cellIdx) async {
-    final type = await showConstraintTypePicker(context);
-    if (!mounted || type == null) return;
+    final slug = await showConstraintTypePicker(context);
+    if (!mounted || slug == null) return;
     Constraint? added;
-    switch (type) {
-      case ConstraintType.forbiddenPattern:
+    switch (slug) {
+      case 'FM':
         added = await showForbiddenMotifDialog(context);
-      case ConstraintType.parity:
+      case 'PA':
         added = await showParityDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.groupSize:
+      case 'GS':
         added = await showGroupSizeDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.letterGroup:
+      case 'LT':
         await _startLetterGroup(cellIdx);
         return;
-      case ConstraintType.majority:
+      case 'MJ':
         await _startMajorityZone(cellIdx);
         return;
-      case ConstraintType.quantity:
+      case 'QA':
         added = await showQuantityDialog(
           context,
           width: _width,
           height: _height,
         );
-      case ConstraintType.columnCount:
+      case 'CC':
         added = await showColumnCountDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.rowCount:
+      case 'RC':
         added = await showRowCountDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.rowTransition:
+      case 'RT':
         added = await showRowTransitionDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.columnTransition:
+      case 'CT':
         added = await showColumnTransitionDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.groupCount:
+      case 'GC':
         added = await showGroupCountDialog(
           context,
           width: _width,
           height: _height,
         );
-      case ConstraintType.neighborCount:
+      case 'NC':
         added = await showNeighborCountDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.shape:
+      case 'SH':
         added = await showShapeDialog(context);
-      case ConstraintType.symmetry:
+      case 'SY':
         added = await showSymmetryDialog(context, cellIdx: cellIdx);
-      case ConstraintType.differentFrom:
+      case 'DF':
         added = await showDifferentFromDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.eyes:
+      case 'EY':
         added = await showEyesDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.chain:
+      case 'CH':
         added = await showChainDialog(context);
-      case ConstraintType.fixBlack:
+      case 'fixBlack':
         _setFixedCell(cellIdx, CellValue.black);
         return;
-      case ConstraintType.fixWhite:
+      case 'fixWhite':
         _setFixedCell(cellIdx, CellValue.white);
         return;
     }

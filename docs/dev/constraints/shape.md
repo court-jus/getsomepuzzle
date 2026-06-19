@@ -88,7 +88,7 @@ L-triomino (3), tetrominoes (4), and pentominoes (5).
 
 ## Display
 
-**File**: `lib/widgets/motif.dart`
+**File**: `lib/widgets/constraints/motif.dart`
 
 SH uses the shared `MotifWidget` (same as FM). The motif is rendered as a small grid inside
 the constraint square with each occupied cell coloured by the constrained color.

@@ -4,6 +4,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/new_constraint_dialog.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 import 'package:intl/intl.dart';
 
 /// Reference page surfaced as the menu entry "Apprentissage" next to

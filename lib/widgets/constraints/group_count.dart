@@ -31,10 +31,28 @@ class GroupCountWidget extends StatelessWidget {
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
         : mandatoryColor;
-    final smallText = "$actualGroupCount/";
     final largeText = constraint.count.toString();
-    final smallFontSize = cellSize * cellSizeToFontSize / 3.5;
     final largeFontSize = cellSize * cellSizeToFontSize;
+    final color = textColors[constraint.color];
+    final compact = cellSize < 28;
+
+    if (compact) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: bgColor,
+          border: BoxBorder.all(color: borderColor, width: 2),
+        ),
+        child: Center(
+          child: Text(
+            largeText,
+            style: TextStyle(fontSize: largeFontSize * 0.6, color: color),
+          ),
+        ),
+      );
+    }
+
+    final smallText = "$actualGroupCount/";
+    final smallFontSize = cellSize * cellSizeToFontSize / 3.5;
     final iconSize = cellSize * 0.4;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -53,26 +71,19 @@ class GroupCountWidget extends StatelessWidget {
                 left: 8,
                 child: Text(
                   smallText,
-                  style: TextStyle(
-                    fontSize: smallFontSize,
-                    color: textColors[constraint.color],
-                  ),
+                  style: TextStyle(fontSize: smallFontSize, color: color),
                 ),
               ),
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.link,
-                    size: iconSize,
-                    color: textColors[constraint.color],
-                  ),
+                  Icon(Icons.link, size: iconSize, color: color),
                   Text(
                     largeText,
                     style: TextStyle(
                       fontSize: largeFontSize * 0.6,
-                      color: textColors[constraint.color],
+                      color: color,
                     ),
                   ),
                 ],
