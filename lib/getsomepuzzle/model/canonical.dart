@@ -163,9 +163,14 @@ String? normalizeToV2Line(String input) {
     return null;
   }
 
-  final parts = trimmed.split('_');
+  // URL-decode the input in case the user pasted a share link's
+  // encoded form (e.g. %3B → ;, %3A → :) without the full URL wrapper.
+  // This must happen before any use of `trimmed` below so the version-
+  // tag and canonical branches also benefit from the decoded form.
+  final decoded = trimmed.contains('%') ? Uri.decodeFull(trimmed) : trimmed;
+  final parts = decoded.split('_');
   // 2. Already-versioned line — let the existing parser handle it.
-  if (parts.isNotEmpty && _isVersionTag(parts.first)) return trimmed;
+  if (parts.isNotEmpty && _isVersionTag(parts.first)) return decoded;
 
   // 3. Bare canonical: need at least domain, wxh, prefill, constraints.
   if (parts.length < 4) return null;
@@ -176,5 +181,5 @@ String? normalizeToV2Line(String input) {
   if (!RegExp(r'^\d+$').hasMatch(parts[2])) return null;
   // Constraint field must contain at least one `slug:params` token.
   if (!parts[3].contains(':')) return null;
-  return 'v2_$trimmed';
+  return 'v2_$decoded';
 }

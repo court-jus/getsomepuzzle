@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 
 void main() {
   group('canonicalPuzzleKey', () {
@@ -196,6 +197,20 @@ void main() {
       // Constraints field has no slug:params pair.
       expect(normalizeToV2Line('12_3x3_100000000_nothing'), isNull);
     });
+
+    test(
+      'decodes URL-encoded v2 lines so PuzzleData does not choke on %3B/%3A',
+      () {
+        // Pasting a share link's encoded form (e.g. `%3B` for `;`, `%3A`
+        // for `:`) without the full URL wrapper must still parse correctly.
+        const encoded = 'v2_12_3x3_100000000_FM%3A12%3BPA%3A0.right_0%3A0_5';
+        final decoded = normalizeToV2Line(encoded);
+        expect(decoded, 'v2_12_3x3_100000000_FM:12;PA:0.right_0:0_5');
+        // PuzzleData must also accept the decoded line without throwing.
+        // ignore: unused_local_variable
+        final puz = PuzzleData(decoded!);
+      },
+    );
 
     test(
       'round-trip: canonicalPuzzleKey output normalizes back to a parseable line',
