@@ -773,7 +773,7 @@ void main() {
   });
 
   group('TargetUniverse.allowedCompositions', () {
-    test('full 5-family universe yields 85 compositions', () {
+    test('full 6-family universe yields 156 compositions', () {
       final u = TargetUniverse(
         allowedSlugs: kConstraintFamily.keys,
         minWidth: 4,
@@ -781,7 +781,7 @@ void main() {
         minHeight: 4,
         maxHeight: 4,
       );
-      expect(u.allowedCompositions.length, 85);
+      expect(u.allowedCompositions.length, 156);
       // Every triple has length 3 and starts with a real family.
       for (final t in u.allowedCompositions) {
         expect(t.length, 3);

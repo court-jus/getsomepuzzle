@@ -15,6 +15,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/implication.dart';
 import 'package:getsomepuzzle/widgets/constraints/eyes.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_size.dart';
@@ -178,6 +179,12 @@ final constraintUIRegistry =
         buildPreview: (fg, size) =>
             EyesWidget(constraint: EyesConstraint('2.1.5'), cellSize: size),
       ),
+      (
+        slug: 'IM',
+        label: 'Implication',
+        buildPreview: (fg, size) =>
+            ImplicationWidget(fgcolor: fg, cellSize: size),
+      ),
     ];
 
 Widget previewForSlug(String slug, Color fgcolor, double size) {
@@ -218,6 +225,8 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintNeighborCount;
     case 'EY':
       return l.constraintEyes;
+    case 'IM':
+      return l.constraintImplication;
     case 'RT':
     case 'CT':
       return l.constraintTransition;

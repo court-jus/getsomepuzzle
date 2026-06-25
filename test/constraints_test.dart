@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
@@ -1663,6 +1664,203 @@ void main() {
 
     test('a non-MJ constraint never conflicts', () {
       expect(mj('0.0.1.1').conflictsWith(SymmetryConstraint('7.2')), isFalse);
+    });
+  });
+
+  group('ImplicationConstraint.verify', () {
+    test('both black (same as colour) → valid', () {
+      final p = makePuzzle('11');
+      expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+    });
+
+    test('source black, target white → invalid', () {
+      final p = makePuzzle('12');
+      expect(ImplicationConstraint('0.1.1').verify(p), isFalse);
+    });
+
+    test('source white, target black → valid (vacuously true)', () {
+      final p = makePuzzle('21');
+      expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+    });
+
+    test('source black, target free with black option → valid (reachable)', () {
+      final p = makePuzzle('20');
+      expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+    });
+
+    test(
+      'source black, target free without black option → invalid (unreachable)',
+      () {
+        final p = Puzzle.empty(2, 1, fullDomain);
+        p.cells[0].setForSolver(CellValue.black);
+        p.cells[1].removeOption(CellValue.black);
+        expect(ImplicationConstraint('0.1.1').verify(p), isFalse);
+      },
+    );
+
+    test(
+      'source free with colour, target white → valid (source can avoid colour)',
+      () {
+        final p = makePuzzle('02');
+        expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+      },
+    );
+
+    test('both free → valid (reachable)', () {
+      final p = makePuzzle('00');
+      expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+    });
+  });
+
+  group('ImplicationConstraint.apply', () {
+    test('forward: source is colour → set target', () {
+      final p = makePuzzle('10');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      final move = im.apply(p);
+      expect(move, isNotNull);
+      expect(move, isA<SetValue>());
+      expect(move!.idx, 1);
+      expect(move.value, CellValue.black);
+    });
+
+    test(
+      'forward impossible: source colour, target can never be → Impossible',
+      () {
+        final p = Puzzle.empty(2, 1, fullDomain);
+        p.cells[0].setForSolver(CellValue.black);
+        p.cells[1].removeOption(CellValue.black);
+        final im = ImplicationConstraint('0.1.1');
+        p.addConstraint(im);
+        expect(im.apply(p), isA<Impossible>());
+      },
+    );
+
+    test('contrapositive: target not colour → remove colour from source', () {
+      final p = makePuzzle('02');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      final move = im.apply(p);
+      expect(move, isNotNull);
+      expect(move, isA<RemoveOption>());
+      expect(move!.idx, 0);
+      expect(move.removeOption, CellValue.black);
+    });
+
+    test('contrapositive: target not colour, source already pruned → null', () {
+      final p = Puzzle.empty(2, 1, fullDomain);
+      p.cells[1].setForSolver(CellValue.white);
+      p.cells[0].removeOption(CellValue.black);
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('both determined same colour → null', () {
+      final p = makePuzzle('11');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('both determined, source not colour → null', () {
+      final p = makePuzzle('22');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('both free → null', () {
+      final p = makePuzzle('00');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('source not colour, target free → null (vacuously true)', () {
+      final p = makePuzzle('20');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('both determined, source colour, target wrong → Impossible', () {
+      final p = makePuzzle('12');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isA<Impossible>());
+    });
+
+    test(
+      '3-colour: forward with source colour removes other colour option',
+      () {
+        final p = Puzzle.empty(2, 1, fullDomain);
+        p.cells[0].setForSolver(CellValue.black);
+        final im = ImplicationConstraint('0.1.1');
+        p.addConstraint(im);
+        final move = im.apply(p);
+        expect(move, isNotNull);
+        expect(move, isA<SetValue>());
+        expect(move!.idx, 1);
+        expect(move.value, CellValue.black);
+      },
+    );
+
+    test('3-colour: contrapositive removes colour from source options', () {
+      final p = Puzzle.empty(2, 1, fullDomain);
+      p.cells[1].setForSolver(CellValue.white);
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      final move = im.apply(p);
+      expect(move, isNotNull);
+      expect(move, isA<RemoveOption>());
+      expect(move!.idx, 0);
+      expect(move.removeOption, CellValue.black);
+    });
+  });
+
+  group('ImplicationConstraint.isCompleteFor', () {
+    test('source determined a different colour → complete', () {
+      final p = makePuzzle('20');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isTrue);
+    });
+
+    test('source can never be the colour → complete', () {
+      final p = Puzzle.empty(2, 1, fullDomain);
+      p.cells[0].removeOption(CellValue.black);
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.isCompleteFor(p), isTrue);
+    });
+
+    test('target is already the colour → complete', () {
+      final p = makePuzzle('01');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isTrue);
+    });
+
+    test('source colour, target free with colour → not complete', () {
+      final p = makePuzzle('10');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isFalse);
+    });
+
+    test('target not colour, source free with colour → not complete', () {
+      final p = makePuzzle('02');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isFalse);
+    });
+
+    test('both free with colour option → not complete (arrow visible)', () {
+      final p = makePuzzle('00');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isFalse);
+    });
+
+    test('both determined same colour → complete', () {
+      final p = makePuzzle('11');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isTrue);
+    });
+
+    test('invalid state → not complete', () {
+      final p = makePuzzle('12');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isFalse);
     });
   });
 }

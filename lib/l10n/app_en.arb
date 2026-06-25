@@ -568,6 +568,26 @@
     "createChooseSize": "Group size",
     "createChooseLetter": "Letter",
     "createChooseValue": "Value",
+    "createImplicationSource": "Source cell ({total} cells, 0-based)",
+    "@createImplicationSource": {
+        "placeholders": {
+            "total": {
+                "type": "int"
+            }
+        }
+    },
+    "createImplicationTarget": "Target cell ({total} cells, 0-based)",
+    "@createImplicationTarget": {
+        "placeholders": {
+            "total": {
+                "type": "int"
+            }
+        }
+    },
+    "createImplicationInvalid": "Invalid source/target",
+    "colorBlack": "Black",
+    "colorWhite": "White",
+    "colorPurple": "Purple",
     "createChooseCount": "Count",
     "createMotifWidth": "Pattern width",
     "createMotifHeight": "Pattern height",
@@ -659,6 +679,10 @@
     "constraintChain": "chain",
     "@constraintChain": {
         "description": "Name of the chain constraint"
+    },
+    "constraintImplication": "implication",
+    "@constraintImplication": {
+        "description": "Name of the implication constraint"
     },
     "newConstraintModalTitle": "New rule!",
     "@newConstraintModalTitle": {
@@ -789,6 +813,10 @@
     "constraintExplainCH": "A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.",
     "@constraintExplainCH": {
         "description": "Body of the new-constraint explanation modal for the Chain (CH) constraint"
+    },
+    "constraintExplainIM": "An arrow from one cell to another means: if the source cell takes the arrow's colour, the target cell must also take that colour. The contrapositive also holds: if the target is a different colour, the source cannot take the arrow's colour.",
+    "@constraintExplainIM": {
+        "description": "Body of the new-constraint explanation modal for the Implication (IM) constraint"
     },
     "complicityOtherConstraint": "another constraint",
     "@complicityOtherConstraint": {

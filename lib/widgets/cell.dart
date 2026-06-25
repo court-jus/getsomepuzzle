@@ -6,6 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/to_flutter.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
 
@@ -87,14 +88,13 @@ class CellWidget extends StatelessWidget {
   // Build UI
   @override
   Widget build(BuildContext context) {
-    final color = bgColors[value];
-
     int widgetScale = 1;
     if (constraints != null) {
-      // DF is rendered on the cell border by DifferentFromPainter, not inside
-      // the cell, so it must not shrink the in-cell widgets.
+      // DF and IM are rendered by background painters, not inside the cell.
       final inCellCount = constraints!
-          .where((c) => c is! DifferentFromConstraint)
+          .where(
+            (c) => c is! DifferentFromConstraint && c is! ImplicationConstraint,
+          )
           .length;
       if (inCellCount > 0) widgetScale = sqrt(inCellCount).ceil();
     }
@@ -105,7 +105,8 @@ class CellWidget extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               for (final constraint in constraints!)
-                if (constraint is! DifferentFromConstraint)
+                if (constraint is! DifferentFromConstraint &&
+                    constraint is! ImplicationConstraint)
                   constraintToFlutter(
                     constraint,
                     constraint.isHighlighted
@@ -167,7 +168,6 @@ class CellWidget extends StatelessWidget {
         onVerticalDragEnd: (details) => onDragEnd(),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: color,
             border: BoxBorder.all(
               width: borderWidth ?? ((readonly || isHighlighted) ? 6 : 1),
               color:

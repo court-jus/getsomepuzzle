@@ -1,5 +1,6 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
@@ -136,6 +137,12 @@ final constraintRegistry =
         label: 'Eyes',
         fromParams: EyesConstraint.new,
         generateAllParameters: EyesConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'IM',
+        label: 'Implication',
+        fromParams: ImplicationConstraint.new,
+        generateAllParameters: ImplicationConstraint.generateAllParameters,
       ),
     ];
 

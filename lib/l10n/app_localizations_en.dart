@@ -473,6 +473,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createChooseValue => 'Value';
 
   @override
+  String createImplicationSource(int total) {
+    return 'Source cell ($total cells, 0-based)';
+  }
+
+  @override
+  String createImplicationTarget(int total) {
+    return 'Target cell ($total cells, 0-based)';
+  }
+
+  @override
+  String get createImplicationInvalid => 'Invalid source/target';
+
+  @override
+  String get colorBlack => 'Black';
+
+  @override
+  String get colorWhite => 'White';
+
+  @override
+  String get colorPurple => 'Purple';
+
+  @override
   String get createChooseCount => 'Count';
 
   @override
@@ -596,6 +618,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintChain => 'chain';
 
   @override
+  String get constraintImplication => 'implication';
+
+  @override
   String get newConstraintModalTitle => 'New rule!';
 
   @override
@@ -713,6 +738,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get constraintExplainCH =>
       'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.';
+
+  @override
+  String get constraintExplainIM =>
+      'An arrow from one cell to another means: if the source cell takes the arrow\'s colour, the target cell must also take that colour. The contrapositive also holds: if the target is a different colour, the source cannot take the arrow\'s colour.';
 
   @override
   String get complicityOtherConstraint => 'another constraint';

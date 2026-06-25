@@ -477,6 +477,28 @@ class AppLocalizationsFr extends AppLocalizations {
   String get createChooseValue => 'Valeur';
 
   @override
+  String createImplicationSource(int total) {
+    return 'Cellule source ($total cellules, base 0)';
+  }
+
+  @override
+  String createImplicationTarget(int total) {
+    return 'Cellule cible ($total cellules, base 0)';
+  }
+
+  @override
+  String get createImplicationInvalid => 'Source/cible invalide';
+
+  @override
+  String get colorBlack => 'Noir';
+
+  @override
+  String get colorWhite => 'Blanc';
+
+  @override
+  String get colorPurple => 'Violet';
+
+  @override
   String get createChooseCount => 'Nombre';
 
   @override
@@ -601,6 +623,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintChain => 'chaîne';
 
   @override
+  String get constraintImplication => 'implication';
+
+  @override
   String get newConstraintModalTitle => 'Nouvelle règle !';
 
   @override
@@ -718,6 +743,10 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get constraintExplainCH =>
       'Une icône de mini-grille montre deux côtés de la grille reliés par une chaîne. La solution doit contenir un chemin orthogonal ininterrompu de cette couleur allant du côté marqué à l\'autre côté marqué.';
+
+  @override
+  String get constraintExplainIM =>
+      'Une flèche d\'une case à une autre signifie : si la case source prend la couleur de la flèche, la case cible doit aussi prendre cette couleur. La contraposée s\'applique aussi : si la cible est d\'une couleur différente, la source ne peut pas prendre la couleur de la flèche.';
 
   @override
   String get complicityOtherConstraint => 'une autre contrainte';

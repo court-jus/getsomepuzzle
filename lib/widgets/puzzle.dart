@@ -7,6 +7,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
@@ -17,10 +18,12 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/cell_background_painter.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/different_from_painter.dart';
+import 'package:getsomepuzzle/widgets/implication_painter.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/majority.dart';
 import 'package:getsomepuzzle/widgets/constraints/motif.dart';
@@ -275,6 +278,10 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       (c) => c is DifferentFromConstraint,
     );
 
+    final hasIM = widget.currentPuzzle.constraints.any(
+      (c) => c is ImplicationConstraint,
+    );
+
     final hasMJ = widget.currentPuzzle.constraints.any(
       (c) => c is MajorityConstraint,
     );
@@ -484,6 +491,28 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                           height: gridHeight,
                           child: Stack(
                             children: [
+                              IgnorePointer(
+                                child: CustomPaint(
+                                  painter: CellBackgroundPainter(
+                                    puzzle: widget.currentPuzzle,
+                                    cellSize: adjustedCellSize,
+                                  ),
+                                ),
+                              ),
+                              if (hasIM)
+                                IgnorePointer(
+                                  child: CustomPaint(
+                                    painter: ImplicationPainter(
+                                      constraints: widget
+                                          .currentPuzzle
+                                          .constraints
+                                          .whereType<ImplicationConstraint>()
+                                          .toList(),
+                                      cellSize: adjustedCellSize,
+                                      gridWidth: widget.currentPuzzle.width,
+                                    ),
+                                  ),
+                                ),
                               Table(
                                 border: TableBorder.all(),
                                 defaultColumnWidth: FixedColumnWidth(

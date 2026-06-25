@@ -24,12 +24,12 @@ Match existing style. Don't refactor what isn't broken.
 ### Rule 4 - Goal-Driven Execution
 
 Define success criteria. Loop until verified.
-Strong success critera let Claude loop independently.
+Strong success criteria let Claude loop independently.
 
 ### Rule 5 - Use the model only for judgment calls
 
 Use for: classification, drafting, summarization, extraction.
-Do NOT use for : routing, retries, status-code handling, deterministic transformes.
+Do NOT use for : routing, retries, status-code handling, deterministic transforms.
 If code can answer, code answers.
 
 ### Rule 6 - Surface conflicts, don't average them

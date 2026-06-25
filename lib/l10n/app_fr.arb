@@ -137,6 +137,7 @@
     "constraintNeighborCount": "nombre de voisins",
     "constraintEyes": "yeux",
     "constraintChain": "chaîne",
+    "constraintImplication": "implication",
     "newConstraintModalTitle": "Nouvelle règle !",
     "newConstraintModalSkip": "Ignorer l'apprentissage",
     "thirdColorSuggestionTitle": "Prêt pour les 3 couleurs ?",
@@ -194,6 +195,10 @@
     "constraintExplainCH": "Une icône de mini-grille montre deux côtés de la grille reliés par une chaîne. La solution doit contenir un chemin orthogonal ininterrompu de cette couleur allant du côté marqué à l'autre côté marqué.",
     "@constraintExplainCH": {
         "description": "Body of the new-constraint explanation modal for the Chain (CH) constraint"
+    },
+    "constraintExplainIM": "Une flèche d'une case à une autre signifie : si la case source prend la couleur de la flèche, la case cible doit aussi prendre cette couleur. La contraposée s'applique aussi : si la cible est d'une couleur différente, la source ne peut pas prendre la couleur de la flèche.",
+    "@constraintExplainIM": {
+        "description": "Body of the new-constraint explanation modal for the Implication (IM) constraint"
     },
     "createLetterGroupDone": "Terminer",
     "createAddNew": "Ajouter une contrainte",
@@ -300,6 +305,12 @@
     "createChooseSize": "Taille du groupe",
     "createChooseLetter": "Lettre",
     "createChooseValue": "Valeur",
+    "createImplicationSource": "Cellule source ({total} cellules, base 0)",
+    "createImplicationTarget": "Cellule cible ({total} cellules, base 0)",
+    "createImplicationInvalid": "Source/cible invalide",
+    "colorBlack": "Noir",
+    "colorWhite": "Blanc",
+    "colorPurple": "Violet",
     "createChooseCount": "Nombre",
     "createMotifWidth": "Largeur du motif",
     "createMotifHeight": "Hauteur du motif",

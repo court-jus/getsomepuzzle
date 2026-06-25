@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
@@ -76,6 +77,10 @@ class _CreatePageState extends State<CreatePage> {
   bool _editing = false;
 
   final List<Constraint> _constraints = [];
+
+  bool _implicationMode = false;
+  CellValue _implicationColor = CellValue.black;
+  int? _implicationSourceIdx;
 
   bool _letterGroupMode = false;
   String _letterGroupLetter = 'A';
@@ -302,6 +307,26 @@ class _CreatePageState extends State<CreatePage> {
   // --- Cell tap handling ---
 
   Future<void> _onCellTap(int cellIdx) async {
+    if (_implicationMode) {
+      if (_implicationSourceIdx == null) {
+        setState(() {
+          _implicationSourceIdx = cellIdx;
+        });
+      } else {
+        _addConstraint(
+          ImplicationConstraint(
+            '$_implicationSourceIdx.$cellIdx'
+            '.${cellValueToString(_implicationColor)}',
+          ),
+        );
+        setState(() {
+          _implicationMode = false;
+          _implicationSourceIdx = null;
+        });
+      }
+      return;
+    }
+
     if (_majorityZoneMode) {
       _finishMajorityZone(cellIdx);
       return;
@@ -509,6 +534,42 @@ class _CreatePageState extends State<CreatePage> {
           width: _width,
           height: _height,
         );
+      case 'IM':
+        final loc2 = AppLocalizations.of(context)!;
+        final color = await showDialog<CellValue>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(loc2.constraintImplication),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(ctx, CellValue.black),
+                  icon: const Icon(Icons.circle, color: Colors.black),
+                  label: Text(loc2.colorBlack),
+                ),
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(ctx, CellValue.white),
+                  icon: const Icon(Icons.circle, color: Colors.white),
+                  label: Text(loc2.colorWhite),
+                ),
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(ctx, CellValue.purple),
+                  icon: const Icon(Icons.circle, color: Colors.purple),
+                  label: Text(loc2.colorPurple),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (color == null) return;
+        if (!mounted) return;
+        setState(() {
+          _implicationMode = true;
+          _implicationColor = color;
+          _implicationSourceIdx = null;
+        });
+        return;
       case 'CH':
         added = await showChainDialog(context);
       case 'fixBlack':
@@ -638,6 +699,8 @@ class _CreatePageState extends State<CreatePage> {
       _solvedValues.clear();
       _propagationCells.clear();
       _forceCells.clear();
+      _implicationMode = false;
+      _implicationSourceIdx = null;
       _editing = false;
       _autoComplexity = null;
       _autoImpossibleBy = null;
@@ -691,7 +754,9 @@ class _CreatePageState extends State<CreatePage> {
               ? loc.createSecondCorner
               : (_letterGroupMode
                     ? loc.createLetterGroupMode(_letterGroupLetter)
-                    : loc.createTitle),
+                    : (_implicationMode
+                          ? loc.constraintImplication
+                          : loc.createTitle)),
         ),
         actions: [
           if (_majorityZoneMode)
@@ -700,6 +765,14 @@ class _CreatePageState extends State<CreatePage> {
               onPressed: () => setState(() {
                 _majorityZoneMode = false;
                 _majorityZoneFirstIdx = null;
+              }),
+            ),
+          if (_implicationMode)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => setState(() {
+                _implicationMode = false;
+                _implicationSourceIdx = null;
               }),
             ),
           if (_letterGroupMode)
@@ -1179,6 +1252,8 @@ class _CreatePageState extends State<CreatePage> {
     final constraints = cellConstraintsMap[cellIdx];
     final isLetterGroupSelected =
         _letterGroupMode && _letterGroupIndices.contains(cellIdx);
+    final isImplicationSource =
+        _implicationMode && _implicationSourceIdx == cellIdx;
     final isMjZoneFirst = _majorityZoneMode && _majorityZoneFirstIdx == cellIdx;
     final fixedValue = _fixedCells[cellIdx];
     final isFixed = fixedValue != null;
@@ -1191,6 +1266,9 @@ class _CreatePageState extends State<CreatePage> {
       borderColor = Colors.amber;
       borderWidth = 3;
     } else if (isLetterGroupSelected) {
+      borderColor = Colors.amber;
+      borderWidth = 3;
+    } else if (isImplicationSource) {
       borderColor = Colors.amber;
       borderWidth = 3;
     } else if (_propagationCells.contains(cellIdx)) {

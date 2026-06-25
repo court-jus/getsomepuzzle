@@ -137,6 +137,7 @@
     "constraintNeighborCount": "número de vecinos",
     "constraintEyes": "ojos",
     "constraintChain": "cadena",
+    "constraintImplication": "implicación",
     "newConstraintModalTitle": "¡Regla nueva!",
     "newConstraintModalSkip": "Saltar aprendizaje",
     "thirdColorSuggestionTitle": "¿Listo para 3 colores?",
@@ -194,6 +195,10 @@
     "constraintExplainCH": "Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por una cadena. La solución debe contener un camino ortogonal ininterrumpido de ese color desde el lado marcado hasta el otro lado marcado.",
     "@constraintExplainCH": {
         "description": "Body of the new-constraint explanation modal for the Chain (CH) constraint"
+    },
+    "constraintExplainIM": "Una flecha de una celda a otra significa: si la celda fuente toma el color de la flecha, la celda destino también debe tomar ese color. También se aplica la contrapuesta: si el destino es de un color diferente, la fuente no puede tomar el color de la flecha.",
+    "@constraintExplainIM": {
+        "description": "Body of the new-constraint explanation modal for the Implication (IM) constraint"
     },
     "createLetterGroupDone": "Listo",
     "createAddNew": "Agregar restricción",
@@ -300,6 +305,12 @@
     "createChooseSize": "Tamaño del grupo",
     "createChooseLetter": "Letra",
     "createChooseValue": "Valor",
+    "createImplicationSource": "Celda origen ({total} celdas, base 0)",
+    "createImplicationTarget": "Celda destino ({total} celdas, base 0)",
+    "createImplicationInvalid": "Origen/destino no válido",
+    "colorBlack": "Negro",
+    "colorWhite": "Blanco",
+    "colorPurple": "Morado",
     "createChooseCount": "Cantidad",
     "createMotifWidth": "Ancho del patrón",
     "createMotifHeight": "Alto del patrón",

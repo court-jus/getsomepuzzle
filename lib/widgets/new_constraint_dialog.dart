@@ -129,6 +129,8 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainNC;
     case 'EY':
       return l.constraintExplainEY;
+    case 'IM':
+      return l.constraintExplainIM;
     case 'RT':
     case 'CT':
       return l.constraintExplainTransition;

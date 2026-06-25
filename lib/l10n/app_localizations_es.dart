@@ -477,6 +477,28 @@ class AppLocalizationsEs extends AppLocalizations {
   String get createChooseValue => 'Valor';
 
   @override
+  String createImplicationSource(int total) {
+    return 'Celda origen ($total celdas, base 0)';
+  }
+
+  @override
+  String createImplicationTarget(int total) {
+    return 'Celda destino ($total celdas, base 0)';
+  }
+
+  @override
+  String get createImplicationInvalid => 'Origen/destino no válido';
+
+  @override
+  String get colorBlack => 'Negro';
+
+  @override
+  String get colorWhite => 'Blanco';
+
+  @override
+  String get colorPurple => 'Morado';
+
+  @override
   String get createChooseCount => 'Cantidad';
 
   @override
@@ -601,6 +623,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintChain => 'cadena';
 
   @override
+  String get constraintImplication => 'implicación';
+
+  @override
   String get newConstraintModalTitle => '¡Regla nueva!';
 
   @override
@@ -718,6 +743,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get constraintExplainCH =>
       'Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por una cadena. La solución debe contener un camino ortogonal ininterrumpido de ese color desde el lado marcado hasta el otro lado marcado.';
+
+  @override
+  String get constraintExplainIM =>
+      'Una flecha de una celda a otra significa: si la celda fuente toma el color de la flecha, la celda destino también debe tomar ese color. También se aplica la contrapuesta: si el destino es de un color diferente, la fuente no puede tomar el color de la flecha.';
 
   @override
   String get complicityOtherConstraint => 'otra restricción';

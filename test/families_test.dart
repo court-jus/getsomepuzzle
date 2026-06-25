@@ -70,10 +70,10 @@ void main() {
   });
 
   group('allCompositions', () {
-    test('enumerates 85 triples for the full 5-family universe', () {
-      // P(5,3)=60 (three real) + P(5,2)=20 (two real + empty) + 5 (one real +
-      // two empties) = 85.
-      expect(allCompositions(kConstraintFamilies).length, 85);
+    test('enumerates 156 triples for the full 6-family universe', () {
+      // allCompositions of a 6-family universe = P(6,3) + P(6,2) + 6 (no
+      // two empties) = 156.
+      expect(allCompositions(kConstraintFamilies).length, 156);
     });
 
     test('every triple starts with a real family and empties only trail', () {

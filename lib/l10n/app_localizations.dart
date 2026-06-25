@@ -952,6 +952,42 @@ abstract class AppLocalizations {
   /// **'Value'**
   String get createChooseValue;
 
+  /// No description provided for @createImplicationSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source cell ({total} cells, 0-based)'**
+  String createImplicationSource(int total);
+
+  /// No description provided for @createImplicationTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Target cell ({total} cells, 0-based)'**
+  String createImplicationTarget(int total);
+
+  /// No description provided for @createImplicationInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid source/target'**
+  String get createImplicationInvalid;
+
+  /// No description provided for @colorBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get colorBlack;
+
+  /// No description provided for @colorWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get colorWhite;
+
+  /// No description provided for @colorPurple.
+  ///
+  /// In en, this message translates to:
+  /// **'Purple'**
+  String get colorPurple;
+
   /// No description provided for @createChooseCount.
   ///
   /// In en, this message translates to:
@@ -1192,6 +1228,12 @@ abstract class AppLocalizations {
   /// **'chain'**
   String get constraintChain;
 
+  /// Name of the implication constraint
+  ///
+  /// In en, this message translates to:
+  /// **'implication'**
+  String get constraintImplication;
+
   /// Title of the dialog shown the first time a player encounters a new constraint
   ///
   /// In en, this message translates to:
@@ -1371,6 +1413,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.'**
   String get constraintExplainCH;
+
+  /// Body of the new-constraint explanation modal for the Implication (IM) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'An arrow from one cell to another means: if the source cell takes the arrow\'s colour, the target cell must also take that colour. The contrapositive also holds: if the target is a different colour, the source cannot take the arrow\'s colour.'**
+  String get constraintExplainIM;
 
   /// Fallback name used when a complicity's secondary slug is the wildcard '*' (kept as a safety fallback; the dedicated 'hintComplicityWithAny' template is preferred for the wildcard case)
   ///

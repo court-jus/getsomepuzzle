@@ -62,6 +62,8 @@ directly in the code):
   a side of the anchor; same-axis constraints merge per anchor.
 - [`majority.md`](constraints/majority.md) — `MJ`: strict majority of one colour
   in a rectangle.
+- [`implication.md`](constraints/implication.md) — `IM`: if the source cell is a
+  colour, the target cell must be too (directional, with contrapositive).
 
 ## Adding a new constraint
 

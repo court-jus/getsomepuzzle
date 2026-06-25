@@ -59,8 +59,8 @@ except as noted on axis 3):
    families are padded with the virtual `none` family. The axis is
    **uniform** over all valid ordered triples — including the focused
    one-family and two-family tuples — so it pushes both *combination variety*
-   and *thematic focus*. For the full five-family universe `allCompositions`
-   enumerates 85 distinct bins. Implementation: `compositionOf` in
+   and *thematic focus*. For the full six-family universe `allCompositions`
+   enumerates 156 distinct bins. Implementation: `compositionOf` in
    `families.dart`, `CompositionTarget` in `equilibrium.dart`.
 7. **Domain** — colour-domain size of the emitted line: 2 (`v2_12_…`,
    black/white) or 3 (`v2_123_…`, +purple), read off the line's

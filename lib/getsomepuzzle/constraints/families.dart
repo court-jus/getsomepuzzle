@@ -1,4 +1,4 @@
-/// Constraint families: a taxonomy that groups the 17 player-facing
+/// Constraint families: a taxonomy that groups the 18 player-facing
 /// constraint slugs by *deduction strategy*, orthogonal to the class
 /// hierarchy in `constraints/`. Pure Dart, no imports — importable by both
 /// the generator (`equilibrium.dart`) and the CLI tools in `bin/`.
@@ -11,6 +11,8 @@ library;
 /// Slug → family. Must stay total over every slug in
 /// `constraintRegistry` (a guard test enforces this).
 const Map<String, String> kConstraintFamily = {
+  // implication: directional colour constraint (if source is C, target is C).
+  'IM': 'implication',
   // line-centric: reasons about a whole row/column line (counts, transitions,
   // parity over a line segment).
   'RC': 'line-centric',
@@ -40,6 +42,7 @@ const Map<String, String> kConstraintFamily = {
 /// Fixed family order. Drives the deterministic tie-break in [compositionOf]
 /// and the display order in dashboards/tables.
 const List<String> kConstraintFamilies = [
+  'implication',
   'line-centric',
   'local',
   'path',
@@ -96,7 +99,7 @@ List<String> compositionOf(Iterable<String> slugInstances) {
 /// All valid ordered composition triples over [families] (the real families
 /// in play) plus the empty padding. A real family always outranks [kEmptyFamily],
 /// so empties only occupy trailing slots and the first slot is always real.
-/// For `m` real families the count is `P(m,3) + P(m,2) + m` (85 when m = 5).
+/// For `m` real families the count is `P(m,3) + P(m,2) + m` (156 when m = 6).
 List<List<String>> allCompositions(List<String> families) {
   final real = kConstraintFamilies.where(families.contains).toList();
   final out = <List<String>>[];

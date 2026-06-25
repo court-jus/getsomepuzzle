@@ -7,6 +7,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
@@ -76,6 +77,9 @@ Widget constraintToFlutter(
   }
   if (constraint is ColumnTransitionConstraint) {
     return _transitionWidget(constraint, cellSize, count, Axis.vertical);
+  }
+  if (constraint is ImplicationConstraint) {
+    return const SizedBox.shrink();
   }
 
   // Default: use toString()

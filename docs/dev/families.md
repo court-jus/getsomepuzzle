@@ -1,6 +1,6 @@
 # Constraint families & the equilibrium "composition" axis
 
-The 17 player-facing constraint slugs are partitioned into five families by
+The 18 player-facing constraint slugs are partitioned into six families by
 **deduction strategy** — i.e. *how* a constraint narrows the grid, orthogonal
 to the `Constraint` class hierarchy in `constraints/`. The taxonomy feeds the
 equilibrium engine's **composition** axis, which balances the blend of families
@@ -10,6 +10,7 @@ a puzzle is built from rather than individual slugs.
 
 | Family (key)     | Slugs                | Common deduction strategy                              |
 |------------------|----------------------|--------------------------------------------------------|
+| `implication`    | IM                   | directional colour link: if the source is the colour, the target must be too (contrapositive also fires) |
 | `line-centric`   | RC, RT, CC, CT, PA   | reasons about a whole row/column line (count / transition / parity) |
 | `local`          | FM, DF, NC, EY       | forbidden motif / adjacency / immediate-neighbourhood count |
 | `path`           | LT, CH               | connectivity: shared connected group / border-to-border chain |
@@ -41,7 +42,7 @@ So the example yields `(path, line-centric, local)`; a pure line puzzle yields
 compositions is
 
 ```
-P(m,3) + P(m,2) + m       # m=5 → 60 + 20 + 5 = 85
+P(m,3) + P(m,2) + m       # m=6 → 120 + 30 + 6 = 156
 ```
 
 ## Source module — `lib/getsomepuzzle/constraints/families.dart`
@@ -50,13 +51,13 @@ Pure Dart, no Flutter imports — usable by both the generator and `bin/` tools:
 
 | Export | Purpose |
 |--------|---------|
-| `kConstraintFamily` | slug → family mapping (17 entries) |
-| `kConstraintFamilies` | fixed display/tie-break order (`line-centric, local, path, group-topology, global`) |
+| `kConstraintFamily` | slug → family mapping (18 entries) |
+| `kConstraintFamilies` | fixed display/tie-break order (`implication, line-centric, local, path, group-topology, global`) |
 | `kEmptyFamily` | virtual `'none'` family for padding |
 | `familyOf(String slug)` | lookup a single slug's family |
 | `familiesOf(Iterable<String> slugs)` | distinct families spanned by a set of slugs |
 | `compositionOf(Iterable<String> slugInstances)` | compute a puzzle's composition triple (slugs with repeats → length-3 list) |
-| `allCompositions(List<String> families)` | enumerate all valid ordered triples for a set of real families (85 for the full five) |
+| `allCompositions(List<String> families)` | enumerate all valid ordered triples for a set of real families (156 for the full six) |
 
 ## How the composition axis works in the generator
 
@@ -115,6 +116,6 @@ dart run bin/query_corpus.dart --cross composition,collection
   values ⊆ `kConstraintFamilies`; `compositionOf` ranking, empty padding and
   deterministic tie-break; `allCompositions` size and shape.
 - `test/equilibrium_test.dart` — `compositionCounts` from
-  `fromLines`/`withPuzzle`; `allowedCompositions.length == 85` on the full
+  `fromLines`/`withPuzzle`; `allowedCompositions.length == 156` on the full
   universe; `_scoreAll` emits `CompositionTarget`s; `parseTargetKey('comp:…')`
   round-trip; `targetShare(Axis.composition, …)`.
