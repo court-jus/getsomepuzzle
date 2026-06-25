@@ -502,10 +502,26 @@ class Database {
   }
 
   void load(List<String> lines) {
-    puzzles = lines
-        .where((e) => e.isNotEmpty && !e.startsWith("#"))
-        .map((e) => PuzzleData(e))
-        .toList();
+    final parsed = <PuzzleData>[];
+    var skipped = 0;
+    for (final e in lines) {
+      if (e.isEmpty || e.startsWith("#")) continue;
+      try {
+        parsed.add(PuzzleData(e));
+      } catch (err) {
+        // A single malformed line (e.g. a truncated `custom.txt` row from a
+        // partial write) must not brick startup. Skip it, but log loudly so
+        // the corruption is visible rather than silently swallowed.
+        skipped++;
+        if (skipped <= 3) {
+          print('Database.load: skipping malformed puzzle line "$e" ($err)');
+        }
+      }
+    }
+    if (skipped > 0) {
+      print('Database.load: skipped $skipped malformed puzzle line(s)');
+    }
+    puzzles = parsed;
   }
 
   /// Number of stats entries that count as "usable plays" — finished,
