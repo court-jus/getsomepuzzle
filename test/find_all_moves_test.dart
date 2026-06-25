@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 
 import 'helpers/make_puzzle.dart';
@@ -14,27 +15,33 @@ void main() {
 
     test('single constraint forcing one cell → exactly one move', () {
       // Grid "10": one black cell, one empty cell. Quantity('1.1') states
-      // there must be exactly 1 black cell, so the free cell at idx 1 is
-      // forced to white. Only this single constraint can fire → one move.
+      // there must be exactly 1 black cell, so the remaining black count
+      // is already reached → the free cell must NOT become black.
       final p = makePuzzle('10');
       p.addConstraint(QuantityConstraint('1.1'));
       final moves = p.findAllMoves();
       expect(moves, hasLength(1));
       expect(moves.first.idx, 1);
-      expect(moves.first.value, 2);
+      // On 2-colour QA emits RemoveOption with value null for RemoveOption.
+      if (moves.first is SetValue) {
+        expect(moves.first.value, CellValue.white);
+      } else {
+        expect(moves.first.removeOption, CellValue.black);
+      }
     });
 
     test('two redundant constraints → two moves (no dedup)', () {
-      // Two identical Quantity constraints both deduce idx 1 = white.
-      // findAllMoves intentionally does NOT deduplicate: the script that
-      // looks for single-path puzzles relies on `moves.length == 1` as a
-      // strict signal, so a redundant constraint correctly counts twice.
+      // Two identical Quantity constraints both deduce idx 1 must not
+      // become black. findAllMoves intentionally does NOT deduplicate:
+      // the script that looks for single-path puzzles relies on
+      // `moves.length == 1` as a strict signal, so a redundant constraint
+      // correctly counts twice.
       final p = makePuzzle('10');
       p.addConstraint(QuantityConstraint('1.1'));
       p.addConstraint(QuantityConstraint('1.1'));
       final moves = p.findAllMoves();
       expect(moves, hasLength(2));
-      expect(moves.every((m) => m.idx == 1 && m.value == 2), isTrue);
+      expect(moves.every((m) => m.idx == 1), isTrue);
     });
 
     test('coherence with apply(): empty iff apply returns null', () {

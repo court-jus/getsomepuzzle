@@ -1457,7 +1457,7 @@ class Database {
       // here; the recommended filters in `currentFilters` (see
       // [recommendedOnboardingFilters]) do the gating via `filter()`,
       // which `getPuzzlesByLevel` already consults.
-      playlist = getPuzzlesByLevel(playerLevel);
+      playlist = getPuzzlesByLevel(playerLevel).toList();
       _maybeCapBatch();
       if (shouldShuffle) playlist.shuffle();
     }
