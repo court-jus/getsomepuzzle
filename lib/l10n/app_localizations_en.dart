@@ -621,6 +621,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintImplication => 'implication';
 
   @override
+  String get constraintBoundingBox => 'bounding box';
+
+  @override
   String get newConstraintModalTitle => 'New rule!';
 
   @override
@@ -726,6 +729,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get constraintExplainGC =>
       'A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.';
+
+  @override
+  String get constraintExplainBB =>
+      'Every connected group of this color must occupy a bounding box of exactly this width and height — the smallest rectangle enclosing the group spans exactly that many columns and rows (the group need not fill it).';
 
   @override
   String get constraintExplainNC =>
@@ -896,6 +903,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get scenarioExplainSh =>
       'At least one shape constraint defines exact form for a group.';
+
+  @override
+  String get scenarioBb => 'Bounding box';
+
+  @override
+  String get scenarioExplainBb =>
+      'Every group of a colour fits the same bounding box.';
 
   @override
   String get scenarioPathBased => 'Path';

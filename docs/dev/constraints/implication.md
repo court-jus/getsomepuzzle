@@ -100,13 +100,20 @@ draws, for each `ImplicationConstraint`, a cubic Bézier from source to target
 center (curving toward the grid interior) with a filled arrowhead, applying the
 color / highlight / grayout styling described under **Display**.
 
-**Stacking**: `lib/widgets/puzzle.dart` places, inside the grid `Stack`:
+**Stacking**: the shared `PuzzleGridStack` (`lib/widgets/puzzle_grid_stack.dart`,
+used by both the game `lib/widgets/puzzle.dart` and the editor
+`lib/widgets/create_page/create_page.dart`) builds, inside the grid `Stack`:
 1. a `CellBackgroundPainter` (`lib/widgets/cell_background_painter.dart`) that
    paints every cell's fill color behind the grid — the per-cell `DecoratedBox`
    in `cell.dart` no longer carries a fill, so arrows can sit *between* the cell
    fill and the cell borders/content;
 2. the `ImplicationPainter` overlay (only when the puzzle has any `IM`);
-3. the `Table` of cells (now transparent-filled).
+3. the `Table` of cells (now transparent-filled);
+4. the `DifferentFromPainter` / `MajorityZonePainter` overlays.
+
+Centralising this order in `PuzzleGridStack` keeps the game and editor from
+drifting apart (the editor once lost its cell backgrounds because only
+`puzzle.dart` was updated when `IM` moved colouring into the painter).
 
 `cell.dart` excludes `ImplicationConstraint` (like `DifferentFromConstraint`)
 from in-cell widget rendering, so it does not shrink the other in-cell widgets.

@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/bb.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/path.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/regular.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/sh.dart';
@@ -507,6 +508,11 @@ class PuzzleGenerator {
     // by user or pushed by an equilibrium / warm-up target), the pre-fill
     // paints a valid Shape motif so the SH constraint is satisfiable.
     final hasSH = prioritySlugs.contains("SH");
+    // BB mirrors SH's lightweight wiring: when BB is prioritised and SH is not,
+    // the pre-fill builds islands whose colour groups all share one W×H extent
+    // so a BB constraint is satisfiable (a random grid almost never survives
+    // the candidate `verify` filter for BB). SH keeps priority over BB.
+    final hasBB = prioritySlugs.contains("BB");
     List<LetterGroup> constructiveLts = const [];
     final Puzzle solved;
     if (config.pathBasedScenario) {
@@ -535,6 +541,8 @@ class PuzzleGenerator {
     } else {
       solved = hasSH
           ? preFillSh(width, height, domain, _rng)
+          : hasBB
+          ? preFillBB(width, height, domain, _rng)
           : preFillRegular(width, height, domain, _rng);
     }
     final solvedValues = solved.cellValues;
@@ -1089,10 +1097,15 @@ class PuzzleGenerator {
     // pre-fill didn't find a valid motif, the flow falls back to
     // classic.
     final shAttached = pu.constraints.any((c) => c.slug == 'SH');
+    // `bb` requires that `preFillBB` actually attached a BB constraint; when
+    // BB was requested but nothing attached, the flow falls back to classic.
+    final bbAttached = pu.constraints.any((c) => c.slug == 'BB');
     pu.generationScenario = config.pathBasedScenario
         ? 'pathBased'
         : (hasSH && shAttached)
         ? 'sh'
+        : (hasBB && bbAttached)
+        ? 'bb'
         : 'classic';
 
     // Post-loop cleanup: the cheap-tier accept signal in phase 1 is

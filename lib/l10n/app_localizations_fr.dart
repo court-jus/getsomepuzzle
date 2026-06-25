@@ -626,6 +626,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintImplication => 'implication';
 
   @override
+  String get constraintBoundingBox => 'boîte englobante';
+
+  @override
   String get newConstraintModalTitle => 'Nouvelle règle !';
 
   @override
@@ -731,6 +734,10 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get constraintExplainGC =>
       'Un nombre encadré avec une icône de chaîne indique combien de groupes distincts (composantes connexes) de cette couleur la solution doit contenir.';
+
+  @override
+  String get constraintExplainBB =>
+      'Chaque groupe connexe de cette couleur doit occuper une boîte englobante d\'exactement cette largeur et cette hauteur — le plus petit rectangle entourant le groupe couvre exactement ce nombre de colonnes et de lignes (le groupe n\'a pas besoin de la remplir).';
 
   @override
   String get constraintExplainNC =>
@@ -904,6 +911,13 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get scenarioExplainSh =>
       'Au moins une contrainte de forme définit la forme exacte d\'un groupe.';
+
+  @override
+  String get scenarioBb => 'Boîte englobante';
+
+  @override
+  String get scenarioExplainBb =>
+      'Chaque groupe d\'une couleur tient dans la même boîte englobante.';
 
   @override
   String get scenarioPathBased => 'Chemin';

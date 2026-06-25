@@ -138,6 +138,7 @@
     "constraintEyes": "ojos",
     "constraintChain": "cadena",
     "constraintImplication": "implicación",
+    "constraintBoundingBox": "caja delimitadora",
     "newConstraintModalTitle": "¡Regla nueva!",
     "newConstraintModalSkip": "Saltar aprendizaje",
     "thirdColorSuggestionTitle": "¿Listo para 3 colores?",
@@ -282,6 +283,7 @@
 
     "constraintSymmetry": "simetría",
     "constraintExplainGC": "Un número enmarcado con un icono de cadena indica cuántos grupos separados (componentes conexos) de ese color debe contener la solución.",
+    "constraintExplainBB": "Cada grupo conexo de este color debe ocupar una caja delimitadora de exactamente este ancho y alto: el rectángulo más pequeño que encierra el grupo abarca exactamente esas columnas y filas (el grupo no tiene que llenarla).",
 
     "create": "Crear",
     "createTitle": "Crear un puzzle",
@@ -373,6 +375,14 @@
     "scenarioExplainSh": "Al menos una restricción de forma define la forma exacta de un grupo.",
     "@scenarioExplainSh": {
         "description": "Description of the Shape user scenario."
+    },
+    "scenarioBb": "Caja envolvente",
+    "@scenarioBb": {
+        "description": "Label for the Bounding box (BB) user scenario."
+    },
+    "scenarioExplainBb": "Cada grupo de un color cabe en la misma caja envolvente.",
+    "@scenarioExplainBb": {
+        "description": "Description of the Bounding box user scenario."
     },
     "scenarioPathBased": "Ruta",
     "@scenarioPathBased": {

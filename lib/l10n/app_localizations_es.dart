@@ -626,6 +626,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintImplication => 'implicación';
 
   @override
+  String get constraintBoundingBox => 'caja delimitadora';
+
+  @override
   String get newConstraintModalTitle => '¡Regla nueva!';
 
   @override
@@ -731,6 +734,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get constraintExplainGC =>
       'Un número enmarcado con un icono de cadena indica cuántos grupos separados (componentes conexos) de ese color debe contener la solución.';
+
+  @override
+  String get constraintExplainBB =>
+      'Cada grupo conexo de este color debe ocupar una caja delimitadora de exactamente este ancho y alto: el rectángulo más pequeño que encierra el grupo abarca exactamente esas columnas y filas (el grupo no tiene que llenarla).';
 
   @override
   String get constraintExplainNC =>
@@ -902,6 +909,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get scenarioExplainSh =>
       'Al menos una restricción de forma define la forma exacta de un grupo.';
+
+  @override
+  String get scenarioBb => 'Caja envolvente';
+
+  @override
+  String get scenarioExplainBb =>
+      'Cada grupo de un color cabe en la misma caja envolvente.';
 
   @override
   String get scenarioPathBased => 'Ruta';

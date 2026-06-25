@@ -21,6 +21,8 @@ read the relevant page before touching the corresponding subsystem.
   dominated by `LT` (topology + bipartite disambiguation).
 - [`prefill_sy.md`](prefill_sy.md) — Pre-fill by symmetric island
   growth for `SY` puzzles.
+- [`prefill_bb.md`](prefill_bb.md) — Pre-fill by bounding-box islands
+  for `BB` puzzles.
 
 ## Solving & reasoning
 
@@ -64,6 +66,8 @@ directly in the code):
   in a rectangle.
 - [`implication.md`](constraints/implication.md) — `IM`: if the source cell is a
   colour, the target cell must be too (directional, with contrapositive).
+- [`bounding_box.md`](constraints/bounding_box.md) — `BB`: every group of a colour
+  must have a bounding box of exactly W×H (extent, not fill; global).
 
 ## Adding a new constraint
 
@@ -140,6 +144,9 @@ constraint introduces a novel `verify` contract pattern.
 
 ## Player & experience
 
+- [`editor.md`](editor.md) — In-app puzzle editor (`CreatePage`): fix
+  cells, attach constraints via per-slug dialogs, live solve feedback,
+  test/save. Renders its grid through the shared `PuzzleGridStack`.
 - [`adapt_to_player.md`](adapt_to_player.md) — Player-level inference
   and Gaussian sampling of puzzles around that level.
 - [`onboarding.md`](onboarding.md) — Gradual replacement of the

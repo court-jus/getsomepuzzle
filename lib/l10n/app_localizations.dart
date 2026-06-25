@@ -1234,6 +1234,12 @@ abstract class AppLocalizations {
   /// **'implication'**
   String get constraintImplication;
 
+  /// Name of the bounding box constraint
+  ///
+  /// In en, this message translates to:
+  /// **'bounding box'**
+  String get constraintBoundingBox;
+
   /// Title of the dialog shown the first time a player encounters a new constraint
   ///
   /// In en, this message translates to:
@@ -1395,6 +1401,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.'**
   String get constraintExplainGC;
+
+  /// No description provided for @constraintExplainBB.
+  ///
+  /// In en, this message translates to:
+  /// **'Every connected group of this color must occupy a bounding box of exactly this width and height — the smallest rectangle enclosing the group spans exactly that many columns and rows (the group need not fill it).'**
+  String get constraintExplainBB;
 
   /// Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint
   ///
@@ -1689,6 +1701,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'At least one shape constraint defines exact form for a group.'**
   String get scenarioExplainSh;
+
+  /// Label for the Bounding box (BB) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Bounding box'**
+  String get scenarioBb;
+
+  /// Description of the Bounding box user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Every group of a colour fits the same bounding box.'**
+  String get scenarioExplainBb;
 
   /// Label for the Path-based (LT) user scenario.
   ///

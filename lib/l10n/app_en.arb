@@ -684,6 +684,10 @@
     "@constraintImplication": {
         "description": "Name of the implication constraint"
     },
+    "constraintBoundingBox": "bounding box",
+    "@constraintBoundingBox": {
+        "description": "Name of the bounding box constraint"
+    },
     "newConstraintModalTitle": "New rule!",
     "@newConstraintModalTitle": {
         "description": "Title of the dialog shown the first time a player encounters a new constraint"
@@ -799,6 +803,7 @@
         "description": "Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)"
     },
     "constraintExplainGC": "A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.",
+    "constraintExplainBB": "Every connected group of this color must occupy a bounding box of exactly this width and height — the smallest rectangle enclosing the group spans exactly that many columns and rows (the group need not fill it).",
     "@constraintExplainGC": {
         "description": "Body of the new-constraint explanation modal for the Group Count (GC) constraint"
     },
@@ -1012,6 +1017,14 @@
     "scenarioExplainSh": "At least one shape constraint defines exact form for a group.",
     "@scenarioExplainSh": {
         "description": "Description of the Shape user scenario."
+    },
+    "scenarioBb": "Bounding box",
+    "@scenarioBb": {
+        "description": "Label for the Bounding box (BB) user scenario."
+    },
+    "scenarioExplainBb": "Every group of a colour fits the same bounding box.",
+    "@scenarioExplainBb": {
+        "description": "Description of the Bounding box user scenario."
     },
     "scenarioPathBased": "Path",
     "@scenarioPathBased": {

@@ -4,13 +4,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
@@ -18,10 +18,10 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
-import 'package:getsomepuzzle/widgets/constraints/majority.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/eyes_dialog.dart';
-import 'package:getsomepuzzle/widgets/different_from_painter.dart';
+import 'package:getsomepuzzle/widgets/puzzle_grid_stack.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
@@ -30,6 +30,7 @@ import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/bounding_box_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/cell_actions_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/chain_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/column_count_dialog.dart';
@@ -572,6 +573,12 @@ class _CreatePageState extends State<CreatePage> {
         return;
       case 'CH':
         added = await showChainDialog(context);
+      case 'BB':
+        added = await showBoundingBoxDialog(
+          context,
+          width: _width,
+          height: _height,
+        );
       case 'fixBlack':
         _setFixedCell(cellIdx, CellValue.black);
         return;
@@ -1054,6 +1061,14 @@ class _CreatePageState extends State<CreatePage> {
                     cellSize: topBarSize,
                   ),
                 )
+              else if (constraint is BoundingBoxConstraint)
+                GestureDetector(
+                  onTap: () => _confirmDeleteTopBar(constraint),
+                  child: BoundingBoxWidget(
+                    constraint: constraint,
+                    cellSize: topBarSize,
+                  ),
+                )
               else if (constraint is ChainConstraint)
                 GestureDetector(
                   onTap: () => _confirmDeleteTopBar(constraint),
@@ -1130,11 +1145,6 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Widget _buildGrid(Map<int, List<Constraint>> cellConstraintsMap) {
-    final dfConstraints = _constraints
-        .whereType<DifferentFromConstraint>()
-        .toList();
-    final mjConstraints = _constraints.whereType<MajorityConstraint>().toList();
-
     final rcConstraints = _constraints.whereType<RowCountConstraint>();
     final rcByRow = <int, RowCountConstraint>{};
     for (final c in rcConstraints) {
@@ -1153,52 +1163,13 @@ class _CreatePageState extends State<CreatePage> {
           (MediaQuery.sizeOf(context).height * 0.5) / _height,
         );
 
-        final grid = Stack(
-          children: [
-            Table(
-              border: TableBorder.all(),
-              defaultColumnWidth: FixedColumnWidth(cellSize),
-              children: [
-                for (var row = 0; row < _height; row++)
-                  TableRow(
-                    children: [
-                      for (var col = 0; col < _width; col++)
-                        _buildEditorCell(
-                          row * _width + col,
-                          cellSize,
-                          cellConstraintsMap,
-                        ),
-                    ],
-                  ),
-              ],
-            ),
-            if (dfConstraints.isNotEmpty)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: DifferentFromPainter(
-                      constraints: dfConstraints,
-                      cellSize: cellSize,
-                      gridWidth: _width,
-                      defaultColor: Colors.blueGrey,
-                      highlightColor: Colors.green,
-                    ),
-                  ),
-                ),
-              ),
-            if (mjConstraints.isNotEmpty)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: MajorityZonePainter(
-                      constraints: mjConstraints,
-                      cellSize: cellSize,
-                      gridWidth: _width,
-                    ),
-                  ),
-                ),
-              ),
-          ],
+        final grid = PuzzleGridStack(
+          puzzle: _buildPuzzle(),
+          cellSize: cellSize,
+          dfDefaultColor: Colors.blueGrey,
+          dfHighlightColor: Colors.green,
+          cellBuilder: (idx) =>
+              _buildEditorCell(idx, cellSize, cellConstraintsMap),
         );
 
         if (rcByRow.isEmpty && rtByRow.isEmpty) return grid;

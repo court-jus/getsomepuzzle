@@ -138,6 +138,7 @@
     "constraintEyes": "yeux",
     "constraintChain": "chaîne",
     "constraintImplication": "implication",
+    "constraintBoundingBox": "boîte englobante",
     "newConstraintModalTitle": "Nouvelle règle !",
     "newConstraintModalSkip": "Ignorer l'apprentissage",
     "thirdColorSuggestionTitle": "Prêt pour les 3 couleurs ?",
@@ -282,6 +283,7 @@
 
     "constraintSymmetry": "symétrie",
     "constraintExplainGC": "Un nombre encadré avec une icône de chaîne indique combien de groupes distincts (composantes connexes) de cette couleur la solution doit contenir.",
+    "constraintExplainBB": "Chaque groupe connexe de cette couleur doit occuper une boîte englobante d'exactement cette largeur et cette hauteur — le plus petit rectangle entourant le groupe couvre exactement ce nombre de colonnes et de lignes (le groupe n'a pas besoin de la remplir).",
 
     "create": "Créer",
     "createTitle": "Créer un puzzle",
@@ -373,6 +375,14 @@
     "scenarioExplainSh": "Au moins une contrainte de forme définit la forme exacte d'un groupe.",
     "@scenarioExplainSh": {
         "description": "Description of the Shape user scenario."
+    },
+    "scenarioBb": "Boîte englobante",
+    "@scenarioBb": {
+        "description": "Label for the Bounding box (BB) user scenario."
+    },
+    "scenarioExplainBb": "Chaque groupe d'une couleur tient dans la même boîte englobante.",
+    "@scenarioExplainBb": {
+        "description": "Description of the Bounding box user scenario."
     },
     "scenarioPathBased": "Chemin",
     "@scenarioPathBased": {

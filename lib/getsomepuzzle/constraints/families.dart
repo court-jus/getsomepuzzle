@@ -1,4 +1,4 @@
-/// Constraint families: a taxonomy that groups the 18 player-facing
+/// Constraint families: a taxonomy that groups the 19 player-facing
 /// constraint slugs by *deduction strategy*, orthogonal to the class
 /// hierarchy in `constraints/`. Pure Dart, no imports — importable by both
 /// the generator (`equilibrium.dart`) and the CLI tools in `bin/`.
@@ -35,6 +35,7 @@ const Map<String, String> kConstraintFamily = {
   'SH': 'group-topology',
   'SY': 'group-topology',
   'MJ': 'group-topology',
+  'BB': 'group-topology',
   // global: whole-grid quantity.
   'QA': 'global',
 };

@@ -4,12 +4,11 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
@@ -18,14 +17,12 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
-import 'package:getsomepuzzle/widgets/cell_background_painter.dart';
+import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
-import 'package:getsomepuzzle/widgets/different_from_painter.dart';
-import 'package:getsomepuzzle/widgets/implication_painter.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
-import 'package:getsomepuzzle/widgets/constraints/majority.dart';
+import 'package:getsomepuzzle/widgets/puzzle_grid_stack.dart';
 import 'package:getsomepuzzle/widgets/constraints/motif.dart';
 import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
 import 'package:getsomepuzzle/widgets/constraints/transition.dart';
@@ -176,6 +173,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
               (constraint is Motif ||
               constraint is QuantityConstraint ||
               constraint is GroupCountConstraint ||
+              constraint is BoundingBoxConstraint ||
               constraint is ChainConstraint),
         )
         .length;
@@ -245,6 +243,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
         highlightedConstraint is ColumnCountConstraint ||
         highlightedConstraint is ColumnTransitionConstraint ||
         highlightedConstraint is GroupCountConstraint ||
+        highlightedConstraint is BoundingBoxConstraint ||
         highlightedConstraint is ChainConstraint;
 
     // For cell-centric constraints, find the constraint's home cell index
@@ -273,18 +272,6 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     // Compute groups once per build so GC widgets and per-cell
     // getCellGroupSize callbacks share a single O(N) flood-fill.
     final groups = getGroups(widget.currentPuzzle);
-
-    final hasDF = widget.currentPuzzle.constraints.any(
-      (c) => c is DifferentFromConstraint,
-    );
-
-    final hasIM = widget.currentPuzzle.constraints.any(
-      (c) => c is ImplicationConstraint,
-    );
-
-    final hasMJ = widget.currentPuzzle.constraints.any(
-      (c) => c is MajorityConstraint,
-    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -374,6 +361,15 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                     constraint.color,
                               )
                               .length,
+                          cellSize: topBarConstraintsSize,
+                        )
+                      else if (constraint is BoundingBoxConstraint)
+                        BoundingBoxWidget(
+                          key:
+                              (constraint.isHighlighted && constraintIsInTopBar)
+                              ? _constraintKey
+                              : null,
+                          constraint: constraint,
                           cellSize: topBarConstraintsSize,
                         )
                       else if (constraint is ChainConstraint)
@@ -489,86 +485,21 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                           key: _gridKey,
                           width: gridWidth,
                           height: gridHeight,
-                          child: Stack(
-                            children: [
-                              IgnorePointer(
-                                child: CustomPaint(
-                                  painter: CellBackgroundPainter(
-                                    puzzle: widget.currentPuzzle,
-                                    cellSize: adjustedCellSize,
-                                  ),
-                                ),
-                              ),
-                              if (hasIM)
-                                IgnorePointer(
-                                  child: CustomPaint(
-                                    painter: ImplicationPainter(
-                                      constraints: widget
-                                          .currentPuzzle
-                                          .constraints
-                                          .whereType<ImplicationConstraint>()
-                                          .toList(),
-                                      cellSize: adjustedCellSize,
-                                      gridWidth: widget.currentPuzzle.width,
-                                    ),
-                                  ),
-                                ),
-                              Table(
-                                border: TableBorder.all(),
-                                defaultColumnWidth: FixedColumnWidth(
-                                  adjustedCellSize,
-                                ),
-                                children: [
-                                  for (var (rowidx, row)
-                                      in widget.currentPuzzle.getRows().indexed)
-                                    TableRow(
-                                      children: [
-                                        for (var (cellidx, cell) in row.indexed)
-                                          _buildCell(
-                                            cell,
-                                            rowidx,
-                                            cellidx,
-                                            adjustedCellSize,
-                                            constraintIsInTopBar,
-                                            constraintCellIdx,
-                                            hasHighlightedCell,
-                                            groups,
-                                            mjZoneHighlightIndices,
-                                          ),
-                                      ],
-                                    ),
-                                ],
-                              ),
-                              if (hasDF)
-                                IgnorePointer(
-                                  child: CustomPaint(
-                                    painter: DifferentFromPainter(
-                                      constraints: widget
-                                          .currentPuzzle
-                                          .constraints
-                                          .whereType<DifferentFromConstraint>()
-                                          .toList(),
-                                      cellSize: adjustedCellSize,
-                                      gridWidth: widget.currentPuzzle.width,
-                                      defaultColor: Colors.black87,
-                                      highlightColor: highlightColor,
-                                    ),
-                                  ),
-                                ),
-                              if (hasMJ)
-                                IgnorePointer(
-                                  child: CustomPaint(
-                                    painter: MajorityZonePainter(
-                                      constraints: widget
-                                          .currentPuzzle
-                                          .constraints
-                                          .whereType<MajorityConstraint>()
-                                          .toList(),
-                                      cellSize: adjustedCellSize,
-                                      gridWidth: widget.currentPuzzle.width,
-                                    ),
-                                  ),
-                                ),
+                          child: PuzzleGridStack(
+                            puzzle: widget.currentPuzzle,
+                            cellSize: adjustedCellSize,
+                            cellBuilder: (idx) => _buildCell(
+                              widget.currentPuzzle.cells[idx],
+                              idx ~/ widget.currentPuzzle.width,
+                              idx % widget.currentPuzzle.width,
+                              adjustedCellSize,
+                              constraintIsInTopBar,
+                              constraintCellIdx,
+                              hasHighlightedCell,
+                              groups,
+                              mjZoneHighlightIndices,
+                            ),
+                            overlays: [
                               _buildOptionDotsOverlay(adjustedCellSize),
                             ],
                           ),

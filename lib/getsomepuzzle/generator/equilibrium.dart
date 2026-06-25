@@ -26,8 +26,9 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 /// [detectPuzzleProfile]. Lines without that suffix are treated as
 /// `classic` (legacy corpus included).
 const Map<ProfileCategory, double> kTargetProfile = {
-  ProfileCategory.classic: 0.85,
+  ProfileCategory.classic: 0.80,
   ProfileCategory.sh: 0.05,
+  ProfileCategory.bb: 0.05,
   ProfileCategory.pathBased: 0.05,
   ProfileCategory.syBased: 0.05,
 };
@@ -189,6 +190,10 @@ enum ProfileCategory {
   /// SH-themed: `preFillSh` seeds a Shape motif. The puzzle contains at
   /// least one SH constraint.
   sh,
+
+  /// BB-themed: `preFillBB` grows bounding-box islands so the puzzle contains
+  /// at least one BB constraint. See `docs/dev/prefill_bb.md`.
+  bb,
 
   /// Path-based: constructive topology built from a residual graph,
   /// self-avoiding walk and DPLL completion (see `docs/dev/path_based.md`).
@@ -359,6 +364,7 @@ ProfileCategory detectPuzzleProfile(String v2Line) {
       if (p.name == name) {
         if (p == ProfileCategory.pathBased ||
             p == ProfileCategory.sh ||
+            p == ProfileCategory.bb ||
             p == ProfileCategory.syBased) {
           return p;
         }
@@ -380,8 +386,12 @@ ProfileCategory detectPuzzleProfile(String v2Line) {
     if (rawSlugs.isNotEmpty) {
       final total = rawSlugs.length;
 
-      // SH present → sh (prolongs the legacy heuristic).
+      // SH present → sh (prolongs the legacy heuristic). SH keeps priority
+      // over BB when both are present.
       if (rawSlugs.any((s) => s == 'SH')) return ProfileCategory.sh;
+
+      // BB present → bb.
+      if (rawSlugs.any((s) => s == 'BB')) return ProfileCategory.bb;
 
       // minesweeper: {NC, EY} ≥ threshold, NC itself must be present.
       if (rawSlugs.where((s) => s == 'NC' || s == 'EY').length / total >=

@@ -1111,6 +1111,10 @@ _ResolvedTarget _resolveTarget(
           // Push SH as soft preference; `_preFillSh` activates whenever
           // SH ∈ prioritySlugs (cf. `generator.dart` dispatch).
           return const _ResolvedTarget(preferredSlugs: {'SH'});
+        case ProfileCategory.bb:
+          // Push BB as soft preference; `preFillBB` activates whenever
+          // BB ∈ prioritySlugs (cf. `generator.dart` dispatch).
+          return const _ResolvedTarget(preferredSlugs: {'BB'});
         case ProfileCategory.pathBased:
           // Activate path-based pre-fill. The path generator picks its
           // own L / K / colors / topology — slug-level preferences are
@@ -1194,6 +1198,9 @@ String _resolveScenario({
   if (syBased) return 'syBased';
   if (preferredSlugs.contains('SH') || requiredSlugs.contains('SH')) {
     return 'sh';
+  }
+  if (preferredSlugs.contains('BB') || requiredSlugs.contains('BB')) {
+    return 'bb';
   }
   return 'classic';
 }

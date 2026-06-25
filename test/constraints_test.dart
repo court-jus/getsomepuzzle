@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
@@ -1861,6 +1862,169 @@ void main() {
     test('invalid state → not complete', () {
       final p = makePuzzle('12');
       expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isFalse);
+    });
+  });
+
+  group('BoundingBoxConstraint.verify', () {
+    test('complete puzzle, box equals target → valid', () {
+      // Single 3×3 black group filling its box exactly.
+      final p = makePuzzle('111\n111\n111');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isTrue);
+    });
+
+    test('box larger than target → invalid', () {
+      // 3×4 black group: width 4 exceeds the target width 3. Over-large is
+      // broken now (boxes only grow, never shrink).
+      final p = makePuzzle('1111\n1111\n1111');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isFalse);
+    });
+
+    test('incomplete, box too small but reachable → valid', () {
+      // Lone black corner (box 1×1) on an otherwise free 2×2 grid: the
+      // reachable region still spans 2×2, so the 2×2 target is reachable.
+      final p = makePuzzle('10\n00');
+      expect(BoundingBoxConstraint('1.2.2').verify(p), isTrue);
+    });
+
+    test('complete puzzle, box smaller than target → invalid', () {
+      // Finished 2×2 black block against a 3×3 target.
+      final p = makePuzzle('11\n11');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isFalse);
+    });
+
+    test('incomplete, box too small and walled off → invalid', () {
+      // Black corner boxed in by white; no reachable black-capable cell can
+      // extend it, so a 3×3 box is unreachable even though free cells remain
+      // elsewhere (puzzle is not complete).
+      final p = makePuzzle('120\n220\n000');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isFalse);
+    });
+
+    test('hollow connected shape spanning the target → valid', () {
+      // A ring of black cells reaches all four sides of a 3×3 box without
+      // filling it (the holes stay free). Box == target ⇒ valid.
+      final p = makePuzzle('101\n111\n101');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isTrue);
+    });
+  });
+
+  group('BoundingBoxConstraint.apply', () {
+    test('box exceeds target → reports impossibility', () {
+      final p = makePuzzle('1111\n1111\n1111');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('box at target, free cell adjacent outside box → prunes colour', () {
+      // 3×3 black group in a 4-wide grid; the free cell at (1,3)=idx 7 is
+      // orthogonally adjacent to group cell (1,2) and lies right of the box.
+      // Colouring it would push the width to 4, so `colour` must be removed.
+      final p = makePuzzle('1112\n1110\n1112');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 7);
+      expect(move.removeOption, CellValue.black);
+    });
+
+    test('box at target, free cell only diagonal to box → no deduction', () {
+      // The lone free cell (3,3) is diagonally off the box corner, not
+      // orthogonally adjacent to any group cell, so it could start a separate
+      // group — it must not be pruned.
+      final p = makePuzzle('1112\n1112\n1112\n2220');
+      expect(BoundingBoxConstraint('1.3.3').apply(p), isNull);
+    });
+
+    test('box too small and walled off → reports impossibility', () {
+      final p = makePuzzle('120\n220\n000');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('box too small with several growth directions → no deduction', () {
+      // Lone black centre on an open grid: it can still grow up/down/left/
+      // right, so no single cell is forced and nothing overshoots yet.
+      final p = makePuzzle('0000\n0100\n0000\n0000');
+      expect(BoundingBoxConstraint('1.2.2').apply(p), isNull);
+    });
+
+    test('pinned box, edge with a single reachable cell → forces it', () {
+      // Black corner at (0,0) on a 6×4 grid pins the 3×3 box to rows 0-2 ×
+      // cols 0-2. Column 2 (the box's right edge) is walled by white at (0,2)
+      // and (1,2), so (2,2)=idx 14 is the only cell that can reach it — forced
+      // black. This is the unique-box growth deduction.
+      final p = makePuzzle('102000\n002000\n000000\n000000');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isA<SetValue>());
+      expect(move!.idx, 14);
+      expect(move.value, CellValue.black);
+    });
+
+    test('pinned box, edge with no reachable cell → impossible', () {
+      // Same pinned 3×3 box, but the entire right-edge column 2 is white
+      // (no cell can reach the box's right side) → unsatisfiable.
+      final p = makePuzzle('102000\n002000\n002000\n000000');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('pinned box, lone edge cell connects only through one cell → forces '
+        'it', () {
+      // Continuation of the unique-edge case: (2,2)=idx 14 is now black. It is
+      // the box's only right-edge cell, and within the pinned 3×3 box its only
+      // `color`-capable neighbour is (2,1)=idx 13 ((1,2) is white). So idx 13
+      // is forced to keep idx 14 connected to the rest of the group.
+      final p = makePuzzle('102000\n002000\n001000\n000000');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isA<SetValue>());
+      expect(move!.idx, 13);
+      expect(move.value, CellValue.black);
+    });
+  });
+
+  group('BoundingBoxConstraint.isCompleteFor', () {
+    test('complete puzzle at target → complete', () {
+      final p = makePuzzle('111\n111\n111');
+      expect(BoundingBoxConstraint('1.3.3').isCompleteFor(p), isTrue);
+    });
+
+    test('box at target but adjacent free cell can still grow it → not '
+        'complete', () {
+      // 3×3 black group with the col-3 cells free and `black`-capable: `apply`
+      // case 2 can still fire, so grey-out must wait.
+      final p = makePuzzle('1110\n1110\n1110');
+      expect(BoundingBoxConstraint('1.3.3').isCompleteFor(p), isFalse);
+    });
+
+    test('group smaller than target → not complete', () {
+      final p = makePuzzle('11\n11');
+      expect(BoundingBoxConstraint('1.3.3').isCompleteFor(p), isFalse);
+    });
+  });
+
+  group('BoundingBoxConstraint.generateAllParameters', () {
+    test('keeps boxes strictly inside the grid in both dimensions', () {
+      final params = BoundingBoxConstraint.generateAllParameters(
+        4,
+        7,
+        defaultDomain,
+        null,
+      );
+      // Each extent is bounded to [2, dim-1]: w∈[2,3] (2) × h∈[2,6] (5) = 10
+      // per colour, two colours.
+      expect(params.length, 2 * 5 * 2);
+      // No 1-wide/1-tall rule, and no box spanning a full grid dimension —
+      // the generator should attach none of these.
+      expect(params, isNot(contains('2.1.1'))); // 1-wide and 1-tall
+      expect(params, isNot(contains('1.4.6'))); // W == width
+      expect(params, isNot(contains('1.3.7'))); // H == height
+      expect(params, isNot(contains('1.4.7'))); // full grid
+      // Largest allowed box is one cell short of the grid in each dimension.
+      expect(params, contains('1.3.6'));
+      expect(params, contains('1.2.2'));
     });
   });
 }

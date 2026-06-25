@@ -1,3 +1,4 @@
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
@@ -143,6 +144,12 @@ final constraintRegistry =
         label: 'Implication',
         fromParams: ImplicationConstraint.new,
         generateAllParameters: ImplicationConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'BB',
+        label: 'Bounding box',
+        fromParams: BoundingBoxConstraint.new,
+        generateAllParameters: BoundingBoxConstraint.generateAllParameters,
       ),
     ];
 

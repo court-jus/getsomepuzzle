@@ -249,6 +249,30 @@ than per-cell counting.
 The completion-enumeration deductions (4 and 5) are the hardest: they
 require mentally placing every variant on the grid.
 
+### BB — Bounding Box (`constraints/bounding_box.dart`)
+
+| # | Deduction                                                                                   | Weight |
+| - | ------------------------------------------------------------------------------------------- | -----: |
+| 1 | Box over-large, or too small with an unreachable extent → impossible                        |  (n/a) |
+| 2 | A dimension already at target: an adjacent outside-box cell would overgrow it → block       |      2 |
+| 3 | Pinned box: the unique `color`-capable cell on an unreached edge → force                     |      3 |
+| 4 | Pinned box: a cut cell whose removal would sever a needed edge from the group → force        |      4 |
+
+The "pinned box" deductions (3, 4) only fire once the group's extent plus
+the grid borders force a single position for the W×H box. Forced growth on
+a box that can still slide is not yet implemented.
+
+### IM — Implication (`constraints/implication.dart`)
+
+| # | Deduction                                                          | Weight |
+| - | ------------------------------------------------------------------ | -----: |
+| 1 | Source is the colour → target must be the colour (modus ponens)    |      0 |
+| 2 | Target is not the colour → source can't be it (contrapositive)     |      1 |
+
+Following the arrow forward (modus ponens) is a read-off once the source is
+set, so it stays at the trivial `0`. The contrapositive (modus tollens) takes
+one extra inversion step, so it is rated `1`.
+
 ## How weights are assigned in code
 
 Each constraint's `apply()` method now sets `complexity` explicitly on the

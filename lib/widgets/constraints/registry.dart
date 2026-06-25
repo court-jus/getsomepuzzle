@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
@@ -13,6 +14,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/implication.dart';
@@ -185,6 +187,14 @@ final constraintUIRegistry =
         buildPreview: (fg, size) =>
             ImplicationWidget(fgcolor: fg, cellSize: size),
       ),
+      (
+        slug: 'BB',
+        label: 'Bounding box',
+        buildPreview: (fg, size) => BoundingBoxWidget(
+          constraint: BoundingBoxConstraint('1.3.3'),
+          cellSize: size,
+        ),
+      ),
     ];
 
 Widget previewForSlug(String slug, Color fgcolor, double size) {
@@ -227,6 +237,8 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintEyes;
     case 'IM':
       return l.constraintImplication;
+    case 'BB':
+      return l.constraintBoundingBox;
     case 'RT':
     case 'CT':
       return l.constraintTransition;

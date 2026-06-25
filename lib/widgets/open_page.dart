@@ -382,6 +382,8 @@ class _OpenPageState extends State<OpenPage> {
         return loc.scenarioClassic;
       case equilibrium.ProfileCategory.sh:
         return loc.scenarioSh;
+      case equilibrium.ProfileCategory.bb:
+        return loc.scenarioBb;
       case equilibrium.ProfileCategory.pathBased:
         return loc.scenarioPathBased;
       case equilibrium.ProfileCategory.syBased:
@@ -408,6 +410,8 @@ class _OpenPageState extends State<OpenPage> {
         return loc.scenarioExplainClassic;
       case equilibrium.ProfileCategory.sh:
         return loc.scenarioExplainSh;
+      case equilibrium.ProfileCategory.bb:
+        return loc.scenarioExplainBb;
       case equilibrium.ProfileCategory.pathBased:
         return loc.scenarioExplainPathBased;
       case equilibrium.ProfileCategory.syBased:
