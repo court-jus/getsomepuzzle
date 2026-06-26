@@ -66,6 +66,10 @@ La symétrie centrale (🞋) est équivalente à une rotation d'un demi-tour.
 
 Lorsque deux cellules sont séparées par le symbole ≠, elles doivent être de couleurs différentes.
 
+### Implication (→)
+
+Une flèche d'une case à une autre signifie : si la case source prend la couleur de la flèche, la case cible doit aussi prendre cette couleur. La contraposée s'applique aussi : si la cible est d'une couleur différente, la source ne peut pas prendre la couleur de la flèche.
+
 ### Nombre par colonne
 
 Un nombre dans un cercle au dessus d'une colonne indique combien de cellules de cette couleur doivent être dans cette colonne spécifique.
@@ -85,6 +89,10 @@ Une onde carrée avec un nombre dans un carré à gauche d'une ligne indique com
 ### Nombre de groupes
 
 Un nombre dans un cadre avec une icône de lien indique combien de groupes (composantes connectées) de cette couleur doivent être dans la solution.
+
+### Boîte englobante
+
+Chaque groupe connexe de cette couleur doit occuper une boîte englobante d'exactement la largeur et la hauteur indiquées — le plus petit rectangle entourant le groupe couvre exactement ce nombre de colonnes et de lignes. Le groupe n'a pas besoin de remplir la boîte.
 
 ### Nombre de voisins
 
@@ -144,6 +152,19 @@ Pratique quand vous voulez un petit indice sans tout vous gâcher : arrêtez-vou
 Au lieu de désigner une case, le deuxième appui ajoute une nouvelle contrainte au puzzle. Cette règle est cohérente avec la solution et vous donne une information supplémentaire pour avancer — le puzzle devient plus simple sans qu'on vous dise quelle case remplir.
 
 Après l'ajout d'une contrainte, le cycle reprend au diagnostic d'erreurs sur l'appui suivant.
+
+## Raccourcis clavier
+
+Sur ordinateur, ces touches pilotent un puzzle pendant que vous jouez :
+
+- **U** — annuler le dernier coup
+- **R** — recommencer le puzzle
+- **P** — mettre en pause ou reprendre
+- **H** — afficher une astuce
+- **N** — passer au puzzle suivant
+- **Entrée** — valider (quand la validation manuelle est active)
+- **Échap** — ouvrir le menu
+- **Espace** — sur les puzzles à 3 couleurs, basculer entre poser une couleur et retirer une option
 
 ## Paramètres
 

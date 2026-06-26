@@ -1,6 +1,6 @@
 # Constraint families & the equilibrium "composition" axis
 
-The 18 player-facing constraint slugs are partitioned into six families by
+The 19 player-facing constraint slugs are partitioned into six families by
 **deduction strategy** — i.e. *how* a constraint narrows the grid, orthogonal
 to the `Constraint` class hierarchy in `constraints/`. The taxonomy feeds the
 equilibrium engine's **composition** axis, which balances the blend of families
@@ -14,7 +14,7 @@ a puzzle is built from rather than individual slugs.
 | `line-centric`   | RC, RT, CC, CT, PA   | reasons about a whole row/column line (count / transition / parity) |
 | `local`          | FM, DF, NC, EY       | forbidden motif / adjacency / immediate-neighbourhood count |
 | `path`           | LT, CH               | connectivity: shared connected group / border-to-border chain |
-| `group-topology` | GS, GC, SH, SY, MJ   | connected-component size/count/shape, symmetry, rectangular-zone majority |
+| `group-topology` | GS, GC, SH, SY, MJ, BB | connected-component size/count/shape, symmetry, rectangular-zone majority, bounding-box extent (width × height) |
 | `global`         | QA                   | whole-grid quantity                                    |
 
 It is a strict partition: every slug belongs to exactly one family, and a
@@ -51,7 +51,7 @@ Pure Dart, no Flutter imports — usable by both the generator and `bin/` tools:
 
 | Export | Purpose |
 |--------|---------|
-| `kConstraintFamily` | slug → family mapping (18 entries) |
+| `kConstraintFamily` | slug → family mapping (19 entries) |
 | `kConstraintFamilies` | fixed display/tie-break order (`implication, line-centric, local, path, group-topology, global`) |
 | `kEmptyFamily` | virtual `'none'` family for padding |
 | `familyOf(String slug)` | lookup a single slug's family |

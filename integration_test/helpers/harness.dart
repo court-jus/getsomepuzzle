@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -71,9 +72,24 @@ Future<void> prepareApp(
   final firstSeenSeed = <String, String>{
     for (final s in allSlugs) s: '2020-01-01T00:00:00.000',
   };
+  // Tests that hand us explicit puzzles aren't exercising the onboarding
+  // flow, so graduate the simulated player past it (every strict phase
+  // completed). Otherwise preparePlaylist builds an onboarding playlist
+  // that filters the custom fixture out, leaving no puzzle on screen.
+  // Individual tests can still override these keys via [prefs].
+  final graduationSeed = (customPuzzles != null && customPuzzles.isNotEmpty)
+      ? <String, Object>{
+          'onboardingCompletions': jsonEncode({
+            for (final phase in OnboardingPhase.phases)
+              phase.introducing: OnboardingPhase.phaseLength,
+          }),
+          'onboardingCompletedAt': '2020-01-01T00:00:00.000',
+        }
+      : const <String, Object>{};
   final seed = <String, Object>{
     'locale': 'en',
     'constraintFirstSeen': jsonEncode(firstSeenSeed),
+    ...graduationSeed,
     ...prefs,
   };
   if (customPuzzles != null && customPuzzles.isNotEmpty) {

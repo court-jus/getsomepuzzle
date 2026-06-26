@@ -46,12 +46,12 @@ except as noted on axis 3):
    non-square bin, the worker picks one of the two orientations at random
    (`_orientSize` in `worker_io.dart`, constrained to the width/height
    bounds), so both orientations keep being emitted while counting as one.
-5. **Profile** — pre-fill scenario category (`classic`, `sh`, `pathBased`,
-   `syBased`). Identification reads the authoritative `scenario:<name>`
-   suffix written by the generator at emission time (see
+5. **Profile** — pre-fill scenario category (`classic`, `sh`, `bb`,
+   `pathBased`, `syBased`). Identification reads the authoritative
+   `scenario:<name>` suffix written by the generator at emission time (see
    `detectPuzzleProfile` in `equilibrium.dart`); unmarked lines fall
    back to a heuristic: lines containing the `SH` constraint slug are
-   counted as `sh`, all others as `classic`.
+   counted as `sh`, those containing `BB` as `bb`, all others as `classic`.
 6. **Composition** — ordered triple of the puzzle's three principal
    constraint families (see `families.md`). Each constraint instance
    contributes to its family's count, so a puzzle with `3×LT, 2×PA, 1×FM`
@@ -161,13 +161,14 @@ exact per-n weights.
 
 ### Profile axis distribution
 
-The bulk of puzzles come from the regular flow; the remaining ~15 % is
-split between the three themed pre-fills.
+The bulk of puzzles come from the regular flow; the remaining ~20 % is
+split between the four themed pre-fills.
 
 | Profile     | Target share | Pre-fill source                                       |
 | ----------- | ------------ | ----------------------------------------------------- |
-| `classic`   | 85 %         | `preFillRegular` (random grid + greedy cherry-pick)   |
+| `classic`   | 80 %         | `preFillRegular` (random grid + greedy cherry-pick)   |
 | `sh`        | 5 %          | `preFillSh` (seeded Shape motif)                      |
+| `bb`        | 5 %          | `preFillBB` (bounding-box islands, cf. [`prefill_bb.md`](prefill_bb.md)) |
 | `pathBased` | 5 %          | `preFillPath` (constructive LT topology, cf. [`path_based.md`](path_based.md)) |
 | `syBased`   | 5 %          | `preFillSy` (symmetric island growth, cf. `prefill_sy.md`) |
 
@@ -416,12 +417,13 @@ combination.
 
 Some constraint families need a custom seed grid because a random fill
 almost never produces a valid puzzle for them. The generator dispatches
-to one of four pre-fill functions inside `generateOne`:
+to one of five pre-fill functions inside `generateOne`:
 
 | Pre-fill           | Trigger                                                           | Stamped `scenario:` suffix |
 | ------------------ | ----------------------------------------------------------------- | -------------------------- |
 | `preFillRegular`   | default — random grid                                             | *(none, read as `classic`)* |
 | `preFillSh`        | `prioritySlugs` contains `"SH"` (via `requiredRules` or `preferredSlugs`, SH allowed by `allowedSlugs`) | `sh`           |
+| `preFillBB`        | `prioritySlugs` contains `"BB"` (via `preferredSlugs`, BB allowed by `allowedSlugs`) | `bb`           |
 | `preFillPath`      | `pathBasedScenario == true`                                       | `pathBased`                |
 | `preFillSy`        | `syBasedScenario == true`                                         | `syBased`                  |
 
@@ -492,8 +494,8 @@ The `ntypes` field distinguishes hard from soft constraints:
 
 `slugs={…}` always lists the sorted preferred slugs. `scenario` is resolved by
 `_resolveScenario` in `worker_io.dart` following the priority order
-`pathBased > syBased > sh > classic`; `sh` activates whenever
-`SH ∈ preferredSlugs`.
+`pathBased > syBased > sh > bb > classic`; `sh` activates whenever
+`SH ∈ preferredSlugs` and `bb` activates whenever `BB ∈ preferredSlugs`.
 
 ### Warmup threshold
 
@@ -526,8 +528,8 @@ algorithm:
   tail through n=14). Any `n` absent from the map has an implicit target
   of 0 and is never pushed. Refer to `equilibrium.dart` for the exact
   per-key percentages — the constant is the source of truth.
-- `kTargetProfile` — map for the profile axis (`{classic: 0.85, sh: 0.05,
-  pathBased: 0.05, syBased: 0.05}`).
+- `kTargetProfile` — map for the profile axis (`{classic: 0.80, sh: 0.05,
+  bb: 0.05, pathBased: 0.05, syBased: 0.05}`).
 - `kTargetDomainProfile` — map for the domain axis (`{2: 0.60, 3: 0.40}`).
   Drives both the `DomainTarget` gaps in `_scoreAll` and the per-attempt
   off-target draw in `pickWeightedDomain`.

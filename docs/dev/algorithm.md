@@ -39,6 +39,8 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 | MJ | Majority | A rectangular zone must contain a strict majority of a given colour |
 | NC | Neighbor Count | A given cell must have exactly N orthogonal neighbors of a color |
 | EY | Eyes | A given cell must "see" exactly N cells of a colour through straight lines of same-colour cells |
+| IM | Implication | If the source cell is a given colour, the target cell must be that colour too (directional; contrapositive also fires) |
+| BB | Bounding Box | Every connected group of a colour must occupy a bounding box of exactly W×H (extent, not fill; global) |
 
 ## Solving Algorithm
 
@@ -96,7 +98,7 @@ Select a random subset of cells (controlled by a ratio parameter, randomly drawn
 
 ### Step 3: Enumerate Valid Constraints
 
-For each constraint type (FM, PA, RC, RT, GS, LT, QA, SY, DF, SH, CC, CH, CT, GC, MJ, NC, EY), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
+For each constraint type (FM, PA, RC, RT, GS, LT, QA, SY, DF, SH, CC, CH, CT, GC, MJ, NC, EY, IM, BB), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
 
 ### Step 4: Iterative Constraint Selection
 

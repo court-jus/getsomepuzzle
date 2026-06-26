@@ -47,6 +47,7 @@ declared slugs. See `levels.md` for the cascade.
 | `bin/query_corpus.dart`               | Ad-hoc filtered queries over `assets/*.txt` (read-only)      |
 | `bin/plot_vectors.py`                 | 2-D PCA projection + supervised separability of the vectors (matplotlib + numpy) |
 | `bin/detect_regular_solutions.dart`   | Diagnose globally-regular solutions (damier / colour bars) over-rated by the trace (read-only report + optional CSV) |
+| `bin/find_single_path_puzzles.dart`   | Filter puzzles that have a unique deduction path (exactly one move at every step) — no branching, no backtracking needed |
 
 ## Generation
 
@@ -439,6 +440,41 @@ header line reports the number of distinct buckets.
 
 The script never writes to disk and emits nothing to `stdout` other than
 the table; warnings (missing files, parse errors) go to `stderr`.
+
+## Single-path puzzles
+
+`bin/find_single_path_puzzles.dart` filters a collection down to puzzles that
+have a **single deduction path**: at every step of the solving loop there is
+exactly one available move. These puzzles are uniquely determined by propagation
+alone — no player needs to consider alternative options, and no branching occurs
+in the solver.
+
+```bash
+# Default: reads assets/2-player.txt, writes single_path_puzzles.txt
+dart run bin/find_single_path_puzzles.dart
+
+# Custom source and destination
+dart run bin/find_single_path_puzzles.dart -i assets/3-advanced.txt -o single_path.txt
+
+# Verbose: print a KEPT / REJECTED line per puzzle with the rejection reason
+dart run bin/find_single_path_puzzles.dart -i assets/2-player.txt --verbose
+```
+
+The script uses `Puzzle.findAllMoves()` at each step and rejects any puzzle
+where more than one move is available, or where no move exists before completion
+(stuck), or where a contradiction is reached. After exhausting the path it
+verifies every constraint via `verify()` on the completed grid so constraints
+that only fire at completion (e.g. `QA`, `GC`) are not silently missed.
+
+Rejection reasons are collected and printed as a breakdown table at the end.
+Progress is emitted on `stderr`; results go to the output file.
+
+**Typical uses:**
+
+- Build a curated study set where the logic is purely linear — no "what-if"
+  enumeration required from the player.
+- Audit whether a newly introduced constraint type tends to produce
+  single-path or branching puzzles.
 
 ## Visual diagnostics
 

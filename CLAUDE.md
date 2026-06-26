@@ -102,7 +102,7 @@ flutter analyze
   - `model/settings.dart` — User preferences with enums: `ValidateType`, `ShowRating`, `ShareData`, `LiveCheckType`
   - `model/cell.dart`, `model/constants.dart` — Small shared types
   - `constraints/constraint.dart` — Base `Constraint` and `CellsCentricConstraint` classes
-  - `constraints/` — Implementations: `groups.dart`, `parity.dart`, `symmetry.dart`, `motif.dart`, `quantity.dart`, `shape.dart`, `column_count.dart`, `group_count.dart`, `neighbor_count.dart`, `different_from.dart`, `eyes_constraint.dart`. The `registry.dart` maps slugs (`FM`, `PA`, `GS`, `LT`, `QA`, `SY`, `DF`, `CC`, `GC`, `NC`, `EY`) to constraint classes; `to_flutter.dart` maps constraint instances to their rendering widget.
+  - `constraints/` — Implementations: `groups.dart`, `parity.dart`, `symmetry.dart`, `motif.dart`, `quantity.dart`, `shape.dart`, `column_count.dart`, `group_count.dart`, `neighbor_count.dart`, `different_from.dart`, `eyes_constraint.dart`. The `registry.dart` maps slugs to constraint classes (see `registry.dart` for the authoritative, up-to-date list of slugs); `to_flutter.dart` maps constraint instances to their rendering widget.
   - `generator/generator.dart` — In-app puzzle generator
   - `generator/worker.dart` (+ `worker_io.dart`/`worker_web.dart`/`worker_stub.dart`) — Background execution for generation (Isolate/web)
   - `generator/equilibrium.dart` — Adaptive difficulty layer

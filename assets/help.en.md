@@ -66,6 +66,10 @@ The central symmetry (🞋) is identical to a rotation by half a turn.
 
 When two cells are separated by the ≠ symbol, they must be different colors.
 
+### Implication (→)
+
+An arrow from one cell to another means: if the source cell takes the arrow's colour, the target cell must also take that colour. The contrapositive also holds — if the target takes a different colour, the source cannot take the arrow's colour either.
+
 ### Column count
 
 A number in a circle above a column indicates how many cells of that color must be in that specific column.
@@ -85,6 +89,10 @@ A square wave with a number in a square beside a row tells how many color change
 ### Group count
 
 A number in a box with a link icon indicates how many groups (connected components) of that color must be in the solution.
+
+### Bounding box
+
+Every connected group of this colour must occupy a bounding box of exactly the indicated width and height — the smallest rectangle that encloses the group spans exactly that many columns and rows. The group itself does not need to fill the box.
 
 ### Neighbor count
 
@@ -144,6 +152,19 @@ Useful when you want a small push without spoiling the rest: stop at the second 
 Instead of pointing at a cell, the second tap adds a brand-new constraint to the puzzle. The new rule is consistent with the solution and gives you extra information to work from — the puzzle becomes easier without anyone telling you which cell to fill.
 
 After a constraint is added, the next tap restarts the cycle at the error check.
+
+## Keyboard shortcuts
+
+On desktop, these keys control a puzzle while you play:
+
+- **U** — undo the last move
+- **R** — restart the puzzle
+- **P** — pause or resume
+- **H** — show a hint
+- **N** — skip to the next puzzle
+- **Enter** — validate (when manual validation is on)
+- **Esc** — open the menu
+- **Space** — on 3-colour puzzles, switch between setting a colour and removing an option
 
 ## Settings
 

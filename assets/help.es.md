@@ -66,6 +66,10 @@ La simetría central (🞋) es equivalente a una rotación de medio giro.
 
 Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.
 
+### Implicación (→)
+
+Una flecha de una celda a otra significa: si la celda fuente toma el color de la flecha, la celda destino también debe tomar ese color. También se aplica la contrapuesta: si el destino es de un color diferente, la fuente no puede tomar el color de la flecha.
+
 ### Número por columna
 
 Un número en un círculo encima de una columna indica cuántas celdas de ese color deben estar en esa columna específica.
@@ -85,6 +89,10 @@ Una onda cuadrada con un número dentro de un cuadrado a la izquierda de una fil
 ### Número de grupos
 
 Un número en un cuadro con un icono de enlace indica cuántos grupos (componentes conectados) de ese color deben estar en la solución.
+
+### Caja delimitadora
+
+Cada grupo conexo de este color debe ocupar una caja delimitadora de exactamente el ancho y el alto indicados — el rectángulo más pequeño que encierra el grupo abarca exactamente esas columnas y filas. El grupo no tiene que llenar la caja por completo.
 
 ### Número de vecinos
 
@@ -144,6 +152,19 @@ El modo por defecto. Tras el diagnóstico de errores, los toques siguientes te g
 En lugar de señalar una celda, el segundo toque añade una nueva restricción al puzzle. Esta regla es coherente con la solución y te da información adicional para avanzar — el puzzle se vuelve más fácil sin que nadie te diga qué celda rellenar.
 
 Tras añadir una restricción, el ciclo vuelve al diagnóstico de errores en el siguiente toque.
+
+## Atajos de teclado
+
+En el escritorio, estas teclas controlan un puzle mientras juegas:
+
+- **U** — deshacer el último movimiento
+- **R** — reiniciar el puzle
+- **P** — pausar o reanudar
+- **H** — mostrar una pista
+- **N** — pasar al siguiente puzle
+- **Intro** — validar (cuando la validación manual está activada)
+- **Esc** — abrir el menú
+- **Espacio** — en puzles de 3 colores, alternar entre poner un color y quitar una opción
 
 ## Ajustes
 

@@ -18,7 +18,12 @@ see §3.6).
 
 - **Collection** — the bucket of puzzle lines currently loaded into
   `Database.puzzles`. Selected via `loadPuzzlesFile(key)` and persisted
-  in `SharedPreferences` under `collectionToLoad`. Three families exist:
+  in `SharedPreferences` under `collectionToLoad`. Lines are parsed by
+  `Database.load()`; a malformed line (e.g. a truncated `custom.txt`
+  row from a partial write) is skipped rather than crashing the app.
+  Up to the first 3 parse errors are logged via `print` so corruption
+  is visible; a total count is always printed when any lines are
+  skipped. Three families exist:
   - **Built-in level collections** (`1-easy`, `2-player`, `3-advanced`,
     `4-strong`, `5-expert`, `6-mad`) — read-only assets shipped in
     `assets/<key>.txt`. They are the only collections that participate

@@ -6,6 +6,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
@@ -180,6 +181,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // confirm screen, guarding against accidental restarts (issue 21).
   bool _confirmingRestart = false;
   Timer? _saveTimer;
+  // Lets the keyboard shortcut handler open/close the navigation drawer
+  // (ESC = Menu) without a separate Scaffold.of(context) lookup.
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final log = Logger("HomePage");
 
   @override
@@ -846,6 +850,102 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   // ---------------------------------------------------------------------------
+  // Keyboard shortcuts (desktop)
+  // ---------------------------------------------------------------------------
+
+  /// Manual completion check, shared by the topbar Validate button and the
+  /// Enter shortcut. No-op unless the grid is complete and the rating screen
+  /// isn't showing.
+  void _manualValidate() {
+    final puzzle = game.currentPuzzle;
+    if (puzzle == null || !puzzle.complete || game.betweenPuzzles) return;
+    final l10n = AppLocalizations.of(context)!;
+    game.checkPuzzle(
+      settings,
+      manualCheck: true,
+      invalidConstraintsText: l10n.someConstraintsInvalid,
+      errorsCountText: l10n.errorsCount,
+      onPuzzleCompleted: _onPuzzleCompleted,
+    );
+  }
+
+  /// Routes hardware-keyboard shortcuts during play. Returns
+  /// [KeyEventResult.handled] when a shortcut fires so the event stops
+  /// bubbling. Only key-down events act. Dialogs and the drawer take focus
+  /// from this node while open, so they naturally suppress these shortcuts
+  /// (ESC closes the drawer again). Each branch mirrors the matching topbar
+  /// button's enable condition.
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (!initialized || shouldChooseLocale) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+
+    // Menu (ESC) and pause (P) stay available even while paused.
+    if (key == LogicalKeyboardKey.escape) {
+      final scaffold = _scaffoldKey.currentState;
+      if (scaffold == null) return KeyEventResult.ignored;
+      if (scaffold.isDrawerOpen) {
+        scaffold.closeDrawer();
+      } else {
+        scaffold.openDrawer();
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyP) {
+      if (database == null) return KeyEventResult.ignored;
+      togglePause();
+      return KeyEventResult.handled;
+    }
+
+    // The remaining shortcuts only make sense while actively playing.
+    final playing =
+        game.currentPuzzle != null && !game.paused && !game.betweenPuzzles;
+    if (!playing) return KeyEventResult.ignored;
+
+    if (key == LogicalKeyboardKey.keyU) {
+      if (game.history.isEmpty) return KeyEventResult.ignored;
+      game.undo();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyR) {
+      if (game.history.isEmpty) return KeyEventResult.ignored;
+      // Mirror the topbar restart: pause + confirmation overlay (issue 21).
+      setState(() {
+        _confirmingRestart = true;
+        game.pause();
+      });
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyH) {
+      showHelpMove();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyN) {
+      loadPuzzle(skipped: true);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.space) {
+      // Toggle setValue / removeOption — only meaningful on 3+ colour
+      // puzzles, where the topbar paint-bucket button is shown.
+      if (game.currentPuzzle!.domain.length <= 2) {
+        return KeyEventResult.ignored;
+      }
+      setState(() => _removeOptionMode = !_removeOptionMode);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      if (settings.validateType != ValidateType.manual) {
+        return KeyEventResult.ignored;
+      }
+      if (!game.currentPuzzle!.complete) return KeyEventResult.ignored;
+      _manualValidate();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
 
@@ -910,471 +1010,471 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       cellSize = min(maxWidth, maxHeight);
     }
 
-    return Scaffold(
-      onDrawerChanged: _onDrawerChanged,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-        actions: [
-          if (_testingFromEditor && database != null)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              tooltip: AppLocalizations.of(context)!.create,
-              onPressed: _openCreatePage,
-            ),
-          if (game.currentPuzzle != null &&
-              !shouldChooseLocale &&
-              settings.validateType == ValidateType.manual)
-            Tooltip(
-              message: AppLocalizations.of(context)!.manuallyValidatePuzzle,
-              child: TextButton.icon(
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
-                  backgroundColor: Colors.lightGreen,
-                  disabledBackgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceDim,
-                  disabledForegroundColor: Theme.of(
-                    context,
-                  ).colorScheme.secondaryFixedDim,
-                ),
-                onPressed:
-                    (game.currentPuzzle!.complete && !game.betweenPuzzles)
-                    ? () => game.checkPuzzle(
-                        settings,
-                        manualCheck: true,
-                        invalidConstraintsText: AppLocalizations.of(
-                          context,
-                        )!.someConstraintsInvalid,
-                        errorsCountText: AppLocalizations.of(
-                          context,
-                        )!.errorsCount,
-                        onPuzzleCompleted: _onPuzzleCompleted,
-                      )
-                    : null,
-                icon: const Icon(Icons.check),
-                label: Text(
-                  AppLocalizations.of(context)!.manuallyValidatePuzzle,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+    return Focus(
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: Scaffold(
+        key: _scaffoldKey,
+        onDrawerChanged: _onDrawerChanged,
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          title: Text(widget.title),
+          actions: [
+            if (_testingFromEditor && database != null)
+              IconButton(
+                icon: const Icon(Icons.edit),
+                tooltip: AppLocalizations.of(context)!.create,
+                onPressed: _openCreatePage,
               ),
-            ),
-          if (game.currentPuzzle != null &&
-              !shouldChooseLocale &&
-              game.currentPuzzle!.domain.length > 2)
-            IconButton(
-              icon: Icon(
-                _removeOptionMode
-                    ? Icons.do_not_disturb_alt
-                    : Icons.format_paint,
-              ),
-              tooltip: _removeOptionMode
-                  ? AppLocalizations.of(context)!.tooltipTapModeRemoveOption
-                  : AppLocalizations.of(context)!.tooltipTapModeIncrValue,
-              onPressed: () {
-                setState(() => _removeOptionMode = !_removeOptionMode);
-              },
-            ),
-          if (game.currentPuzzle != null && !shouldChooseLocale)
-            IconButton(
-              icon: Icon(Icons.lightbulb),
-              tooltip: AppLocalizations.of(context)!.tooltipClue,
-              onPressed: _isHintButtonEnabled() ? showHelpMove : null,
-            ),
-          if (game.currentPuzzle != null && !shouldChooseLocale)
-            IconButton(
-              icon: Icon(Icons.undo_outlined),
-              tooltip: AppLocalizations.of(context)!.tooltipUndo,
-              onPressed: game.history.isEmpty ? null : game.undo,
-            ),
-          if (game.currentPuzzle != null && !shouldChooseLocale)
-            IconButton(
-              icon: Icon(Icons.restart_alt_outlined),
-              tooltip: AppLocalizations.of(context)!.restart,
-              // Don't restart immediately: pause and show the confirmation
-              // overlay to guard against accidental taps (issue 21).
-              onPressed: game.history.isEmpty
-                  ? null
-                  : () => setState(() {
-                      _confirmingRestart = true;
-                      game.pause();
-                    }),
-            ),
-          if (database != null && !shouldChooseLocale)
-            IconButton(
-              icon: Icon(Icons.pause),
-              tooltip: AppLocalizations.of(context)!.tooltipPause,
-              onPressed: togglePause,
-            ),
-        ],
-      ),
-      drawer: MainDrawer(
-        title: widget.title,
-        versionText: versionText,
-        authorText: 'Ghislain "court-jus" Lévêque',
-        database: database,
-        game: game,
-        onLoadPuzzleSkipped: () => loadPuzzle(skipped: true),
-        onSaveProgress: _saveProgress,
-        onSharePuzzle: _sharePuzzle,
-        onBrowse: () => Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (context) =>
-                OpenPage(database: database!, onPuzzleSelected: openPuzzle),
-          ),
-        ),
-        onGenerate: () => Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (context) =>
-                GeneratePage(database: database!, onPuzzleSelected: openPuzzle),
-          ),
-        ),
-        onCreate: _openCreatePage,
-        onStats: () => Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (context) => StatsPage(database: database!),
-          ),
-        ),
-        onLearning: () => Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (context) =>
-                LearningPage(database: database!, progress: progress),
-          ),
-        ),
-        onSettings: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SettingsPage(
-                settings: settings,
-                onReplayOnboarding: () async {
-                  // Restart the onboarding journey end-to-end.
-                  // Play stats are deliberately preserved — only
-                  // the discovery overlay (firstSeen + strict
-                  // phase counter), the open-page filters and
-                  // the loaded collection are reset, and the
-                  // in-progress puzzle is dropped (it could be
-                  // from any collection — typically an expert
-                  // puzzle the player wandered into — and has no
-                  // place in a freshly-strict P0 playlist).
-                  if (database != null) {
-                    await database!.resetOnboardingProgress();
-                    // Restore open-page state to first-launch
-                    // defaults: a stale filter would otherwise
-                    // gate the freshly-strict P0 catalog (e.g.
-                    // `wantedRules={EY}` would hide the FM
-                    // puzzles phase 0 needs). Persist filters
-                    // BEFORE loadPuzzlesFile — that call re-
-                    // loads them from prefs.
-                    database!.currentFilters = Filters();
-                    await database!.currentFilters.save();
-                    await database!.setShouldShuffle(false);
-                    await database!.loadPuzzlesFile(
-                      Database.entryCollectionKey,
-                    );
-                    // `firstSeen` must be cleared AFTER
-                    // loadPuzzlesFile: that call's internal
-                    // loadStats() re-populates the map from
-                    // history, so a clear() done earlier is
-                    // silently undone — and the new-rule modal
-                    // would then never re-fire on the P0 puzzle.
-                    progress.clear();
-                    await progress.save();
-                    // Defensive: ensure the playlist is rebuilt
-                    // with the now-empty firstSeen and reset
-                    // counter in scope, even if a future change
-                    // to loadPuzzlesFile drops its trailing
-                    // preparePlaylist() call.
-                    database!.preparePlaylist();
-                    // Drop whatever puzzle was on screen and
-                    // hand the player a fresh P0 pick from the
-                    // rebuilt 1-easy playlist.
-                    game.clearPuzzle();
-                    loadPuzzle();
-                  }
-                  setState(() {});
-                },
-                onClearStats: () async {
-                  if (database == null) return;
-                  await database!.clearAllStats();
-                  // Drop any in-progress puzzle so the next puzzle is
-                  // picked from the freshly empty playlist; without
-                  // this, the player would be stuck on whatever was
-                  // currently displayed (now flagged unplayed again
-                  // but still selected as `current`).
-                  game.clearPuzzle();
-                  loadPuzzle();
-                  setState(() {});
-                },
-                onSettingsChange: (newValue) {
-                  final autoLevelTurnedOn =
-                      newValue.autoLevel == true && !settings.autoLevel;
-                  var levelChanged =
-                      (newValue.playerLevel != null &&
-                      newValue.playerLevel != settings.playerLevel);
-                  settings.change(newValue);
-                  if (newValue.hintType != null) {
-                    _onHintTypeChanged();
-                  }
-                  if (newValue.idleTimeout != null) {
-                    game.idleTimeoutDuration = settings.idleTimeoutDuration;
-                    game.rearmIdleTimer();
-                  }
-                  if (newValue.grayoutEnabled != null) {
-                    _applyGrayoutSetting();
-                    setState(() {});
-                  }
-                  // Recompute immediately when auto is toggled on, so
-                  // the player doesn't have to finish a puzzle first.
-                  if (autoLevelTurnedOn && database != null) {
-                    final newLevel = database!.computePlayerLevel(
-                      fallback: settings.playerLevel,
-                    );
-                    if (newLevel != settings.playerLevel) {
-                      settings.playerLevel = newLevel;
-                      settings.save();
-                      levelChanged = true;
-                    }
-                  }
-                  if (levelChanged) {
-                    database?.setPlayerLevel(settings.playerLevel);
-                    // Defer the playlist recompute + puzzle reload to when the
-                    // Settings page closes (see `onSettings`): doing it inline
-                    // here would recompute on every slider commit and could
-                    // surface onboarding modals on top of the menu.
-                    _playlistDirty = true;
-                  }
-                  game.refresh();
-                },
-                onChangeLanguage: () {
-                  setState(() {
-                    shouldChooseLocale = true;
-                  });
-                },
-              ),
-            ),
-          );
-          // Recompute the playlist (and hand out the next puzzle) once, now
-          // that the menu is closed — a level change inside Settings only
-          // marked it dirty. Running it here also lets the new-rule modal
-          // fire on the puzzle screen rather than over the Settings route.
-          if (_playlistDirty && database != null) {
-            _playlistDirty = false;
-            database!.preparePlaylist();
-            loadPuzzle();
-          }
-        },
-        onHelp: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => HelpPage(locale: locale)),
-        ),
-      ),
-      body: LayoutBuilder(
-        builder: (context, viewportConstraints) {
-          // Anchor the puzzle to the bottom while playing so hint messages
-          // appearing above don't push the grid down. In modal-like states
-          // (pause, between puzzles, loading, locale picker) center instead,
-          // since there's no grid to stabilise.
-          final hasActivePuzzle =
-              initialized &&
-              !shouldChooseLocale &&
-              !game.betweenPuzzles &&
-              !game.paused &&
-              game.currentPuzzle != null;
-          return SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: viewportConstraints.maxHeight,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Column(
-                    mainAxisAlignment: hasActivePuzzle
-                        ? MainAxisAlignment.end
-                        : MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    spacing: 2,
-                    children: <Widget>[
-                      Text(
-                        game.topMessage,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: game.topMessageColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      (initialized && !shouldChooseLocale)
-                          ? Stack(
-                              alignment: AlignmentGeometry.center,
-                              children: [
-                                if (game.betweenPuzzles)
-                                  BetweenPuzzles(
-                                    like: like,
-                                    loadPuzzle: loadPuzzle,
-                                  )
-                                else if (game.paused)
-                                  PauseOverlay(
-                                    onResume: togglePause,
-                                    onRestart: _confirmingRestart
-                                        ? _confirmRestart
-                                        : null,
-                                    restartLabel: AppLocalizations.of(
-                                      context,
-                                    )!.restart,
-                                    width: contextWidth,
-                                    height: contextHeight,
-                                    iconSize: cellSize * 3,
-                                    subtitle: _pauseSubtitle(context),
-                                  )
-                                else
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      if (game.currentPuzzle != null)
-                                        PuzzleWidget(
-                                          currentPuzzle: game.currentPuzzle!,
-                                          onCellTap: handlePuzzleTap,
-                                          onCellDrag: handlePuzzleDrag,
-                                          onCellDragEnd: handlePuzzleDragEnd,
-                                          onCellRightDrag: isDesktopOrWeb
-                                              ? handlePuzzleRightDrag
-                                              : null,
-                                          onCellRightDragEnd: isDesktopOrWeb
-                                              ? handlePuzzleRightDragEnd
-                                              : null,
-                                          onCellLongPress:
-                                              handlePuzzleLongPress,
-                                          cellSize: cellSize,
-                                          hintText: game.hintText,
-                                          hintIsError: game.hintIsError,
-                                        )
-                                      else
-                                        Builder(
-                                          builder: (context) {
-                                            final l = AppLocalizations.of(
-                                              context,
-                                            )!;
-                                            final labels = CollectionLabels(
-                                              easy: l.collectionEasy,
-                                              player: l.collectionPlayer,
-                                              advanced: l.collectionAdvanced,
-                                              strong: l.collectionStrong,
-                                              expert: l.collectionExpert,
-                                              mad: l.collectionMad,
-                                              myPuzzles: l.collectionMyPuzzles,
-                                              recommendedTooltip: l
-                                                  .tooltipRecommendedCollection,
-                                            );
-                                            final recommendedKey = database
-                                                ?.recommendedCollectionKey;
-                                            return EndOfPlaylist(
-                                              currentLevel:
-                                                  settings.playerLevel,
-                                              filtersBlocking:
-                                                  database
-                                                      ?.areFiltersBlocking ??
-                                                  false,
-                                              hasMoreInCurrent:
-                                                  database
-                                                      ?.hasMoreCandidatesInCurrentCollection() ??
-                                                  false,
-                                              playedCount:
-                                                  database?.puzzles
-                                                      .where((p) => p.played)
-                                                      .length ??
-                                                  0,
-                                              onboardingActive:
-                                                  database?.isInOnboarding ??
-                                                  false,
-                                              currentCollectionLabel: labels
-                                                  .labelFor(
-                                                    database?.collection ?? '',
-                                                  ),
-                                              recommendedCollectionLabel:
-                                                  recommendedKey == null
-                                                  ? null
-                                                  : labels.labelFor(
-                                                      recommendedKey,
-                                                    ),
-                                              onContinueCurrent: () {
-                                                if (database == null) return;
-                                                database!.preparePlaylist();
-                                                if (database!
-                                                    .playlist
-                                                    .isNotEmpty) {
-                                                  loadPuzzle();
-                                                }
-                                                setState(() {});
-                                              },
-                                              onSwitchToRecommended:
-                                                  recommendedKey == null
-                                                  ? null
-                                                  : () async {
-                                                      if (database == null) {
-                                                        return;
-                                                      }
-                                                      await database!
-                                                          .loadPuzzlesFile(
-                                                            recommendedKey,
-                                                          );
-                                                      if (database!
-                                                          .playlist
-                                                          .isNotEmpty) {
-                                                        loadPuzzle();
-                                                      }
-                                                      setState(() {});
-                                                    },
-                                              onPickAnother: () {
-                                                if (database == null) return;
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute<void>(
-                                                    builder: (context) =>
-                                                        OpenPage(
-                                                          database: database!,
-                                                          onPuzzleSelected:
-                                                              openPuzzle,
-                                                        ),
-                                                  ),
-                                                );
-                                              },
-                                            );
-                                          },
-                                        ),
-                                    ],
-                                  ),
-                              ],
-                            )
-                          : (shouldChooseLocale
-                                ? InitialLocaleChooser(
-                                    selectLocale: toggleLocale,
-                                  )
-                                : Text("Loading...")),
-                    ],
+            if (game.currentPuzzle != null &&
+                !shouldChooseLocale &&
+                settings.validateType == ValidateType.manual)
+              Tooltip(
+                message: AppLocalizations.of(context)!.manuallyValidatePuzzle,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    backgroundColor: Colors.lightGreen,
+                    disabledBackgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceDim,
+                    disabledForegroundColor: Theme.of(
+                      context,
+                    ).colorScheme.secondaryFixedDim,
+                  ),
+                  onPressed:
+                      (game.currentPuzzle!.complete && !game.betweenPuzzles)
+                      ? _manualValidate
+                      : null,
+                  icon: const Icon(Icons.check),
+                  label: Text(
+                    AppLocalizations.of(context)!.manuallyValidatePuzzle,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
+            if (game.currentPuzzle != null &&
+                !shouldChooseLocale &&
+                game.currentPuzzle!.domain.length > 2)
+              IconButton(
+                icon: Icon(
+                  _removeOptionMode
+                      ? Icons.do_not_disturb_alt
+                      : Icons.format_paint,
+                ),
+                tooltip: _removeOptionMode
+                    ? AppLocalizations.of(context)!.tooltipTapModeRemoveOption
+                    : AppLocalizations.of(context)!.tooltipTapModeIncrValue,
+                onPressed: () {
+                  setState(() => _removeOptionMode = !_removeOptionMode);
+                },
+              ),
+            if (game.currentPuzzle != null && !shouldChooseLocale)
+              IconButton(
+                icon: Icon(Icons.lightbulb),
+                tooltip: AppLocalizations.of(context)!.tooltipClue,
+                onPressed: _isHintButtonEnabled() ? showHelpMove : null,
+              ),
+            if (game.currentPuzzle != null && !shouldChooseLocale)
+              IconButton(
+                icon: Icon(Icons.undo_outlined),
+                tooltip: AppLocalizations.of(context)!.tooltipUndo,
+                onPressed: game.history.isEmpty ? null : game.undo,
+              ),
+            if (game.currentPuzzle != null && !shouldChooseLocale)
+              IconButton(
+                icon: Icon(Icons.restart_alt_outlined),
+                tooltip: AppLocalizations.of(context)!.restart,
+                // Don't restart immediately: pause and show the confirmation
+                // overlay to guard against accidental taps (issue 21).
+                onPressed: game.history.isEmpty
+                    ? null
+                    : () => setState(() {
+                        _confirmingRestart = true;
+                        game.pause();
+                      }),
+              ),
+            if (database != null && !shouldChooseLocale)
+              IconButton(
+                icon: Icon(Icons.pause),
+                tooltip: AppLocalizations.of(context)!.tooltipPause,
+                onPressed: togglePause,
+              ),
+          ],
+        ),
+        drawer: MainDrawer(
+          title: widget.title,
+          versionText: versionText,
+          authorText: 'Ghislain "court-jus" Lévêque',
+          database: database,
+          game: game,
+          onLoadPuzzleSkipped: () => loadPuzzle(skipped: true),
+          onSaveProgress: _saveProgress,
+          onSharePuzzle: _sharePuzzle,
+          onBrowse: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (context) =>
+                  OpenPage(database: database!, onPuzzleSelected: openPuzzle),
             ),
-          );
-        },
+          ),
+          onGenerate: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (context) => GeneratePage(
+                database: database!,
+                onPuzzleSelected: openPuzzle,
+              ),
+            ),
+          ),
+          onCreate: _openCreatePage,
+          onStats: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (context) => StatsPage(database: database!),
+            ),
+          ),
+          onLearning: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (context) =>
+                  LearningPage(database: database!, progress: progress),
+            ),
+          ),
+          onSettings: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SettingsPage(
+                  settings: settings,
+                  onReplayOnboarding: () async {
+                    // Restart the onboarding journey end-to-end.
+                    // Play stats are deliberately preserved — only
+                    // the discovery overlay (firstSeen + strict
+                    // phase counter), the open-page filters and
+                    // the loaded collection are reset, and the
+                    // in-progress puzzle is dropped (it could be
+                    // from any collection — typically an expert
+                    // puzzle the player wandered into — and has no
+                    // place in a freshly-strict P0 playlist).
+                    if (database != null) {
+                      await database!.resetOnboardingProgress();
+                      // Restore open-page state to first-launch
+                      // defaults: a stale filter would otherwise
+                      // gate the freshly-strict P0 catalog (e.g.
+                      // `wantedRules={EY}` would hide the FM
+                      // puzzles phase 0 needs). Persist filters
+                      // BEFORE loadPuzzlesFile — that call re-
+                      // loads them from prefs.
+                      database!.currentFilters = Filters();
+                      await database!.currentFilters.save();
+                      await database!.setShouldShuffle(false);
+                      await database!.loadPuzzlesFile(
+                        Database.entryCollectionKey,
+                      );
+                      // `firstSeen` must be cleared AFTER
+                      // loadPuzzlesFile: that call's internal
+                      // loadStats() re-populates the map from
+                      // history, so a clear() done earlier is
+                      // silently undone — and the new-rule modal
+                      // would then never re-fire on the P0 puzzle.
+                      progress.clear();
+                      await progress.save();
+                      // Defensive: ensure the playlist is rebuilt
+                      // with the now-empty firstSeen and reset
+                      // counter in scope, even if a future change
+                      // to loadPuzzlesFile drops its trailing
+                      // preparePlaylist() call.
+                      database!.preparePlaylist();
+                      // Drop whatever puzzle was on screen and
+                      // hand the player a fresh P0 pick from the
+                      // rebuilt 1-easy playlist.
+                      game.clearPuzzle();
+                      loadPuzzle();
+                    }
+                    setState(() {});
+                  },
+                  onClearStats: () async {
+                    if (database == null) return;
+                    await database!.clearAllStats();
+                    // Drop any in-progress puzzle so the next puzzle is
+                    // picked from the freshly empty playlist; without
+                    // this, the player would be stuck on whatever was
+                    // currently displayed (now flagged unplayed again
+                    // but still selected as `current`).
+                    game.clearPuzzle();
+                    loadPuzzle();
+                    setState(() {});
+                  },
+                  onSettingsChange: (newValue) {
+                    final autoLevelTurnedOn =
+                        newValue.autoLevel == true && !settings.autoLevel;
+                    var levelChanged =
+                        (newValue.playerLevel != null &&
+                        newValue.playerLevel != settings.playerLevel);
+                    settings.change(newValue);
+                    if (newValue.hintType != null) {
+                      _onHintTypeChanged();
+                    }
+                    if (newValue.idleTimeout != null) {
+                      game.idleTimeoutDuration = settings.idleTimeoutDuration;
+                      game.rearmIdleTimer();
+                    }
+                    if (newValue.grayoutEnabled != null) {
+                      _applyGrayoutSetting();
+                      setState(() {});
+                    }
+                    // Recompute immediately when auto is toggled on, so
+                    // the player doesn't have to finish a puzzle first.
+                    if (autoLevelTurnedOn && database != null) {
+                      final newLevel = database!.computePlayerLevel(
+                        fallback: settings.playerLevel,
+                      );
+                      if (newLevel != settings.playerLevel) {
+                        settings.playerLevel = newLevel;
+                        settings.save();
+                        levelChanged = true;
+                      }
+                    }
+                    if (levelChanged) {
+                      database?.setPlayerLevel(settings.playerLevel);
+                      // Defer the playlist recompute + puzzle reload to when the
+                      // Settings page closes (see `onSettings`): doing it inline
+                      // here would recompute on every slider commit and could
+                      // surface onboarding modals on top of the menu.
+                      _playlistDirty = true;
+                    }
+                    game.refresh();
+                  },
+                  onChangeLanguage: () {
+                    setState(() {
+                      shouldChooseLocale = true;
+                    });
+                  },
+                ),
+              ),
+            );
+            // Recompute the playlist (and hand out the next puzzle) once, now
+            // that the menu is closed — a level change inside Settings only
+            // marked it dirty. Running it here also lets the new-rule modal
+            // fire on the puzzle screen rather than over the Settings route.
+            if (_playlistDirty && database != null) {
+              _playlistDirty = false;
+              database!.preparePlaylist();
+              loadPuzzle();
+            }
+          },
+          onHelp: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => HelpPage(locale: locale)),
+          ),
+        ),
+        body: LayoutBuilder(
+          builder: (context, viewportConstraints) {
+            // Anchor the puzzle to the bottom while playing so hint messages
+            // appearing above don't push the grid down. In modal-like states
+            // (pause, between puzzles, loading, locale picker) center instead,
+            // since there's no grid to stabilise.
+            final hasActivePuzzle =
+                initialized &&
+                !shouldChooseLocale &&
+                !game.betweenPuzzles &&
+                !game.paused &&
+                game.currentPuzzle != null;
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: viewportConstraints.maxHeight,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      mainAxisAlignment: hasActivePuzzle
+                          ? MainAxisAlignment.end
+                          : MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      spacing: 2,
+                      children: <Widget>[
+                        Text(
+                          game.topMessage,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: game.topMessageColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        (initialized && !shouldChooseLocale)
+                            ? Stack(
+                                alignment: AlignmentGeometry.center,
+                                children: [
+                                  if (game.betweenPuzzles)
+                                    BetweenPuzzles(
+                                      like: like,
+                                      loadPuzzle: loadPuzzle,
+                                    )
+                                  else if (game.paused)
+                                    PauseOverlay(
+                                      onResume: togglePause,
+                                      onRestart: _confirmingRestart
+                                          ? _confirmRestart
+                                          : null,
+                                      restartLabel: AppLocalizations.of(
+                                        context,
+                                      )!.restart,
+                                      width: contextWidth,
+                                      height: contextHeight,
+                                      iconSize: cellSize * 3,
+                                      subtitle: _pauseSubtitle(context),
+                                    )
+                                  else
+                                    Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        if (game.currentPuzzle != null)
+                                          PuzzleWidget(
+                                            currentPuzzle: game.currentPuzzle!,
+                                            onCellTap: handlePuzzleTap,
+                                            onCellDrag: handlePuzzleDrag,
+                                            onCellDragEnd: handlePuzzleDragEnd,
+                                            onCellRightDrag: isDesktopOrWeb
+                                                ? handlePuzzleRightDrag
+                                                : null,
+                                            onCellRightDragEnd: isDesktopOrWeb
+                                                ? handlePuzzleRightDragEnd
+                                                : null,
+                                            onCellLongPress:
+                                                handlePuzzleLongPress,
+                                            cellSize: cellSize,
+                                            hintText: game.hintText,
+                                            hintIsError: game.hintIsError,
+                                          )
+                                        else
+                                          Builder(
+                                            builder: (context) {
+                                              final l = AppLocalizations.of(
+                                                context,
+                                              )!;
+                                              final labels = CollectionLabels(
+                                                easy: l.collectionEasy,
+                                                player: l.collectionPlayer,
+                                                advanced: l.collectionAdvanced,
+                                                strong: l.collectionStrong,
+                                                expert: l.collectionExpert,
+                                                mad: l.collectionMad,
+                                                myPuzzles:
+                                                    l.collectionMyPuzzles,
+                                                recommendedTooltip: l
+                                                    .tooltipRecommendedCollection,
+                                              );
+                                              final recommendedKey = database
+                                                  ?.recommendedCollectionKey;
+                                              return EndOfPlaylist(
+                                                currentLevel:
+                                                    settings.playerLevel,
+                                                filtersBlocking:
+                                                    database
+                                                        ?.areFiltersBlocking ??
+                                                    false,
+                                                hasMoreInCurrent:
+                                                    database
+                                                        ?.hasMoreCandidatesInCurrentCollection() ??
+                                                    false,
+                                                playedCount:
+                                                    database?.puzzles
+                                                        .where((p) => p.played)
+                                                        .length ??
+                                                    0,
+                                                onboardingActive:
+                                                    database?.isInOnboarding ??
+                                                    false,
+                                                currentCollectionLabel: labels
+                                                    .labelFor(
+                                                      database?.collection ??
+                                                          '',
+                                                    ),
+                                                recommendedCollectionLabel:
+                                                    recommendedKey == null
+                                                    ? null
+                                                    : labels.labelFor(
+                                                        recommendedKey,
+                                                      ),
+                                                onContinueCurrent: () {
+                                                  if (database == null) return;
+                                                  database!.preparePlaylist();
+                                                  if (database!
+                                                      .playlist
+                                                      .isNotEmpty) {
+                                                    loadPuzzle();
+                                                  }
+                                                  setState(() {});
+                                                },
+                                                onSwitchToRecommended:
+                                                    recommendedKey == null
+                                                    ? null
+                                                    : () async {
+                                                        if (database == null) {
+                                                          return;
+                                                        }
+                                                        await database!
+                                                            .loadPuzzlesFile(
+                                                              recommendedKey,
+                                                            );
+                                                        if (database!
+                                                            .playlist
+                                                            .isNotEmpty) {
+                                                          loadPuzzle();
+                                                        }
+                                                        setState(() {});
+                                                      },
+                                                onPickAnother: () {
+                                                  if (database == null) return;
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute<void>(
+                                                      builder: (context) =>
+                                                          OpenPage(
+                                                            database: database!,
+                                                            onPuzzleSelected:
+                                                                openPuzzle,
+                                                          ),
+                                                    ),
+                                                  );
+                                                },
+                                              );
+                                            },
+                                          ),
+                                      ],
+                                    ),
+                                ],
+                              )
+                            : (shouldChooseLocale
+                                  ? InitialLocaleChooser(
+                                      selectLocale: toggleLocale,
+                                    )
+                                  : Text("Loading...")),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        bottomNavigationBar: (initialized && !shouldChooseLocale)
+            ? TimerBottomBar(
+                currentMeta: game.currentMeta,
+                currentPuzzle: game.currentPuzzle,
+                dbSize: game.dbSize,
+                playerLevel: settings.playerLevel,
+                autoLevel: settings.autoLevel,
+              )
+            : null,
       ),
-      bottomNavigationBar: (initialized && !shouldChooseLocale)
-          ? TimerBottomBar(
-              currentMeta: game.currentMeta,
-              currentPuzzle: game.currentPuzzle,
-              dbSize: game.dbSize,
-              playerLevel: settings.playerLevel,
-              autoLevel: settings.autoLevel,
-            )
-          : null,
     );
   }
 }
