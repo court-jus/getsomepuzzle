@@ -431,5 +431,25 @@
     "scenarioExplainGroup": "Tailles et comptages de groupes axés sur la topologie des composantes connexes.",
     "@scenarioExplainGroup": {
         "description": "Description of the Group user scenario."
+    },
+    "statsSyncDirectory": "Dossier de synchronisation",
+    "@statsSyncDirectory": {
+        "description": "Section header for the stats sync directory setting"
+    },
+    "statsSyncDirectoryChoose": "Choisir le dossier",
+    "@statsSyncDirectoryChoose": {
+        "description": "Button label to pick a stats sync directory"
+    },
+    "statsSyncDirectoryChange": "Changer",
+    "@statsSyncDirectoryChange": {
+        "description": "Button label to change the stats sync directory"
+    },
+    "statsSyncDirectoryClear": "Effacer",
+    "@statsSyncDirectoryClear": {
+        "description": "Button label to clear the stats sync directory"
+    },
+    "statsSyncDirectoryWebUnsupported": "Non disponible sur le web.",
+    "@statsSyncDirectoryWebUnsupported": {
+        "description": "Message shown on the stats sync directory setting when running on web"
     }
 }

@@ -248,6 +248,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> initializeDatabase(int playerLevel) async {
     final db = Database(playerLevel: playerLevel, progress: progress);
+    db.statsDirectory = settings.statsDirectory;
     await db.loadPuzzlesFile();
     setState(() {
       database = db;
@@ -1245,6 +1246,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       _playlistDirty = true;
                     }
                     game.refresh();
+                  },
+                  onStatsDirectoryChanged: (path) async {
+                    if (path == null && database != null) {
+                      // Flush the merged history (custom dir + legacy) back
+                      // to the legacy location before dropping the reference,
+                      // so plays made while the custom dir was active are not
+                      // orphaned when it stops being read.
+                      await database!.writeStatsToDefaultLocation();
+                    }
+                    await settings.setStatsDirectory(path);
+                    if (database != null) {
+                      database!.statsDirectory = path;
+                    }
                   },
                   onChangeLanguage: () {
                     setState(() {

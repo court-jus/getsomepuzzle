@@ -1785,6 +1785,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Group sizes and group counts focus on connected-component topology.'**
   String get scenarioExplainGroup;
+
+  /// Section header for the stats sync directory setting
+  ///
+  /// In en, this message translates to:
+  /// **'Stats sync directory'**
+  String get statsSyncDirectory;
+
+  /// Button label to pick a stats sync directory
+  ///
+  /// In en, this message translates to:
+  /// **'Choose folder'**
+  String get statsSyncDirectoryChoose;
+
+  /// Button label to change the stats sync directory
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get statsSyncDirectoryChange;
+
+  /// Button label to clear the stats sync directory
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get statsSyncDirectoryClear;
+
+  /// Message shown on the stats sync directory setting when running on web
+  ///
+  /// In en, this message translates to:
+  /// **'Not available on web.'**
+  String get statsSyncDirectoryWebUnsupported;
 }
 
 class _AppLocalizationsDelegate

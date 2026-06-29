@@ -196,4 +196,6 @@ El juego registra cuánto tiempo ha pasado antes de que un rompecabezas se resue
 
 La página de estadísticas es accesible desde el menú principal, sección **Progreso**. Arriba, un selector permite cambiar entre la colección actual y todas las colecciones. El botón **Compartir** (o **Abrir** en ordenador) exporta las estadísticas para enviármelas, y el botón **Importar** permite reinyectar un archivo de estadísticas previamente exportado.
 
+También puedes sincronizar tus estadísticas entre dispositivos señalando la aplicación a una carpeta compartida y usando una herramienta de sincronización como Syncthing o Dropbox — consulta la [guía de estadísticas multi-dispositivo](https://leveque.cc/getsomepuzzle/doc/es/crossplay.html) para las instrucciones.
+
 > Muchas gracias.

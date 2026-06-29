@@ -396,6 +396,13 @@ class Database {
   /// wiring it.
   final ConstraintProgress? progress;
 
+  /// User-chosen directory for stats file sync. When non-null,
+  /// [writeStats] and [importStats] write here instead of the legacy
+  /// `ApplicationDocumentsDirectory/getsomepuzzle/`. Reads still scan
+  /// both locations so existing local stats are never lost.
+  /// Set by [main.dart] from [Settings.statsDirectory].
+  String? statsDirectory;
+
   Database({required this.playerLevel, this.progress});
 
   void setPlayerLevel(int newLevel) {
@@ -1329,14 +1336,29 @@ class Database {
       }
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
-      final path = p.join(documentsDirectory.path, "getsomepuzzle");
-      final pattern = p.join(path, "stats");
-      await Directory(path).create(recursive: true);
-      for (final entry in Directory(path).listSync()) {
+      final defaultPath = p.join(documentsDirectory.path, "getsomepuzzle");
+      final pattern = p.join(defaultPath, "stats");
+      await Directory(defaultPath).create(recursive: true);
+      for (final entry in Directory(defaultPath).listSync()) {
         if (entry is! File || !entry.path.contains(pattern)) continue;
         log.finer("Loading stats from ${entry.path}");
         final content = await entry.readAsString();
         stats.addAll(content.split("\n"));
+      }
+      // Also read from the custom sync directory when set.
+      // The caller dedupes via _mergedStatHistory / loadStats.
+      if (statsDirectory != null) {
+        final dir = Directory(statsDirectory!);
+        if (await dir.exists()) {
+          for (final entry in dir.listSync()) {
+            if (entry is! File || !p.basename(entry.path).startsWith("stats")) {
+              continue;
+            }
+            log.finer("Loading stats from ${entry.path}");
+            final content = await entry.readAsString();
+            stats.addAll(content.split("\n"));
+          }
+        }
       }
     }
     return stats;
@@ -1424,6 +1446,34 @@ class Database {
       await prefs.setStringList("stats", merged);
       return;
     }
+    // Custom sync directory: write there as the single source of truth.
+    // The legacy directory is deliberately not written when a custom
+    // directory is set, avoiding a split-brain scenario where the sync
+    // tool would pick up the stale legacy file on the next sync.
+    if (statsDirectory != null) {
+      final dir = Directory(statsDirectory!);
+      await dir.create(recursive: true);
+      final filePath = p.join(statsDirectory!, "stats.txt");
+      File(filePath).writeAsStringSync(
+        merged.join("\n"),
+        mode: FileMode.writeOnly,
+        flush: true,
+      );
+      return;
+    }
+    await _writeToLegacyDir(merged);
+  }
+
+  /// Write the merged stat history to the default
+  /// `ApplicationDocumentsDirectory/getsomepuzzle/stats.txt`,
+  /// regardless of the current [statsDirectory] setting.
+  /// Used before clearing [statsDirectory] so no plays are orphaned.
+  Future<void> writeStatsToDefaultLocation() async {
+    final merged = await _mergedStatHistory();
+    await _writeToLegacyDir(merged);
+  }
+
+  Future<void> _writeToLegacyDir(List<String> merged) async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = p.join(documentsDirectory.path, "getsomepuzzle");
     await Directory(path).create(recursive: true);
@@ -1726,19 +1776,21 @@ class Database {
         }
       }
     } else {
-      final documentsDirectory = await getApplicationDocumentsDirectory();
-      final dirPath = p.join(documentsDirectory.path, 'getsomepuzzle');
-      final dir = Directory(dirPath);
-      if (await dir.exists()) {
-        // Remove every `stats*` file, not just `stats.txt`. Older
-        // collections leave behind `stats_<collection>.txt` files that
-        // are still loaded by `loadPuzzlesFile` — leaving them in place
-        // would silently restore play history on the next launch.
-        for (final entry in dir.listSync()) {
-          if (entry is File && p.basename(entry.path).startsWith('stats')) {
-            await entry.delete();
+      void clearStatsDir(String dirPath) {
+        final dir = Directory(dirPath);
+        if (dir.existsSync()) {
+          for (final entry in dir.listSync()) {
+            if (entry is File && p.basename(entry.path).startsWith('stats')) {
+              entry.deleteSync();
+            }
           }
         }
+      }
+
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      clearStatsDir(p.join(documentsDirectory.path, 'getsomepuzzle'));
+      if (statsDirectory != null) {
+        clearStatsDir(statsDirectory!);
       }
     }
 
@@ -2253,10 +2305,14 @@ class Database {
       // _readRawStatsFromStorage — same merge semantics as the native path.
       await prefs.setStringList('stats_imported_$timestamp', validLines);
     } else {
-      final documentsDirectory = await getApplicationDocumentsDirectory();
-      final dirPath = p.join(documentsDirectory.path, 'getsomepuzzle');
-      await Directory(dirPath).create(recursive: true);
-      final filePath = p.join(dirPath, 'stats_imported_$timestamp.txt');
+      final targetDir =
+          statsDirectory ??
+          p.join(
+            (await getApplicationDocumentsDirectory()).path,
+            'getsomepuzzle',
+          );
+      await Directory(targetDir).create(recursive: true);
+      final filePath = p.join(targetDir, 'stats_imported_$timestamp.txt');
       File(filePath).writeAsStringSync(
         validLines.join('\n'),
         mode: FileMode.writeOnly,

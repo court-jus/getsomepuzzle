@@ -1073,5 +1073,25 @@
     "scenarioExplainGroup": "Group sizes and group counts focus on connected-component topology.",
     "@scenarioExplainGroup": {
         "description": "Description of the Group user scenario."
+    },
+    "statsSyncDirectory": "Stats sync directory",
+    "@statsSyncDirectory": {
+        "description": "Section header for the stats sync directory setting"
+    },
+    "statsSyncDirectoryChoose": "Choose folder",
+    "@statsSyncDirectoryChoose": {
+        "description": "Button label to pick a stats sync directory"
+    },
+    "statsSyncDirectoryChange": "Change",
+    "@statsSyncDirectoryChange": {
+        "description": "Button label to change the stats sync directory"
+    },
+    "statsSyncDirectoryClear": "Clear",
+    "@statsSyncDirectoryClear": {
+        "description": "Button label to clear the stats sync directory"
+    },
+    "statsSyncDirectoryWebUnsupported": "Not available on web.",
+    "@statsSyncDirectoryWebUnsupported": {
+        "description": "Message shown on the stats sync directory setting when running on web"
     }
 }

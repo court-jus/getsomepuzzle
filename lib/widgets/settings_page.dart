@@ -1,3 +1,5 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
@@ -20,6 +22,10 @@ class SettingsPage extends StatefulWidget {
   /// in the main scaffold.
   final VoidCallback onChangeLanguage;
 
+  /// Called when the user picks or clears a stats sync directory.
+  /// Passes the absolute path, or null to revert to the default location.
+  final ValueChanged<String?> onStatsDirectoryChanged;
+
   const SettingsPage({
     super.key,
     required this.settings,
@@ -27,6 +33,7 @@ class SettingsPage extends StatefulWidget {
     required this.onClearStats,
     required this.onReplayOnboarding,
     required this.onChangeLanguage,
+    required this.onStatsDirectoryChanged,
   });
 
   @override
@@ -281,6 +288,21 @@ class _SettingsPageState extends State<SettingsPage> {
                           onPressed: _confirmClearStats,
                         ),
                       ),
+                      const SizedBox(height: 24),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          l10n.statsSyncDirectory,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _StatsDirectoryRow(
+                        path: widget.settings.statsDirectory,
+                        onChange: (path) {
+                          widget.onStatsDirectoryChanged(path);
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -360,6 +382,76 @@ String _localeDisplayName(BuildContext context) {
       return 'Español';
     default:
       return 'English';
+  }
+}
+
+class _StatsDirectoryRow extends StatelessWidget {
+  final String? path;
+  final ValueChanged<String?> onChange;
+
+  const _StatsDirectoryRow({required this.path, required this.onChange});
+
+  Future<void> _pickDirectory() async {
+    final selected = await FilePicker.getDirectoryPath(
+      dialogTitle: 'Select stats sync directory',
+    );
+    if (selected != null) {
+      onChange(selected);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (path != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                path!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          if (kIsWeb)
+            Text(
+              l10n.statsSyncDirectoryWebUnsupported,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
+            )
+          else
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.folder_open),
+                  label: Text(
+                    path != null
+                        ? l10n.statsSyncDirectoryChange
+                        : l10n.statsSyncDirectoryChoose,
+                  ),
+                  onPressed: _pickDirectory,
+                ),
+                if (path != null) ...[
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.clear),
+                    label: Text(l10n.statsSyncDirectoryClear),
+                    onPressed: () => onChange(null),
+                  ),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
   }
 }
 

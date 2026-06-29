@@ -196,4 +196,6 @@ The game records how much time has passed before a puzzle is solved and how many
 
 The Stats page is reachable from the main menu, under the **Progress** section. At the top, a selector lets you switch between the current collection and all collections. The **Share** button (or **Open** on desktop) exports the stats to send them over, and the **Import** button lets you re-inject a previously exported stats file.
 
+You can also synchronise your stats between devices by pointing the app to a shared folder and using a file-sync tool like Syncthing or Dropbox — see the [cross-device stats guide](https://leveque.cc/getsomepuzzle/doc/en/crossplay.html) for instructions.
+
 > Thank you very much.

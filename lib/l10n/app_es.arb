@@ -431,5 +431,25 @@
     "scenarioExplainGroup": "Tamaños y conteos de grupos enfocados en la topología de componentes conectados.",
     "@scenarioExplainGroup": {
         "description": "Description of the Group user scenario."
+    },
+    "statsSyncDirectory": "Directorio de sincronización",
+    "@statsSyncDirectory": {
+        "description": "Section header for the stats sync directory setting"
+    },
+    "statsSyncDirectoryChoose": "Elegir carpeta",
+    "@statsSyncDirectoryChoose": {
+        "description": "Button label to pick a stats sync directory"
+    },
+    "statsSyncDirectoryChange": "Cambiar",
+    "@statsSyncDirectoryChange": {
+        "description": "Button label to change the stats sync directory"
+    },
+    "statsSyncDirectoryClear": "Borrar",
+    "@statsSyncDirectoryClear": {
+        "description": "Button label to clear the stats sync directory"
+    },
+    "statsSyncDirectoryWebUnsupported": "No disponible en web.",
+    "@statsSyncDirectoryWebUnsupported": {
+        "description": "Message shown on the stats sync directory setting when running on web"
     }
 }

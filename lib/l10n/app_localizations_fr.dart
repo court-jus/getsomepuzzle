@@ -960,4 +960,19 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get scenarioExplainGroup =>
       'Tailles et comptages de groupes axés sur la topologie des composantes connexes.';
+
+  @override
+  String get statsSyncDirectory => 'Dossier de synchronisation';
+
+  @override
+  String get statsSyncDirectoryChoose => 'Choisir le dossier';
+
+  @override
+  String get statsSyncDirectoryChange => 'Changer';
+
+  @override
+  String get statsSyncDirectoryClear => 'Effacer';
+
+  @override
+  String get statsSyncDirectoryWebUnsupported => 'Non disponible sur le web.';
 }

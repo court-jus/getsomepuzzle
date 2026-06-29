@@ -958,4 +958,19 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get scenarioExplainGroup =>
       'Tamaños y conteos de grupos enfocados en la topología de componentes conectados.';
+
+  @override
+  String get statsSyncDirectory => 'Directorio de sincronización';
+
+  @override
+  String get statsSyncDirectoryChoose => 'Elegir carpeta';
+
+  @override
+  String get statsSyncDirectoryChange => 'Cambiar';
+
+  @override
+  String get statsSyncDirectoryClear => 'Borrar';
+
+  @override
+  String get statsSyncDirectoryWebUnsupported => 'No disponible en web.';
 }

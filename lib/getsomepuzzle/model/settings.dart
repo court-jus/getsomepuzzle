@@ -20,6 +20,7 @@ class ChangeableSettings {
   int? playerLevel;
   bool? autoLevel;
   bool? grayoutEnabled;
+  String? statsDirectory;
 
   ChangeableSettings({
     this.validateType,
@@ -30,6 +31,7 @@ class ChangeableSettings {
     this.playerLevel,
     this.autoLevel,
     this.grayoutEnabled,
+    this.statsDirectory,
   });
 
   @override
@@ -47,6 +49,7 @@ class Settings {
   int playerLevel;
   bool autoLevel;
   bool grayoutEnabled;
+  String? statsDirectory;
 
   final log = Logger("Settings");
 
@@ -59,6 +62,7 @@ class Settings {
     this.playerLevel = 0,
     this.autoLevel = true,
     this.grayoutEnabled = true,
+    this.statsDirectory,
   });
 
   @override
@@ -132,6 +136,7 @@ class Settings {
     playerLevel = prefs.getInt("settingsPlayerLevel") ?? 0;
     autoLevel = prefs.getBool("settingsAutoLevel") ?? true;
     grayoutEnabled = prefs.getBool("settingsGrayoutEnabled") ?? true;
+    statsDirectory = prefs.getString("settingsStatsDirectory");
   }
 
   Future<void> save() async {
@@ -144,6 +149,11 @@ class Settings {
     prefs.setInt("settingsPlayerLevel", playerLevel);
     prefs.setBool("settingsAutoLevel", autoLevel);
     prefs.setBool("settingsGrayoutEnabled", grayoutEnabled);
+    if (statsDirectory != null) {
+      prefs.setString("settingsStatsDirectory", statsDirectory!);
+    } else {
+      prefs.remove("settingsStatsDirectory");
+    }
   }
 
   void change(ChangeableSettings newValue) {
@@ -171,6 +181,23 @@ class Settings {
     if (newValue.grayoutEnabled != null) {
       grayoutEnabled = newValue.grayoutEnabled!;
     }
+    if (newValue.statsDirectory != null) {
+      statsDirectory = newValue.statsDirectory;
+    }
     save();
+  }
+
+  /// Set or clear the stats sync directory and persist immediately.
+  /// Separate from [change] because [ChangeableSettings.statsDirectory]
+  /// is a tri-state (null = unset, non-null = set) that doesn't map
+  /// cleanly to the "null = unchanged" convention of [change].
+  Future<void> setStatsDirectory(String? path) async {
+    statsDirectory = path;
+    final prefs = await SharedPreferences.getInstance();
+    if (path != null) {
+      await prefs.setString('settingsStatsDirectory', path);
+    } else {
+      await prefs.remove('settingsStatsDirectory');
+    }
   }
 }

@@ -196,4 +196,6 @@ Le jeu enregistre le temps passé à résoudre un puzzle ainsi que le nombre d'e
 
 La page Stats est accessible depuis le menu principal, section **Progression**. En haut, un sélecteur permet de basculer entre la collection courante et l'ensemble des collections. Le bouton **Partager** (ou **Ouvrir** sur ordinateur) exporte les stats pour me les envoyer, et le bouton **Importer** permet de réinjecter un fichier de stats précédemment exporté.
 
+Vous pouvez aussi synchroniser vos stats entre différents appareils en pointant l'application vers un dossier partagé et en utilisant un outil de synchronisation comme Syncthing ou Dropbox — voir le [guide des stats multi-appareil](https://leveque.cc/getsomepuzzle/doc/fr/crossplay.html) pour les instructions.
+
 > Merci beaucoup.
