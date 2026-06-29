@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
@@ -77,7 +78,7 @@ class PABalancedSideComplicity extends Complicity {
 
     for (final pa in puzzle.constraints.whereType<ParityConstraint>()) {
       for (final side in _sideCellIndices(pa, puzzle)) {
-        final move = _solveSide(side, puzzle, fms, lts);
+        final move = _solveSide(side, puzzle, pa, fms, lts);
         if (move != null) return move;
       }
     }
@@ -91,6 +92,7 @@ class PABalancedSideComplicity extends Complicity {
   Move? _solveSide(
     List<int> side,
     Puzzle puzzle,
+    ParityConstraint pa,
     List<ForbiddenMotif> fms,
     List<LetterGroup> lts,
   ) {
@@ -121,10 +123,10 @@ class PABalancedSideComplicity extends Complicity {
     if (freePositions.isEmpty) return null;
 
     final survivors = <List<CellValue>>[];
-    // Track which constraint *types* rejected at least one config.
+    // Track which constraint instances rejected at least one config.
     // Used to tag the returned move so the hint UI can render
     // "PA + FM", "PA + LT" or "PA + other" rather than always "PA + *".
-    final rejectingSlugs = <String>{};
+    final rejectingConstraints = <CanApply>{};
 
     _enumerateMultinomial(
       freePositions.length,
@@ -143,13 +145,13 @@ class PABalancedSideComplicity extends Complicity {
         }
         for (final fm in fms) {
           if (!fm.verify(clone)) {
-            rejectingSlugs.add('FM');
+            rejectingConstraints.add(fm);
             return;
           }
         }
         for (final lt in lts) {
           if (!lt.verify(clone)) {
-            rejectingSlugs.add('LT');
+            rejectingConstraints.add(lt);
             return;
           }
         }
@@ -158,7 +160,7 @@ class PABalancedSideComplicity extends Complicity {
     );
 
     if (survivors.isEmpty) {
-      return _withTag(Impossible(this), rejectingSlugs);
+      return _tagContributors(Impossible(this), rejectingConstraints, pa);
     }
     // Partial determination on each free cell:
     //  * every survivor agrees on its value → force it;
@@ -177,18 +179,20 @@ class PABalancedSideComplicity extends Complicity {
         // colour has been pruned from the cell's options (3+-colour domain),
         // in which case no allowed colour satisfies the balanced composition.
         if (cell.options.contains(used.first)) {
-          return _withTag(
+          return _tagContributors(
             SetValue(side[freePos], used.first, this, complexity: 3),
-            rejectingSlugs,
+            rejectingConstraints,
+            pa,
           );
         }
-        return _withTag(Impossible(this), rejectingSlugs);
+        return _tagContributors(Impossible(this), rejectingConstraints, pa);
       }
       for (final color in domain) {
         if (!used.contains(color) && cell.options.contains(color)) {
-          return _withTag(
+          return _tagContributors(
             RemoveOption(side[freePos], color, this, complexity: 3),
-            rejectingSlugs,
+            rejectingConstraints,
+            pa,
           );
         }
       }
@@ -196,12 +200,49 @@ class PABalancedSideComplicity extends Complicity {
     return null;
   }
 
-  /// Wrap [move] so its `givenBy` carries the unique rejector slug
-  /// when there is one — letting the hint UI render "PA + FM" or
-  /// "PA + LT" instead of the generic "PA + other".
-  Move _withTag(Move move, Set<String> rejectingSlugs) {
-    if (rejectingSlugs.length != 1) return move;
-    return move.retag(PABalancedSideComplicity(rejectingSlugs.first));
+  /// Wrap [move] so its `contributors` lists the [pa] constraint and
+  /// every specific constraint instance in [rejectingConstraints]. Also
+  /// retag `givenBy` to a `PABalancedSideComplicity` with the unique
+  /// rejector slug when all rejectors share the same slug, so the hint
+  /// UI can render "PA + FM" or "PA + LT" instead of "PA + other".
+  Move _tagContributors(
+    Move move,
+    Set<CanApply> rejectingConstraints,
+    ParityConstraint pa,
+  ) {
+    final involved = <CanApply>[pa, ...rejectingConstraints];
+    final withContribs = switch (move) {
+      SetValue(:final idx, :final value, :final complexity) => SetValue(
+        idx,
+        value,
+        this,
+        complexity: complexity,
+        contributors: involved,
+      ),
+      RemoveOption(
+        :final idx,
+        :final option,
+        :final complexity,
+        :final isForce,
+        :final forceDepth,
+      ) =>
+        RemoveOption(
+          idx,
+          option,
+          this,
+          complexity: complexity,
+          isForce: isForce,
+          forceDepth: forceDepth,
+          contributors: involved,
+        ),
+      Impossible() => Impossible(this, contributors: involved),
+    };
+    final slugs = rejectingConstraints.map((c) {
+      if (c is Constraint) return c.slug;
+      return c.serialize();
+    }).toSet();
+    if (slugs.length != 1) return withContribs;
+    return withContribs.retag(PABalancedSideComplicity(slugs.first));
   }
 
   /// Cells covered by [pa] for each of its sides, in natural reading

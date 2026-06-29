@@ -894,6 +894,7 @@ class Puzzle {
         if (r.failed) {
           // Propagation hit an explicit impossibility. Re-run apply once
           // to recover the responsible constraint for the hint display.
+          // Also pass the full propagation chain as contributors.
           final diag = clone.apply();
           candidate = RemoveOption(
             idx,
@@ -901,6 +902,7 @@ class Puzzle {
             diag?.givenBy ?? clone.constraints.first,
             isForce: true,
             forceDepth: r.moves,
+            contributors: r.fired,
           );
           depth = r.moves;
         } else {
@@ -912,6 +914,7 @@ class Puzzle {
               errors.first,
               isForce: true,
               forceDepth: r.moves,
+              contributors: r.fired,
             );
             depth = r.moves;
           } else {
@@ -934,17 +937,20 @@ class Puzzle {
     return best;
   }
 
-  /// Like `propagateToFixpoint` but always returns the move count, even
-  /// when propagation hits an impossibility. `failed=true` signals the
-  /// impossibility branch.
-  ({int moves, bool failed}) _propagateCount() {
+  /// Like `propagateToFixpoint` but always returns the move count and the
+  /// list of `givenBy` sources that fired, even when propagation hits an
+  /// impossibility. `failed=true` signals the impossibility branch.
+  /// `fired` is empty when no move was successfully applied before the
+  /// terminal condition.
+  ({int moves, bool failed, List<CanApply> fired}) _propagateCount() {
     int moves = 0;
+    final fired = <CanApply>[];
     while (true) {
       final m = findAMove(checkErrors: false, tryForce: false);
-      if (m == null) return (moves: moves, failed: false);
+      if (m == null) return (moves: moves, failed: false, fired: fired);
       switch (m) {
         case Impossible():
-          return (moves: moves, failed: true);
+          return (moves: moves, failed: true, fired: fired);
         case SetValue(:final idx, :final value):
           // A setValue move whose value is no longer in the cell's options is
           // a contradiction surfaced by a constraint that has not been
@@ -955,18 +961,20 @@ class Puzzle {
           // was already excluded. Treat as failure rather than throwing.
           final cell = cells[idx];
           if (cell.value == CellValue.free && !cell.options.contains(value)) {
-            return (moves: moves, failed: true);
+            return (moves: moves, failed: true, fired: fired);
           }
+          fired.add(m.givenBy);
           setValue(idx, value);
         case RemoveOption(:final idx, :final option):
           // A no-op removeOption (option already pruned) would loop forever
           // without progress. Bail out as "stuck".
           if (!removeOption(idx, option)) {
-            return (moves: moves, failed: false);
+            return (moves: moves, failed: false, fired: fired);
           }
+          fired.add(m.givenBy);
       }
       moves++;
-      if (complete) return (moves: moves, failed: false);
+      if (complete) return (moves: moves, failed: false, fired: fired);
     }
   }
 

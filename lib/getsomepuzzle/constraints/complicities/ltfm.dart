@@ -55,16 +55,20 @@ class LTFMComplicity extends Complicity {
       final cols = lt.indices.map((i) => i % puzzle.width).toSet();
 
       for (final color in puzzle.domain) {
-        bool blocked = false;
+        final blockingFms = <ForbiddenMotif>[];
 
         if (rows.length > 1) {
-          blocked = fmConstraints.any((fm) => _blocksVertical(fm, color));
+          for (final fm in fmConstraints) {
+            if (_blocksVertical(fm, color)) blockingFms.add(fm);
+          }
         }
-        if (!blocked && cols.length > 1) {
-          blocked = fmConstraints.any((fm) => _blocksHorizontal(fm, color));
+        if (blockingFms.isEmpty && cols.length > 1) {
+          for (final fm in fmConstraints) {
+            if (_blocksHorizontal(fm, color)) blockingFms.add(fm);
+          }
         }
 
-        if (blocked) {
+        if (blockingFms.isNotEmpty) {
           // Combination deduction: requires holding two rules in mind
           // simultaneously. See docs/dev/complexity.md, "future work".
           // Iterate LT cells looking for the first free one that still
@@ -74,7 +78,13 @@ class LTFMComplicity extends Complicity {
           for (final idx in lt.indices) {
             if (puzzle.cellValues[idx] == CellValue.free &&
                 puzzle.cells[idx].options.contains(color)) {
-              return RemoveOption(idx, color, this, complexity: 3);
+              return RemoveOption(
+                idx,
+                color,
+                this,
+                complexity: 3,
+                contributors: [lt, ...blockingFms],
+              );
             }
           }
         }

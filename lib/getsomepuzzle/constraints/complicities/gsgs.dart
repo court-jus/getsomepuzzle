@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -55,9 +56,10 @@ class GSGSComplicity extends Complicity {
         if (!puzzle.getNeighbors(ai).contains(aj)) continue;
         final vi = puzzle.cellValues[ai];
         final vj = puzzle.cellValues[aj];
+        final contribs = <CanApply>[gss[i], gss[j]];
         if (vi != CellValue.free && vj != CellValue.free) {
           if (vi == vj) {
-            return Impossible(this);
+            return Impossible(this, contributors: contribs);
           }
           continue; // already on different colours — nothing to do
         }
@@ -68,13 +70,25 @@ class GSGSComplicity extends Complicity {
           // If aj already excluded vi (3-colour puzzles), no useful
           // deduction here — skip to next pair.
           if (puzzle.cells[aj].options.contains(vi)) {
-            return RemoveOption(aj, vi, this, complexity: 3);
+            return RemoveOption(
+              aj,
+              vi,
+              this,
+              complexity: 3,
+              contributors: contribs,
+            );
           }
           continue;
         }
         if (vj != CellValue.free && vi == CellValue.free) {
           if (puzzle.cells[ai].options.contains(vj)) {
-            return RemoveOption(ai, vj, this, complexity: 3);
+            return RemoveOption(
+              ai,
+              vj,
+              this,
+              complexity: 3,
+              contributors: contribs,
+            );
           }
           continue;
         }

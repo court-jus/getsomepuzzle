@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -54,34 +55,67 @@ class GSAllComplicity extends Complicity {
     return null;
   }
 
-  /// Wrap `move` so its `givenBy` carries the unique blocker slug when
-  /// there is one. Lets the hint UI render "GS + FM" instead of
-  /// "GS + other constraints" whenever the deduction was actually
-  /// caused by a single constraint type rejecting every other sealing.
-  Move _attachBlocker(Move move, Set<String> blockers) {
-    if (blockers.length != 1) return move;
-    return move.retag(GSAllComplicity(blockers.first));
+  /// Wrap [move] so its `contributors` lists the [gs] constraint and
+  /// every specific constraint instance in [blockers]. Also retag
+  /// `givenBy` to a `GSAllComplicity` with the unique blocker slug
+  /// when all blockers share the same slug, so the hint UI can render
+  /// "GS + FM" instead of "GS + other".
+  Move _tagContributors(
+    Move move,
+    Set<Constraint> blockers,
+    GroupSize gs,
+  ) {
+    final involved = <CanApply>[gs, ...blockers];
+    final withContribs = switch (move) {
+      SetValue(:final idx, :final value, :final complexity) => SetValue(
+        idx,
+        value,
+        this,
+        complexity: complexity,
+        contributors: involved,
+      ),
+      RemoveOption(
+        :final idx,
+        :final option,
+        :final complexity,
+        :final isForce,
+        :final forceDepth,
+      ) =>
+        RemoveOption(
+          idx,
+          option,
+          this,
+          complexity: complexity,
+          isForce: isForce,
+          forceDepth: forceDepth,
+          contributors: involved,
+        ),
+      Impossible() => Impossible(this, contributors: involved),
+    };
+    final slugs = blockers.map((c) => c.slug).toSet();
+    if (slugs.length != 1) return withContribs;
+    return withContribs.retag(GSAllComplicity(slugs.first));
   }
 
   Move? _solveGS(GroupSize gs, Puzzle puzzle) {
     final anchor = gs.indices.first;
     final c = puzzle.cellValues[anchor];
     if (c != CellValue.free) {
-      final blockers = <String>{};
+      final blockers = <Constraint>{};
       final survivors = _enumerateForColor(puzzle, gs, anchor, c, blockers);
       if (survivors == null) return null;
       if (survivors.isEmpty) {
-        return _attachBlocker(Impossible(this), blockers);
+        return _tagContributors(Impossible(this), blockers, gs);
       }
       final move = _forceFromSurvivors(puzzle, survivors, c);
-      return move == null ? null : _attachBlocker(move, blockers);
+      return move == null ? null : _tagContributors(move, blockers, gs);
     }
 
     // Empty anchor: try each domain colour. Track blockers across
     // both hypotheses so the hint surfaces a single rejecting
     // constraint when one is responsible for collapsing the choice.
     final feasible = <CellValue>[];
-    final blockers = <String>{};
+    final blockers = <Constraint>{};
     for (final color in puzzle.domain) {
       final hyp = puzzle.clone();
       hyp.cells[anchor].setForSolver(color);
@@ -95,7 +129,7 @@ class GSAllComplicity extends Complicity {
       }
     }
     if (feasible.isEmpty) {
-      return _attachBlocker(Impossible(this), blockers);
+      return _tagContributors(Impossible(this), blockers, gs);
     }
     if (feasible.length == 1) {
       // Tier 4: trying both colours and concluding only one works
@@ -104,27 +138,27 @@ class GSAllComplicity extends Complicity {
       // unless it has been pruned from the anchor's options (3+-colour
       // domain), in which case no allowed colour is feasible → impossible.
       if (puzzle.cells[anchor].options.contains(feasible.first)) {
-        return _attachBlocker(
+        return _tagContributors(
           SetValue(anchor, feasible.first, this, complexity: 4),
           blockers,
+          gs,
         );
       }
-      return _attachBlocker(Impossible(this), blockers);
+      return _tagContributors(Impossible(this), blockers, gs);
     }
     return null;
   }
 
   /// Returns the list of surviving sealings for the given anchor
-  /// colour, or null when the gap is too large to enumerate. Slugs
-  /// of every constraint that rejected at least one sealing are
-  /// added to [blockers] so the caller can surface a meaningful
-  /// secondary slug in the hint.
+  /// colour, or null when the gap is too large to enumerate. Every
+  /// constraint instance that rejected at least one sealing is added
+  /// to [blockers] so the caller can surface a meaningful hint.
   List<_Survivor>? _enumerateForColor(
     Puzzle puzzle,
     GroupSize gs,
     int anchor,
     CellValue color,
-    Set<String> blockers,
+    Set<Constraint> blockers,
   ) {
     // All cells of `color` connected (4-adjacency) to the anchor.
     final group = floodFill(puzzle, [
@@ -159,7 +193,7 @@ class GSAllComplicity extends Complicity {
       }
       for (final cst in puzzle.constraints) {
         if (!cst.verify(clone)) {
-          blockers.add(cst.slug);
+          blockers.add(cst);
           return;
         }
       }
@@ -170,12 +204,12 @@ class GSAllComplicity extends Complicity {
 
   /// Group already at target size — verify that sealing the frontier
   /// is consistent. Returns a single survivor or empty. Records the
-  /// rejecting constraint's slug in [blockers] when sealing fails.
+  /// specific rejecting constraint in [blockers] when sealing fails.
   List<_Survivor> _checkSealedTarget(
     Puzzle puzzle,
     Set<int> group,
     CellValue color,
-    Set<String> blockers,
+    Set<Constraint> blockers,
   ) {
     final sealed = <int>{};
     for (final m in group) {
@@ -193,7 +227,7 @@ class GSAllComplicity extends Complicity {
     }
     for (final cst in puzzle.constraints) {
       if (!cst.verify(clone)) {
-        blockers.add(cst.slug);
+        blockers.add(cst);
         return [];
       }
     }

@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
@@ -53,7 +54,7 @@ class SYFMComplicity extends Complicity {
       if (c != CellValue.free) {
         move = _solveColouredAnchor(sy, puzzle, fms, anchor, c);
       } else {
-        move = _solveEmptyAnchor(sy, puzzle, anchor);
+        move = _solveEmptyAnchor(sy, puzzle, anchor, fms);
       }
       if (move != null) return move;
     }
@@ -100,16 +101,31 @@ class SYFMComplicity extends Complicity {
         if (!fm.verify(clone)) {
           // Colouring a = c (and forcing mirror = c by SY) violates an
           // FM, so a cannot be c.
-          return RemoveOption(a, c, this, complexity: 4);
+          return RemoveOption(
+            a,
+            c,
+            this,
+            complexity: 4,
+            contributors: [sy, fm],
+          );
         }
       }
     }
     return null;
   }
 
-  Move? _solveEmptyAnchor(SymmetryConstraint sy, Puzzle puzzle, int anchor) {
+  Move? _solveEmptyAnchor(
+    SymmetryConstraint sy,
+    Puzzle puzzle,
+    int anchor,
+    List<ForbiddenMotif> fms,
+  ) {
     final feasible = <CellValue>[];
     final colorStates = <CellValue, List<CellValue>>{};
+    // Track all constraint instances that participated in the deduction:
+    // those that produced moves during propagation (for any hypothesis)
+    // and those whose verify rejected a hypothesis.
+    final participatingConstraints = <CanApply>{};
 
     for (final color in puzzle.domain) {
       final hyp = puzzle.clone();
@@ -125,6 +141,9 @@ class SYFMComplicity extends Complicity {
       for (int step = 0; step < _maxHypothesisSteps; step++) {
         final m = hyp.findAMove(checkErrors: false, tryForce: false);
         if (m == null) break;
+        if (m.givenBy is CanApply) {
+          participatingConstraints.add(m.givenBy as CanApply);
+        }
         switch (m) {
           case Impossible():
             failed = true;
@@ -138,12 +157,12 @@ class SYFMComplicity extends Complicity {
       }
       // A hypothesis that ends with at least one constraint failing
       // is also infeasible — propagation may simply have stopped
-      // before noticing.
+      // before noticing. Track the specific failing constraints.
       if (!failed) {
         for (final cst in hyp.constraints) {
           if (!cst.verify(hyp)) {
             failed = true;
-            break;
+            participatingConstraints.add(cst);
           }
         }
       }
@@ -153,15 +172,22 @@ class SYFMComplicity extends Complicity {
       colorStates[color] = hyp.cellValues;
     }
 
+    final contribs = <CanApply>[sy, ...participatingConstraints];
     if (feasible.isEmpty) {
-      return Impossible(this);
+      return Impossible(this, contributors: contribs);
     }
     if (feasible.length == 1) {
       // Only one colour for the anchor leads to a feasible state. If
       // that colour has already been pruned from the anchor's options
       // (3-colour puzzles), no useful deduction here — fall through.
       if (puzzle.cells[anchor].options.contains(feasible.first)) {
-        return SetValue(anchor, feasible.first, this, complexity: 4);
+        return SetValue(
+          anchor,
+          feasible.first,
+          this,
+          complexity: 4,
+          contributors: contribs,
+        );
       }
     }
     // Multiple colours feasible — find a free cell whose value is the
@@ -178,7 +204,7 @@ class SYFMComplicity extends Complicity {
         }
       }
       if (unanimous && puzzle.cells[i].options.contains(v)) {
-        return SetValue(i, v, this, complexity: 4);
+        return SetValue(i, v, this, complexity: 4, contributors: contribs);
       }
     }
     return null;

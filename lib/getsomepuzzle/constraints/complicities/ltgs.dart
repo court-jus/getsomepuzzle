@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
@@ -55,10 +56,12 @@ class LTGSComplicity extends Complicity {
         if (lt.indices.length < 2) continue;
         if (!lt.indices.contains(cell)) continue;
 
+        final contribs = <CanApply>[gs, lt];
+
         // 1. Impossibility — too far apart for the requested size.
         final lower = _minGroupSize(lt.indices, puzzle.width);
         if (gs.size < lower) {
-          return Impossible(this);
+          return Impossible(this, contributors: contribs);
         }
 
         // 2. Collinear LT (all cells on one row or column) with exact
@@ -66,7 +69,7 @@ class LTGSComplicity extends Complicity {
         // to the largest LT cell IS the unique minimum tree, so every
         // cell on it must take the LT colour.
         if (_isAligned(lt.indices, puzzle.width) && gs.size == lower) {
-          final move = _forceLineCells(lt, puzzle);
+          final move = _forceLineCells(lt, puzzle, contributors: contribs);
           if (move != null) return move;
         }
       }
@@ -79,7 +82,11 @@ class LTGSComplicity extends Complicity {
   /// smallest to the largest LT cell. When the segment colour is
   /// already known (any line cell coloured), force the first empty
   /// cell on the segment to that colour.
-  Move? _forceLineCells(LetterGroup lt, Puzzle puzzle) {
+  Move? _forceLineCells(
+    LetterGroup lt,
+    Puzzle puzzle, {
+    List<CanApply> contributors = const [],
+  }) {
     final w = puzzle.width;
     final firstR = lt.indices[0] ~/ w;
     final firstC = lt.indices[0] % w;
@@ -135,7 +142,13 @@ class LTGSComplicity extends Complicity {
           puzzle.cells[idx].options.contains(color)) {
         // Tier 4: combine LT (path-must-form) + GS (size-bounded path)
         // to force every cell on the unique minimum line.
-        return SetValue(idx, color, this, complexity: 4);
+        return SetValue(
+          idx,
+          color,
+          this,
+          complexity: 4,
+          contributors: contributors,
+        );
       }
     }
     return null;

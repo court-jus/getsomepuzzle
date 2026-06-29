@@ -895,29 +895,28 @@ class GameModel extends ChangeNotifier {
     currentPuzzle!.clearHighlights();
     switch (move) {
       case Impossible(:final givenBy):
-        // Only Constraints carry the `isValid` UI flag; complicities
-        // currently have no on-screen representation, so we just skip the
-        // highlight in that branch.
         if (givenBy is Constraint) givenBy.isValid = false;
         hintText = texts.hintImpossible;
         hintIsError = true;
-      case RemoveOption(:final idx, :final isForce, :final givenBy):
+      case RemoveOption(
+        :final idx,
+        :final isForce,
+        :final givenBy,
+        :final contributors,
+      ):
         currentPuzzle!.cells[idx].isHighlighted = true;
-        // In a 2-colour domain, removing one option ≡ choosing the other, so
-        // present it with the cell-deduction phrasing instead of option removal.
         final domain2 = currentPuzzle!.domain.length == 2;
         if (isForce) {
           hintText = domain2 ? texts.hintForce : texts.hintForceRemoveOption;
         } else {
-          if (givenBy is Constraint) givenBy.isHighlighted = true;
+          _highlightContributors(contributors, givenBy);
           hintText = domain2
               ? texts.hintDeducedFrom(givenBy)
               : texts.hintRemoveOptionDeducedFrom(givenBy);
         }
         hintIsError = false;
-      case SetValue(:final idx, :final givenBy):
-        // A setValue is never a force (forces always emit removeOption).
-        if (givenBy is Constraint) givenBy.isHighlighted = true;
+      case SetValue(:final idx, :final givenBy, :final contributors):
+        _highlightContributors(contributors, givenBy);
         currentPuzzle!.cells[idx].isHighlighted = true;
         hintText = texts.hintDeducedFrom(givenBy);
         hintIsError = false;
@@ -925,6 +924,13 @@ class GameModel extends ChangeNotifier {
     if (currentMeta != null) {
       currentMeta!.hints += 1;
       currentMeta!.stats?.hints += 1;
+    }
+  }
+
+  void _highlightContributors(List<CanApply> contributors, CanApply givenBy) {
+    final targets = contributors.isEmpty ? <CanApply>[givenBy] : contributors;
+    for (final c in targets) {
+      if (c is Constraint) c.isHighlighted = true;
     }
   }
 

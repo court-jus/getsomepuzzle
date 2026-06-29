@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
@@ -47,8 +48,10 @@ class SHGSComplicity extends Complicity {
     // at most one SH per colour; if more were ever added, the first
     // wins (any disagreement would already fail SH.verify on its own).
     final shapeSizeByColor = <CellValue, int>{};
+    final shapeByColor = <CellValue, ShapeConstraint>{};
     for (final sh in shs) {
       shapeSizeByColor.putIfAbsent(sh.color, () => sh.shapeSize);
+      shapeByColor.putIfAbsent(sh.color, () => sh);
     }
     for (final gs in puzzle.constraints.whereType<GroupSize>()) {
       final cellIdx = gs.indices.first;
@@ -58,6 +61,13 @@ class SHGSComplicity extends Complicity {
         if (entry.value != gs.size) excluded.add(entry.key);
       }
       if (excluded.isEmpty) continue;
+
+      final involvedShs = excluded
+          .map((c) => shapeByColor[c])
+          .whereType<ShapeConstraint>()
+          .toList();
+      final contribs = <CanApply>[gs, ...involvedShs];
+
       // Impossibility must be judged against the cell's *current options*,
       // not the full declared domain: a 3-colour cell whose options were
       // already pruned (by another constraint) down to an all-SH-excluded
@@ -68,7 +78,7 @@ class SHGSComplicity extends Complicity {
       final cell = puzzle.cells[cellIdx];
       final hasViableOption = cell.options.any((o) => !excluded.contains(o));
       if (!hasViableOption) {
-        return Impossible(this);
+        return Impossible(this, contributors: contribs);
       }
       // Combination deduction: tier 3 (see docs/dev/constraint_complicity.md).
       // Each `exColor` in `excluded` is a colour the cell cannot take. On
@@ -80,7 +90,13 @@ class SHGSComplicity extends Complicity {
       // cell's options, this GS has no deduction left — fall through.
       for (final exColor in excluded) {
         if (cell.options.contains(exColor)) {
-          return RemoveOption(cellIdx, exColor, this, complexity: 3);
+          return RemoveOption(
+            cellIdx,
+            exColor,
+            this,
+            complexity: 3,
+            contributors: contribs,
+          );
         }
       }
     }

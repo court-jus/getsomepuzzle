@@ -152,7 +152,8 @@ String cellValueToString(CellValue value) {
 /// the subtype instead.
 sealed class Move {
   final CanApply givenBy;
-  const Move._(this.givenBy);
+  final List<CanApply> contributors;
+  const Move._(this.givenBy, {this.contributors = const []});
 
   int get idx => switch (this) {
     SetValue(:final idx) => idx,
@@ -191,6 +192,7 @@ sealed class Move {
       value,
       by,
       complexity: complexity,
+      contributors: contributors,
     ),
     RemoveOption(
       :final idx,
@@ -206,8 +208,9 @@ sealed class Move {
         complexity: complexity,
         isForce: isForce,
         forceDepth: forceDepth,
+        contributors: contributors,
       ),
-    Impossible() => Impossible(by),
+    Impossible() => Impossible(by, contributors: contributors),
   };
 
   @override
@@ -229,8 +232,13 @@ final class SetValue extends Move {
   final CellValue value;
   @override
   final int complexity;
-  const SetValue(this.idx, this.value, super.givenBy, {this.complexity = 0})
-    : super._();
+  const SetValue(
+    this.idx,
+    this.value,
+    super.givenBy, {
+    this.complexity = 0,
+    List<CanApply> contributors = const [],
+  }) : super._(contributors: contributors);
 }
 
 /// Prune colour [option] from the still-free cell [idx]. Issued either by
@@ -256,11 +264,13 @@ final class RemoveOption extends Move {
     this.complexity = 0,
     this.isForce = false,
     this.forceDepth = 0,
-  }) : super._();
+    List<CanApply> contributors = const [],
+  }) : super._(contributors: contributors);
 }
 
 /// The current state contradicts [givenBy] — either directly broken or with
 /// future satisfaction now unreachable. Carries no cell target.
 final class Impossible extends Move {
-  const Impossible(super.givenBy) : super._();
+  const Impossible(super.givenBy, {List<CanApply> contributors = const []})
+    : super._(contributors: contributors);
 }

@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
@@ -48,21 +49,29 @@ class GSQAComplicity extends Complicity {
     final anchorColor = puzzle.cellValues[anchor];
 
     final feasible = <CellValue>[];
+    // Track specific QAs that actually rejected a colour, so we only
+    // credit those (not every QA in the puzzle) as contributors.
+    final rejectingQas = <QuantityConstraint>{};
     for (final color in puzzle.domain) {
       if (_colorIsFeasible(gs, color, qas, puzzle)) {
         feasible.add(color);
+      } else {
+        final qa = _qaThatRejects(gs, color, qas, puzzle);
+        if (qa != null) rejectingQas.add(qa);
       }
     }
 
+    final contribs = <CanApply>[gs, ...rejectingQas];
+
     if (feasible.isEmpty) {
-      return Impossible(this);
+      return Impossible(this, contributors: contribs);
     }
 
     // Anchor already committed: a contradiction iff its colour is one
     // the QA arithmetic ruled out. Otherwise nothing to add.
     if (anchorColor != CellValue.free) {
       if (!feasible.contains(anchorColor)) {
-        return Impossible(this);
+        return Impossible(this, contributors: contribs);
       }
       return null;
     }
@@ -73,9 +82,15 @@ class GSQAComplicity extends Complicity {
     // unsatisfiable.
     if (feasible.length == 1) {
       if (puzzle.cells[anchor].options.contains(feasible.first)) {
-        return SetValue(anchor, feasible.first, this, complexity: 3);
+        return SetValue(
+          anchor,
+          feasible.first,
+          this,
+          complexity: 3,
+          contributors: contribs,
+        );
       }
-      return Impossible(this);
+      return Impossible(this, contributors: contribs);
     }
 
     // Several colours still feasible — only reachable on domain ≥ 3.
@@ -85,10 +100,40 @@ class GSQAComplicity extends Complicity {
     final anchorCell = puzzle.cells[anchor];
     for (final color in puzzle.domain) {
       if (!feasible.contains(color) && anchorCell.options.contains(color)) {
-        return RemoveOption(anchor, color, this, complexity: 3);
+        return RemoveOption(
+          anchor,
+          color,
+          this,
+          complexity: 3,
+          contributors: contribs,
+        );
       }
     }
     return null;
+  }
+
+  /// Returns the specific [QuantityConstraint] that makes [color]
+  /// infeasible for the anchor given [gs], or null if the colour is
+  /// feasible or was ruled out for a non-QA reason (e.g. GS-merge).
+  QuantityConstraint? _qaThatRejects(
+    GroupSize gs,
+    CellValue color,
+    List<QuantityConstraint> qas,
+    Puzzle puzzle,
+  ) {
+    final qa = qas.firstWhereOrNull((q) => q.color == color);
+    if (qa == null) return null;
+    final anchor = gs.indices.first;
+    // GS-merge infeasibility is not a QA reason.
+    if (_hypotheticalMergedSize(puzzle, anchor, color) > gs.size) return null;
+    final dist = _distancesOverPassable(puzzle, anchor, color);
+    var definitelyOutside = 0;
+    for (int i = 0; i < puzzle.cellValues.length; i++) {
+      if (i == anchor || puzzle.cellValues[i] != color) continue;
+      final d = dist[i];
+      if (d == null || d >= gs.size) definitelyOutside++;
+    }
+    return gs.size + definitelyOutside > qa.count ? qa : null;
   }
 
   /// `true` when colouring the anchor's group `color` is compatible

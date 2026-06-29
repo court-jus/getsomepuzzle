@@ -233,3 +233,206 @@ next press.
    `_onHintTypeChanged` in `lib/main.dart`.
 6. If the new mode needs precomputation, follow the worker/isolate
    pattern from `addConstraint` — don't block the UI thread.
+
+---
+
+## Multi-constraint hints
+
+**Status:** implemented.
+- ✅ `contributors` field on `Move` (`cell.dart:155`)
+- ✅ Complicity → contributors, all 9 complicities, with **specific-instance** tracking
+- ✅ Force move → contributors (`_propagateCount` / `_forceOneCell`)
+- ✅ UI: `_revealCellAndConstraint` uses `contributors` instead of `givenBy` alone
+- ✅ UI: `_computeArrowPositions` draws multiple arrows (geometric + per-constraint keys)
+
+### Motivation
+
+When a hint reveals a deducible cell (`deducibleCell` mode, tap 3),
+the deduction may stem from multiple constraints working together
+rather than a single constraint. There are two sources of
+multi-constraint deduction:
+
+1. **Complicity** — a `Complicity` (e.g. `GSAllComplicity`) combines
+   info from two or more constraint types to produce a deduction that
+   no single constraint could make alone. Currently the hint tags the
+   `Complicity` instance as `givenBy`, which is opaque to the player
+   — the UI shows something like "Deduced from GS+FM" instead of
+   pointing at the actual constraints.
+
+2. **Force move** — `_forceOneCell()` sets a cell to a value on a
+   clone and propagates until contradiction. The contradiction
+   surfaces at one constraint, but every constraint that fired during
+   the propagation chain contributed to the deduction. Currently only
+   the final contradicting constraint is tagged.
+
+In both cases the player sees a single arrow from one constraint to
+the target cell, when the truth is richer. Multi-constraint hints
+surface *all* contributing constraints.
+
+### Tap-3 visual change
+
+Tap 2 (cell-only highlight) is unchanged. Tap 3 (`_revealCellAndConstraint`)
+gains the ability to display **multiple arrows** — one per contributing
+constraint — all pointing at the same target cell.
+
+When only one constraint contributes, the behaviour is identical to
+today (single arrow). When multiple contribute, the arrows fan out
+from each constraint's widget to the target cell. All contributing
+constraints are highlighted via `Constraint.isHighlighted`. The hint
+text lists them (e.g. "Deduced from Groups, Forbidden Motif, and
+Parity").
+
+### `contributors` field on `Move`
+
+```dart
+sealed class Move {
+  final CanApply givenBy;
+  final List<CanApply> contributors;   // NEW
+  const Move._(this.givenBy, {this.contributors = const []});
+}
+```
+
+- `contributors` is the set of sources that *together* justify this
+  deduction. It is always a superset of `givenBy`.
+- When `contributors.length == 1` (the common case: a single
+  constraint fired), `contributors` is `[givenBy]` and the arrow
+  rendering is identical to today.
+- When `contributors.length > 1`, the UI highlights all of them and
+  draws an arrow from each.
+- `Move.retag()` copies `contributors` unchanged from the source move
+  (the new `givenBy` is already part of `contributors` if the caller
+  added it there).
+
+### Complicity → contributors
+
+Each `Complicity.apply()` that returns a `Move` must populate
+`contributors` with the actual `Constraint` (or `CanApply`) instances
+it combined. How this is done depends on the complicity type:
+
+- **`GSAllComplicity`** — tracks `blockers` as `Set<Constraint>`
+  (not slugs). During sealing enumeration, each blocking constraint
+  instance that rejects a colour is added directly. `_tagContributors`
+  builds `[gs, ...blockers]` without lookup — no slug-to-instance
+  expansion.
+- **`PABalancedSideComplicity`** — uses `Set<CanApply> rejectingConstraints`
+  instead of `Set<String> rejectingSlugs`. The specific FM/LT instances
+  that reject a configuration are added. `_tagContributors` builds
+  `[pa, ...rejectingConstraints]` directly.
+- **`SYFMComplicity._solveEmptyAnchor`** — collects `participatingConstraints`
+  from every move's `givenBy` during hypothesis propagation, plus any
+  constraints whose `verify` fails. The set is unioned across all
+  hypothesis runs (feasible and infeasible alike), so constraints that
+  participated indirectly (e.g. FM firing `RemoveOption` during
+  propagation) are credited even when no single constraint's `verify`
+  directly failed.
+- **`GSQAComplicity`** — `_qaThatRejects` identifies the specific
+  `QuantityConstraint` that makes a colour infeasible (vs GS-merge
+  failures which carry no QA). Only those QAs appear in `contribs`,
+  not every QA in the puzzle.
+- **`FMFMComplicity`** — introduces `_SynthNode`, pairing each
+  synthesized FM with the `List<ForbiddenMotif>` of original FMs whose
+  combination chain produced it. `apply` uses `node.origins` as
+  contributors, so only FMs that actually entered the synthesis chain
+  are credited.
+- **`SHGSComplicity`, `LTGSComplicity`, `LTFMComplicity`,
+  `GSGSComplicity`** — already track specific instances; they add the
+  actual `ShapeConstraint`, `LetterGroup`, `GroupSize`, etc. that
+  participated, not all constraints of that type.
+
+The key invariant: `contributors` holds **references to constraint
+instances that are part of `puzzle.constraints`** (or complicities
+that are part of the puzzle's complicity list), so the UI can look
+up their render position.
+
+**No slug-based expansion.** Earlier versions used `Set<String>` of
+slugs and then expanded each slug to all matching constraints via
+`puzzle.constraints.where((c) => c.slug == slug)`, which credited
+irrelevant constraints (e.g. both NCs when only one sealed a GS
+expansion). All complicities now track specific instances directly.
+
+### Force move → contributors
+
+`_forceOneCell()` must now capture the full propagation chain that
+led to the contradiction. This requires modifying `_propagateCount`:
+
+
+```dart
+// New return type
+({int moves, bool failed, List<CanApply> fired})
+```
+
+- `fired` collects `move.givenBy` for every `SetValue` / `RemoveOption`
+  that `_propagateCount` processes before hitting impossibility (or
+  completion). An `Impossible` move itself is not added to `fired`
+  since it carries no deduction — only the moves that led to it.
+- `_forceOneCell()` receives the `fired` list from
+  `clone._propagateCount()` and passes it as `contributors` on the
+  returned `RemoveOption`.
+- Duplicates across the chain (the same constraint firing on
+  consecutive iterations) are collapsed to one entry per constraint,
+  but deduplication is a display-level concern — the `fired` list may
+  contain repeats that the UI deduplicates before drawing.
+
+### UI: multiple arrows
+
+In `PuzzleWidget._computeArrowPositions()`:
+
+1. Instead of `break`-ing after the first highlighted constraint,
+   collect *all* constraints where `isHighlighted == true`.
+2. For each, compute the arrow start position (same logic as today —
+   constraint widget's render box or cell-centric position).
+3. Store `List<Offset>? _arrowStarts` and `Offset? _arrowEnd` (the
+   cell position).
+4. Render one `_ArrowPainter` per start position. All painters share
+   the same end point.
+5. When `_arrowStarts.length > 3`, consider fading less-important
+   contributors (e.g., draw the 3 most recent with full opacity and
+   the rest as grey dashes) to avoid visual clutter.
+
+The `_constraintKey` assignment must also handle multiple highlighted
+constraints: currently it is assigned to at most one constraint's
+widget. For multi-arrow rendering, either:
+
+- use one `GlobalKey` per constraint (the cell-centric key assignment
+  already exists as a path per cell, but the top-bar/constraint-widget
+  keys need expansion), or
+- compute arrow origins from layout geometry without keys (scan the
+  rendered widget tree, or compute positions from grid coordinates
+  directly for cell-centric constraints).
+
+### Tap flow (no change to stages)
+
+| Tap | Behaviour | Change from today |
+|-----|-----------|-------------------|
+| 1   | Errors / "all correct" | Unchanged |
+| 2   | Cell highlighted alone | Unchanged |
+| 3   | Cell + **all** contributing constraints (arrows drawn) | Previously: single constraint. Now: all from `contributors`. |
+| 4   | Apply move | Unchanged |
+
+### Edge cases
+
+1. **Single contributor** — degenerate case of the new system.
+   Behaviour is identical to today: one arrow from one constraint,
+   hint text unchanged.
+
+2. **Complicity + force overlap** — a move whose `givenBy` is a
+   complicity and whose `contributors` also includes constraints that
+   the complicity combined. The complicity itself is in
+   `contributors`; the UI highlights both the complicity and the
+   individual constraints. The complicity is not an independent arrow
+   source (it has no render widget) — it is represented textually in
+   the hint message.
+
+3. **No contributors** — `contributors` is empty (should not happen
+   in practice). Fall back to highlighting `givenBy` alone.
+
+4. **Overlapping contributors** — a constraint appears both as a
+   direct propagator and as a participant in a complicity. The UI
+   deduplicates by identity before drawing arrows.
+
+5. **Complicity retag uniqueness** — when all rejecting constraints
+   share the same slug (e.g. all rejectors are FMs), `_tagContributors`
+   retags `givenBy` to a synthetic one-slug `PABalancedSideComplicity`
+   or `GSAllComplicity` so the hint text can render "PA + FM" instead
+   of "PA + other". The retag affects only `givenBy` — `contributors`
+   still holds the specific instances.
