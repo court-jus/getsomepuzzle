@@ -35,25 +35,22 @@ void main() {
       expect(move.contributors.whereType<ForbiddenMotif>(), hasLength(1));
     });
 
-    test('PABalancedSideComplicity.apply populates contributors with PA+FM', () {
-      // PA+FM complicity: PA:8.top with FM:2.1 forces the vertical
-      // pattern on column 2 (cells 2,5) to be 1, then 2.
-      final puzzle = Puzzle('v2_12_3x3_000000000_FM:2.1;PA:8.top_0:0_100');
-      final pabs = puzzle.complicities
-          .whereType<PABalancedSideComplicity>()
-          .first;
-      final move = pabs.apply(puzzle);
-      expect(move, isNotNull);
-      expect(move!.contributors, hasLength(2));
-      expect(
-        move.contributors.whereType<ParityConstraint>(),
-        hasLength(1),
-      );
-      expect(
-        move.contributors.whereType<ForbiddenMotif>(),
-        hasLength(1),
-      );
-    });
+    test(
+      'PABalancedSideComplicity.apply populates contributors with PA+FM',
+      () {
+        // PA+FM complicity: PA:8.top with FM:2.1 forces the vertical
+        // pattern on column 2 (cells 2,5) to be 1, then 2.
+        final puzzle = Puzzle('v2_12_3x3_000000000_FM:2.1;PA:8.top_0:0_100');
+        final pabs = puzzle.complicities
+            .whereType<PABalancedSideComplicity>()
+            .first;
+        final move = pabs.apply(puzzle);
+        expect(move, isNotNull);
+        expect(move!.contributors, hasLength(2));
+        expect(move.contributors.whereType<ParityConstraint>(), hasLength(1));
+        expect(move.contributors.whereType<ForbiddenMotif>(), hasLength(1));
+      },
+    );
 
     test('FMFMComplicity.apply populates contributors with both FMs', () {
       // FM:12 + FM:21 next to each other → composite forbidden motifs
@@ -86,7 +83,9 @@ void main() {
       // GS and QA both present. GSAllComplicity's _maxGap=6 caps
       // combinatorial exploration; when GS needs more than that, GSQA
       // catches the size-vs-cap deduction.
-      final puzzle = Puzzle('v2_12_5x5_0000000000000000000000000_GS:0.10;QA:1.5_0:0_100');
+      final puzzle = Puzzle(
+        'v2_12_5x5_0000000000000000000000000_GS:0.10;QA:1.5_0:0_100',
+      );
       final gsqa = puzzle.complicities.whereType<GSQAComplicity>().first;
       final move = gsqa.apply(puzzle);
       expect(move, isNotNull);
@@ -101,7 +100,9 @@ void main() {
     test('LTFMComplicity.apply populates contributors with LT+FM', () {
       // LT:A on cells 6,0 + FM:2.2 (vertical 2s forbidden)
       // → LT must be black (colour 1).
-      final puzzle = Puzzle('v2_12_3x3_000000000_LT:A.6.0;FM:2.2;LT:B.5.4_0:0_100');
+      final puzzle = Puzzle(
+        'v2_12_3x3_000000000_LT:A.6.0;FM:2.2;LT:B.5.4_0:0_100',
+      );
       final ltf = puzzle.complicities.whereType<LTFMComplicity>().first;
       final move = ltf.apply(puzzle);
       expect(move, isNotNull);
@@ -129,7 +130,9 @@ void main() {
     test('SHGSComplicity.apply populates contributors with GS+SH', () {
       // SH constrains a shape region to a specific size; GS specifies
       // a group size on one of the shape cells → interplay.
-      final puzzle = Puzzle('v2_12_4x4_0000000000000000_GS:5.3;SH:0.0.2.2_0:0_100');
+      final puzzle = Puzzle(
+        'v2_12_4x4_0000000000000000_GS:5.3;SH:0.0.2.2_0:0_100',
+      );
       final shgs = puzzle.complicities.whereType<SHGSComplicity>().first;
       final move = shgs.apply(puzzle);
       if (move != null) {
@@ -172,9 +175,7 @@ void main() {
       // Instead use a puzzle where force is the only option: two
       // FMs that forbid both horizontal patterns, plus a QA that
       // creates a unique contradiction path.
-      final puzzle = Puzzle(
-        'v2_12_2x2_1000_FM:11;FM:22_0:0_0',
-      );
+      final puzzle = Puzzle('v2_12_2x2_1000_FM:11;FM:22_0:0_0');
       puzzle.computeComplexity(force: true);
       // findAMove may return a force or complicity move depending on
       // what the propagation discovers.

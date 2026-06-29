@@ -60,11 +60,7 @@ class GSAllComplicity extends Complicity {
   /// `givenBy` to a `GSAllComplicity` with the unique blocker slug
   /// when all blockers share the same slug, so the hint UI can render
   /// "GS + FM" instead of "GS + other".
-  Move _tagContributors(
-    Move move,
-    Set<Constraint> blockers,
-    GroupSize gs,
-  ) {
+  Move _tagContributors(Move move, Set<Constraint> blockers, GroupSize gs) {
     final involved = <CanApply>[gs, ...blockers];
     final withContribs = switch (move) {
       SetValue(:final idx, :final value, :final complexity) => SetValue(
