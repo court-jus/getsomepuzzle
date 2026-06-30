@@ -36,6 +36,8 @@ Future<void> main(List<String> args) async {
 
 Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final debug = parsed['debug'] as bool;
+  final showTimingBreakdown = parsed['timingBreakdown'] as bool;
+  final showCompositions = parsed['showCompositions'] as bool;
   final count = parsed['count'] as int;
   final minWidth = parsed['minWidth'] as int;
   final maxWidth = parsed['maxWidth'] as int;
@@ -263,6 +265,8 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       rejectCounts: rejectCounts,
       stageTotalsMicros: stageTotalsMicros,
       stageTotalsCalls: stageTotalsCalls,
+      showTimingBreakdown: showTimingBreakdown,
+      showCompositions: showCompositions,
       domainSize: domainSize,
       allowedDomains: allowedDomains,
       requiredRules: requiredRules,
@@ -670,7 +674,7 @@ class _CollectionStats {
   // stays stable. The '10+' bin's target follows whatever the equilibrium
   // profile declares for keys ≥ 10 (0 when none).
   final Map<String, int> nTypes;
-  // Profile axis: classic / sh / pathBased / syBased (read off the
+  // Profile axis: classic / sh / bb / pathBased / syBased (read off the
   // authoritative `scenario:` v2 suffix via `detectPuzzleProfile` in
   // equilibrium.dart). Keys match the `ProfileCategory.name` values.
   final Map<String, int> profiles;
@@ -700,6 +704,7 @@ class _CollectionStats {
     final profiles = <String, int>{
       'classic': 0,
       'sh': 0,
+      'bb': 0,
       'pathBased': 0,
       'syBased': 0,
     };
@@ -788,6 +793,8 @@ void _renderDashboard({
   Map<GenerationRejectReason, int> rejectCounts = const {},
   Map<String, int> stageTotalsMicros = const {},
   Map<String, int> stageTotalsCalls = const {},
+  bool showTimingBreakdown = false,
+  bool showCompositions = false,
 }) {
   // \x1B[2J clears the screen, \x1B[H homes the cursor.
   stderr.write('\x1B[2J\x1B[H');
@@ -894,7 +901,7 @@ void _renderDashboard({
     0,
     (a, b) => a + b,
   );
-  if (totalStageMicros > 0) {
+  if (showTimingBreakdown && totalStageMicros > 0) {
     stderr.writeln('');
     stderr.writeln(
       'Timing breakdown (sum across $jobs workers, '
@@ -979,7 +986,7 @@ void _renderDashboard({
   // the `ProfileCategory` enum order. Missing buckets default to 0
   // (e.g. early corpus).
   final orderedProfiles = <String, int>{
-    for (final k in ['classic', 'sh', 'pathBased', 'syBased'])
+    for (final k in ['classic', 'sh', 'bb', 'pathBased', 'syBased'])
       k: stats.profiles[k] ?? 0,
   };
 
@@ -1061,7 +1068,7 @@ void _renderDashboard({
   // buckets, sorted by gap descending. Only shown when the universe defines
   // composition targets.
   final compositionsToShow = 6;
-  if (axisTargets.composition.isNotEmpty) {
+  if (showCompositions && axisTargets.composition.isNotEmpty) {
     stderr.writeln('');
     stderr.writeln('Compositions (top deficits):');
     final compGaps = <MapEntry<String, double>>[];
@@ -1738,12 +1745,18 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'blacklistAdaptiveK': 20,
     'blacklistSkipSafety': 100,
     'debug': false,
+    'timingBreakdown': false,
+    'showCompositions': false,
     // null = no --domain flag → the domain axis is active on {2, 3} (the
     // worker draws each attempt's domain gap-based toward
     // kTargetDomainProfile). An explicit 2 or 3 freezes the domain and
     // disables the axis.
     'domain': null,
-    'strategy': <GenerationStrategy>[GenerationStrategy.phaseGate],
+    'strategy': <GenerationStrategy>[
+      GenerationStrategy.phaseGate,
+      GenerationStrategy.phase1Oneshot,
+      GenerationStrategy.propOnly,
+    ],
     'maxStall': 15,
     // Path-based tunables (forwarded to preFillPath). Defaults match
     // GeneratorConfig so omitting the flags preserves current behaviour.
@@ -1835,6 +1848,10 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['winding'] = double.parse(args[++i]);
       case '--debug':
         result['debug'] = true;
+      case '--timing-breakdown':
+        result['timingBreakdown'] = true;
+      case '--compositions':
+        result['showCompositions'] = true;
       case '--domain':
         final raw = args[++i];
         final v = int.tryParse(raw);
@@ -2050,6 +2067,10 @@ Generation options:
 General:
       --debug             Enable debug mode: sequential output
                           instead of the real-time dashboard.
+      --timing-breakdown  Show per-stage timing breakdown in the
+                          dashboard (hidden by default).
+      --compositions      Show composition deficits in the dashboard
+                          (hidden by default).
   -h, --help              Show this help
 
 Rule slugs: $rules
