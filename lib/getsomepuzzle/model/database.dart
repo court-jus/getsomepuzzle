@@ -15,6 +15,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/saf_access.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -1348,16 +1349,14 @@ class Database {
       // Also read from the custom sync directory when set.
       // The caller dedupes via _mergedStatHistory / loadStats.
       if (statsDirectory != null) {
-        final dir = Directory(statsDirectory!);
-        if (await dir.exists()) {
-          for (final entry in dir.listSync()) {
-            if (entry is! File || !p.basename(entry.path).startsWith("stats")) {
-              continue;
-            }
-            log.finer("Loading stats from ${entry.path}");
-            final content = await entry.readAsString();
-            stats.addAll(content.split("\n"));
-          }
+        final fileNames = await SafAccess.listFileNames(
+          statsDirectory!,
+          "stats",
+        );
+        for (final name in fileNames) {
+          log.finer("Loading stats from $statsDirectory/$name");
+          final content = await SafAccess.readFile(statsDirectory!, name);
+          stats.addAll(content.split("\n"));
         }
       }
     }
@@ -1451,13 +1450,10 @@ class Database {
     // directory is set, avoiding a split-brain scenario where the sync
     // tool would pick up the stale legacy file on the next sync.
     if (statsDirectory != null) {
-      final dir = Directory(statsDirectory!);
-      await dir.create(recursive: true);
-      final filePath = p.join(statsDirectory!, "stats.txt");
-      File(filePath).writeAsStringSync(
+      await SafAccess.writeFile(
+        statsDirectory!,
+        "stats.txt",
         merged.join("\n"),
-        mode: FileMode.writeOnly,
-        flush: true,
       );
       return;
     }
@@ -1776,21 +1772,13 @@ class Database {
         }
       }
     } else {
-      void clearStatsDir(String dirPath) {
-        final dir = Directory(dirPath);
-        if (dir.existsSync()) {
-          for (final entry in dir.listSync()) {
-            if (entry is File && p.basename(entry.path).startsWith('stats')) {
-              entry.deleteSync();
-            }
-          }
-        }
-      }
-
       final documentsDirectory = await getApplicationDocumentsDirectory();
-      clearStatsDir(p.join(documentsDirectory.path, 'getsomepuzzle'));
+      await SafAccess.deleteFiles(
+        p.join(documentsDirectory.path, 'getsomepuzzle'),
+        'stats',
+      );
       if (statsDirectory != null) {
-        clearStatsDir(statsDirectory!);
+        await SafAccess.deleteFiles(statsDirectory!, 'stats');
       }
     }
 
@@ -2311,13 +2299,8 @@ class Database {
             (await getApplicationDocumentsDirectory()).path,
             'getsomepuzzle',
           );
-      await Directory(targetDir).create(recursive: true);
-      final filePath = p.join(targetDir, 'stats_imported_$timestamp.txt');
-      File(filePath).writeAsStringSync(
-        validLines.join('\n'),
-        mode: FileMode.writeOnly,
-        flush: true,
-      );
+      final fileName = 'stats_imported_$timestamp.txt';
+      await SafAccess.writeFile(targetDir, fileName, validLines.join('\n'));
     }
     final allStats = await _readRawStatsFromStorage();
     loadStats(allStats);
