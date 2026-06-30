@@ -11,6 +11,7 @@
 library;
 
 import 'dart:io';
+import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 
@@ -60,6 +61,9 @@ class _Puzzle {
   /// instance-count ranking matches [compositionOf] exactly.
   final String compositionKey;
 
+  /// The raw puzzle line as it appears in the corpus file.
+  final String rawLine;
+
   _Puzzle(
     this.collection,
     this.slugs,
@@ -68,6 +72,7 @@ class _Puzzle {
     this.domainSize,
     this.scenario,
     this.compositionKey,
+    this.rawLine,
   );
 }
 
@@ -102,6 +107,10 @@ class _Args {
   /// Flip the order produced by [sort]. Combined with [top] this surfaces the
   /// bottom of the ranking (e.g. the least-represented slug pairs).
   final bool reverse;
+
+  /// When non-null, output a random playlist of this many puzzles instead of
+  /// a summary table. Mutually exclusive with --group-by/--cross/--buckets.
+  final int? playlist;
   _Args(
     this.files,
     this.filters,
@@ -111,6 +120,7 @@ class _Args {
     this.top,
     this.sort,
     this.reverse,
+    this.playlist,
   );
 }
 
@@ -164,7 +174,16 @@ _Puzzle? _parseLine(String line, String collection) {
   }
   final comp = compositionOf(rawSlugs);
   final compKey = comp.join('+');
-  return _Puzzle(collection, slugs, w, h, domainSize, scenario, compKey);
+  return _Puzzle(
+    collection,
+    slugs,
+    w,
+    h,
+    domainSize,
+    scenario,
+    compKey,
+    trimmed,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +326,10 @@ void _printUsage(IOSink out) {
   out.writeln('  --reverse         Flip the sort order. With --top this');
   out.writeln('                    surfaces the bottom of the ranking (e.g.');
   out.writeln('                    the least-represented rows/columns).');
+  out.writeln('  --playlist N      Output N randomly-selected puzzle lines');
+  out.writeln('                    matching the filters (skips the summary');
+  out.writeln('                    table). Mutually exclusive with');
+  out.writeln('                    --group-by/--cross/--buckets.');
   out.writeln('  -h, --help        This message.');
   out.writeln('');
   out.writeln('Examples:');
@@ -344,6 +367,7 @@ _Args _parseArgs(List<String> args) {
   int? top;
   var sort = 'count';
   var reverse = false;
+  int? playlist;
 
   const validAxes = {
     'slug',
@@ -499,6 +523,13 @@ _Args _parseArgs(List<String> args) {
       case '--reverse':
         reverse = true;
         break;
+      case '--playlist':
+        playlist = int.parse(need(i));
+        i++;
+        if (playlist! < 1) {
+          throw ArgumentError('--playlist must be >= 1.');
+        }
+        break;
       default:
         throw ArgumentError('Unknown option: $a (use --help).');
     }
@@ -507,6 +538,7 @@ _Args _parseArgs(List<String> args) {
     if (groupBySet) '--group-by',
     if (cross != null) '--cross',
     if (buckets != null) '--buckets',
+    if (playlist != null) '--playlist',
   ];
   if (modes.length > 1) {
     throw ArgumentError(
@@ -514,7 +546,17 @@ _Args _parseArgs(List<String> args) {
     );
   }
   if (!pickedFiles) files = List<String>.from(_publishedFiles);
-  return _Args(files, filters, groupBy, cross, buckets, top, sort, reverse);
+  return _Args(
+    files,
+    filters,
+    groupBy,
+    cross,
+    buckets,
+    top,
+    sort,
+    reverse,
+    playlist,
+  );
 }
 
 void main(List<String> rawArgs) {
@@ -548,13 +590,11 @@ void main(List<String> rawArgs) {
       .where((p) => _passesFilters(p, opts.filters))
       .toList();
 
-  // Header
-  stdout.writeln(
-    'Scanned files (${opts.files.length}): ${opts.files.join(", ")}',
-  );
-  stdout.writeln('Total puzzles: $totalScanned');
+  final out = opts.playlist != null ? stderr : stdout;
+  out.writeln('Scanned files (${opts.files.length}): ${opts.files.join(", ")}');
+  out.writeln('Total puzzles: $totalScanned');
   final pct = totalScanned == 0 ? 0.0 : filtered.length * 100 / totalScanned;
-  stdout.writeln(
+  out.writeln(
     'After filters: ${filtered.length} (${pct.toStringAsFixed(2)}% of total)',
   );
 
@@ -586,16 +626,37 @@ void main(List<String> rawArgs) {
   if (opts.filters.minArea != null) active.add('area>=${opts.filters.minArea}');
   if (opts.filters.maxArea != null) active.add('area<=${opts.filters.maxArea}');
   if (active.isNotEmpty) {
-    stdout.writeln('Filters: ${active.join(' ')}');
+    out.writeln('Filters: ${active.join(' ')}');
   }
-  stdout.writeln('');
+  out.writeln('');
 
-  if (opts.cross != null) {
+  if (opts.playlist != null) {
+    _printPlaylist(filtered, opts);
+  } else if (opts.cross != null) {
     _printCrosstab(filtered, opts);
   } else if (opts.buckets != null) {
     _printBuckets(filtered, opts);
   } else {
     _printTable1D(filtered, opts);
+  }
+}
+
+/// Print `n` randomly-selected puzzle lines matching the filters.
+/// When the filtered pool is smaller than the requested count, every puzzle
+/// is included (in random order).
+void _printPlaylist(List<_Puzzle> filtered, _Args opts) {
+  final rng = Random();
+  final pool = filtered.toList()..shuffle(rng);
+  final n = opts.playlist!;
+  final taken = pool.take(n).toList();
+  if (taken.length < n) {
+    stderr.writeln(
+      'Warning: only ${taken.length} puzzles match filters '
+      '(requested $n).',
+    );
+  }
+  for (final p in taken) {
+    stdout.writeln(p.rawLine);
   }
 }
 
