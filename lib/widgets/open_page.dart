@@ -640,56 +640,66 @@ class _OpenPageState extends State<OpenPage> {
                                           context,
                                         )!.scenarioFilterLabel,
                                       ),
-                                      DropdownButton<
-                                        equilibrium.ProfileCategory?
-                                      >(
-                                        value: widget
-                                            .database
-                                            .currentFilters
-                                            .wantedScenario,
-                                        hint: Text(
-                                          AppLocalizations.of(
-                                            context,
-                                          )!.scenarioAny,
-                                        ),
-                                        items: [
-                                          DropdownMenuItem(
-                                            value: null,
-                                            child: Text(
-                                              AppLocalizations.of(
-                                                context,
-                                              )!.scenarioAny,
-                                            ),
-                                          ),
-                                          for (final p
-                                              in equilibrium
-                                                  .ProfileCategory
-                                                  .values)
-                                            DropdownMenuItem(
-                                              value: p,
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    _scenarioLabel(p, context),
-                                                  ),
-                                                  Text(
-                                                    _scenarioExplain(
-                                                      p,
-                                                      context,
-                                                    ),
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey,
-                                                    ),
-                                                  ),
-                                                ],
+                                      Expanded(
+                                        child:
+                                            DropdownButton<
+                                              equilibrium.ProfileCategory?
+                                            >(
+                                              isExpanded: true,
+                                              value: widget
+                                                  .database
+                                                  .currentFilters
+                                                  .wantedScenario,
+                                              hint: Text(
+                                                AppLocalizations.of(
+                                                  context,
+                                                )!.scenarioAny,
                                               ),
+                                              items: [
+                                                DropdownMenuItem(
+                                                  value: null,
+                                                  child: Text(
+                                                    AppLocalizations.of(
+                                                      context,
+                                                    )!.scenarioAny,
+                                                  ),
+                                                ),
+                                                for (final p
+                                                    in equilibrium
+                                                        .ProfileCategory
+                                                        .values)
+                                                  DropdownMenuItem(
+                                                    value: p,
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          _scenarioLabel(
+                                                            p,
+                                                            context,
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          _scenarioExplain(
+                                                            p,
+                                                            context,
+                                                          ),
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    Colors.grey,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                              ],
+                                              onChanged: (v) =>
+                                                  applyFilter(newScenario: v),
                                             ),
-                                        ],
-                                        onChanged: (v) =>
-                                            applyFilter(newScenario: v),
                                       ),
                                     ],
                                   ),

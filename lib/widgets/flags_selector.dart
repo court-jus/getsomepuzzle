@@ -21,40 +21,8 @@ class FlagsSelector extends StatefulWidget {
 }
 
 class _FlagsSelectorState extends State<FlagsSelector> {
-  List<GlobalKey> _chipKeys = [];
-  double? _maxChipWidth;
-
-  @override
-  void initState() {
-    super.initState();
-    _chipKeys = List.generate(widget.choices.length, (_) => GlobalKey());
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
-  }
-
-  @override
-  void didUpdateWidget(covariant FlagsSelector oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.choices.length != widget.choices.length) {
-      _chipKeys = List.generate(widget.choices.length, (_) => GlobalKey());
-      _maxChipWidth = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
-    }
-  }
-
-  void _measure() {
-    double max = 0;
-    for (final key in _chipKeys) {
-      final size = key.currentContext?.size;
-      if (size != null && size.width > max) max = size.width;
-    }
-    if (max > 0 && max != _maxChipWidth) {
-      setState(() => _maxChipWidth = max);
-    }
-  }
-
   Widget _buildChip((String, String) entry, int index) {
-    final chip = ActionChip(
-      key: _chipKeys[index],
+    return ActionChip(
       avatar: widget.iconBuilder != null
           ? SizedBox(
               width: 24,
@@ -101,24 +69,16 @@ class _FlagsSelectorState extends State<FlagsSelector> {
         }
       },
     );
-
-    if (_maxChipWidth == null) return chip;
-    return SizedBox(width: _maxChipWidth, child: chip);
   }
 
   @override
   Widget build(BuildContext context) {
     final entries = widget.choices;
-    return Column(
+    return Wrap(
+      alignment: WrapAlignment.center,
+      runSpacing: 4,
       children: [
-        for (int start = 0; start < entries.length; start += 4)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (int i = start; i < (start + 4).clamp(0, entries.length); i++)
-                _buildChip(entries[i], i),
-            ],
-          ),
+        for (int i = 0; i < entries.length; i++) _buildChip(entries[i], i),
       ],
     );
   }
