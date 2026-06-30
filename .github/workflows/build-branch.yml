@@ -1,6 +1,8 @@
-name: Build Branch (Manual)
+name: Build Branch
 on:
   workflow_dispatch:
+  push:
+    branches: [develop]
 
 permissions:
   contents: read
@@ -16,19 +18,10 @@ jobs:
     outputs:
       slug: ${{ steps.slug.outputs.slug }}
     steps:
-      - name: Compute branch slug
+      - name: Compute timestamp suffix
         id: slug
         run: |
-          BRANCH="${{ github.ref_name }}"
-          SLUG=$(echo "$BRANCH" \
-            | tr '[:upper:]' '[:lower:]' \
-            | sed -E 's/[^a-z0-9]+/-/g' \
-            | sed -E 's/^-+|-+$//g' \
-            | cut -c1-30)
-          if [ -z "$SLUG" ]; then
-            echo "Empty slug derived from branch '$BRANCH'" >&2
-            exit 1
-          fi
+          SLUG=$(date -u '+%y%m%d%H%M')
           echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
           echo "Slug: $SLUG"
 
