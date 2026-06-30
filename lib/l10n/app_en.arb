@@ -1093,5 +1093,13 @@
     "statsSyncDirectoryWebUnsupported": "Not available on web.",
     "@statsSyncDirectoryWebUnsupported": {
         "description": "Message shown on the stats sync directory setting when running on web"
+    },
+    "statsSyncDirectoryInvalid": "The selected folder is not accessible. Please choose a new one.",
+    "@statsSyncDirectoryInvalid": {
+        "description": "Error shown in settings when the stats sync directory is inaccessible"
+    },
+    "statsSyncDirectoryAutoCleared": "The stats sync folder was cleared because it is no longer accessible. You can set a new one in the settings.",
+    "@statsSyncDirectoryAutoCleared": {
+        "description": "Snackbar shown at boot when the stats directory has been auto-cleared due to inaccessibility"
     }
 }

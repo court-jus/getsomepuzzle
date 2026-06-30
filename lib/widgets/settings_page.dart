@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/saf_access.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -24,7 +25,11 @@ class SettingsPage extends StatefulWidget {
 
   /// Called when the user picks or clears a stats sync directory.
   /// Passes the absolute path, or null to revert to the default location.
-  final ValueChanged<String?> onStatsDirectoryChanged;
+  final Future<void> Function(String?) onStatsDirectoryChanged;
+
+  /// Error description for the stats sync directory, shown in red
+  /// below the directory path when the directory is inaccessible.
+  final String? statsDirectoryError;
 
   const SettingsPage({
     super.key,
@@ -34,6 +39,7 @@ class SettingsPage extends StatefulWidget {
     required this.onReplayOnboarding,
     required this.onChangeLanguage,
     required this.onStatsDirectoryChanged,
+    this.statsDirectoryError,
   });
 
   @override
@@ -299,8 +305,10 @@ class _SettingsPageState extends State<SettingsPage> {
                       const SizedBox(height: 8),
                       _StatsDirectoryRow(
                         path: widget.settings.statsDirectory,
-                        onChange: (path) {
-                          widget.onStatsDirectoryChanged(path);
+                        error: widget.statsDirectoryError,
+                        onChange: (path) async {
+                          await widget.onStatsDirectoryChanged(path);
+                          if (mounted) setState(() {});
                         },
                       ),
                     ],
@@ -385,16 +393,43 @@ String _localeDisplayName(BuildContext context) {
   }
 }
 
+/// Convert a `content://` tree URI to a human-readable filesystem path
+/// for display in the UI. Non-content URIs are returned unchanged.
+String _contentUriToDisplayPath(String path) {
+  if (!path.startsWith('content://')) return path;
+  try {
+    final uri = Uri.parse(path);
+    final last = uri.pathSegments.last;
+    final decoded = Uri.decodeComponent(last);
+    final colon = decoded.indexOf(':');
+    return colon > 0 && colon < decoded.length - 1
+        ? decoded.substring(colon + 1)
+        : decoded;
+  } catch (_) {
+    return path;
+  }
+}
+
 class _StatsDirectoryRow extends StatelessWidget {
   final String? path;
+  final String? error;
   final ValueChanged<String?> onChange;
 
-  const _StatsDirectoryRow({required this.path, required this.onChange});
+  const _StatsDirectoryRow({
+    required this.path,
+    this.error,
+    required this.onChange,
+  });
 
   Future<void> _pickDirectory() async {
-    final selected = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Select stats sync directory',
-    );
+    String? selected;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      selected = await SafAccess.pickDirectory();
+    } else {
+      selected = await FilePicker.getDirectoryPath(
+        dialogTitle: 'Select stats sync directory',
+      );
+    }
     if (selected != null) {
       onChange(selected);
     }
@@ -412,12 +447,34 @@ class _StatsDirectoryRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
-                path!,
+                _contentUriToDisplayPath(path!),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      error!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           if (kIsWeb)

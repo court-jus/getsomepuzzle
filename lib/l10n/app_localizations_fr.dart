@@ -975,4 +975,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get statsSyncDirectoryWebUnsupported => 'Non disponible sur le web.';
+
+  @override
+  String get statsSyncDirectoryInvalid =>
+      'Le dossier sélectionné n\'est pas accessible. Veuillez en choisir un nouveau.';
+
+  @override
+  String get statsSyncDirectoryAutoCleared =>
+      'Le dossier de synchronisation a été effacé car il n\'est plus accessible. Vous pouvez en définir un nouveau dans les paramètres.';
 }

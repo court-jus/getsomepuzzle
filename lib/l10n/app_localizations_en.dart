@@ -967,4 +967,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statsSyncDirectoryWebUnsupported => 'Not available on web.';
+
+  @override
+  String get statsSyncDirectoryInvalid =>
+      'The selected folder is not accessible. Please choose a new one.';
+
+  @override
+  String get statsSyncDirectoryAutoCleared =>
+      'The stats sync folder was cleared because it is no longer accessible. You can set a new one in the settings.';
 }

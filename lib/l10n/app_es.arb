@@ -451,5 +451,13 @@
     "statsSyncDirectoryWebUnsupported": "No disponible en web.",
     "@statsSyncDirectoryWebUnsupported": {
         "description": "Message shown on the stats sync directory setting when running on web"
+    },
+    "statsSyncDirectoryInvalid": "La carpeta seleccionada no es accesible. Por favor, elige una nueva.",
+    "@statsSyncDirectoryInvalid": {
+        "description": "Error shown in settings when the stats sync directory is inaccessible"
+    },
+    "statsSyncDirectoryAutoCleared": "La carpeta de sincronización se ha borrado porque ya no es accesible. Puedes configurar una nueva en los ajustes.",
+    "@statsSyncDirectoryAutoCleared": {
+        "description": "Snackbar shown at boot when the stats directory has been auto-cleared due to inaccessibility"
     }
 }

@@ -1,6 +1,7 @@
 import 'dart:io' show Directory, File, FileMode, Platform;
 
 import 'package:flutter/services.dart';
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 
 /// Platform-aware file I/O that transparently uses Android's SAF
@@ -11,10 +12,15 @@ import 'package:path/path.dart' as p;
 /// Without this bridge, [Directory] and [File] throw or silently
 /// return empty results when passed a SAF content URI, which is what
 /// makes the user-chosen stats-sync directory invisible on modern Android.
+///
+/// Exceptions are logged at warning level and then rethrown — callers
+/// should catch what they can handle (e.g. [Database] sets
+/// [Database.statsDirectoryError] on failure so the UI can react).
 class SafAccess {
   SafAccess._();
 
   static const _channel = MethodChannel('getsomepuzzle/saf');
+  static final _log = Logger('SafAccess');
 
   static bool _isContentUri(String path) => path.startsWith('content://');
 
@@ -24,33 +30,43 @@ class SafAccess {
     String dirPath,
     String prefix,
   ) async {
-    if (Platform.isAndroid && _isContentUri(dirPath)) {
-      final result = await _channel.invokeListMethod<String>('listFiles', {
-        'uri': dirPath,
-        'prefix': prefix,
-      });
-      return result ?? [];
+    try {
+      if (Platform.isAndroid && _isContentUri(dirPath)) {
+        final result = await _channel.invokeListMethod<String>('listFiles', {
+          'uri': dirPath,
+          'prefix': prefix,
+        });
+        return result ?? [];
+      }
+      final dir = Directory(dirPath);
+      if (!await dir.exists()) return [];
+      return dir
+          .listSync()
+          .whereType<File>()
+          .map((f) => p.basename(f.path))
+          .where((name) => name.startsWith(prefix))
+          .toList();
+    } on Exception catch (e) {
+      _log.warning('listFileNames($dirPath, $prefix) failed: $e');
+      rethrow;
     }
-    final dir = Directory(dirPath);
-    if (!await dir.exists()) return [];
-    return dir
-        .listSync()
-        .whereType<File>()
-        .map((f) => p.basename(f.path))
-        .where((name) => name.startsWith(prefix))
-        .toList();
   }
 
   /// Read the full text content of [fileName] inside [dirPath].
   static Future<String> readFile(String dirPath, String fileName) async {
-    if (Platform.isAndroid && _isContentUri(dirPath)) {
-      final result = await _channel.invokeMethod<String>('readFile', {
-        'uri': dirPath,
-        'fileName': fileName,
-      });
-      return result ?? '';
+    try {
+      if (Platform.isAndroid && _isContentUri(dirPath)) {
+        final result = await _channel.invokeMethod<String>('readFile', {
+          'uri': dirPath,
+          'fileName': fileName,
+        });
+        return result ?? '';
+      }
+      return File(p.join(dirPath, fileName)).readAsString();
+    } on Exception catch (e) {
+      _log.warning('readFile($dirPath, $fileName) failed: $e');
+      rethrow;
     }
-    return File(p.join(dirPath, fileName)).readAsString();
   }
 
   /// Write [content] to [fileName] inside [dirPath], creating the
@@ -61,36 +77,77 @@ class SafAccess {
     String fileName,
     String content,
   ) async {
-    if (Platform.isAndroid && _isContentUri(dirPath)) {
-      await _channel.invokeMethod<void>('writeFile', {
-        'uri': dirPath,
-        'fileName': fileName,
-        'content': content,
-      });
-      return;
+    try {
+      if (Platform.isAndroid && _isContentUri(dirPath)) {
+        await _channel.invokeMethod<void>('writeFile', {
+          'uri': dirPath,
+          'fileName': fileName,
+          'content': content,
+        });
+        return;
+      }
+      final dir = Directory(dirPath);
+      await dir.create(recursive: true);
+      File(
+        p.join(dirPath, fileName),
+      ).writeAsStringSync(content, mode: FileMode.writeOnly, flush: true);
+    } on Exception catch (e) {
+      _log.warning('writeFile($dirPath, $fileName) failed: $e');
+      rethrow;
     }
-    final dir = Directory(dirPath);
-    await dir.create(recursive: true);
-    File(
-      p.join(dirPath, fileName),
-    ).writeAsStringSync(content, mode: FileMode.writeOnly, flush: true);
+  }
+
+  /// Open a SAF directory picker. Returns a `content://` tree URI with
+  /// persistable read/write permissions, or null if the user cancelled.
+  static Future<String?> pickDirectory() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      return await _channel.invokeMethod<String>('pickDirectory');
+    } on Exception catch (e) {
+      _log.warning('pickDirectory failed: $e');
+      return null;
+    }
+  }
+
+  /// Convert a `content://` tree URI to a human-readable path for display.
+  /// Falls back to the raw URI when conversion fails or the path is not a
+  /// content URI.
+  static Future<String> displayPath(String path) async {
+    if (Platform.isAndroid && _isContentUri(path)) {
+      try {
+        final result = await _channel.invokeMethod<String>(
+          'getDisplayPath',
+          path,
+        );
+        return result ?? path;
+      } on Exception catch (e) {
+        _log.warning('displayPath($path) failed: $e');
+        return path;
+      }
+    }
+    return path;
   }
 
   /// Delete every file inside [dirPath] whose name starts with [prefix].
   static Future<void> deleteFiles(String dirPath, String prefix) async {
-    if (Platform.isAndroid && _isContentUri(dirPath)) {
-      await _channel.invokeMethod<void>('deleteFiles', {
-        'uri': dirPath,
-        'prefix': prefix,
-      });
-      return;
-    }
-    final dir = Directory(dirPath);
-    if (!await dir.exists()) return;
-    for (final entry in dir.listSync()) {
-      if (entry is File && p.basename(entry.path).startsWith(prefix)) {
-        entry.deleteSync();
+    try {
+      if (Platform.isAndroid && _isContentUri(dirPath)) {
+        await _channel.invokeMethod<void>('deleteFiles', {
+          'uri': dirPath,
+          'prefix': prefix,
+        });
+        return;
       }
+      final dir = Directory(dirPath);
+      if (!await dir.exists()) return;
+      for (final entry in dir.listSync()) {
+        if (entry is File && p.basename(entry.path).startsWith(prefix)) {
+          entry.deleteSync();
+        }
+      }
+    } on Exception catch (e) {
+      _log.warning('deleteFiles($dirPath, $prefix) failed: $e');
+      rethrow;
     }
   }
 }

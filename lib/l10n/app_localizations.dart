@@ -1815,6 +1815,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not available on web.'**
   String get statsSyncDirectoryWebUnsupported;
+
+  /// Error shown in settings when the stats sync directory is inaccessible
+  ///
+  /// In en, this message translates to:
+  /// **'The selected folder is not accessible. Please choose a new one.'**
+  String get statsSyncDirectoryInvalid;
+
+  /// Snackbar shown at boot when the stats directory has been auto-cleared due to inaccessibility
+  ///
+  /// In en, this message translates to:
+  /// **'The stats sync folder was cleared because it is no longer accessible. You can set a new one in the settings.'**
+  String get statsSyncDirectoryAutoCleared;
 }
 
 class _AppLocalizationsDelegate

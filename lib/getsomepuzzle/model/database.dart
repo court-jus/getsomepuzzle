@@ -404,7 +404,41 @@ class Database {
   /// Set by [main.dart] from [Settings.statsDirectory].
   String? statsDirectory;
 
+  /// Error description when [statsDirectory] is set but inaccessible.
+  /// Set by [validateStatsDirectory], [writeStats] or
+  /// [_readRawStatsFromStorage] when a file operation fails.
+  /// Checked by the UI to display a warning in the settings page.
+  String? statsDirectoryError;
+
   Database({required this.playerLevel, this.progress});
+
+  /// Check whether [statsDirectory] is actually writable.
+  /// Returns true when the path is null or passes a test write.
+  /// On failure sets [statsDirectoryError] and returns false.
+  Future<bool> validateStatsDirectory() async {
+    final dir = statsDirectory;
+    if (dir == null) {
+      statsDirectoryError = null;
+      return true;
+    }
+    try {
+      await SafAccess.writeFile(dir, '.gsp_validate', 'ok');
+      await SafAccess.deleteFiles(dir, '.gsp_validate');
+      statsDirectoryError = null;
+      return true;
+    } on Exception catch (e) {
+      statsDirectoryError = '$e';
+      return false;
+    }
+  }
+
+  /// Clear [statsDirectory] and [statsDirectoryError], flushing
+  /// the merged history to the legacy location first.
+  Future<void> clearStatsDirectory() async {
+    await writeStatsToDefaultLocation();
+    statsDirectory = null;
+    statsDirectoryError = null;
+  }
 
   void setPlayerLevel(int newLevel) {
     playerLevel = newLevel;
@@ -1349,14 +1383,19 @@ class Database {
       // Also read from the custom sync directory when set.
       // The caller dedupes via _mergedStatHistory / loadStats.
       if (statsDirectory != null) {
-        final fileNames = await SafAccess.listFileNames(
-          statsDirectory!,
-          "stats",
-        );
-        for (final name in fileNames) {
-          log.finer("Loading stats from $statsDirectory/$name");
-          final content = await SafAccess.readFile(statsDirectory!, name);
-          stats.addAll(content.split("\n"));
+        try {
+          final fileNames = await SafAccess.listFileNames(
+            statsDirectory!,
+            "stats",
+          );
+          for (final name in fileNames) {
+            log.finer("Loading stats from $statsDirectory/$name");
+            final content = await SafAccess.readFile(statsDirectory!, name);
+            stats.addAll(content.split("\n"));
+          }
+        } on Exception catch (e) {
+          log.warning("Failed to read stats from $statsDirectory: $e");
+          statsDirectoryError = '$e';
         }
       }
     }
@@ -1450,11 +1489,17 @@ class Database {
     // directory is set, avoiding a split-brain scenario where the sync
     // tool would pick up the stale legacy file on the next sync.
     if (statsDirectory != null) {
-      await SafAccess.writeFile(
-        statsDirectory!,
-        "stats.txt",
-        merged.join("\n"),
-      );
+      try {
+        await SafAccess.writeFile(
+          statsDirectory!,
+          "stats.txt",
+          merged.join("\n"),
+        );
+        statsDirectoryError = null;
+      } on Exception catch (e) {
+        log.warning("Failed to write stats to $statsDirectory: $e");
+        statsDirectoryError = '$e';
+      }
       return;
     }
     await _writeToLegacyDir(merged);
@@ -1773,12 +1818,22 @@ class Database {
       }
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
-      await SafAccess.deleteFiles(
-        p.join(documentsDirectory.path, 'getsomepuzzle'),
-        'stats',
-      );
+      try {
+        await SafAccess.deleteFiles(
+          p.join(documentsDirectory.path, 'getsomepuzzle'),
+          'stats',
+        );
+      } on Exception catch (e) {
+        log.warning('Failed to clear legacy stats: $e');
+      }
       if (statsDirectory != null) {
-        await SafAccess.deleteFiles(statsDirectory!, 'stats');
+        try {
+          await SafAccess.deleteFiles(statsDirectory!, 'stats');
+          statsDirectoryError = null;
+        } on Exception catch (e) {
+          log.warning('Failed to clear stats in custom dir: $e');
+          statsDirectoryError = '$e';
+        }
       }
     }
 
@@ -2300,7 +2355,12 @@ class Database {
             'getsomepuzzle',
           );
       final fileName = 'stats_imported_$timestamp.txt';
-      await SafAccess.writeFile(targetDir, fileName, validLines.join('\n'));
+      try {
+        await SafAccess.writeFile(targetDir, fileName, validLines.join('\n'));
+      } on Exception catch (e) {
+        log.warning('Failed to write imported stats to $targetDir: $e');
+        if (statsDirectory != null) statsDirectoryError = '$e';
+      }
     }
     final allStats = await _readRawStatsFromStorage();
     loadStats(allStats);

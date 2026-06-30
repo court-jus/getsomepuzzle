@@ -451,5 +451,13 @@
     "statsSyncDirectoryWebUnsupported": "Non disponible sur le web.",
     "@statsSyncDirectoryWebUnsupported": {
         "description": "Message shown on the stats sync directory setting when running on web"
+    },
+    "statsSyncDirectoryInvalid": "Le dossier sélectionné n'est pas accessible. Veuillez en choisir un nouveau.",
+    "@statsSyncDirectoryInvalid": {
+        "description": "Error shown in settings when the stats sync directory is inaccessible"
+    },
+    "statsSyncDirectoryAutoCleared": "Le dossier de synchronisation a été effacé car il n'est plus accessible. Vous pouvez en définir un nouveau dans les paramètres.",
+    "@statsSyncDirectoryAutoCleared": {
+        "description": "Snackbar shown at boot when the stats directory has been auto-cleared due to inaccessibility"
     }
 }

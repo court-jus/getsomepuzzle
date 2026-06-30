@@ -973,4 +973,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get statsSyncDirectoryWebUnsupported => 'No disponible en web.';
+
+  @override
+  String get statsSyncDirectoryInvalid =>
+      'La carpeta seleccionada no es accesible. Por favor, elige una nueva.';
+
+  @override
+  String get statsSyncDirectoryAutoCleared =>
+      'La carpeta de sincronización se ha borrado porque ya no es accesible. Puedes configurar una nueva en los ajustes.';
 }

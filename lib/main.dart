@@ -244,6 +244,31 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     // returning player doesn't have to re-derive them on every launch.
     await progress.save();
     initialized = true;
+    // Validate statsDirectory and auto-clear if the path is
+    // inaccessible (e.g. an old filesystem path saved before the
+    // SAF-migration commit on Android 11+).
+    final dir = settings.statsDirectory;
+    if (database != null && dir != null && !kIsWeb) {
+      await _validateAndAutoClearStatsDir(database!, dir);
+    }
+  }
+
+  Future<void> _validateAndAutoClearStatsDir(Database db, String dir) async {
+    final valid = await db.validateStatsDirectory();
+    if (valid) return;
+    await db.clearStatsDirectory();
+    await settings.setStatsDirectory(null);
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.statsSyncDirectoryAutoCleared,
+          ),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    }
   }
 
   Future<void> initializeDatabase(int playerLevel) async {
@@ -1148,6 +1173,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               MaterialPageRoute(
                 builder: (context) => SettingsPage(
                   settings: settings,
+                  statsDirectoryError: database?.statsDirectoryError,
                   onReplayOnboarding: () async {
                     // Restart the onboarding journey end-to-end.
                     // Play stats are deliberately preserved — only
@@ -1248,16 +1274,38 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     game.refresh();
                   },
                   onStatsDirectoryChanged: (path) async {
-                    if (path == null && database != null) {
+                    if (database == null) return;
+                    if (path == null) {
                       // Flush the merged history (custom dir + legacy) back
                       // to the legacy location before dropping the reference,
                       // so plays made while the custom dir was active are not
                       // orphaned when it stops being read.
                       await database!.writeStatsToDefaultLocation();
+                      await settings.setStatsDirectory(null);
+                      database!.statsDirectory = null;
+                      database!.statsDirectoryError = null;
+                      return;
                     }
                     await settings.setStatsDirectory(path);
-                    if (database != null) {
-                      database!.statsDirectory = path;
+                    database!.statsDirectory = path;
+                    database!.statsDirectoryError = null;
+                    final valid = await database!.validateStatsDirectory();
+                    if (!valid) {
+                      await database!.clearStatsDirectory();
+                      await settings.setStatsDirectory(null);
+                      if (mounted) {
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              AppLocalizations.of(
+                                context,
+                              )!.statsSyncDirectoryInvalid,
+                            ),
+                            duration: const Duration(seconds: 6),
+                          ),
+                        );
+                      }
                     }
                   },
                   onChangeLanguage: () {
