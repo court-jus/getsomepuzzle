@@ -10,6 +10,24 @@ localised under
 `marketing/play_store/<locale>/changelogs/default.txt` and
 `marketing/app_store/<locale>/release_notes.txt`.
 
+## [Unreleased]
+
+- **Third color (purple)**: puzzles can now be played with three colors (black, white, purple). Free cells show colored option dots for remaining possibilities. Right-click cycles to the last domain color.
+- **New constraint: Implication** (IM) — a directional link between two cells: if the source is of a given color, the target must be too.
+- **New constraint: Bounding Box** (BB) — every group of a color must fit within a fixed-size bounding box (e.g. 3×3).
+- **Keyboard shortcuts** on desktop
+- **Restart confirmation**: a split-screen pause/restart dialog prevents accidental resets.
+- **Scenario picker** in the Open page: eight reasoning-style filters (classic, shapes, paths, symmetry, minesweeper, nonogram, local patterns, groups) to find puzzles by deduction style.
+- **Richer hints**: when a deduction involves multiple constraints, all contributors are highlighted, not just the last one.
+- **Option to disable grayout** of completed constraints, available in Settings.
+- **Merged CC/RC and CT/RT** onboarding phases for a faster tutorial.
+- **Full play history** kept in stats (multiple sessions per puzzle).
+- **Custom stats directory**: choose a location (Dropbox, Syncthing, etc.) in Settings.
+- **Open page visual rework**: the filter selector uses a centered `Wrap` to adapt to all screen widths.
+- **Gradual collection progression**: the suggested collection moves one level at a time, no more jumps straight to "mad".
+- **Slugs in the in-app generator**: constraints are listed by code (NC, GS…) instead of localized names.
+- ~10K new puzzles (BB, IM, paths, more variety across levels).
+
 ## [1.6.22] - 2026-06-04
 
 - Fix android build

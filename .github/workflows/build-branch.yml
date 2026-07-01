@@ -5,7 +5,7 @@ on:
     branches: [develop]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -128,3 +128,64 @@ jobs:
         with:
           name: WebRelease-${{ needs.prepare.outputs.slug }}
           path: build/web-build.tgz
+
+  release:
+    needs: [prepare, build-apk, build-windows, build-web]
+    runs-on: ubuntu-latest
+    name: Experimental Release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract base version from pubspec.yaml
+        run: |
+          VERSION=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
+          # Strip the Flutter build-number suffix (+N), same as ci.yml
+          BASE="${VERSION%+*}"
+          echo "VERSION=$BASE" >> "$GITHUB_ENV"
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ApkReleases-${{ needs.prepare.outputs.slug }}
+          path: artifacts/apk
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WindowsRelease-${{ needs.prepare.outputs.slug }}
+          path: artifacts/windows
+      - name: Download Web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WebRelease-${{ needs.prepare.outputs.slug }}
+          path: artifacts/web
+      - name: Rename assets
+        env:
+          SLUG: ${{ needs.prepare.outputs.slug }}
+        run: |
+          mv artifacts/apk/app-release.apk "artifacts/apk/getsomepuzzle-v${VERSION}-exp.${SLUG}.apk"
+          mv artifacts/windows/windows-build.tgz "artifacts/windows/getsomepuzzle-v${VERSION}-exp.${SLUG}-windows.tgz"
+          mv artifacts/web/web-build.tgz "artifacts/web/getsomepuzzle-v${VERSION}-exp.${SLUG}-web.tgz"
+      - name: Create Pre-release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: v${{ env.VERSION }}-exp.${{ needs.prepare.outputs.slug }}
+          name: v${{ env.VERSION }}-exp.${{ needs.prepare.outputs.slug }}
+          prerelease: true
+          artifacts: >-
+            artifacts/apk/getsomepuzzle-v${{ env.VERSION }}-exp.${{ needs.prepare.outputs.slug }}.apk,
+            artifacts/windows/getsomepuzzle-v${{ env.VERSION }}-exp.${{ needs.prepare.outputs.slug }}-windows.tgz,
+            artifacts/web/getsomepuzzle-v${{ env.VERSION }}-exp.${{ needs.prepare.outputs.slug }}-web.tgz
+
+  cleanup-experimental:
+    needs: [release]
+    runs-on: ubuntu-latest
+    name: Cleanup Old Pre-releases
+    steps:
+      - name: Delete old experimental releases (keep 5)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --json tagName,isPrerelease,createdAt --limit 100 \
+            --jq '[.[] | select(.isPrerelease)] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' \
+            | while read tag; do
+              echo "Deleting old experimental release: $tag"
+              gh release delete "$tag" --yes
+            done
