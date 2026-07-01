@@ -6,6 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/bb.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/boss.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/path.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/regular.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/sh.dart';
@@ -108,6 +109,14 @@ class GeneratorConfig {
   /// legitimately slow successes.
   final Duration maxStall;
 
+  /// Use the experimental "seed-and-grow" prefill instead of the
+  /// default random/SH/BB prefill. Targets large grids ("Boss" levels):
+  /// plants seeds weighted toward the grid centre, grows each one into
+  /// a group of 15–25 cells, then random-fills the remaining ~30 % and
+  /// posts a GS constraint per seeded group with its final size.
+  /// See `docs/dev/boss.md`.
+  final bool useBossPrefill;
+
   const GeneratorConfig({
     required this.width,
     required this.height,
@@ -131,6 +140,7 @@ class GeneratorConfig {
     this.domain = defaultDomain,
     this.strategy = GenerationStrategy.phaseGate,
     this.maxStall = const Duration(seconds: 15),
+    this.useBossPrefill = false,
   });
 }
 
@@ -539,7 +549,11 @@ class PuzzleGenerator {
       solved = result.solved;
       constructiveLts = result.letterGroups;
     } else {
-      solved = hasSH
+      // Boss prefill (seed-and-grow) takes precedence over the other
+      // prefills when explicitly requested via config flag.
+      solved = config.useBossPrefill
+          ? preFillBoss(width, height, domain, _rng)
+          : hasSH
           ? preFillSh(width, height, domain, _rng)
           : hasBB
           ? preFillBB(width, height, domain, _rng)

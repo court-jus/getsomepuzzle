@@ -45,12 +45,17 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final maxHeight = parsed['maxHeight'] as int;
   final maxTime = parsed['maxTime'] as int;
   final maxAttemptTime = parsed['maxAttemptTime'] as int;
-  final output = parsed['output'] as String?;
+  final bossMode = parsed['boss'] as bool;
+  final output =
+      (parsed['output'] as String?) ?? (bossMode ? 'assets/boss.txt' : null);
   final bannedRules = (parsed['banned'] as String?)?.split(',').toSet() ?? {};
   final allowedSlugsArg = (parsed['allowed'] as String?)?.split(',').toSet();
   final requiredRules =
       (parsed['required'] as String?)?.split(',').toSet() ?? {};
-  final equilibriumRequested = parsed['equilibrium'] as bool;
+  // --boss forces equilibrium off: the warmup phase locks us into a 2-slug
+  // configuration that's far too thin to resolve a 30×20 grid, and the
+  // equilibrium picker has no calibration for grids that size.
+  final equilibriumRequested = (parsed['equilibrium'] as bool) && !bossMode;
   final jobs = (parsed['jobs'] as int).clamp(1, count);
   final logDir = parsed['logDir'] as String?;
   final targetLevel = parsed['targetLevel'] as PuzzleLevel?;
@@ -387,6 +392,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       domain: domain,
       strategy: workerStrategy,
       maxStall: Duration(seconds: maxStall),
+      useBossPrefill: bossMode,
     );
     final worker = GeneratorWorker();
     workers.add(worker);
@@ -1757,6 +1763,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
       GenerationStrategy.phase1Oneshot,
       GenerationStrategy.propOnly,
     ],
+    'boss': false,
     'maxStall': 15,
     // Path-based tunables (forwarded to preFillPath). Defaults match
     // GeneratorConfig so omitting the flags preserves current behaviour.
@@ -1895,6 +1902,8 @@ Map<String, dynamic> _parseArgs(List<String> args) {
               exit(1);
           }
         }).toList();
+      case '--boss':
+        result['boss'] = true;
       case '-h':
       case '--help':
         _printUsage();
@@ -2059,10 +2068,17 @@ Generation options:
                           Each worker starts from the same initial corpus
                           and evolves its equilibrium state independently.
       --log-dir DIR       Write per-worker diagnostic logs to
-                          DIR/worker_<n>.log (one file per parallel
-                          worker, append mode). Useful to investigate
-                          why a worker is stuck without producing
-                          puzzles. Default: no logging.
+                           DIR/worker_<n>.log (one file per parallel
+                           worker, append mode). Useful to investigate
+                           why a worker is stuck without producing
+                           puzzles. Default: no logging.
+      --boss              Use the experimental seed-and-grow prefill
+                           (for large "Boss" grids like 30x20). Plants
+                           seeds weighted toward the centre, grows them
+                           into groups of 15-25 cells, posts one GS
+                           constraint per seed, then random-fills the
+                           rest. Without -o, output goes to
+                           assets/boss.txt. --no-equilibrium is implied.
 
 General:
       --debug             Enable debug mode: sequential output
