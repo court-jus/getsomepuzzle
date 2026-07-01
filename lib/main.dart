@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_print
 
-import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -180,7 +179,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // tapped). It pauses the game and turns the pause overlay into a two-button
   // confirm screen, guarding against accidental restarts (issue 21).
   bool _confirmingRestart = false;
-  Timer? _saveTimer;
   // Lets the keyboard shortcut handler open/close the navigation drawer
   // (ESC = Menu) without a separate Scaffold.of(context) lookup.
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -198,17 +196,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (mounted) setState(() {});
     });
     initialize();
-    _saveTimer = Timer.periodic(const Duration(seconds: 60), (tmr) {
-      if (database == null) return;
-      database!.writeStats();
-    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     game.dispose();
-    _saveTimer?.cancel();
     super.dispose();
   }
 
