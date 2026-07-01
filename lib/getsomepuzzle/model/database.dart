@@ -1213,10 +1213,15 @@ class Database {
 
       if (puz.filled > currentFilters.maxFilled) return false;
       if (puz.filled < currentFilters.minFilled) return false;
-      if (puz.width > currentFilters.maxWidth) return false;
-      if (puz.width < currentFilters.minWidth) return false;
-      if (puz.height > currentFilters.maxHeight) return false;
-      if (puz.height < currentFilters.minHeight) return false;
+      final w = puz.width;
+      final h = puz.height;
+      final minW = currentFilters.minWidth;
+      final maxW = currentFilters.maxWidth;
+      final minH = currentFilters.minHeight;
+      final maxH = currentFilters.maxHeight;
+      final fitsNormal = w >= minW && w <= maxW && h >= minH && h <= maxH;
+      final fitsRotated = h >= minW && h <= maxW && w >= minH && w <= maxH;
+      if (!fitsNormal && !fitsRotated) return false;
       if (currentFilters.wantedRules.isNotEmpty &&
           currentFilters.wantedRules.intersection(puz.rules.toSet()).length !=
               currentFilters.wantedRules.length) {
