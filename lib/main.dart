@@ -45,7 +45,7 @@ import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-const versionText = "Version 1.6.22";
+const versionText = "Version 2.0.0";
 
 /// Share links target this URL with a `?puzzle=<line>` query — works as a
 /// browser fallback everywhere, and later as the App Links / Universal Links
