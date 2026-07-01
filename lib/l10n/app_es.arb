@@ -27,6 +27,9 @@
     "labelAdvancedFilters": "Filtros avanzados",
     "labelWidgetWantedrules": "Reglas deseadas",
     "labelWidgetBannedrules": "Reglas prohibidas",
+    "labelWidgetDomain": "Número de colores",
+    "labelDomainTwoColors": "2 colores",
+    "labelDomainThreeColors": "3 colores",
     "msgCountMatchingPuzzles": "Puzzles que coinciden con filtros",
     "btnShareStats": "Compartir",
     "statsCopiedToClipboard": "Estadísticas copiadas al portapapeles",
@@ -48,6 +51,8 @@
     "tooltipMore": "Más...",
     "tooltipLanguage": "Idioma",
     "tooltipClue": "Pista",
+    "tooltipTapModeIncrValue": "Tocar cambia el color",
+    "tooltipTapModeRemoveOption": "Tocar elimina una opción",
     "tooltipUndo": "Deshacer",
     "closeMenu": "Cerrar",
     "settings": "Ajustes",
@@ -63,7 +68,6 @@
     "settingsLiveCheckTypeAll": "Tiempo real",
     "settingsLiveCheckTypeCount": "Recuento",
     "settingsLiveCheckTypeComplete": "Esperar",
-    "settingHintsEnabled": "Activar las pistas",
     "settingGrayoutEnabled": "Atenuar las restricciones completas",
     "settingHintType": "Pistas",
     "settingHintTypeDeducibleCell": "Celda deducible",
@@ -117,17 +121,31 @@
     "hintCellWrong": "Esta celda está mal",
     "hintAllCorrectSoFar": "Todo lo rellenado hasta ahora es correcto",
     "hintCellDeducible": "Esta celda es deducible",
+    "hintCellOptionRemovable": "Se puede descartar una opción de esta celda",
+    "hintForceRemoveOption": "Se puede descartar una opción combinando varias restricciones",
+    "hintRemoveOptionDeducedFrom": "Se puede descartar una opción a partir de la restricción {constraintName}",
+    "hintRemoveOptionComplicity": "Se puede descartar una opción combinando las restricciones {c1} y {c2}",
+    "hintRemoveOptionComplicityTwin": "Se puede descartar una opción combinando dos restricciones {c}",
     "constraintForbiddenPattern": "patrón prohibido",
     "constraintGroupSize": "tamaño de grupo",
     "constraintLetterGroup": "grupo de letras",
+    "constraintMajority": "color mayoritario",
     "constraintParity": "paridad",
     "constraintQuantity": "cantidad",
     "constraintGroupCount": "número de grupos",
     "constraintShape": "forma",
     "constraintNeighborCount": "número de vecinos",
     "constraintEyes": "ojos",
+    "constraintChain": "cadena",
+    "constraintImplication": "implicación",
+    "constraintBoundingBox": "caja delimitadora",
     "newConstraintModalTitle": "¡Regla nueva!",
     "newConstraintModalSkip": "Saltar aprendizaje",
+    "thirdColorSuggestionTitle": "¿Listo para 3 colores?",
+    "thirdColorSuggestionBody": "Has resuelto un buen número de puzles en blanco y negro. ¿Quieres probar el modo 3 colores? Un nuevo color — el púrpura — se une al negro y al blanco, y las reglas se aplican a cada color de forma independiente. Es un nuevo tipo de desafío basado en lo que ya conoces.",
+    "thirdColorSuggestionTryLabel": "Probar",
+    "thirdColorSuggestionLaterLabel": "Más tarde",
+    "thirdColorSuggestionFiltersReminder": "No olvides que siempre puedes elegir el tipo de puzles que quieres en los filtros avanzados de la biblioteca.",
     "welcomeModalTitle": "Bienvenido",
     "welcomeModalBody": "¡Bienvenido a Get Some Puzzle! Tu objetivo es colorear cada casilla en negro o blanco respetando un conjunto de restricciones. Las reglas de cada restricción se explicarán a medida que las encuentres por primera vez.",
     "learning": "Aprendizaje",
@@ -155,16 +173,17 @@
     "constraintExplainGS": "Cuando una casilla contiene un número, debe pertenecer a un grupo de casillas del mismo color, adyacentes ortogonalmente, cuyo tamaño coincida con ese número.",
     "constraintExplainPA": "Cuando una casilla contiene una flecha, debe haber el mismo número de casillas negras y blancas delante de la flecha. Una flecha doble extiende la regla a ambos lados.",
     "constraintExplainLT": "Las casillas marcadas con la misma letra deben pertenecer al mismo grupo. Un grupo no puede contener dos letras diferentes.",
+    "constraintExplainMJ": "Un borde punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad).",
     "constraintExplainQA": "Un indicador numérico sobre fondo azul encima del puzzle señala cuántas casillas de ese color debe contener la solución en total.",
     "constraintExplainSY": "Cuando una casilla contiene uno de estos símbolos (⟍, |, ⟋, ―, 🞋), el grupo del que forma parte debe respetar la simetría asociada. La simetría central (🞋) equivale a un giro de media vuelta.",
     "constraintExplainDF": "Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.",
-    "constraintExplainCC": "Un número dentro de un círculo sobre una columna indica cuántas celdas de ese color deben aparecer en esa columna específica.",
-    "@constraintExplainCC": {
-        "description": "Body of the new-constraint explanation modal for the Column Count (CC) constraint"
+    "constraintExplainLineCount": "Un número dentro de un círculo al lado de una fila o columna indica cuántas celdas de ese color deben aparecer en esa línea.",
+    "@constraintExplainLineCount": {
+        "description": "Body of the new-constraint explanation modal for the merged line count constraint (CC/RC)"
     },
-    "constraintExplainRC": "Un número dentro de un círculo a la izquierda de una fila indica cuántas celdas de ese color deben aparecer en esa fila específica.",
-    "@constraintExplainRC": {
-        "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
+    "constraintExplainTransition": "Una onda cuadrada con un número al lado de una fila o columna indica cuántos cambios de color deben aparecer en esa línea. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la línea es de un solo color.",
+    "@constraintExplainTransition": {
+        "description": "Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)"
     },
     "constraintExplainNC": "Una casilla mostrada como una cruz que contiene un número debe tener exactamente ese número de vecinos ortogonales del color indicado.",
     "@constraintExplainNC": {
@@ -173,6 +192,14 @@
     "constraintExplainEY": "Una casilla mostrada como un ojo debe «ver» exactamente el número indicado de casillas del color del ojo. La vista se propaga en línea recta en cada una de las cuatro direcciones ortogonales hasta alcanzar el borde de la cuadrícula o una casilla del color opuesto (que bloquea la vista).",
     "@constraintExplainEY": {
         "description": "Body of the new-constraint explanation modal for the Eyes (EY) constraint"
+    },
+    "constraintExplainCH": "Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por una cadena. La solución debe contener un camino ortogonal ininterrumpido de ese color desde el lado marcado hasta el otro lado marcado.",
+    "@constraintExplainCH": {
+        "description": "Body of the new-constraint explanation modal for the Chain (CH) constraint"
+    },
+    "constraintExplainIM": "Una flecha de una celda a otra significa: si la celda fuente toma el color de la flecha, la celda destino también debe tomar ese color. También se aplica la contrapuesta: si el destino es de un color diferente, la fuente no puede tomar el color de la flecha.",
+    "@constraintExplainIM": {
+        "description": "Body of the new-constraint explanation modal for the Implication (IM) constraint"
     },
     "createLetterGroupDone": "Listo",
     "createAddNew": "Agregar restricción",
@@ -228,13 +255,13 @@
     "endOfPlaylistSuggestedHint": "Según tu nivel, podría gustarte esta colección.",
     "endOfPlaylistOnboardingNote": "Aún no has visto todas las reglas — sigue jugando para descubrirlas una a una.",
     "endOfPlaylistPickAnother": "Elegir otra colección",
-    "constraintColumnCount": "células por columna",
-    "@constraintColumnCount": {
-        "description": "Name of the column count constraint"
+    "constraintLineCount": "células por línea",
+    "@constraintLineCount": {
+        "description": "Name of the line count constraint (merged row/column count)"
     },
-    "constraintRowCount": "células por fila",
-    "@constraintRowCount": {
-        "description": "Name of the row count constraint"
+    "constraintTransition": "transición",
+    "@constraintTransition": {
+        "description": "Name of the transition constraint (merged row/column transition)"
     },
     "complicityOtherConstraint": "otra restricción",
     "settingReplayOnboarding": "Repetir la introducción",
@@ -256,9 +283,11 @@
 
     "constraintSymmetry": "simetría",
     "constraintExplainGC": "Un número enmarcado con un icono de cadena indica cuántos grupos separados (componentes conexos) de ese color debe contener la solución.",
+    "constraintExplainBB": "Cada grupo conexo de este color debe ocupar una caja delimitadora de exactamente este ancho y alto: el rectángulo más pequeño que encierra el grupo abarca exactamente esas columnas y filas (el grupo no tiene que llenarla).",
 
     "create": "Crear",
     "createTitle": "Crear un puzzle",
+    "createNewPuzzle": "Nuevo puzzle",
     "createStart": "Empezar a editar",
     "createTest": "Probar",
     "createValidate": "Validar",
@@ -278,9 +307,17 @@
     "createChooseSize": "Tamaño del grupo",
     "createChooseLetter": "Letra",
     "createChooseValue": "Valor",
+    "createImplicationSource": "Celda origen ({total} celdas, base 0)",
+    "createImplicationTarget": "Celda destino ({total} celdas, base 0)",
+    "createImplicationInvalid": "Origen/destino no válido",
+    "colorBlack": "Negro",
+    "colorWhite": "Blanco",
+    "colorPurple": "Morado",
     "createChooseCount": "Cantidad",
     "createMotifWidth": "Ancho del patrón",
     "createMotifHeight": "Alto del patrón",
+    "createSecondCorner": "Toca la segunda esquina de la zona MJ",
+    "createZoneTooSmall": "La zona debe tener al menos 3 celdas",
     "createLetterGroupMode": "Toca las celdas para añadirlas al grupo {letter}, luego pulsa Listo",
 
     "generate": "Generar",
@@ -300,10 +337,127 @@
     "generatePlay": "Jugar",
     "generateMore": "Más",
     "noCustomPuzzles": "Aún no hay puzzles personalizados. Usa la página Generar para crear algunos.",
+    "emptyPlaylistUserEmpty": "Esta lista está vacía. Añade puzzles antes de pulsar Jugar.",
     "emptyPlaylistUserAllPlayed": "Ya jugaste todos los puzzles de esta lista. Elige otra colección o crea una nueva lista.",
     "emptyPlaylistNoPuzzlesLoaded": "No hay puzzles cargados para esta colección.",
     "emptyPlaylistFiltersTooStrict": "Tus filtros excluyen todos los puzzles de esta colección. Prueba a relajar dimensiones, reglas o marcadores.",
-    "emptyPlaylistOnboardingPhase": "Ningún puzzle de esta colección encaja con el paso de aprendizaje actual. Termina los puzzles introductorios o cambia de colección.",
-    "emptyPlaylistSoftFilter": "Los puzzles restantes introducirían más de una regla nueva a la vez. Juega algunos puzzles más de las colecciones anteriores.",
-    "emptyPlaylistGeneric": "No hay ningún puzzle disponible por ahora."
+    "emptyPlaylistGeneric": "No hay ningún puzzle disponible por ahora.",
+    "bannerOnboardingFiltersDefault": "Estos filtros reflejan tu progresión de aprendizaje. Puedes modificarlos — pulsa el icono de reinicio para volver a la recomendación.",
+    "bannerOnboardingFiltersOverridden": "Estás usando tus propios filtros. Pulsa reinicio para volver a la recomendación de la ruta de aprendizaje.",
+    "onboardingCompleteTitle": "¡Aprendizaje completado!",
+    "@onboardingCompleteTitle": {
+        "description": "Title of the dialog shown when the player has completed all onboarding steps (every rule encountered)."
+    },
+    "onboardingCompleteBody": "¡Has aprendido todas las reglas disponibles! Ahora puedes jugar libremente. Cuando se añadan nuevas reglas al juego, serás notificado.",
+    "@onboardingCompleteBody": {
+        "description": "Body of the onboarding-complete dialog — congratulates the player and mentions future rule additions."
+    },
+    "scenarioFilterLabel": "Escenario",
+    "@scenarioFilterLabel": {
+        "description": "Label of the scenario filter dropdown in the advanced filters section."
+    },
+    "scenarioAny": "Cualquier escenario",
+    "@scenarioAny": {
+        "description": "Dropdown option meaning 'no scenario filter' — show every scenario."
+    },
+    "scenarioClassic": "Clásico",
+    "@scenarioClassic": {
+        "description": "Label for the Classic user scenario."
+    },
+    "scenarioExplainClassic": "Puzzle general sin estilo de juego dominante.",
+    "@scenarioExplainClassic": {
+        "description": "Description of the Classic user scenario."
+    },
+    "scenarioSh": "Forma",
+    "@scenarioSh": {
+        "description": "Label for the Shape (SH) user scenario."
+    },
+    "scenarioExplainSh": "Al menos una restricción de forma define la forma exacta de un grupo.",
+    "@scenarioExplainSh": {
+        "description": "Description of the Shape user scenario."
+    },
+    "scenarioBb": "Caja envolvente",
+    "@scenarioBb": {
+        "description": "Label for the Bounding box (BB) user scenario."
+    },
+    "scenarioExplainBb": "Cada grupo de un color cabe en la misma caja envolvente.",
+    "@scenarioExplainBb": {
+        "description": "Description of the Bounding box user scenario."
+    },
+    "scenarioPathBased": "Ruta",
+    "@scenarioPathBased": {
+        "description": "Label for the Path-based (LT) user scenario."
+    },
+    "scenarioExplainPathBased": "Grupos de letras se conectan por la cuadrícula — encuentra el camino.",
+    "@scenarioExplainPathBased": {
+        "description": "Description of the Path-based user scenario."
+    },
+    "scenarioSyBased": "Simetría",
+    "@scenarioSyBased": {
+        "description": "Label for the Symmetry (SY) user scenario."
+    },
+    "scenarioExplainSyBased": "Restricciones de simetría reflejan grupos a través de ejes.",
+    "@scenarioExplainSyBased": {
+        "description": "Description of the Symmetry user scenario."
+    },
+    "scenarioMinesweeper": "Buscaminas",
+    "@scenarioMinesweeper": {
+        "description": "Label for the Minesweeper-like user scenario."
+    },
+    "scenarioExplainMinesweeper": "Conteo de vecinos y ojos — juega como Buscaminas.",
+    "@scenarioExplainMinesweeper": {
+        "description": "Description of the Minesweeper user scenario."
+    },
+    "scenarioNonogram": "Nonograma",
+    "@scenarioNonogram": {
+        "description": "Label for the Nonogram / Hanjie-like user scenario."
+    },
+    "scenarioExplainNonogram": "Conteos de columnas y filas — deducción estilo hanjie.",
+    "@scenarioExplainNonogram": {
+        "description": "Description of the Nonogram user scenario."
+    },
+    "scenarioLocal": "Local",
+    "@scenarioLocal": {
+        "description": "Label for the Local-pattern (DF/FM) user scenario."
+    },
+    "scenarioExplainLocal": "Patrones prohibidos y restricciones de diferencia definen reglas locales.",
+    "@scenarioExplainLocal": {
+        "description": "Description of the Local user scenario."
+    },
+    "scenarioGroup": "Grupo",
+    "@scenarioGroup": {
+        "description": "Label for the Group-topology (GS/GC) user scenario."
+    },
+    "scenarioExplainGroup": "Tamaños y conteos de grupos enfocados en la topología de componentes conectados.",
+    "@scenarioExplainGroup": {
+        "description": "Description of the Group user scenario."
+    },
+    "statsSyncDirectory": "Directorio de sincronización",
+    "@statsSyncDirectory": {
+        "description": "Section header for the stats sync directory setting"
+    },
+    "statsSyncDirectoryChoose": "Elegir carpeta",
+    "@statsSyncDirectoryChoose": {
+        "description": "Button label to pick a stats sync directory"
+    },
+    "statsSyncDirectoryChange": "Cambiar",
+    "@statsSyncDirectoryChange": {
+        "description": "Button label to change the stats sync directory"
+    },
+    "statsSyncDirectoryClear": "Borrar",
+    "@statsSyncDirectoryClear": {
+        "description": "Button label to clear the stats sync directory"
+    },
+    "statsSyncDirectoryWebUnsupported": "No disponible en web.",
+    "@statsSyncDirectoryWebUnsupported": {
+        "description": "Message shown on the stats sync directory setting when running on web"
+    },
+    "statsSyncDirectoryInvalid": "La carpeta seleccionada no es accesible. Por favor, elige una nueva.",
+    "@statsSyncDirectoryInvalid": {
+        "description": "Error shown in settings when the stats sync directory is inaccessible"
+    },
+    "statsSyncDirectoryAutoCleared": "La carpeta de sincronización se ha borrado porque ya no es accesible. Puedes configurar una nueva en los ajustes.",
+    "@statsSyncDirectoryAutoCleared": {
+        "description": "Snackbar shown at boot when the stats directory has been auto-cleared due to inaccessibility"
+    }
 }

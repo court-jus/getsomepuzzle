@@ -1,0 +1,18 @@
+Get Some Puzzle is a logic puzzle game played on a grid. Each cell becomes black or white according to the rules — and there is exactly one solution.
+
+There is no luck and no rush. Every move follows logically from the puzzle's constraints. When you ask for a hint, the game walks you through the deduction step by step rather than handing you the answer.
+
+The rules are introduced one at a time. You start with simple parity and group constraints, and over time you discover symmetry rules, eyes constraints, group counts, neighbour counts, and a dozen others. Each constraint changes how you read the grid; each combination opens a new kind of deduction.
+
+What's inside:
+• Thousands of bundled puzzles, gradually increasing in difficulty.
+• An adaptive playlist that picks puzzles matching your current skill.
+• Built-in puzzle generator: tweak the size and the constraint set, get a fresh puzzle every time.
+• Built-in editor: design your own puzzles and share them with friends via a link.
+• Three languages: English, French, Spanish.
+• Available on Android, iOS, Windows, macOS, Linux and the web.
+
+Free, no ads, no tracking, no account required.
+Get Some Puzzle is open source — every line of code is on GitHub. The app does not collect or transmit any data: your stats, your settings and the puzzles you create stay on your device.
+
+Have fun.

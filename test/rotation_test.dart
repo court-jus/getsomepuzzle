@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
@@ -123,6 +125,18 @@ void main() {
       final r = c.rotated(w, h).rotated(h, w).rotated(w, h).rotated(h, w);
       expect(r.serialize(), c.serialize());
     });
+
+    test(
+      'BoundingBoxConstraint (BB) — width/height swap, identity after 4',
+      () {
+        // A 90° rotation turns a W×H box into H×W; serialize is width-first so
+        // `1.2.3` becomes `1.3.2`. Four rotations must round-trip.
+        final c = BoundingBoxConstraint('1.2.3');
+        expect(c.rotated(w, h).serialize(), 'BB:1.3.2');
+        final r = c.rotated(w, h).rotated(h, w).rotated(w, h).rotated(h, w);
+        expect(r.serialize(), c.serialize());
+      },
+    );
 
     test('EyesConstraint (EY) — index transforms back', () {
       final c = EyesConstraint('5.2.3');

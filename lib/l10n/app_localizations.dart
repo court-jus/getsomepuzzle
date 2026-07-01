@@ -262,6 +262,24 @@ abstract class AppLocalizations {
   /// **'Banned rules'**
   String get labelWidgetBannedrules;
 
+  /// Label of the open-page filter that picks the puzzle domain size (2- vs 3-color puzzles)
+  ///
+  /// In en, this message translates to:
+  /// **'Number of colors'**
+  String get labelWidgetDomain;
+
+  /// Chip label for two-color puzzles in the domain filter
+  ///
+  /// In en, this message translates to:
+  /// **'2 colors'**
+  String get labelDomainTwoColors;
+
+  /// Chip label for three-color puzzles in the domain filter
+  ///
+  /// In en, this message translates to:
+  /// **'3 colors'**
+  String get labelDomainThreeColors;
+
   /// Message displayed before the number of puzzles
   ///
   /// In en, this message translates to:
@@ -339,6 +357,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clue'**
   String get tooltipClue;
+
+  /// Tooltip on the tap-mode toggle button shown on 3+ colour puzzles when the current mode is 'paint': a tap on a free cell will set the next colour.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap cycles colour'**
+  String get tooltipTapModeIncrValue;
+
+  /// Tooltip on the tap-mode toggle button shown on 3+ colour puzzles when the current mode is 'remove option': a tap on a free cell will rule out one of its remaining colour options.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap removes an option'**
+  String get tooltipTapModeRemoveOption;
 
   /// Tooltip displayed while the mouse is over the undo button
   ///
@@ -435,12 +465,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wait'**
   String get settingsLiveCheckTypeComplete;
-
-  /// Setting toggle label for the hint button master switch. Disable on very large boards to avoid running the solver in-app.
-  ///
-  /// In en, this message translates to:
-  /// **'Enable hints'**
-  String get settingHintsEnabled;
 
   /// Setting toggle label: when off, constraints stay at full opacity (skips the per-tap completeness scan, useful on large boards).
   ///
@@ -622,6 +646,36 @@ abstract class AppLocalizations {
   /// **'This cell can be deduced'**
   String get hintCellDeducible;
 
+  /// Hint message shown on tap 2 of the deducibleCell mode when the next deduction is a removeOption rather than a setValue. The dot for the ruled-out colour will disappear when the hint is applied.
+  ///
+  /// In en, this message translates to:
+  /// **'One of the options for this cell can be ruled out'**
+  String get hintCellOptionRemovable;
+
+  /// Hint message shown on tap 3 for a force-deduced removeOption move
+  ///
+  /// In en, this message translates to:
+  /// **'An option can be ruled out by combining multiple constraints'**
+  String get hintForceRemoveOption;
+
+  /// Hint message shown on tap 3 for a removeOption deduced from a single constraint
+  ///
+  /// In en, this message translates to:
+  /// **'An option can be ruled out from the {constraintName} constraint'**
+  String hintRemoveOptionDeducedFrom(String constraintName);
+
+  /// Hint message shown on tap 3 when a removeOption is deduced by a complicity that combines two distinct constraint types
+  ///
+  /// In en, this message translates to:
+  /// **'An option can be ruled out by combining the {c1} and {c2} constraints'**
+  String hintRemoveOptionComplicity(String c1, String c2);
+
+  /// Hint message shown on tap 3 when a removeOption is deduced by a complicity that combines two constraints of the same type
+  ///
+  /// In en, this message translates to:
+  /// **'An option can be ruled out by combining two {c} constraints'**
+  String hintRemoveOptionComplicityTwin(String c);
+
   /// Name of the forbidden pattern constraint
   ///
   /// In en, this message translates to:
@@ -639,6 +693,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'letter group'**
   String get constraintLetterGroup;
+
+  /// Name of the majority zone constraint
+  ///
+  /// In en, this message translates to:
+  /// **'majority color'**
+  String get constraintMajority;
 
   /// Name of the parity constraint
   ///
@@ -772,6 +832,12 @@ abstract class AppLocalizations {
   /// **'Create a puzzle'**
   String get createTitle;
 
+  /// No description provided for @createNewPuzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'New puzzle'**
+  String get createNewPuzzle;
+
   /// No description provided for @createStart.
   ///
   /// In en, this message translates to:
@@ -886,6 +952,42 @@ abstract class AppLocalizations {
   /// **'Value'**
   String get createChooseValue;
 
+  /// No description provided for @createImplicationSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source cell ({total} cells, 0-based)'**
+  String createImplicationSource(int total);
+
+  /// No description provided for @createImplicationTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Target cell ({total} cells, 0-based)'**
+  String createImplicationTarget(int total);
+
+  /// No description provided for @createImplicationInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid source/target'**
+  String get createImplicationInvalid;
+
+  /// No description provided for @colorBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get colorBlack;
+
+  /// No description provided for @colorWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get colorWhite;
+
+  /// No description provided for @colorPurple.
+  ///
+  /// In en, this message translates to:
+  /// **'Purple'**
+  String get colorPurple;
+
   /// No description provided for @createChooseCount.
   ///
   /// In en, this message translates to:
@@ -903,6 +1005,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pattern height'**
   String get createMotifHeight;
+
+  /// No description provided for @createSecondCorner.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap second corner of MJ zone'**
+  String get createSecondCorner;
+
+  /// No description provided for @createZoneTooSmall.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone must be at least 3 cells'**
+  String get createZoneTooSmall;
 
   /// No description provided for @createLetterGroupMode.
   ///
@@ -1078,17 +1192,17 @@ abstract class AppLocalizations {
   /// **'group count'**
   String get constraintGroupCount;
 
-  /// Name of the column count constraint
+  /// Name of the line count constraint (merged row/column count)
   ///
   /// In en, this message translates to:
-  /// **'cells per column'**
-  String get constraintColumnCount;
+  /// **'cells per line'**
+  String get constraintLineCount;
 
-  /// Name of the row count constraint
+  /// Name of the transition constraint (merged row/column transition)
   ///
   /// In en, this message translates to:
-  /// **'cells per row'**
-  String get constraintRowCount;
+  /// **'transition'**
+  String get constraintTransition;
 
   /// Name of the shape constraint
   ///
@@ -1108,6 +1222,24 @@ abstract class AppLocalizations {
   /// **'eyes'**
   String get constraintEyes;
 
+  /// Name of the chain constraint
+  ///
+  /// In en, this message translates to:
+  /// **'chain'**
+  String get constraintChain;
+
+  /// Name of the implication constraint
+  ///
+  /// In en, this message translates to:
+  /// **'implication'**
+  String get constraintImplication;
+
+  /// Name of the bounding box constraint
+  ///
+  /// In en, this message translates to:
+  /// **'bounding box'**
+  String get constraintBoundingBox;
+
   /// Title of the dialog shown the first time a player encounters a new constraint
   ///
   /// In en, this message translates to:
@@ -1119,6 +1251,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skip learning'**
   String get newConstraintModalSkip;
+
+  /// Title of the modal suggesting the player try 3-color puzzles. Shown once after onboarding plus 50 plays, only if the player has never played a 3-color puzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for 3 colors?'**
+  String get thirdColorSuggestionTitle;
+
+  /// Body of the 3-color suggestion modal. Reassures the player by linking 3-color puzzles to the rules they already master.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. It\'s a fresh kind of challenge built on what you already know.'**
+  String get thirdColorSuggestionBody;
+
+  /// Button on the 3-color suggestion modal that opts the player into 3-color puzzles by enabling the d3 domain in their filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it'**
+  String get thirdColorSuggestionTryLabel;
+
+  /// Button on the 3-color suggestion modal that dismisses the suggestion without changing filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Maybe later'**
+  String get thirdColorSuggestionLaterLabel;
+
+  /// Secondary paragraph on the 3-color suggestion modal, shown between the main body and the action buttons. Reassures the player that the opt-in is reversible via the Open page filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember that you can always choose the type of puzzles you want from the advanced filters in the library.'**
+  String get thirdColorSuggestionFiltersReminder;
 
   /// Title of the intro modal shown once before the first rule explanation, on a brand-new player or right after a 'Replay onboarding' reset.
   ///
@@ -1198,6 +1360,12 @@ abstract class AppLocalizations {
   /// **'Cells marked with the same letter must belong to the same group. A group must not contain two different letters.'**
   String get constraintExplainLT;
 
+  /// Body of the new-constraint explanation modal for the Majority (MJ) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half).'**
+  String get constraintExplainMJ;
+
   /// Body of the new-constraint explanation modal for the Quantity (QA) constraint
   ///
   /// In en, this message translates to:
@@ -1216,23 +1384,29 @@ abstract class AppLocalizations {
   /// **'Two cells separated by a ≠ symbol must be of different colors.'**
   String get constraintExplainDF;
 
-  /// Body of the new-constraint explanation modal for the Column Count (CC) constraint
+  /// Body of the new-constraint explanation modal for the merged line count constraint (CC/RC)
   ///
   /// In en, this message translates to:
-  /// **'A circled number above a column tells how many cells of that color must appear in this specific column.'**
-  String get constraintExplainCC;
+  /// **'A circled number beside a row or column tells how many cells of that color must appear in that line.'**
+  String get constraintExplainLineCount;
 
-  /// Body of the new-constraint explanation modal for the Row Count (RC) constraint
+  /// Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)
   ///
   /// In en, this message translates to:
-  /// **'A circled number to the left of a row tells how many cells of that color must appear in this specific row.'**
-  String get constraintExplainRC;
+  /// **'A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.'**
+  String get constraintExplainTransition;
 
   /// Body of the new-constraint explanation modal for the Group Count (GC) constraint
   ///
   /// In en, this message translates to:
   /// **'A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.'**
   String get constraintExplainGC;
+
+  /// No description provided for @constraintExplainBB.
+  ///
+  /// In en, this message translates to:
+  /// **'Every connected group of this color must occupy a bounding box of exactly this width and height — the smallest rectangle enclosing the group spans exactly that many columns and rows (the group need not fill it).'**
+  String get constraintExplainBB;
 
   /// Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint
   ///
@@ -1245,6 +1419,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).'**
   String get constraintExplainEY;
+
+  /// Body of the new-constraint explanation modal for the Chain (CH) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.'**
+  String get constraintExplainCH;
+
+  /// Body of the new-constraint explanation modal for the Implication (IM) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'An arrow from one cell to another means: if the source cell takes the arrow\'s colour, the target cell must also take that colour. The contrapositive also holds: if the target is a different colour, the source cannot take the arrow\'s colour.'**
+  String get constraintExplainIM;
 
   /// Fallback name used when a complicity's secondary slug is the wildcard '*' (kept as a safety fallback; the dedicated 'hintComplicityWithAny' template is preferred for the wildcard case)
   ///
@@ -1420,6 +1606,12 @@ abstract class AppLocalizations {
   /// **'Next puzzle'**
   String get nextPuzzle;
 
+  /// Reason shown under the disabled Play button when a freshly-created user_ playlist has no puzzles yet
+  ///
+  /// In en, this message translates to:
+  /// **'This playlist is empty. Add puzzles before pressing Play.'**
+  String get emptyPlaylistUserEmpty;
+
   /// Reason shown under the disabled Play button when the current user_ playlist has no unplayed puzzles left
   ///
   /// In en, this message translates to:
@@ -1438,29 +1630,203 @@ abstract class AppLocalizations {
   /// **'Your filters exclude every puzzle in this collection. Try relaxing the dimensions, rules or flags.'**
   String get emptyPlaylistFiltersTooStrict;
 
-  /// Reason shown under the disabled Play button when the onboarding phase eligibility excludes every filtered puzzle
-  ///
-  /// In en, this message translates to:
-  /// **'No puzzle in this collection fits the current onboarding step. Finish the introductory puzzles or switch collection.'**
-  String get emptyPlaylistOnboardingPhase;
-
-  /// Reason shown under the disabled Play button when the post-strict onboarding soft filter rejects every candidate
-  ///
-  /// In en, this message translates to:
-  /// **'Every remaining puzzle would introduce more than one new rule at once. Play a few more puzzles from earlier collections first.'**
-  String get emptyPlaylistSoftFilter;
-
   /// Generic fallback reason shown under the disabled Play button
   ///
   /// In en, this message translates to:
   /// **'No puzzle is currently available.'**
   String get emptyPlaylistGeneric;
 
+  /// Banner on OpenPage while the player is still in the onboarding journey, explaining that the rule filter chips were preset by the learning track.
+  ///
+  /// In en, this message translates to:
+  /// **'These filters reflect your learning track. You can override them — tap the reset icon to restore the recommendation.'**
+  String get bannerOnboardingFiltersDefault;
+
+  /// Variant of the onboarding-filters banner shown when the player has manually changed the rule filters away from the learning track defaults.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re using your own filters. Tap reset to return to the learning track\'s recommendation.'**
+  String get bannerOnboardingFiltersOverridden;
+
   /// Drawer entry that opens the puzzle selection page (filters, collections)
   ///
   /// In en, this message translates to:
   /// **'Browse'**
   String get browse;
+
+  /// Title of the dialog shown when the player has completed all onboarding steps (every rule encountered).
+  ///
+  /// In en, this message translates to:
+  /// **'Onboarding complete!'**
+  String get onboardingCompleteTitle;
+
+  /// Body of the onboarding-complete dialog — congratulates the player and mentions future rule additions.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve learned all the rules currently available! You can now play freely. When new rules are added to the game, you\'ll be notified.'**
+  String get onboardingCompleteBody;
+
+  /// Label of the scenario filter dropdown in the advanced filters section.
+  ///
+  /// In en, this message translates to:
+  /// **'Scenario'**
+  String get scenarioFilterLabel;
+
+  /// Dropdown option meaning 'no scenario filter' — show every scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Any scenario'**
+  String get scenarioAny;
+
+  /// Label for the Classic user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic'**
+  String get scenarioClassic;
+
+  /// Description of the Classic user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'General logic puzzle with no dominant gameplay style.'**
+  String get scenarioExplainClassic;
+
+  /// Label for the Shape (SH) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Shape'**
+  String get scenarioSh;
+
+  /// Description of the Shape user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'At least one shape constraint defines exact form for a group.'**
+  String get scenarioExplainSh;
+
+  /// Label for the Bounding box (BB) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Bounding box'**
+  String get scenarioBb;
+
+  /// Description of the Bounding box user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Every group of a colour fits the same bounding box.'**
+  String get scenarioExplainBb;
+
+  /// Label for the Path-based (LT) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get scenarioPathBased;
+
+  /// Description of the Path-based user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter groups route across the grid — find the path.'**
+  String get scenarioExplainPathBased;
+
+  /// Label for the Symmetry (SY) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Symmetry'**
+  String get scenarioSyBased;
+
+  /// Description of the Symmetry user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Symmetry constraints mirror groups across axes.'**
+  String get scenarioExplainSyBased;
+
+  /// Label for the Minesweeper-like user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Minesweeper'**
+  String get scenarioMinesweeper;
+
+  /// Description of the Minesweeper user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighbor counts and eye constraints — play it like Minesweeper.'**
+  String get scenarioExplainMinesweeper;
+
+  /// Label for the Nonogram / Hanjie-like user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Nonogram'**
+  String get scenarioNonogram;
+
+  /// Description of the Nonogram user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Column and row counts — classic hanjie-style deduction.'**
+  String get scenarioExplainNonogram;
+
+  /// Label for the Local-pattern (DF/FM) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get scenarioLocal;
+
+  /// Description of the Local user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Forbidden patterns and different-from constraints define local rules.'**
+  String get scenarioExplainLocal;
+
+  /// Label for the Group-topology (GS/GC) user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get scenarioGroup;
+
+  /// Description of the Group user scenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Group sizes and group counts focus on connected-component topology.'**
+  String get scenarioExplainGroup;
+
+  /// Section header for the stats sync directory setting
+  ///
+  /// In en, this message translates to:
+  /// **'Stats sync directory'**
+  String get statsSyncDirectory;
+
+  /// Button label to pick a stats sync directory
+  ///
+  /// In en, this message translates to:
+  /// **'Choose folder'**
+  String get statsSyncDirectoryChoose;
+
+  /// Button label to change the stats sync directory
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get statsSyncDirectoryChange;
+
+  /// Button label to clear the stats sync directory
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get statsSyncDirectoryClear;
+
+  /// Message shown on the stats sync directory setting when running on web
+  ///
+  /// In en, this message translates to:
+  /// **'Not available on web.'**
+  String get statsSyncDirectoryWebUnsupported;
+
+  /// Error shown in settings when the stats sync directory is inaccessible
+  ///
+  /// In en, this message translates to:
+  /// **'The selected folder is not accessible. Please choose a new one.'**
+  String get statsSyncDirectoryInvalid;
+
+  /// Snackbar shown at boot when the stats directory has been auto-cleared due to inaccessibility
+  ///
+  /// In en, this message translates to:
+  /// **'The stats sync folder was cleared because it is no longer accessible. You can set a new one in the settings.'**
+  String get statsSyncDirectoryAutoCleared;
 }
 
 class _AppLocalizationsDelegate

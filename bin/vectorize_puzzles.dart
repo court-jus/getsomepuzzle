@@ -23,6 +23,23 @@
 //   divided by #total_prop_moves. CX = complicity (multi-constraint
 //   deduction). Most cells are 0 — vector is wide but sparse.
 //
+// Solution geometry block — translation- and colour-swap-invariant
+// descriptors of the solved grid (the black mask, ±1). They capture the
+// global regularity a player reads at a glance but the local-deduction trace
+// cannot see (damier, colour bars). Two complementary views:
+//   * Power spectrum |F(u,v)|² (per-bin fractions): spec_peak_frac,
+//     spec_xbars_frac, spec_ybars_frac, spec_checker_frac, spec_concentration.
+//     See `spectralFeatures`. Sharp but parity-fragile (a fixed Nyquist bin
+//     only catches even block counts).
+//   * Autocorrelation peaks (parity-robust): auto_band, auto_checker,
+//     auto_tile. See `autocorrelationFeatures`. The spatial-domain dual,
+//     summarised by peak so a 2×2 damier reads as a damier on 4×4, 4×6 and 6×6.
+//   * Interpretable scalars: period_x, period_y (smallest translation period
+//     per axis; period 1 = a fully constant axis ⇒ colour bars),
+//     checker_block_k (smallest k for a k×k alternating damier, 0 if none),
+//     n_symmetries (dihedral invariances), rle_ratio (run density, a low-ink
+//     proxy). All defined in bin/_solution_geometry.dart.
+//
 // Usage:
 //   dart run bin/vectorize_puzzles.dart [--output PATH] [--sample N]
 //                                        [--timeout-ms MS] [--verbose]
@@ -35,6 +52,9 @@ import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
+import '_solution_geometry.dart';
+import '_trace_cache.dart';
+
 const _collections = [
   'assets/1-easy.txt',
   'assets/2-player.txt',
@@ -42,8 +62,13 @@ const _collections = [
   'assets/4-strong.txt',
   'assets/5-expert.txt',
   'assets/6-mad.txt',
-  'assets/overfilled-easy.txt',
+  'assets/1-easy-overfilled.txt',
   'assets/overfilled.txt',
+  'assets/2-player-overfilled.txt',
+  'assets/3-advanced-overfilled.txt',
+  'assets/4-strong-overfilled.txt',
+  'assets/5-expert-overfilled.txt',
+  'assets/6-mad-overfilled.txt',
 ];
 
 // Stable, alphabetical slug list — defines the CSV column order so two
@@ -51,6 +76,7 @@ const _collections = [
 // slug used for complicity moves (multi-constraint deductions).
 const _slugs = [
   'CC',
+  'CH',
   'CX',
   'DF',
   'EY',
@@ -81,8 +107,13 @@ const Map<PuzzleLevel, int> _levelOrdinal = {
   PuzzleLevel.expert: 4,
   PuzzleLevel.mad: 5,
   PuzzleLevel.overfilledEasy: 6,
-  PuzzleLevel.overfilled: 7,
-  PuzzleLevel.undetermined: 8,
+  PuzzleLevel.overfilledPlayer: 7,
+  PuzzleLevel.overfilledAdvanced: 8,
+  PuzzleLevel.overfilledStrong: 9,
+  PuzzleLevel.overfilledExpert: 10,
+  PuzzleLevel.overfilledMad: 11,
+  PuzzleLevel.overfilled: 12,
+  PuzzleLevel.undetermined: 13,
 };
 
 void main(List<String> args) {
@@ -162,14 +193,32 @@ Options:
   final out = File(outputPath).openWrite();
   out.writeln(_csvHeader());
 
+  final cache = TraceCache.load(kTraceCachePath);
+  if (cache.isEmpty) {
+    stderr.writeln(
+      '  warn: no solve_traces.tsv found — run bin/recompute.dart first '
+      'to populate the cache and speed up vectorization.',
+    );
+  } else {
+    stderr.writeln('  Trace cache loaded: ${cache.size} entries');
+  }
+
   int processed = 0;
   int errors = 0;
   int unsolved = 0;
+  int cacheHits = 0;
   final sw = Stopwatch()..start();
 
   for (final entry in entries) {
     try {
-      final vec = _vectorize(entry, timeoutMs: timeoutMs);
+      final traceKey = traceKeyFromLine(entry.line);
+      final cachedSteps = cache.lookup(traceKey);
+      if (cachedSteps != null) cacheHits++;
+      final vec = _vectorize(
+        entry,
+        timeoutMs: timeoutMs,
+        cachedSteps: cachedSteps,
+      );
       if (vec == null) {
         unsolved++;
         if (verbose) stderr.writeln('  unsolved: ${entry.canonicalKey}');
@@ -191,7 +240,7 @@ Options:
   }
   stderr.writeln(
     '\r  done in ${sw.elapsed.inSeconds}s: '
-    '$processed processed, $errors errors, $unsolved unsolved      ',
+    '$processed processed, $cacheHits cache hits, $errors errors, $unsolved unsolved      ',
   );
 
   out.flush().then((_) => out.close());
@@ -225,6 +274,24 @@ class _Vector {
   // (slug, tier) -> share. Stored as a flat map so the CSV writer can
   // iterate `_slugs × _tiers` in fixed column order.
   final Map<String, double> shares;
+  // Solution-geometry (power-spectrum) descriptors — see `spectralFeatures`.
+  final double specPeakFrac;
+  final double specXbarsFrac;
+  final double specYbarsFrac;
+  final double specCheckerFrac;
+  final double specConcentration;
+  // Solution-geometry (autocorrelation) descriptors — see
+  // `autocorrelationFeatures`. Parity-robust companions to the spectral block.
+  final double autoBand;
+  final double autoChecker;
+  final double autoTile;
+  // Solution-geometry (interpretable scalars) — see bin/_solution_geometry.dart.
+  // Period 1 on an axis = colour bars; checkerBlockK > 0 = damier of that maille.
+  final int periodX;
+  final int periodY;
+  final int checkerBlockK;
+  final int nSymmetries;
+  final double rleRatio;
 
   _Vector({
     required this.entry,
@@ -244,12 +311,32 @@ class _Vector {
     required this.maxCascade,
     required this.avgMoveComplexity,
     required this.shares,
+    required this.specPeakFrac,
+    required this.specXbarsFrac,
+    required this.specYbarsFrac,
+    required this.specCheckerFrac,
+    required this.specConcentration,
+    required this.autoBand,
+    required this.autoChecker,
+    required this.autoTile,
+    required this.periodX,
+    required this.periodY,
+    required this.checkerBlockK,
+    required this.nSymmetries,
+    required this.rleRatio,
   });
 }
 
 /// Build a [_Vector] for one puzzle, or null if the puzzle can't be
 /// solved by propagation+force (it needs backtracking — out of scope).
-_Vector? _vectorize(_Entry entry, {required int timeoutMs}) {
+///
+/// [cachedSteps] — pre-computed trace from [TraceCache]. When non-null,
+/// `puzzle.solveExplained()` is skipped entirely.
+_Vector? _vectorize(
+  _Entry entry, {
+  required int timeoutMs,
+  List<SolveStep>? cachedSteps,
+}) {
   final puzzle = Puzzle(entry.line);
 
   // Static fields.
@@ -269,8 +356,8 @@ _Vector? _vectorize(_Entry entry, {required int timeoutMs}) {
   // field [6], so reading the cache is enough — no need to re-solve.
   final storedCplx = puzzle.cachedComplexity ?? -1;
 
-  // Trace.
-  final steps = puzzle.solveExplained(timeoutMs: timeoutMs);
+  // Trace — use cached steps when available.
+  final steps = cachedSteps ?? puzzle.solveExplained(timeoutMs: timeoutMs);
 
   // Tally per-(slug, tier) counts. Use the synthetic `CX` slug for
   // complicity steps — the `step.constraint` they carry is the slug of
@@ -324,10 +411,23 @@ _Vector? _vectorize(_Entry entry, {required int timeoutMs}) {
   // be vectorizing partial information.
   final replay = puzzle.clone();
   for (final s in steps) {
-    replay.setValue(s.cellIdx, s.value);
+    if (s.value != null) {
+      replay.setValue(s.cellIdx, s.value!);
+    } else if (s.removeOption != null) {
+      replay.removeOption(s.cellIdx, s.removeOption!);
+    }
   }
   final solved = replay.complete && replay.check(saveResult: false).isEmpty;
   if (!solved) return null;
+
+  // Solution geometry: spectral + autocorrelation transforms plus the
+  // interpretable scalars (period / checker / symmetry / RLE), all on the
+  // solved grid. `replay` is the verified full solution, so we read its cell
+  // values directly (no dependency on the line's cached `1:` field). The
+  // scalars are computed inline at construction below.
+  final solGrid = [for (final c in replay.cells) c.value];
+  final spec = spectralFeatures(solGrid, width, height);
+  final auto = autocorrelationFeatures(solGrid, width, height);
 
   final level = classifyTrace(
     steps: steps,
@@ -364,6 +464,19 @@ _Vector? _vectorize(_Entry entry, {required int timeoutMs}) {
     maxCascade: maxCascade,
     avgMoveComplexity: nProp > 0 ? complexitySum / nProp : 0.0,
     shares: shares,
+    specPeakFrac: spec.peak,
+    specXbarsFrac: spec.xbars,
+    specYbarsFrac: spec.ybars,
+    specCheckerFrac: spec.checker,
+    specConcentration: spec.concentration,
+    autoBand: auto.band,
+    autoChecker: auto.checker,
+    autoTile: auto.tile,
+    periodX: periodX(solGrid, width, height),
+    periodY: periodY(solGrid, width, height),
+    checkerBlockK: checkerBlockK(solGrid, width, height),
+    nSymmetries: countSymmetries(solGrid, width, height),
+    rleRatio: rleRatio(solGrid, width, height),
   );
 }
 
@@ -402,6 +515,23 @@ String _csvHeader() {
       cols.add('share_${s}_t$t');
     }
   }
+  // Solution-geometry block, appended last so existing column indices are
+  // stable for any positional reader (consumers select by name).
+  cols.addAll([
+    'spec_peak_frac',
+    'spec_xbars_frac',
+    'spec_ybars_frac',
+    'spec_checker_frac',
+    'spec_concentration',
+    'auto_band',
+    'auto_checker',
+    'auto_tile',
+    'period_x',
+    'period_y',
+    'checker_block_k',
+    'n_symmetries',
+    'rle_ratio',
+  ]);
   return cols.join(',');
 }
 
@@ -432,6 +562,19 @@ String _csvRow(_Vector v) {
       cols.add(v.shares['${s}_t$t']!.toStringAsFixed(4));
     }
   }
+  cols.add(v.specPeakFrac.toStringAsFixed(4));
+  cols.add(v.specXbarsFrac.toStringAsFixed(4));
+  cols.add(v.specYbarsFrac.toStringAsFixed(4));
+  cols.add(v.specCheckerFrac.toStringAsFixed(4));
+  cols.add(v.specConcentration.toStringAsFixed(4));
+  cols.add(v.autoBand.toStringAsFixed(4));
+  cols.add(v.autoChecker.toStringAsFixed(4));
+  cols.add(v.autoTile.toStringAsFixed(4));
+  cols.add('${v.periodX}');
+  cols.add('${v.periodY}');
+  cols.add('${v.checkerBlockK}');
+  cols.add('${v.nSymmetries}');
+  cols.add(v.rleRatio.toStringAsFixed(4));
   return cols.join(',');
 }
 

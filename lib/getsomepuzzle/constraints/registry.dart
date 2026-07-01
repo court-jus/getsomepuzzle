@@ -1,16 +1,24 @@
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 
 /// Registry of all player-facing constraint types.
 /// Centralizes slug, label, and factory for each constraint type.
@@ -23,7 +31,7 @@ final constraintRegistry =
         List<String> Function(
           int width,
           int height,
-          List<int> domain,
+          List<CellValue> domain,
           Set<int>? excludedIndices,
         )
         generateAllParameters,
@@ -46,6 +54,12 @@ final constraintRegistry =
         label: 'Row count',
         fromParams: RowCountConstraint.new,
         generateAllParameters: RowCountConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'RT',
+        label: 'Row transition',
+        fromParams: RowTransitionConstraint.new,
+        generateAllParameters: RowTransitionConstraint.generateAllParameters,
       ),
       (
         slug: 'GS',
@@ -90,10 +104,28 @@ final constraintRegistry =
         generateAllParameters: ColumnCountConstraint.generateAllParameters,
       ),
       (
+        slug: 'CH',
+        label: 'Chain',
+        fromParams: ChainConstraint.new,
+        generateAllParameters: ChainConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'CT',
+        label: 'Column transition',
+        fromParams: ColumnTransitionConstraint.new,
+        generateAllParameters: ColumnTransitionConstraint.generateAllParameters,
+      ),
+      (
         slug: 'GC',
         label: 'Group count',
         fromParams: GroupCountConstraint.new,
         generateAllParameters: GroupCountConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'MJ',
+        label: 'Majority',
+        fromParams: MajorityConstraint.new,
+        generateAllParameters: MajorityConstraint.generateAllParameters,
       ),
       (
         slug: 'NC',
@@ -106,6 +138,18 @@ final constraintRegistry =
         label: 'Eyes',
         fromParams: EyesConstraint.new,
         generateAllParameters: EyesConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'IM',
+        label: 'Implication',
+        fromParams: ImplicationConstraint.new,
+        generateAllParameters: ImplicationConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'BB',
+        label: 'Bounding box',
+        fromParams: BoundingBoxConstraint.new,
+        generateAllParameters: BoundingBoxConstraint.generateAllParameters,
       ),
     ];
 
@@ -130,7 +174,7 @@ List<String>? generateAllParameters(
   String slug,
   int width,
   int height,
-  List<int> domain,
+  List<CellValue> domain,
   Set<int>? excludedIndices,
 ) {
   for (final r in constraintRegistry) {

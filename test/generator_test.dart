@@ -1,28 +1,40 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main() {
   test('Puzzle.clone preserves state for empty puzzles', () {
-    final p = Puzzle.empty(3, 3, [1, 2]);
-    p.cells[0].setForSolver(1);
-    p.cells[4].setForSolver(2);
+    final p = Puzzle.empty(3, 3, defaultDomain);
+    p.cells[0].setForSolver(CellValue.black);
+    p.cells[4].setForSolver(CellValue.white);
 
     final c = p.clone();
-    expect(c.cellValues, [1, 0, 0, 0, 2, 0, 0, 0, 0]);
-    c.cells[1].setForSolver(1);
-    expect(p.cellValues[1], 0); // original unaffected
+    expect(c.cellValues, [
+      CellValue.black,
+      CellValue.free,
+      CellValue.free,
+      CellValue.free,
+      CellValue.white,
+      CellValue.free,
+      CellValue.free,
+      CellValue.free,
+      CellValue.free,
+    ]);
+    c.cells[1].setForSolver(CellValue.black);
+    expect(p.cellValues[1], CellValue.free); // original unaffected
   });
 
   test('Puzzle.lineExport produces parseable format', () {
-    final p = Puzzle.empty(3, 3, [1, 2]);
-    p.cells[0].setForSolver(1);
+    final p = Puzzle.empty(3, 3, defaultDomain);
+    p.cells[0].setForSolver(CellValue.black);
     p.addConstraint(ForbiddenMotif('11'));
     final line = p.lineExport();
     expect(line, startsWith('v2_12_3x3_'));
@@ -47,7 +59,7 @@ void main() {
     // Three constraints together (FM + GS + PA) should uniquely determine
     // a 3x3 puzzle with no prefilled cells — stresses cross-constraint
     // propagation, not covered by single-constraint tests above.
-    final p = Puzzle.empty(3, 3, [1, 2]);
+    final p = Puzzle.empty(3, 3, defaultDomain);
     p.addConstraint(ForbiddenMotif('1.2'));
     p.addConstraint(GroupSize('0.1'));
     p.addConstraint(ParityConstraint('8.top'));
@@ -57,8 +69,8 @@ void main() {
   test('solve() works on puzzle built from Puzzle.empty', () {
     // Build a puzzle manually: 3x3, prefilled cell 0=1, FM:11 constraint
     // Solution should avoid "11" horizontally
-    final p = Puzzle.empty(3, 3, [1, 2]);
-    p.cells[0].setForSolver(1);
+    final p = Puzzle.empty(3, 3, defaultDomain);
+    p.cells[0].setForSolver(CellValue.black);
     p.cells[0].readonly = true;
     p.addConstraint(ForbiddenMotif('11'));
     p.addConstraint(QuantityConstraint('1.3'));
@@ -71,60 +83,90 @@ void main() {
   });
 
   test('Constraint.apply works on Puzzle.empty puzzles', () {
-    final p = Puzzle.empty(3, 3, [1, 2]);
-    p.cells[0].setForSolver(1);
+    final p = Puzzle.empty(3, 3, defaultDomain);
+    p.cells[0].setForSolver(CellValue.black);
     p.cells[0].readonly = true;
     // FM:11 means "11" pattern is forbidden horizontally
     final fm = ForbiddenMotif('11');
     p.addConstraint(fm);
 
-    // Cell 1 is next to cell 0 (value=1). Setting cell 1 to 1 would create "11".
-    // So apply should deduce cell 1 = 2
+    // Cell 1 is next to cell 0 (value=1). Setting cell 1 to 1 would create
+    // "11", so cell 1 must drop the colour-1 option (which collapses to
+    // colour 2 on a 2-colour domain).
     final move = fm.apply(p);
-    print('FM apply move: idx=${move?.idx} value=${move?.value}');
     expect(move, isNotNull);
     expect(move!.idx, 1);
-    expect(move.value, 2);
+    expect(move.removeOption, CellValue.black);
   });
 
   test('generateAllParameters produce valid constraints', () {
     expect(
-      ForbiddenMotif.generateAllParameters(3, 3, [1, 2], null),
+      ForbiddenMotif.generateAllParameters(3, 3, defaultDomain, null),
       isNotEmpty,
     );
     expect(
-      ParityConstraint.generateAllParameters(3, 3, [1, 2], null),
-      isNotEmpty,
-    );
-    expect(GroupSize.generateAllParameters(3, 3, [1, 2], null), isNotEmpty);
-    expect(LetterGroup.generateAllParameters(3, 3, [1, 2], null), isNotEmpty);
-    expect(
-      QuantityConstraint.generateAllParameters(3, 3, [1, 2], null),
+      ParityConstraint.generateAllParameters(3, 3, defaultDomain, null),
       isNotEmpty,
     );
     expect(
-      SymmetryConstraint.generateAllParameters(3, 3, [1, 2], null),
+      GroupSize.generateAllParameters(3, 3, defaultDomain, null),
       isNotEmpty,
     );
+    expect(
+      LetterGroup.generateAllParameters(3, 3, defaultDomain, null),
+      isNotEmpty,
+    );
+    expect(
+      QuantityConstraint.generateAllParameters(3, 3, defaultDomain, null),
+      isNotEmpty,
+    );
+    expect(
+      SymmetryConstraint.generateAllParameters(3, 3, defaultDomain, null),
+      isNotEmpty,
+    );
+  });
+
+  test('LetterGroup never uses the letter I (confusable with SY glyph)', () {
+    // A 10x5 grid yields maxLetters = 50 ~/ 5 = 10, so the loop index reaches
+    // the slot for 'I' (l == 8) and beyond. 'I' must be skipped while the
+    // neighbouring labels 'H' and 'J' are still produced.
+    final letters = LetterGroup.generateAllParameters(
+      10,
+      5,
+      defaultDomain,
+      null,
+    ).map((p) => p.split('.').first).toSet();
+    expect(letters, isNot(contains('I')));
+    expect(letters, containsAll(['H', 'J']));
   });
 
   test('generateOne produces a puzzle for a seeded 3x3 grid', () {
     // Test the core algorithm with a known-good configuration
     // Build a solved grid manually and test constraint selection
     const width = 3, height = 3;
-    const domain = [1, 2];
+    const domain = defaultDomain;
     final solved = Puzzle.empty(width, height, domain);
     // Checkerboard pattern: easy to constrain
-    final values = [1, 2, 1, 2, 1, 2, 1, 2, 1];
+    final values = [
+      CellValue.black,
+      CellValue.white,
+      CellValue.black,
+      CellValue.white,
+      CellValue.black,
+      CellValue.white,
+      CellValue.black,
+      CellValue.white,
+      CellValue.black,
+    ];
     for (int i = 0; i < 9; i++) {
       solved.cells[i].setForSolver(values[i]);
     }
 
     // Create puzzle with 2 prefilled cells
     final pu = Puzzle.empty(width, height, domain);
-    pu.cells[0].setForSolver(1);
+    pu.cells[0].setForSolver(CellValue.black);
     pu.cells[0].readonly = true;
-    pu.cells[8].setForSolver(1);
+    pu.cells[8].setForSolver(CellValue.black);
     pu.cells[8].readonly = true;
 
     // Generate valid constraints for this solution
@@ -195,5 +237,73 @@ void main() {
       expect(p.width, 3);
       expect(p.constraints.isNotEmpty, isTrue);
     }
+  });
+
+  test('generateOne accepts a slugDeficitScores map without crashing', () {
+    // Wiring smoke-test: passing the new deficit map must not break the
+    // sort path even when the map references slugs not in the candidate
+    // pool — generateOne treats unknown entries as zero via `?? 0.0`.
+    final result = PuzzleGenerator.generateOne(
+      GeneratorConfig(
+        width: 4,
+        height: 4,
+        count: 1,
+        maxTime: Duration(seconds: 10),
+        slugDeficitScores: const {'GS': 0.5, 'XX_NOT_A_SLUG': 0.9},
+      ),
+    );
+    if (result == null) return;
+    final p = Puzzle(result.line);
+    expect(p.width, 4);
+    expect(p.constraints.isNotEmpty, isTrue);
+  });
+
+  test('generateOne honours shouldStop quickly (under 2 s)', () {
+    // Regression for the "worker overruns maxAttemptTime" bug: before the
+    // fix, shouldStop was only checked between two passes of the outer
+    // loop, so a single inner pass could chew through 50+ candidates
+    // before re-asking the deadline. With shouldStop now propagated to
+    // the inner loop, to `Puzzle.solve()`, and to `solveExplained`,
+    // an immediate-stop callback must return in well under a second on
+    // a 6x8 grid — versus 20+ s of overshoot in the bug report.
+    //
+    // The bound is loose (2 s) because some prep work happens before the
+    // first shouldStop check: random pre-fill, `generateAllParameters`
+    // for every allowed slug, and `verify()` on each generated candidate.
+    // On cold-start machines this is ~300 ms; we leave a generous margin
+    // to keep the regression test robust without losing the signal.
+    final sw = Stopwatch()..start();
+    final result = PuzzleGenerator.generateOne(
+      GeneratorConfig(
+        width: 6,
+        height: 8,
+        count: 1,
+        maxTime: Duration(seconds: 60),
+      ),
+      shouldStop: () => true,
+    );
+    sw.stop();
+    expect(result, isNull);
+    expect(sw.elapsedMilliseconds, lessThan(2000));
+  });
+
+  test('generateOne stamps a non-null generationScenario', () {
+    // Every puzzle produced by the regular flow must carry an explicit
+    // scenario tag — either `classic` or `sh` depending on whether
+    // preFillSh planted a Shape motif. A null value would make the
+    // equilibrium silently miscount the puzzle as `classic`-by-default,
+    // which is the exact source of bug we're guarding against.
+    final result = PuzzleGenerator.generateOne(
+      GeneratorConfig(
+        width: 4,
+        height: 4,
+        count: 1,
+        maxTime: Duration(seconds: 10),
+      ),
+    );
+    if (result == null) return;
+    final p = Puzzle(result.line);
+    expect(p.generationScenario, isNotNull);
+    expect(['classic', 'sh'], contains(p.generationScenario));
   });
 }

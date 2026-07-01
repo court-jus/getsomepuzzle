@@ -7,6 +7,11 @@
 # Privacy-policy HTML pages generated from assets/privacy.*.md by
 # bin/build_privacy.dart at web-build time.
 web/privacy.*.html
+
+# Raw screenshots produced by integration_test/screenshots_test.dart via
+# `flutter drive`. The processed/cropped versions kept under
+# marketing/screenshots/<locale>/ stay tracked.
+marketing/screenshots/raw/
 .DS_Store
 .atom/
 .build/
@@ -20,7 +25,13 @@ keep_local/*
 assets/liked
 assets/disliked
 assets/played
+# Generator diagnostic outputs (rejected puzzles) — not consumed by the app
+assets/cancelled.txt
+assets/notUnique.txt
+assets/ratioTooHigh.txt
 /stats/
+generator_stats.csv
+stats_*/
 
 # IntelliJ related
 *.iml
@@ -55,3 +66,10 @@ app.*.map.json
 /android/app/release
 scripts
 backup
+.claude/agent-memory
+.claude/settings.local.json
+docs/dev/devdocs.pdf
+tmp
+puzzle_vectors.csv
+solve_traces.tsv
+assets/attemptStalled.txt

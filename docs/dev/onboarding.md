@@ -1,411 +1,390 @@
-# Onboarding — replacing the tutorial
+# Onboarding
 
-Locked-in plan to replace the `tutorial` collection (and its
-"Reset tutorial" button) with a constraint-by-constraint introduction
-mechanism driven by the player's stats. Open discussion is limited to
-the [Still open](#7-decisions-and-still-open) section.
+Constraint-by-constraint introduction mechanism driven by the player's
+stats. Replaces the older "tutorial collection + `TX:` constraint +
+reset button" model end to end.
 
-## 1. Previous state
-
-- Dedicated `tutorial` collection (`assets/tutorial.txt`, 23 puzzles).
-- Each puzzle carried a `TX:` (`HelpText`) constraint that injected a
-  pedagogical block of text at the head of the line (e.g.
-  `TX:text1_1:121121111_45`).
-- The collection was offered as the default at first launch
-  (`collectionToLoad` → `tutorial`) and the app detected
-  "tutorial finished" once every line had been played
-  (`open_page.dart:43`).
-- A "Restart tutorial" button in Settings called
-  `Database.restartTutorial()`, which wiped the stats of the tutorial
-  lines and replayed the whole sequence.
-- The playlist filter had a special path for `tutorial`: no shuffle,
-  no user filters, fixed pedagogical order
-  (`database.dart:622`).
-
-### Observed limitations
-
-- **Too dense**: the 23 puzzles introduced FM, PA, GS, LT, QA, SY,
-  CC, NC, GC, DF, SH in tight succession (often 2-3 constraints per
-  puzzle starting from the 8th).
-- **Incomplete coverage**: `EY` was never introduced. `SH` only
-  appeared in a single puzzle. The pedagogy was implicit (free-form
-  text) rather than tied to a specific constraint.
-- **One-shot**: once finished, no further reminder; coming back six
-  months later to a rare constraint was unguided.
-- **Fragile**: the "reset tutorial" button relied on the exact list
-  of file lines; any change to the file broke the stats reset for the
-  matching entries.
-
-## 2. Adopted model
-
-**Drop the `tutorial` collection, the "Reset tutorial" button and the
-`TX:` constraint.** In their place:
+## Model
 
 1. **Per-constraint tracker** `firstSeen: Map<slug, DateTime>`
    persisted in `SharedPreferences`. When the player opens a puzzle
    that contains a slug whose `firstSeen` is `null`:
-   - a **modal** displays the constraint's explanation
-     (localised text, added to the `.arb` files),
+   - a **modal** displays the constraint's explanation (localised
+     text in the `.arb` files);
    - on dismiss, `firstSeen[slug] = now`.
 2. **Onboarding phases**: as long as not every constraint is
    unlocked, the playlist runs through a dedicated filter restricting
-   the allowed constraints (see § 5 for the chosen sequence).
-   Each phase lasts 10 finished puzzles (skipped excluded).
+   the allowed constraints. Phase advancement is driven by a per-slug
+   completion counter — the player crosses into the next phase once
+   they have finished `phaseLength = 5` puzzles whose declared rules
+   contain the current *introducing* slug.
 3. **Dynamic sampling**: the onboarding playlist is **not a frozen
-   list**. At each phase we sample at random from the `1-easy`
-   collection (and later others) by applying the phase filter.
-   Consequences:
+   list**. At each phase we sample at random from the eligible
+   collections by applying the phase filter. Consequences:
    - Any new puzzle added to the corpus that satisfies the filter is
      immediately eligible.
    - A player who restarts the onboarding will **not** replay the
-     same puzzles (already-played ones are excluded as in normal mode).
-   - Only the **algorithm** (filter + sprinkle ratios) is frozen.
+     same puzzles (already-played ones are excluded as in normal
+     mode).
+   - Only the **algorithm** (filter + introducing-slug requirement) is
+     frozen.
 
-### Asset migration
+### Rebuilding `firstSeen` from stats
 
-- `assets/tutorial.txt` is removed.
-- Its 23 puzzles are **merged into the appropriate level
-  collections** (`1-easy` / `2-player` / …) according to their `cplx`.
-- The `TX:` prefix is stripped from each migrated line. The
-  `HelpText` class (`lib/getsomepuzzle/constraints/helptext.dart`) and
-  its registration in `registry.dart` are removed.
-- The `tutorial` mode disappears from the dropdown, along with the
-  specific code in `Database.preparePlaylist()` and
-  `Database.restartTutorial()`.
+`firstSeen` is derivable at any time from the play history — a player
+saw a constraint the first time they completed a puzzle containing it.
+On every `Database.loadStats`, for each entry where
+`finished != null && skipped == null`, the loader parses the slugs
+from the `puzzleLine` and sets
+`firstSeen[s] = min(firstSeen[s], entry.finished)` (take the `null`
+slot or the older date). This **genuine first-encounter** semantics is
+robust to the order in which stat lines are read (which is not
+guaranteed chronological) and leaves the door open for prompts like
+"you learned this constraint X months ago, want a refresher?".
 
-### Migration and rebuilding `firstSeen` from stats
+The mechanism also acts as a **runtime safety net**: if a puzzle with
+`firstSeen[s] == null` shows up *during a session* (rare — an imported
+playlist, an overlooked constraint, a race between `loadStats` and
+puzzle open), the modal still fires on opening. No `tutorialCompleted`
+flag is stored: stats remain the source of truth.
 
-`firstSeen` is derivable at any time from the play history: a player
-saw a constraint the first time they completed a puzzle that
-contained it. We exploit that:
+## Onboarding sequence
 
-- On every stats load (`Database.loadStats`), for each entry where
-  `finished != null && skipped == null`, we parse the slugs from the
-  `puzzleLine`; for each slug `s`, we set
-  `firstSeen[s] = min(firstSeen[s], entry.finished)` (i.e. take the
-  `null` slot or the older date). This **genuine first-encounter**
-  semantics is robust to the order in which stat lines are read
-  (which is not guaranteed chronological) and leaves the door open
-  for prompts like "you learned this constraint X months ago, want a
-  refresher?".
-- Consequences:
-  - A player who finished the tutorial has `firstSeen` populated for
-    the 11 tutorial constraints (`FM, PA, GS, LT, QA, SY, CC, NC, GC,
-    DF, SH`) — but not for `EY`, which the tutorial didn't cover.
-  - A player who climbed without the tutorial has `firstSeen`
-    populated for each constraint encountered in `1-easy` /
-    `2-player` / etc., proportionally to their plays — typically `EY`
-    will be set if they've played enough in `1-easy` (`EY` is at 9 %
-    there) or higher.
-  - A fresh player keeps `firstSeen = {}` and starts in phase 0.
-- The mechanism is also a **runtime safety net**: if a puzzle with
-  `firstSeen[s] == null` shows up *during a session* (rare — an
-  imported playlist, an overlooked constraint, a race window between
-  loadStats and puzzle open), the modal still fires on opening. The
-  load-time rebuild covers the bulk of the migration without a
-  dedicated button.
-- No "migration date" or `tutorialCompleted` flag is stored: stats
-  remain the source of truth.
+Two modes run back to back:
 
-## 3. Data: constraint distribution in `1-easy`
+### Strict phases (P0–P9)
 
-Computed by `bin/onboarding_stats.dart` on `assets/1-easy.txt`
-(1750 puzzles). For each slug: catalog presence, number of puzzles
-where it is the **only** declared rule (`solo`), and how many of those
-solo puzzles are entirely solvable with complexity-0 propagations
-(`solo_cplx0`).
+10 phases × 5 puzzles = 50 introductory plays. Slug-envelope filter
+**plus** a hard requirement that the puzzle contains the phase's
+introducing slug. Source = `1-easy` ∪ `1-easy-overfilled`.
 
-```
-slug   #puz      %      solo   solo_cplx0  solo_cplx≤1
-FM     1605   91.7%     99        50          93
-PA     1368   78.2%      0         0           0
-GS     1072   61.3%      9         0           2
-SY      397   22.7%      0         0           0
-DF      248   14.2%      0         0           0
-QA      241   13.8%      0         0           0
-CC      228   13.0%      0         0           0
-EY      163    9.3%      7         0           0
-NC      127    7.3%     26        26          26
-LT       93    5.3%      0         0           0
-GC       14    0.8%      0         0           0
-SH        2    0.1%      0         0           0
-```
+`1-easy-overfilled.txt` collects puzzles whose prefill exceeds
+`defaultMaxPrefill` (30 %) **but** whose solving trace would be
+*beginner* — i.e. pedagogically simple puzzles that just happen to
+have many pre-filled cells. The distinction is decided by
+`classifyTrace` at generation time: depending on whether the puzzle's
+`traceLevel` is *beginner* or not, it is routed to
+`1-easy-overfilled.txt` or `overfilled.txt`. Every line in
+`1-easy-overfilled.txt` is therefore pedagogically appropriate by
+construction.
 
-Distribution by complexity tier (over every propagation step observed
-when replaying `solveExplained` on each puzzle):
+| Phase | Length | Introducing | Allowed slugs               |
+|------:|-------:|:------------|:----------------------------|
+| 0     | 5      | `FM`        | `{FM}`                      |
+| 1     | 5      | `NC`        | `{FM, NC}`                  |
+| 2     | 5      | `PA`        | `{FM, PA, NC}`              |
+| 3     | 5      | `CC`        | `{FM, PA, NC, CC}`          |
+| 4     | 5      | `RC`        | `{FM, PA, NC, CC, RC}`      |
+| 5     | 5      | `GS`        | `{FM, PA, NC, CC, RC, GS}`  |
+| 6     | 5      | `EY`        | `{…, EY}`                   |
+| 7     | 5      | `DF`        | `{…, EY, DF}`               |
+| 8     | 5      | `LT`        | `{…, EY, DF, LT}`           |
+| 9     | 5      | `QA`        | `{…, EY, DF, LT, QA}`       |
 
-```
-slug   #puz_used  total   t0     t1     t2     t3     t4     t5    %t0
-FM       1602    15744   8771   3780   3193      0      0      0   55.7
-GS       1072     6220   3790   2159    271      0      0      0   60.9
-PA       1363     3373   2155   1097    121      0      0      0   63.9
-SY        397     1263      0    128   1135      0      0      0    0.0
-EY        163     1246    666      0    580      0      0      0   53.5
-NC        127      993    993      0      0      0      0      0  100.0
-CC        226      663    663      0      0      0      0      0  100.0
-QA        239      606    606      0      0      0      0      0  100.0
-DF        239      472    472      0      0      0      0      0  100.0
-LT         92      158    123     20     15      0      0      0   77.8
-SH          2        5      5      0      0      0      0      0  100.0
-```
+(Each `allowed` set is cumulative: every prior introducing slug plus
+the phase's own.)
 
-## 4. Data: FM+X and NC+X duos
+The two conditions of the original `puzzleEligibleForPhase` predicate
+(allow-envelope + introducing-slug-present) are expressed as a visible
+filter preset on `currentFilters`:
 
-Once FM and NC are mastered, we look to introduce each new constraint
-X via a puzzle whose only declared rules are `{FM, X}` or `{NC, X}`.
-The table gives, per anchor, the number of available "duo" puzzles,
-how many are entirely solvable in complexity 0 (resp. ≤ 1), and the
-tier distribution of propagations attributed to the **partner** only.
+- `wantedRules = {phase.introducing}` — the puzzle must declare the
+  introducing slug.
+- `bannedRules = allKnownSlugs \ phase.allowed` — every slug outside
+  the phase envelope is forbidden.
 
-```
-Duos with anchor=FM  ({FM, partner}):
-  partner   #duo   cplx0  cplx≤1   partner_steps  t0   t1   t2   t3   t4   t5    %t0
-  PA       326     55    258         761        433  294   34    0    0    0    56.9
-  GS       126     20     54         825        505  284   36    0    0    0    61.2
-  LT         7      1      6          15          6    4    5    0    0    0    40.0
-  SY         4      0      0          13          0    2   11    0    0    0     0.0
-  NC         1      0      0          16         16    0    0    0    0    0   100.0
-  QA         1      0      0           1          1    0    0    0    0    0   100.0
+`Database.recommendedOnboardingFilters` returns this pair from
+`_strictPhaseRecommendation(phase)`, and
+`maybeApplyOnboardingFilterDefaults` (run once per launch, gated by
+the `onboardingFiltersApplied` prefs key) writes it into
+`currentFilters` if the player hasn't customised them. From there the
+existing `Database.filter()` does the actual filtering — there is no
+dedicated onboarding sampler. The player can inspect the preset in
+OpenPage and override it via the standard chip UI; the original
+contract holds exactly while the preset is in effect.
 
-Duos with anchor=NC  ({NC, partner}):
-  partner   #duo   cplx0  cplx≤1   partner_steps  t0   t1   t2   t3   t4   t5    %t0
-  PA         7      4      7          33         26    7    0    0    0    0    78.8
-  CC         6      6      6          16         16    0    0    0    0    0   100.0
-  DF         3      3      3           3          3    0    0    0    0    0   100.0
-  GS         2      0      1          14          7    6    1    0    0    0    50.0
-  FM         1      0      0           2          0    0    2    0    0    0     0.0
-  QA         1      1      1           1          1    0    0    0    0    0   100.0
-```
+Once `filter()` passes, puzzles compete on Gaussian-cplx + variety
+score. The one phase-specific weighting is in phase 5: while `GS` is
+the introducing slug, a puzzle holding a size-1 `GS` (an isolated
+cell — a trivial, poorly instructive instance) has its selection
+weight multiplied by `Database.selectionTrivialGsPenalty` (0.05).
+`PuzzleData.hasTrivialGroupSize`, parsed once at load from the `GS`
+`idx.size` parameter, flags it; `getPuzzlesByLevel` applies the
+penalty only when `currentPhase?.introducing == 'GS'`. The factor is
+non-zero so such puzzles stay drawable as a last resort and the
+playlist never empties. Otherwise no refresh share, no anti-forgetting
+sprinkle. `puzzleEligibleForPhase` is still exported for `bin/` tools
+(e.g. `bin/check_phase_coverage.dart`) but is no longer consulted at
+runtime.
 
-## 5. Adopted onboarding sequence
+Filters are kept in sync automatically: `notePuzzleCompleted` syncs
+`currentFilters` with `recommendedOnboardingFilters` after every
+completed puzzle, so the playlist never uses stale phase presets when
+the phase transitions. A cross-session guard in `loadPuzzlesFile`
+handles the edge case where the app is closed at a phase boundary.
 
-Onboarding works in **two phases**:
+### Soft-filter mode (post-P9)
 
-1. **Strict phases** (P0-P3, 40 puzzles) — slug-envelope filter +
-   80/20 bias toward the introduced constraint. Source =
-   `1-easy` ∪ `overfilled-easy`. The second file collects puzzles
-   whose prefill exceeds `defaultMaxPrefill` (30 %) **but** whose
-   solving trace would be *beginner* — i.e. pedagogically simple
-   puzzles that just happen to have many pre-filled cells. The
-   distinction is decided by `classifyTrace` at generation time:
-   depending on whether the puzzle's `traceLevel` is *beginner* or
-   not, it is routed to `overfilled-easy.txt` or `overfilled.txt`.
-   Every line in `overfilled-easy.txt` is therefore pedagogically
-   appropriate by construction.
-2. **Soft filter mode** (post-P3) — the playlist falls back to
-   `getPuzzlesByLevel(playerLevel)` on any collection
-   (1-easy → 6-mad), with **one extra filter**: a puzzle may
-   introduce **at most one constraint not yet seen**. The remaining
-   constraints (LT, QA, SY, DF, SH, CC, GC, EY) are then discovered
-   organically, one at a time, at a pace that depends on the player.
+The corpus doesn't easily sustain strict phases for the remaining
+slugs (the seven in `OnboardingPhase.postStrictDiscoveryOrder` —
+currently `RT, SY, SH, CH, CT, GC, MJ`, derived from
+`constraintRegistry`): too few puzzles whose declared rules sit
+cleanly inside a narrow envelope.
 
-### Strict phases (P0-P3)
+The post-P9 model is also expressed as a filter preset, via
+`_softFilterRecommendation()`:
 
-Filters are expressed as **sets of declared slugs** in the puzzle
-(`TX` is excluded by default since it is gone). Any puzzle whose set
-is a subset of `allowed` is eligible; we sample at random within that
-set. The sprinkle ratios are **targets**, not hard constraints
-(weighted sampling, comparable to `getPuzzlesByLevel`).
+- The recommendation **elects** the first slug in
+  `postStrictDiscoveryOrder` that the player has not yet met
+  (exposed as `Database.electedSoftSlug`). While
+  ≥ 2 slugs are still unseen, the preset is `wantedRules = {}`,
+  `bannedRules = (unseen \ {elected})` — puzzles with 0 new slugs
+  pass (refresh) AND the elected slug can surface (single new rule),
+  while every other unseen slug is banned. The resulting playlist
+  matches the "≤ 1 new rule" contract.
+- **Terminal case** (one unseen slug left): the preset flips to
+  `wantedRules = {elected}`, `bannedRules = {}` so the OpenPage
+  banner references a real chip and the missing slug surfaces faster.
 
-| Phase | Length | Allowed slugs | Target composition |
-|------:|-------:|---------------|--------------------|
-| 0 | 10 | `{FM}` | 100 % FM solo |
-| 1 | 10 | `{FM, NC}` | 100 % NC solo (FM allowed as fallback if scarce) |
-| 2 | 10 | `{FM, PA, NC}` | ~80 % puzzles containing PA · ~20 % NC puzzles (anti-forgetting sprinkle) · FM-only allowed as fallback |
-| 3 | 10 | `{FM, PA, GS, NC}` | ~80 % puzzles containing GS · ~20 % NC (sprinkle) |
+#### Surfacing the elected rule (cadenced injection + widening)
 
-### "Soft filter" mode (post-P3)
+The filter preset alone is not enough: the soft-discovery slugs are
+so rare in the entry catalog that the weighted sampler almost never
+draws one — the abundant 0-new-rule "refresh" puzzles win every slot,
+and a player who stays on the entry collection would loop forever
+without ever meeting them. Two mechanisms in `Database` fix this:
 
-Why no strict phase past P3? The corpus doesn't (or no longer easily)
-sustain strict phases for DF/CC/etc.: only ~5 puzzles `{FM,PA,NC,DF}`
-containing DF, and ~7 `{FM,PA,NC,DF,CC}` containing CC, in
-`1-easy ∪ overfilled<=35 %`. Generating more in such a narrow
-envelope is counter-productive (the generator classifies elsewhere or
-yields very little).
+- **Cadenced injection** (`_injectElectedSoftRule`, called by
+  `getPuzzlesByLevel`). `notePuzzleCompleted` counts soft-phase plays
+  in `_softPlaysSinceElectedChange`, reset whenever discovery advances.
+  Once it reaches `softElectedInjectPeriod` (10) — or the filtered
+  batch is empty, as in the terminal single-slug case — one
+  elected-rule puzzle is spliced into a random slot of the upcoming
+  batch. With the 5-puzzle batch granularity this surfaces a new rule
+  roughly every 10–15 plays: not every batch (too rushed), not never
+  (the stall).
+- **Bounded widening** (`_refreshSoftDiscoveryPool`, Axe B). The entry
+  collection alone is too thin for the scarcest slugs (`RT`, `CT`), so
+  the pool is pre-loaded — when soft mode becomes active — with
+  soft-slug puzzles from the **next level collection(s) up**, capped at
+  `softDiscoveryMaxLevelsAbove` (1) so a beginner meets a rule on a
+  `2-player` puzzle, never a `6-mad` one. Entry (`1-easy` +
+  `1-easy-overfilled`, already in `puzzles`) plus the next level holds
+  ≥ a dozen eligible puzzles for every soft slug. The injection draws
+  from the current collection first and falls back to this pool only
+  when the collection offers fewer than `softElectedMinInCollection`
+  (8) eligible puzzles. Pool puzzles still pass `_matchesFilters` (the
+  predicate extracted from `filter()`), so the envelope/flag/size
+  gates hold.
+- The soft filter becomes a no-op once
+  `progress.firstSeen.length == OnboardingPhase.allKnownSlugs.length`
+  (every known slug encountered). At that point `_softFilterActive`
+  is false, `recommendedOnboardingFilters` returns `null`, and
+  `isInOnboarding` flips to false → onboarding is implicitly over.
+- An `OnboardingCompleteDialog` fires the next time a new-rule modal
+  is dismissed after `isInOnboarding` becomes false. The dialog
+  congratulates the player and mentions that future game updates
+  may add new rules.
+- **New-rule detection in future updates** — the infrastructure
+  naturally handles new constraints added to the registry: when a
+  slug unknown to the player appears in a game update,
+  `_softFilterActive` automatically flips back to true
+  (`firstSeen.length < allKnownSlugs.length`), the player re-enters
+  discovery mode, the `NewConstraintDialog` fires for the new slug,
+  and the `OnboardingCompleteDialog` fires again once all slugs are
+  re-seen. If the update adds a new `OnboardingPhase` entry,
+  `phaseForCompletions` returns that phase (completions for the new
+  slug are 0 < `phaseLength`), placing the returning player in a
+  strict phase for the new constraint.
 
-Adopted model:
+For up-to-date corpus coverage figures per phase, run
+`bin/check_phase_coverage.dart` (and `--soft` for the post-strict
+fan-out). The numbers shift with every generator pass; freezing them
+in this doc was painful to maintain and the script makes the
+diagnostic cheap.
 
-- The player can explore **every level collection** (the user-level
-  filter still drives the sampler).
-- A **soft filter** rejects any puzzle whose declared rules contain
-  ≥ 2 slugs with `firstSeen[s] == null`. Consequence: each surfaced
-  puzzle introduces at most **one** new rule (for which the modal
-  fires), while still serving realistic puzzles that combine
-  already-mastered rules.
-- The soft filter becomes a no-op once the player has met the 12
-  constraints (`firstSeen.length == OnboardingPhase.allKnownSlugs`)
-  → onboarding is implicitly over.
+## Completion accounting
 
-Soft-mode corpus coverage (measured by
-`bin/check_phase_coverage.dart --soft`, post-P3):
+The strict-phase counter lives in
+`Database.onboardingCompletions : Map<String, int>`, persisted as JSON
+in `SharedPreferences` under the `onboardingCompletions` key.
 
-```
-After P3 ({FM, NC, PA, GS}):
-  level         eligible    %      avg_unseen
-  1-easy            1317   62.7 %    0.15
-  2-player           509   21.8 %    0.41
-  3-advanced        1232   63.1 %    0.17
-  4-strong          1342   48.9 %    0.35
-  5-expert           399   36.0 %    0.31
-  6-mad              325   17.3 %    0.52
-  TOTAL             5124   42.3 %
-  Slugs the filter can introduce: {CC, DF, EY, GC, LT, QA, SH, SY}
-```
+- **On `notePuzzleCompleted(puz)`** while `currentPhase != null`,
+  *every* slug present in `puz.rules` increments its counter. A
+  `{FM, PA, NC}` puzzle bumps all three. The map is persisted
+  fire-and-forget — failure only resets the counter on next launch.
+- **`phaseForCompletions(map)`** walks `OnboardingPhase.phases` in
+  order and returns the first phase whose `introducing` slug has a
+  count below `phaseLength`. Returns `null` once every phase's
+  introducing slug has been satisfied — that's the trigger for
+  soft-filter mode.
+- **`skipOnboarding()`** writes `phaseLength` to every phase's
+  introducing slug and **persists immediately**. The immediate
+  persistence is load-bearing: `loadPuzzlesFile` rebuilds
+  `onboardingCompletions` from prefs at app start, so a deferred
+  write would silently drop the player back to phase 0 the next time
+  the app launches.
+- **`resetOnboardingProgress()`** clears the map and persists
+  immediately (same reason). It clears `onboardingCompletions`,
+  **not** `firstSeen` — the explanation modals will not re-fire for
+  already-seen slugs after a reset.
 
-5124 eligible puzzles cover the introduction of the 8 remaining slugs
-across the entire playable corpus.
+## Empty-playlist surfacing
 
-### Notes on the feasibility of each strict phase
+When the strict-phase filter would produce an empty playlist on the
+currently-selected collection (e.g. a beginner-level player tries
+`6-mad` before finishing phase 5), the OpenPage banner (see
+`playlist.md` §8) surfaces the recommended preset and offers a
+one-tap reset to apply it, instead of an empty-state message under a
+disabled Play button. The `EmptyPlaylistReason` enum carries the
+residual cases only (`customEmpty`, `userAllPlayed`,
+`noPuzzlesLoaded`, `filtersTooStrict`, `generic`).
 
-- **Phase 0** — 100 FM-solo puzzles (in 1-easy), +42 in
-  overfilled<=35 %. Plenty.
-- **Phase 1** — 30 puzzles "with NC" + 142 refresh. OK.
-- **Phase 2** — 536 puzzles with PA + 172 refresh. Comfortable.
-- **Phase 3** — 1063 puzzles with GS + 708 refresh. Comfortable.
+## Learning page (menu)
 
-### Learning page (menu)
+A **Learning** menu entry (labelled "Apprentissage" in French) sits
+next to Help. It serves as a rule reference and refresh tool.
 
-A new **Learning** menu entry is added next to Help. It serves as a
-rule reference + memory-refresher tool.
-
-For each constraint (the 12 slugs), the page shows:
+For each entry in `OnboardingPhase.allKnownSlugs` (read from the
+registry), the page shows:
 
 - The localised **icon** + **name**.
-- A status: `seen on 12 March 2026` if `firstSeen[slug] != null`,
-  otherwise `not yet encountered`.
-- The **number of puzzles already played** (finished, skipped
-  excluded) that contained this constraint. Computed from
-  `puzzles.where(p => p.played && p.skipped == null &&
-  p.rules.contains(slug))` over the entire stats history (across
-  every collection, not just the current one).
-- A **"Refresh my memory"** button which:
-  1. Re-displays the explanation modal (same content as the first-
-     encounter modal — the slug isn't unlearned, `firstSeen` stays
-     set).
-  2. Prepares a **temporary playlist of about 10 onboarding
-     puzzles** centred on the constraint. Implementation: we reuse
-     the phase machinery from § 5 by simulating a state where `slug`
-     was just unlocked, and sample ten unplayed puzzles that satisfy
-     its introduction filter (e.g. `{FM, slug}` for slugs introduced
-     via FM, `{NC, slug}` for those introduced via NC), with optional
-     sprinkling.
-  3. At the end of the refresh playlist, the player returns to the
-     collection they had before.
+- A status: `seen on 12 March 2026` if `progress.firstSeen[slug]` is
+  set, otherwise "not yet encountered".
+- The **number of puzzles already played** (finished, non-skipped)
+  that contained this constraint. Computed by
+  `Database.playCountForSlug(slug)` over the entire stats history
+  (across every collection, not just the current one).
+- A **"Refresh"** button that re-opens the constraint's explanation
+  modal (`NewConstraintDialog.show(context, {slug})`) so the player
+  can review the rule any time without affecting their progress —
+  `firstSeen` stays untouched.
+
+Slugs are sorted seen-first, by first-seen date ascending, then
+alphabetical. The page is rebuilt every time it is opened — counts
+and dates are pulled live from `Database` and `ConstraintProgress`.
 
 This page also serves as a gateway for a player who **never went
 through onboarding** (custom-only path, a player playing 6-mad out of
-curiosity): they can browse the list, read each rule, and launch a
-mini-walkthrough for any rule they're curious about, without
-disturbing their main progress.
+curiosity): they can browse the list and read each rule on demand,
+without disturbing their main progress.
 
-### Exiting onboarding
+## Exiting onboarding
 
 Onboarding is implicitly complete once
-`progress.firstSeen.length == OnboardingPhase.allKnownSlugs` (the 12
-constraints have all been encountered at least once). From that point:
+`progress.firstSeen.length == OnboardingPhase.allKnownSlugs.length`
+(every constraint encountered at least once). From that point:
 
-- The soft filter becomes a no-op (nothing to filter, no slug left
-  unknown).
-- The playlist falls back to `getPuzzlesByLevel(playerLevel)` with
-  no extra constraint.
-- The EOP shows the standard message ("continue / switch
-  collection"), without the "you haven't met every rule yet" note.
+- `_softFilterActive` returns false and
+  `recommendedOnboardingFilters` returns `null`; `isInOnboarding`
+  flips to false.
+- `currentFilters` keeps whatever values the player last had — the
+  preset is no longer overridden at boot. The standard
+  `Database.filter()` + `getPuzzlesByLevel(playerLevel)` pipeline
+  runs without onboarding-specific gating.
+- The `EndOfPlaylist` widget shows the standard "continue / switch
+  collection" message, without the "you haven't met every rule yet"
+  note.
+- The `OnboardingCompleteDialog` fires the first time a new-rule
+  modal is dismissed after `isInOnboarding` becomes false. If future
+  updates add new constraints, the player re-enters discovery and
+  the dialog fires again after the new slugs are seen.
 
-## 6. Implementation: code impact
+## Custom and user playlists
 
-Indicative list, to refine when actually coding:
+The phase filter is **ignored** on `custom` / `user_*` collections —
+they're explicit user choices. The `firstSeen` modals **stay
+active**: if a puzzle from the `custom` playlist introduces a
+never-seen constraint, the modal fires and `firstSeen[slug]` gets
+set. The player auto-unlocks progressively.
 
-- **Removed**: `tutorial` from the dropdown (`open_page.dart`),
-  `restartTutorial` (`database.dart`), the matching settings section
-  (`settings_page.dart`), `assets/tutorial.txt`, the `HelpText` class
-  + its registration, the `tutorial` mode in `preparePlaylist`,
-  ARB strings `settingRestartTutorial*` /
-  `endOfPlaylistTutorialFinished`.
-- **`EndOfPlaylist` change**: as long as onboarding is not finished
-  (at least one phase still active in § 5), display a pedagogical
-  note "You haven't met every rule yet. We suggest staying in the
-  *Beginner* collection." + a CTA to switch / stay on `1-easy`
-  depending on context.
-- **Added**:
-  - `lib/getsomepuzzle/model/onboarding.dart`: phases (constants),
-    `currentPhase()` selector from stats, `phaseAllowedSlugs()`
-    filter, weighted sampler.
-  - `firstSeen` map in `SharedPreferences` (`constraintFirstSeen`),
-    with `slug → ISO date` serialization.
-  - `widgets/new_constraint_dialog.dart` modal, fired from
-    `_MyHomePageState` when a puzzle opens.
-  - `widgets/learning_page.dart` page reachable from the main menu
-    next to Help: list of the 12 constraints with `firstSeen`,
-    `played` counter, "refresh" button that re-runs the modal and
-    launches a refresher playlist of ~10 onboarding puzzles
-    (cf. § 5).
-  - 12 entries in the `.arb` files: `constraintExplain<Slug>`
-    (title + body), three languages + the `learning` menu label.
-- **Modified**: `Database.preparePlaylist()` → consult onboarding in
-  addition to level, choose between `phase.sample` and
-  `getPuzzlesByLevel`.
-- **One-shot migration**: at the first upgrade, if a tutorial
-  history footprint exists, populate `firstSeen` for the 11 known
-  tutorial slugs (cf. § 2).
+## Replay and skip controls
 
-## 7. Decisions and still open
+In the player settings:
 
-### Locked-in decisions
+- **Replay onboarding** — `Database.resetOnboardingProgress()` clears
+  `onboardingCompletions` (not `firstSeen`) and persists immediately.
+  The phase filter rolls back to phase 0; dynamic sampling lands the
+  player on unplayed puzzles.
+- **Skip onboarding** — `Database.skipOnboarding()` writes
+  `phaseLength` to every phase's introducing slug and persists,
+  instantly putting the player in soft-filter mode without playing
+  the phase puzzles.
 
-1. **Sprinkle ratio**: **80 / 20** retained. 80 % of a phase's
-   puzzles contain the constraint being introduced, 20 % refresh a
-   previously-met one. To re-evaluate after the first usage data if
-   we observe many spontaneous re-contact modals.
-2. **`playerLevel` during onboarding**: **kept as-is**. The phase
-   sampler uses the Gaussian centred on
-   `playerLevel + selectionOffset` exactly as elsewhere. This is
-   safe only because the onboarding source (`1-easy +
-   overfilled-easy`) is already bounded to the *beginner* level by
-   trace classification — a fast learner can therefore not land on a
-   puzzle out of pedagogical reach, regardless of `playerLevel`.
-   It's the "if we're at beginner, we should be at beginner" intuition:
-   the trade-off is solved at the catalog level, not at the sampler
-   level.
-3. **End of playlist during onboarding**: as long as the § 5 phases
-   aren't all done, the `EndOfPlaylist` widget shows **an explicit
-   note** to the player: they haven't met every rule yet, and we
-   **suggest staying on the "Beginner" (`1-easy`) collection**.
-   Concretely the phase filter keeps the next batch in `1-easy`; the
-   note just prevents the player from diving into a harder collection
-   whose puzzles would be filtered to nothing afterwards.
-4. **"Replay onboarding" button**: replaces the old "Reset
-   tutorial". Action: clears the `firstSeen` map only. The phase
-   filter automatically rolls back to phase 0, and thanks to the
-   dynamic sampling (§ 2.3) the player lands on unplayed puzzles.
+## Code landing zones
 
-### Locked-in decisions (cont.)
+- **`lib/getsomepuzzle/model/onboarding.dart`** — 10 strict
+  `OnboardingPhase` entries (FM, NC, PA, CC, RC, GS, EY, DF, LT, QA),
+  `phaseLength = 5`, `phaseForCompletions(Map<String, int>)`
+  selector, `puzzleEligibleForPhase` helper. The soft-filter
+  predicate is expressed as a filter preset
+  (`_softFilterActive` / `_softFilterRecommendation` in
+  `database.dart`, surfaced through `recommendedOnboardingFilters`).
+  Flutter-free so it can be reused in `bin/`.
+- **`lib/getsomepuzzle/model/database.dart`**:
+  - `onboardingCompletions : Map<String, int>` JSON-serialised in
+    `SharedPreferences` under the `onboardingCompletions` key.
+  - `currentPhase` getter delegates to
+    `phaseForCompletions(onboardingCompletions)`.
+  - `notePuzzleCompleted` increments every slug in `puz.rules`
+    when `currentPhase != null` and persists fire-and-forget. It
+    also syncs `currentFilters` with `recommendedOnboardingFilters`
+    whenever they diverge after the increment, keeping the playlist
+    in step with the current phase. In soft mode it advances
+    `_softPlaysSinceElectedChange` (the injection cadence) and, on the
+    play that graduates the strict phases, triggers
+    `_refreshSoftDiscoveryPool`.
+  - `skipOnboarding` and `resetOnboardingProgress` both persist
+    immediately to avoid the
+    "loadPuzzlesFile-rebuilds-from-prefs-and-drops-the-update"
+    regression.
+  - `recommendedOnboardingFilters` returns the
+    `(wantedRules, bannedRules)` preset for the current state
+    (`_strictPhaseRecommendation` for P0–P9,
+    `_softFilterRecommendation` for the post-strict discovery), or
+    `null` once onboarding is over. `maybeApplyOnboardingFilterDefaults`
+    runs this once per launch, behind the `onboardingFiltersApplied`
+    prefs flag, and writes the result into `currentFilters`.
+  - `getPuzzlesByLevel(playerLevel)` does the strict-phase gating for
+    free once the preset is applied to `currentFilters` (it consults
+    `filter()`). For soft mode it additionally runs
+    `_injectElectedSoftRule` to splice the elected rule into the batch
+    on its cadence, drawing from `_softDiscoveryPool` (Axe B) when the
+    current collection is too thin.
+  - `loadPuzzlesFile` runs an unconditional sync of `currentFilters`
+    with `recommendedOnboardingFilters` after
+    `maybeApplyOnboardingFilterDefaults`, then `_refreshSoftDiscoveryPool`
+    before `preparePlaylist`. The filter sync covers the cross-session
+    edge case where the previous session exited at a phase boundary and
+    the fire-and-forget filter-save from `notePuzzleCompleted` may not
+    have completed.
+- **`firstSeen`** map in `SharedPreferences` under
+  `constraintFirstSeen` (`slug → ISO date` serialisation) drives the
+  explanation modal.
+- **`widgets/new_constraint_dialog.dart`** fires from
+  `_MyHomePageState` when a puzzle introduces a slug with
+  `firstSeen[slug] == null`.
+- **`widgets/onboarding_complete_dialog.dart`** fires once from the
+  same post-dialog-dismissal path when `isInOnboarding` becomes
+  false after the last unseen slug is marked seen.
+- **`widgets/learning_page.dart`** lists
+  `OnboardingPhase.allKnownSlugs` with `firstSeen` status, play
+  count, and a refresh button that re-opens the explanation modal.
+- **ARB entries** — `constraintExplain<Slug>` (title + body) per
+  constraint, the `learningPage*` labels, the
+  `bannerOnboardingFilters*` banner strings for OpenPage, the
+  `onboardingCompleteTitle` / `onboardingCompleteBody` dialog
+  strings, and the residual `emptyPlaylist*` reasons.
 
-5. **`custom` / `user_*` collections**: we **ignore the phase
-   filter** on those (they are explicit user choices). The
-   `firstSeen` modals **stay active**: if a puzzle from the
-   `custom` playlist introduces a never-seen constraint, the modal
-   fires and `firstSeen[slug]` gets set. The player auto-unlocks
-   progressively.
+## Diagnostic tools
 
-### Still open
-
-1. **Phases 6+**: introduction order for LT/QA/SY/EY/GC/SH to be
-   spec'd after the in-progress generation of small puzzles
-   (≤ 5×5) — the enriched corpus should make the missing duos
-   (FM+QA, FM+EY, …) currently absent from `1-easy` available.
-   A new pass of `bin/onboarding_stats.dart` after the generation
-   will tell us whether we can hold phases 6+ as pure duos or have
-   to keep going via trios.
-
-## 8. Diagnostic tools
-
-- `bin/onboarding_stats.dart`: regenerates the tables of § 3 and § 4.
-  Useful to verify that a generator change or a re-sort of `1-easy`
-  doesn't invalidate the § 5 sequencing.
-- `bin/check_phase_coverage.dart`: per-phase coverage on the current
-  corpus. Flags:
-  - no flag: strict coverage (P0-P5) on `1-easy ∪ overfilled-easy`.
+- `bin/onboarding_stats.dart` — regenerates the constraint coverage
+  tables across `1-easy`. Useful to verify that a generator change
+  or a re-sort of `1-easy` doesn't invalidate the phase sequencing.
+- `bin/check_phase_coverage.dart` — per-phase coverage on the
+  current corpus. Flags:
+  - no flag: strict coverage (P0–P9) on `1-easy ∪ 1-easy-overfilled`.
   - `--per-level`: where phase-eligible puzzles land in each
     collection (useful after a generation run).
-  - `--soft`: soft-filter coverage (≤1 unseen slug) at various
+  - `--soft`: soft-filter coverage (≤ 1 unseen slug) at various
     stages of player progression.

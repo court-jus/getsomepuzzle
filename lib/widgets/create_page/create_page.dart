@@ -4,24 +4,35 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
+import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
+import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/eyes_dialog.dart';
-import 'package:getsomepuzzle/widgets/different_from_painter.dart';
+import 'package:getsomepuzzle/widgets/puzzle_grid_stack.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
-import 'package:getsomepuzzle/widgets/motif.dart';
-import 'package:getsomepuzzle/widgets/quantity.dart';
-import 'package:getsomepuzzle/widgets/group_count.dart';
-import 'package:getsomepuzzle/widgets/column_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/motif.dart';
+import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
+import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/bounding_box_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/cell_actions_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/chain_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/column_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/confirm_delete_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/constraint_type_picker.dart';
@@ -34,7 +45,11 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/motif_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/parity_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/playlist_name_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/quantity_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/row_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/symmetry_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/transition_dialog.dart';
+import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/transition.dart';
 
 export 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
 
@@ -64,17 +79,27 @@ class _CreatePageState extends State<CreatePage> {
 
   final List<Constraint> _constraints = [];
 
+  bool _implicationMode = false;
+  CellValue _implicationColor = CellValue.black;
+  int? _implicationSourceIdx;
+
   bool _letterGroupMode = false;
   String _letterGroupLetter = 'A';
   List<int> _letterGroupIndices = [];
 
+  bool _majorityZoneMode = false;
+  int _majorityZoneColor = 1;
+  int? _majorityZoneFirstIdx;
+
   Timer? _solveDebounce;
   Set<int> _propagationCells = {};
   Set<int> _forceCells = {};
-  Map<int, int> _solvedValues = {};
+  Map<int, CellValue> _solvedValues = {};
   int? _autoComplexity;
+  String? _autoImpossibleBy;
+  bool _autoSolving = false;
 
-  final Map<int, int> _fixedCells = {};
+  final Map<int, CellValue> _fixedCells = {};
 
   String _targetPlaylist = 'custom';
 
@@ -109,6 +134,16 @@ class _CreatePageState extends State<CreatePage> {
 
   void _scheduleAutoSolve() {
     _solveDebounce?.cancel();
+    setState(() {
+      _autoSolving = true;
+      // Clear any leftover orange-border highlight from the previous solve so
+      // the UI doesn't keep marking a constraint that may no longer be the
+      // culprit (or may have just been removed).
+      for (final c in _constraints) {
+        c.isValid = true;
+      }
+    });
+    debugPrint('[editor] ${_buildPuzzle().lineExport(compute: false)}');
     _solveDebounce = Timer(const Duration(milliseconds: 500), () {
       _autoSolve();
     });
@@ -117,13 +152,15 @@ class _CreatePageState extends State<CreatePage> {
   Future<void> _autoSolve() async {
     if (!mounted) return;
     final puzzle = _buildPuzzle();
-    final steps = await compute(_solvePuzzle, puzzle);
+    final result = await compute(_solvePuzzle, puzzle);
     if (!mounted) return;
     final propCells = <int>{};
     final frcCells = <int>{};
-    final values = <int, int>{};
-    for (final step in steps) {
-      values[step.cellIdx] = step.value;
+    final values = <int, CellValue>{};
+    for (final step in result.steps) {
+      if (step.value != null) {
+        values[step.cellIdx] = step.value!;
+      }
       if (step.method == SolveMethod.propagation) {
         propCells.add(step.cellIdx);
       } else {
@@ -135,11 +172,83 @@ class _CreatePageState extends State<CreatePage> {
       _forceCells = frcCells;
       _solvedValues = values;
       _autoComplexity = puzzle.computeComplexity();
+      _autoImpossibleBy = result.impossibleBy;
+      _autoSolving = false;
+      // Mirror the in-game "isValid = false → orange border" convention used
+      // by _revealErrors in game_model.dart: if the contradiction was raised
+      // by a regular Constraint, flag that exact instance in our state list.
+      // Complicities have no widget representation, so we fall back to the
+      // serialize() label in the bottom bar.
+      if (result.impossibleBy != null) {
+        for (final c in _constraints) {
+          if (c.serialize() == result.impossibleBy) {
+            c.isValid = false;
+            break;
+          }
+        }
+      }
     });
   }
 
-  static List<SolveStep> _solvePuzzle(Puzzle puzzle) {
-    return puzzle.solveExplained(timeoutMs: 10000);
+  /// Runs the same step-by-step deduction loop as `Puzzle.solveExplained`
+  /// but reports the serialize() of the constraint/complicity that raised
+  /// the contradiction (if any), so the editor can distinguish "impossible"
+  /// from "merely incomplete" and surface the culprit.
+  static ({List<SolveStep> steps, String? impossibleBy}) _solvePuzzle(
+    Puzzle puzzle,
+  ) {
+    final steps = <SolveStep>[];
+    final test = puzzle.clone();
+    final stopwatch = Stopwatch()..start();
+    String? impossibleBy;
+    solveLoop:
+    for (int step = 0; step < 1000; step++) {
+      if (stopwatch.elapsedMilliseconds > 10000) break;
+      final m = test.findAMove(checkErrors: false);
+      if (m == null) break;
+      switch (m) {
+        case Impossible(:final givenBy):
+          impossibleBy = givenBy.serialize();
+          break solveLoop;
+        case SetValue(
+          :final idx,
+          :final value,
+          :final complexity,
+          :final givenBy,
+        ):
+          test.setValue(idx, value);
+          steps.add(
+            SetValueStep(
+              cellIdx: idx,
+              value: value,
+              constraint: givenBy.serialize(),
+              method: SolveMethod.propagation,
+              complexity: complexity,
+            ),
+          );
+        case RemoveOption(
+          :final idx,
+          :final option,
+          :final complexity,
+          :final isForce,
+          :final forceDepth,
+          :final givenBy,
+        ):
+          test.removeOption(idx, option);
+          steps.add(
+            RemoveOptionStep(
+              cellIdx: idx,
+              option: option,
+              constraint: isForce ? '' : givenBy.serialize(),
+              method: isForce ? SolveMethod.force : SolveMethod.propagation,
+              forceDepth: isForce ? forceDepth : 0,
+              complexity: isForce ? 0 : complexity,
+            ),
+          );
+      }
+      if (test.complete) break;
+    }
+    return (steps: steps, impossibleBy: impossibleBy);
   }
 
   void _addConstraint(Constraint c) {
@@ -157,7 +266,7 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Puzzle _buildPuzzle() {
-    final p = Puzzle.empty(_width, _height, [1, 2]);
+    final p = Puzzle.empty(_width, _height, defaultDomain);
     for (final entry in _fixedCells.entries) {
       p.cells[entry.key].setForSolver(entry.value);
       p.cells[entry.key].readonly = true;
@@ -199,6 +308,31 @@ class _CreatePageState extends State<CreatePage> {
   // --- Cell tap handling ---
 
   Future<void> _onCellTap(int cellIdx) async {
+    if (_implicationMode) {
+      if (_implicationSourceIdx == null) {
+        setState(() {
+          _implicationSourceIdx = cellIdx;
+        });
+      } else {
+        _addConstraint(
+          ImplicationConstraint(
+            '$_implicationSourceIdx.$cellIdx'
+            '.${cellValueToString(_implicationColor)}',
+          ),
+        );
+        setState(() {
+          _implicationMode = false;
+          _implicationSourceIdx = null;
+        });
+      }
+      return;
+    }
+
+    if (_majorityZoneMode) {
+      _finishMajorityZone(cellIdx);
+      return;
+    }
+
     if (_letterGroupMode) {
       setState(() {
         if (_letterGroupIndices.contains(cellIdx)) {
@@ -216,11 +350,59 @@ class _CreatePageState extends State<CreatePage> {
         .toList();
     final isFixed = _fixedCells.containsKey(cellIdx);
 
+    final mjZones = _constraints
+        .whereType<MajorityConstraint>()
+        .where((mj) => _cellInMjZone(cellIdx, mj))
+        .toList();
+
+    if (mjZones.isNotEmpty) {
+      final toRemove = await _showMjDeletePicker(mjZones);
+      if (toRemove != null) {
+        _removeConstraint(toRemove);
+        return;
+      }
+    }
+
     if (cellConstraints.isEmpty && !isFixed) {
       await _pickAndAddConstraint(cellIdx);
     } else {
       await _openCellActions(cellIdx, cellConstraints, isFixed);
     }
+  }
+
+  bool _cellInMjZone(int idx, MajorityConstraint mj) {
+    final r = idx ~/ _width;
+    final c = idx % _width;
+    return r >= mj.r0 && r <= mj.r1 && c >= mj.c0 && c <= mj.c1;
+  }
+
+  Future<MajorityConstraint?> _showMjDeletePicker(
+    List<MajorityConstraint> zones,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    return showDialog<MajorityConstraint>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${loc.createDeleteConstraint} MJ'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final z in zones)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: Text(z.serialize()),
+                onTap: () => Navigator.pop(ctx, z),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _openCellActions(
@@ -247,9 +429,9 @@ class _CreatePageState extends State<CreatePage> {
         setState(() => _fixedCells.remove(cellIdx));
         _scheduleAutoSolve();
       case CellAction.fixBlack:
-        _setFixedCell(cellIdx, 1);
+        _setFixedCell(cellIdx, CellValue.black);
       case CellAction.fixWhite:
-        _setFixedCell(cellIdx, 2);
+        _setFixedCell(cellIdx, CellValue.white);
     }
   }
 
@@ -262,78 +444,146 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Future<void> _pickAndAddConstraint(int cellIdx) async {
-    final type = await showConstraintTypePicker(context);
-    if (!mounted || type == null) return;
+    final slug = await showConstraintTypePicker(context);
+    if (!mounted || slug == null) return;
     Constraint? added;
-    switch (type) {
-      case ConstraintType.forbiddenPattern:
+    switch (slug) {
+      case 'FM':
         added = await showForbiddenMotifDialog(context);
-      case ConstraintType.parity:
+      case 'PA':
         added = await showParityDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.groupSize:
+      case 'GS':
         added = await showGroupSizeDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.letterGroup:
+      case 'LT':
         await _startLetterGroup(cellIdx);
         return;
-      case ConstraintType.quantity:
+      case 'MJ':
+        await _startMajorityZone(cellIdx);
+        return;
+      case 'QA':
         added = await showQuantityDialog(
           context,
           width: _width,
           height: _height,
         );
-      case ConstraintType.columnCount:
+      case 'CC':
         added = await showColumnCountDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.groupCount:
+      case 'RC':
+        added = await showRowCountDialog(
+          context,
+          cellIdx: cellIdx,
+          width: _width,
+          height: _height,
+        );
+      case 'RT':
+        added = await showRowTransitionDialog(
+          context,
+          cellIdx: cellIdx,
+          width: _width,
+          height: _height,
+        );
+      case 'CT':
+        added = await showColumnTransitionDialog(
+          context,
+          cellIdx: cellIdx,
+          width: _width,
+          height: _height,
+        );
+      case 'GC':
         added = await showGroupCountDialog(
           context,
           width: _width,
           height: _height,
         );
-      case ConstraintType.neighborCount:
+      case 'NC':
         added = await showNeighborCountDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.shape:
+      case 'SH':
         added = await showShapeDialog(context);
-      case ConstraintType.symmetry:
+      case 'SY':
         added = await showSymmetryDialog(context, cellIdx: cellIdx);
-      case ConstraintType.differentFrom:
+      case 'DF':
         added = await showDifferentFromDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.eyes:
+      case 'EY':
         added = await showEyesDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
         );
-      case ConstraintType.fixBlack:
-        _setFixedCell(cellIdx, 1);
+      case 'IM':
+        final loc2 = AppLocalizations.of(context)!;
+        final color = await showDialog<CellValue>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(loc2.constraintImplication),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(ctx, CellValue.black),
+                  icon: const Icon(Icons.circle, color: Colors.black),
+                  label: Text(loc2.colorBlack),
+                ),
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(ctx, CellValue.white),
+                  icon: const Icon(Icons.circle, color: Colors.white),
+                  label: Text(loc2.colorWhite),
+                ),
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(ctx, CellValue.purple),
+                  icon: const Icon(Icons.circle, color: Colors.purple),
+                  label: Text(loc2.colorPurple),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (color == null) return;
+        if (!mounted) return;
+        setState(() {
+          _implicationMode = true;
+          _implicationColor = color;
+          _implicationSourceIdx = null;
+        });
         return;
-      case ConstraintType.fixWhite:
-        _setFixedCell(cellIdx, 2);
+      case 'CH':
+        added = await showChainDialog(context);
+      case 'BB':
+        added = await showBoundingBoxDialog(
+          context,
+          width: _width,
+          height: _height,
+        );
+      case 'fixBlack':
+        _setFixedCell(cellIdx, CellValue.black);
+        return;
+      case 'fixWhite':
+        _setFixedCell(cellIdx, CellValue.white);
         return;
     }
     if (added != null) _addConstraint(added);
@@ -349,6 +599,7 @@ class _CreatePageState extends State<CreatePage> {
       usedLetters: usedLetters,
     );
     if (letter == null) return;
+    if (!mounted) return;
     setState(() {
       _letterGroupMode = true;
       _letterGroupLetter = letter;
@@ -367,7 +618,72 @@ class _CreatePageState extends State<CreatePage> {
     });
   }
 
-  void _setFixedCell(int cellIdx, int value) {
+  Future<void> _startMajorityZone(int cellIdx) async {
+    final loc = AppLocalizations.of(context)!;
+    final color = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.createChooseType),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            TextButton.icon(
+              onPressed: () => Navigator.pop(ctx, 1),
+              icon: const Icon(Icons.circle, color: Colors.black),
+              label: Text(loc.createFixBlack),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.pop(ctx, 2),
+              icon: const Icon(Icons.circle, color: Colors.white),
+              label: Text(loc.createFixWhite),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (color == null) return;
+    if (!mounted) return;
+    setState(() {
+      _majorityZoneMode = true;
+      _majorityZoneColor = color;
+      _majorityZoneFirstIdx = cellIdx;
+    });
+  }
+
+  void _finishMajorityZone(int cellIdx) {
+    final loc = AppLocalizations.of(context)!;
+    final first = _majorityZoneFirstIdx!;
+    final r0 = first ~/ _width;
+    final c0 = first % _width;
+    final r1 = cellIdx ~/ _width;
+    final c1 = cellIdx % _width;
+    final rMin = min(r0, r1);
+    final rMax = max(r0, r1);
+    final cMin = min(c0, c1);
+    final cMax = max(c0, c1);
+    final area = (rMax - rMin + 1) * (cMax - cMin + 1);
+    if (area < 3) {
+      setState(() {
+        _majorityZoneMode = false;
+        _majorityZoneFirstIdx = null;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(loc.createZoneTooSmall)));
+      });
+      return;
+    }
+    _addConstraint(
+      MajorityConstraint('$rMin.$cMin.$rMax.$cMax.$_majorityZoneColor'),
+    );
+    setState(() {
+      _majorityZoneMode = false;
+      _majorityZoneFirstIdx = null;
+    });
+  }
+
+  void _setFixedCell(int cellIdx, CellValue value) {
     setState(() {
       if (_fixedCells[cellIdx] == value) {
         _fixedCells.remove(cellIdx);
@@ -379,6 +695,25 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   // --- Action buttons ---
+
+  void _newPuzzle() {
+    _solveDebounce?.cancel();
+    setState(() {
+      _width = 4;
+      _height = 4;
+      _constraints.clear();
+      _fixedCells.clear();
+      _solvedValues.clear();
+      _propagationCells.clear();
+      _forceCells.clear();
+      _implicationMode = false;
+      _implicationSourceIdx = null;
+      _editing = false;
+      _autoComplexity = null;
+      _autoImpossibleBy = null;
+      _autoSolving = false;
+    });
+  }
 
   void _testPuzzle() {
     if (widget.onPuzzleSelected == null) return;
@@ -422,11 +757,31 @@ class _CreatePageState extends State<CreatePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _letterGroupMode
-              ? loc.createLetterGroupMode(_letterGroupLetter)
-              : loc.createTitle,
+          _majorityZoneMode
+              ? loc.createSecondCorner
+              : (_letterGroupMode
+                    ? loc.createLetterGroupMode(_letterGroupLetter)
+                    : (_implicationMode
+                          ? loc.constraintImplication
+                          : loc.createTitle)),
         ),
         actions: [
+          if (_majorityZoneMode)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => setState(() {
+                _majorityZoneMode = false;
+                _majorityZoneFirstIdx = null;
+              }),
+            ),
+          if (_implicationMode)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => setState(() {
+                _implicationMode = false;
+                _implicationSourceIdx = null;
+              }),
+            ),
           if (_letterGroupMode)
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -436,9 +791,18 @@ class _CreatePageState extends State<CreatePage> {
                 label: Text(loc.createLetterGroupDone),
               ),
             ),
+          if (_editing)
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              tooltip: loc.createNewPuzzle,
+              onPressed: _newPuzzle,
+            ),
         ],
       ),
-      body: _editing ? _buildEditor(loc) : _buildDimensionsForm(loc),
+      body: SafeArea(
+        top: false,
+        child: _editing ? _buildEditor(loc) : _buildDimensionsForm(loc),
+      ),
       bottomNavigationBar: _editing
           ? BottomAppBar(
               height: 40,
@@ -454,20 +818,41 @@ class _CreatePageState extends State<CreatePage> {
                     '${_constraints.length} ${loc.generateConstraints.toLowerCase()}',
                     style: const TextStyle(color: Colors.white),
                   ),
-                  if (_autoComplexity != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const FaIcon(
-                          FontAwesomeIcons.brain,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                        Text(
-                          ' $_autoComplexity',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ],
+                  if (_autoSolving || _autoComplexity != null)
+                    Builder(
+                      builder: (_) {
+                        final impossible =
+                            !_autoSolving && _autoImpossibleBy != null;
+                        // The orange border on the constraint widget already
+                        // points at the culprit when it's a regular Constraint
+                        // (its serialize() appears in _constraints). Only fall
+                        // back to a textual label for complicities — they have
+                        // no on-screen widget to highlight.
+                        final hasWidgetHighlight =
+                            impossible &&
+                            _constraints.any(
+                              (c) => c.serialize() == _autoImpossibleBy,
+                            );
+                        final color = impossible
+                            ? Colors.red.shade900
+                            : Colors.white;
+                        final label = _autoSolving
+                            ? '...'
+                            : impossible && !hasWidgetHighlight
+                            ? '$_autoComplexity (${_autoImpossibleBy!})'
+                            : '$_autoComplexity';
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FaIcon(
+                              FontAwesomeIcons.brain,
+                              size: 12,
+                              color: color,
+                            ),
+                            Text(' $label', style: TextStyle(color: color)),
+                          ],
+                        );
+                      },
                     ),
                 ],
               ),
@@ -663,7 +1048,7 @@ class _CreatePageState extends State<CreatePage> {
                     constraint: constraint,
                     actualCount: 0,
                     oppositeActual: 0,
-                    oppositeTotal: (_width * _height) - constraint.value,
+                    oppositeTotal: (_width * _height) - constraint.count,
                     cellSize: topBarSize,
                   ),
                 )
@@ -675,6 +1060,22 @@ class _CreatePageState extends State<CreatePage> {
                     actualGroupCount: 0,
                     cellSize: topBarSize,
                   ),
+                )
+              else if (constraint is BoundingBoxConstraint)
+                GestureDetector(
+                  onTap: () => _confirmDeleteTopBar(constraint),
+                  child: BoundingBoxWidget(
+                    constraint: constraint,
+                    cellSize: topBarSize,
+                  ),
+                )
+              else if (constraint is ChainConstraint)
+                GestureDetector(
+                  onTap: () => _confirmDeleteTopBar(constraint),
+                  child: ChainWidget(
+                    constraint: constraint,
+                    cellSize: topBarSize,
+                  ),
                 ),
           ],
         );
@@ -684,11 +1085,18 @@ class _CreatePageState extends State<CreatePage> {
 
   Widget _buildColumnCountRow() {
     final ccConstraints = _constraints.whereType<ColumnCountConstraint>();
-    if (ccConstraints.isEmpty) return const SizedBox.shrink();
+    final ctConstraints = _constraints.whereType<ColumnTransitionConstraint>();
+    if (ccConstraints.isEmpty && ctConstraints.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final ccByColumn = <int, ColumnCountConstraint>{};
     for (final c in ccConstraints) {
       ccByColumn[c.columnIdx] = c;
+    }
+    final ctByCol = <int, ColumnTransitionConstraint>{};
+    for (final c in ctConstraints) {
+      ctByCol[c.columnIdx] = c;
     }
 
     return LayoutBuilder(
@@ -702,12 +1110,29 @@ class _CreatePageState extends State<CreatePage> {
           child: Row(
             children: [
               for (int col = 0; col < _width; col++)
-                if (ccByColumn.containsKey(col))
-                  GestureDetector(
-                    onTap: () => _confirmDeleteTopBar(ccByColumn[col]!),
-                    child: ColumnCountWidget(
-                      constraint: ccByColumn[col]!,
-                      cellSize: cellSize,
+                if (ccByColumn.containsKey(col) || ctByCol.containsKey(col))
+                  SizedBox(
+                    width: cellSize,
+                    child: Column(
+                      children: [
+                        if (ctByCol.containsKey(col))
+                          GestureDetector(
+                            onTap: () => _confirmDeleteTopBar(ctByCol[col]!),
+                            child: TransitionWidget(
+                              constraint: ctByCol[col]!,
+                              cellSize: cellSize,
+                              axis: Axis.vertical,
+                            ),
+                          ),
+                        if (ccByColumn.containsKey(col))
+                          GestureDetector(
+                            onTap: () => _confirmDeleteTopBar(ccByColumn[col]!),
+                            child: ColumnCountWidget(
+                              constraint: ccByColumn[col]!,
+                              cellSize: cellSize,
+                            ),
+                          ),
+                      ],
                     ),
                   )
                 else
@@ -720,9 +1145,16 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Widget _buildGrid(Map<int, List<Constraint>> cellConstraintsMap) {
-    final dfConstraints = _constraints
-        .whereType<DifferentFromConstraint>()
-        .toList();
+    final rcConstraints = _constraints.whereType<RowCountConstraint>();
+    final rcByRow = <int, RowCountConstraint>{};
+    for (final c in rcConstraints) {
+      rcByRow[c.rowIdx] = c;
+    }
+    final rtConstraints = _constraints.whereType<RowTransitionConstraint>();
+    final rtByRow = <int, RowTransitionConstraint>{};
+    for (final c in rtConstraints) {
+      rtByRow[c.rowIdx] = c;
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -731,39 +1163,52 @@ class _CreatePageState extends State<CreatePage> {
           (MediaQuery.sizeOf(context).height * 0.5) / _height,
         );
 
-        return Stack(
+        final grid = PuzzleGridStack(
+          puzzle: _buildPuzzle(),
+          cellSize: cellSize,
+          dfDefaultColor: Colors.blueGrey,
+          dfHighlightColor: Colors.green,
+          cellBuilder: (idx) =>
+              _buildEditorCell(idx, cellSize, cellConstraintsMap),
+        );
+
+        if (rcByRow.isEmpty && rtByRow.isEmpty) return grid;
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Table(
-              border: TableBorder.all(),
-              defaultColumnWidth: FixedColumnWidth(cellSize),
+            Column(
               children: [
-                for (var row = 0; row < _height; row++)
-                  TableRow(
-                    children: [
-                      for (var col = 0; col < _width; col++)
-                        _buildEditorCell(
-                          row * _width + col,
-                          cellSize,
-                          cellConstraintsMap,
-                        ),
-                    ],
-                  ),
+                for (int row = 0; row < _height; row++)
+                  if (rcByRow.containsKey(row) || rtByRow.containsKey(row))
+                    Column(
+                      children: [
+                        if (rcByRow.containsKey(row))
+                          GestureDetector(
+                            onTap: () => _confirmDeleteTopBar(rcByRow[row]!),
+                            child: RowCountWidget(
+                              constraint: rcByRow[row]!,
+                              cellSize: cellSize,
+                            ),
+                          ),
+                        if (rtByRow.containsKey(row))
+                          GestureDetector(
+                            onTap: () => _confirmDeleteTopBar(rtByRow[row]!),
+                            child: TransitionWidget(
+                              constraint: rtByRow[row]!,
+                              cellSize: cellSize,
+                              axis: Axis.horizontal,
+                            ),
+                          ),
+                      ],
+                    )
+                  else
+                    SizedBox(width: cellSize * 0.7, height: cellSize),
               ],
             ),
-            if (dfConstraints.isNotEmpty)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: DifferentFromPainter(
-                      constraints: dfConstraints,
-                      cellSize: cellSize,
-                      gridWidth: _width,
-                      defaultColor: Colors.blueGrey,
-                      highlightColor: Colors.green,
-                    ),
-                  ),
-                ),
-              ),
+            const SizedBox(width: 4),
+            grid,
           ],
         );
       },
@@ -778,14 +1223,23 @@ class _CreatePageState extends State<CreatePage> {
     final constraints = cellConstraintsMap[cellIdx];
     final isLetterGroupSelected =
         _letterGroupMode && _letterGroupIndices.contains(cellIdx);
+    final isImplicationSource =
+        _implicationMode && _implicationSourceIdx == cellIdx;
+    final isMjZoneFirst = _majorityZoneMode && _majorityZoneFirstIdx == cellIdx;
     final fixedValue = _fixedCells[cellIdx];
     final isFixed = fixedValue != null;
 
-    final cellValue = isFixed ? fixedValue : 0;
+    final cellValue = isFixed ? fixedValue : CellValue.free;
 
     Color? borderColor;
     double? borderWidth;
-    if (isLetterGroupSelected) {
+    if (isMjZoneFirst) {
+      borderColor = Colors.amber;
+      borderWidth = 3;
+    } else if (isLetterGroupSelected) {
+      borderColor = Colors.amber;
+      borderWidth = 3;
+    } else if (isImplicationSource) {
       borderColor = Colors.amber;
       borderWidth = 3;
     } else if (_propagationCells.contains(cellIdx)) {

@@ -108,6 +108,18 @@
     "@labelWidgetBannedrules": {
         "description": "Label of the widget"
     },
+    "labelWidgetDomain": "Number of colors",
+    "@labelWidgetDomain": {
+        "description": "Label of the open-page filter that picks the puzzle domain size (2- vs 3-color puzzles)"
+    },
+    "labelDomainTwoColors": "2 colors",
+    "@labelDomainTwoColors": {
+        "description": "Chip label for two-color puzzles in the domain filter"
+    },
+    "labelDomainThreeColors": "3 colors",
+    "@labelDomainThreeColors": {
+        "description": "Chip label for three-color puzzles in the domain filter"
+    },
     "msgCountMatchingPuzzles": "Puzzles matching filters",
     "@msgCountMatchingPuzzles": {
         "description": "Message displayed before the number of puzzles"
@@ -165,6 +177,14 @@
     "tooltipClue": "Clue",
     "@tooltipClue": {
         "description": "Tooltip displayed while the mouse is over the 'give me a clue' button"
+    },
+    "tooltipTapModeIncrValue": "Tap cycles colour",
+    "@tooltipTapModeIncrValue": {
+        "description": "Tooltip on the tap-mode toggle button shown on 3+ colour puzzles when the current mode is 'paint': a tap on a free cell will set the next colour."
+    },
+    "tooltipTapModeRemoveOption": "Tap removes an option",
+    "@tooltipTapModeRemoveOption": {
+        "description": "Tooltip on the tap-mode toggle button shown on 3+ colour puzzles when the current mode is 'remove option': a tap on a free cell will rule out one of its remaining colour options."
     },
     "tooltipUndo": "Undo",
     "@tooltipUndo": {
@@ -229,10 +249,6 @@
     "settingsLiveCheckTypeComplete": "Wait",
     "@settingsLiveCheckTypeComplete": {
         "description": "The player wants to wait until puzzle completion to see errors"
-    },
-    "settingHintsEnabled": "Enable hints",
-    "@settingHintsEnabled": {
-        "description": "Setting toggle label for the hint button master switch. Disable on very large boards to avoid running the solver in-app."
     },
     "settingGrayoutEnabled": "Gray out completed constraints",
     "@settingGrayoutEnabled": {
@@ -387,6 +403,45 @@
     "@hintCellDeducible": {
         "description": "Hint message shown on tap 2 of the deducibleCell mode (cell highlighted, source not yet shown)"
     },
+    "hintCellOptionRemovable": "One of the options for this cell can be ruled out",
+    "@hintCellOptionRemovable": {
+        "description": "Hint message shown on tap 2 of the deducibleCell mode when the next deduction is a removeOption rather than a setValue. The dot for the ruled-out colour will disappear when the hint is applied."
+    },
+    "hintForceRemoveOption": "An option can be ruled out by combining multiple constraints",
+    "@hintForceRemoveOption": {
+        "description": "Hint message shown on tap 3 for a force-deduced removeOption move"
+    },
+    "hintRemoveOptionDeducedFrom": "An option can be ruled out from the {constraintName} constraint",
+    "@hintRemoveOptionDeducedFrom": {
+        "description": "Hint message shown on tap 3 for a removeOption deduced from a single constraint",
+        "placeholders": {
+            "constraintName": {
+                "type": "String",
+                "example": "neighbor count"
+            }
+        }
+    },
+    "hintRemoveOptionComplicity": "An option can be ruled out by combining the {c1} and {c2} constraints",
+    "@hintRemoveOptionComplicity": {
+        "description": "Hint message shown on tap 3 when a removeOption is deduced by a complicity that combines two distinct constraint types",
+        "placeholders": {
+            "c1": {
+                "type": "String"
+            },
+            "c2": {
+                "type": "String"
+            }
+        }
+    },
+    "hintRemoveOptionComplicityTwin": "An option can be ruled out by combining two {c} constraints",
+    "@hintRemoveOptionComplicityTwin": {
+        "description": "Hint message shown on tap 3 when a removeOption is deduced by a complicity that combines two constraints of the same type",
+        "placeholders": {
+            "c": {
+                "type": "String"
+            }
+        }
+    },
     "constraintForbiddenPattern": "forbidden pattern",
     "@constraintForbiddenPattern": {
         "description": "Name of the forbidden pattern constraint"
@@ -398,6 +453,10 @@
     "constraintLetterGroup": "letter group",
     "@constraintLetterGroup": {
         "description": "Name of the letter group constraint"
+    },
+    "constraintMajority": "majority color",
+    "@constraintMajority": {
+        "description": "Name of the majority zone constraint"
     },
     "constraintParity": "parity",
     "@constraintParity": {
@@ -489,6 +548,7 @@
     },
     "create": "Create",
     "createTitle": "Create a puzzle",
+    "createNewPuzzle": "New puzzle",
     "createStart": "Start editing",
     "createTest": "Test",
     "createValidate": "Validate",
@@ -508,9 +568,31 @@
     "createChooseSize": "Group size",
     "createChooseLetter": "Letter",
     "createChooseValue": "Value",
+    "createImplicationSource": "Source cell ({total} cells, 0-based)",
+    "@createImplicationSource": {
+        "placeholders": {
+            "total": {
+                "type": "int"
+            }
+        }
+    },
+    "createImplicationTarget": "Target cell ({total} cells, 0-based)",
+    "@createImplicationTarget": {
+        "placeholders": {
+            "total": {
+                "type": "int"
+            }
+        }
+    },
+    "createImplicationInvalid": "Invalid source/target",
+    "colorBlack": "Black",
+    "colorWhite": "White",
+    "colorPurple": "Purple",
     "createChooseCount": "Count",
     "createMotifWidth": "Pattern width",
     "createMotifHeight": "Pattern height",
+    "createSecondCorner": "Tap second corner of MJ zone",
+    "createZoneTooSmall": "Zone must be at least 3 cells",
     "createLetterGroupMode": "Tap cells to add to group {letter}, then press Done",
     "@createLetterGroupMode": {
         "placeholders": {
@@ -574,13 +656,13 @@
     "@constraintGroupCount": {
         "description": "Name of the group count constraint"
     },
-    "constraintColumnCount": "cells per column",
-    "@constraintColumnCount": {
-        "description": "Name of the column count constraint"
+    "constraintLineCount": "cells per line",
+    "@constraintLineCount": {
+        "description": "Name of the line count constraint (merged row/column count)"
     },
-    "constraintRowCount": "cells per row",
-    "@constraintRowCount": {
-        "description": "Name of the row count constraint"
+    "constraintTransition": "transition",
+    "@constraintTransition": {
+        "description": "Name of the transition constraint (merged row/column transition)"
     },
     "constraintShape": "shape",
     "@constraintShape": {
@@ -594,6 +676,18 @@
     "@constraintEyes": {
         "description": "Name of the eyes constraint"
     },
+    "constraintChain": "chain",
+    "@constraintChain": {
+        "description": "Name of the chain constraint"
+    },
+    "constraintImplication": "implication",
+    "@constraintImplication": {
+        "description": "Name of the implication constraint"
+    },
+    "constraintBoundingBox": "bounding box",
+    "@constraintBoundingBox": {
+        "description": "Name of the bounding box constraint"
+    },
     "newConstraintModalTitle": "New rule!",
     "@newConstraintModalTitle": {
         "description": "Title of the dialog shown the first time a player encounters a new constraint"
@@ -601,6 +695,26 @@
     "newConstraintModalSkip": "Skip learning",
     "@newConstraintModalSkip": {
         "description": "Button on the new-rule dialog that lets the player skip onboarding entirely: every rule is marked as seen and the phase counter jumps past all defined phases."
+    },
+    "thirdColorSuggestionTitle": "Ready for 3 colors?",
+    "@thirdColorSuggestionTitle": {
+        "description": "Title of the modal suggesting the player try 3-color puzzles. Shown once after onboarding plus 50 plays, only if the player has never played a 3-color puzzle."
+    },
+    "thirdColorSuggestionBody": "You've solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. It's a fresh kind of challenge built on what you already know.",
+    "@thirdColorSuggestionBody": {
+        "description": "Body of the 3-color suggestion modal. Reassures the player by linking 3-color puzzles to the rules they already master."
+    },
+    "thirdColorSuggestionTryLabel": "Try it",
+    "@thirdColorSuggestionTryLabel": {
+        "description": "Button on the 3-color suggestion modal that opts the player into 3-color puzzles by enabling the d3 domain in their filters."
+    },
+    "thirdColorSuggestionLaterLabel": "Maybe later",
+    "@thirdColorSuggestionLaterLabel": {
+        "description": "Button on the 3-color suggestion modal that dismisses the suggestion without changing filters."
+    },
+    "thirdColorSuggestionFiltersReminder": "Remember that you can always choose the type of puzzles you want from the advanced filters in the library.",
+    "@thirdColorSuggestionFiltersReminder": {
+        "description": "Secondary paragraph on the 3-color suggestion modal, shown between the main body and the action buttons. Reassures the player that the opt-in is reversible via the Open page filters."
     },
     "welcomeModalTitle": "Welcome",
     "@welcomeModalTitle": {
@@ -664,6 +778,10 @@
     "@constraintExplainLT": {
         "description": "Body of the new-constraint explanation modal for the Letter Group (LT) constraint"
     },
+    "constraintExplainMJ": "A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half).",
+    "@constraintExplainMJ": {
+        "description": "Body of the new-constraint explanation modal for the Majority (MJ) constraint"
+    },
     "constraintExplainQA": "A number on a blue background above the grid sets the total number of cells of that color the solution must contain.",
     "@constraintExplainQA": {
         "description": "Body of the new-constraint explanation modal for the Quantity (QA) constraint"
@@ -676,15 +794,16 @@
     "@constraintExplainDF": {
         "description": "Body of the new-constraint explanation modal for the Different From (DF) constraint"
     },
-    "constraintExplainCC": "A circled number above a column tells how many cells of that color must appear in this specific column.",
-    "@constraintExplainCC": {
-        "description": "Body of the new-constraint explanation modal for the Column Count (CC) constraint"
+    "constraintExplainLineCount": "A circled number beside a row or column tells how many cells of that color must appear in that line.",
+    "@constraintExplainLineCount": {
+        "description": "Body of the new-constraint explanation modal for the merged line count constraint (CC/RC)"
     },
-    "constraintExplainRC": "A circled number to the left of a row tells how many cells of that color must appear in this specific row.",
-    "@constraintExplainRC": {
-        "description": "Body of the new-constraint explanation modal for the Row Count (RC) constraint"
+    "constraintExplainTransition": "A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.",
+    "@constraintExplainTransition": {
+        "description": "Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)"
     },
     "constraintExplainGC": "A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.",
+    "constraintExplainBB": "Every connected group of this color must occupy a bounding box of exactly this width and height — the smallest rectangle enclosing the group spans exactly that many columns and rows (the group need not fill it).",
     "@constraintExplainGC": {
         "description": "Body of the new-constraint explanation modal for the Group Count (GC) constraint"
     },
@@ -695,6 +814,14 @@
     "constraintExplainEY": "A cell with an eye must \"see\" exactly the indicated number of cells of the eye's color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).",
     "@constraintExplainEY": {
         "description": "Body of the new-constraint explanation modal for the Eyes (EY) constraint"
+    },
+    "constraintExplainCH": "A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.",
+    "@constraintExplainCH": {
+        "description": "Body of the new-constraint explanation modal for the Chain (CH) constraint"
+    },
+    "constraintExplainIM": "An arrow from one cell to another means: if the source cell takes the arrow's colour, the target cell must also take that colour. The contrapositive also holds: if the target is a different colour, the source cannot take the arrow's colour.",
+    "@constraintExplainIM": {
+        "description": "Body of the new-constraint explanation modal for the Implication (IM) constraint"
     },
     "complicityOtherConstraint": "another constraint",
     "@complicityOtherConstraint": {
@@ -827,6 +954,10 @@
     "@nextPuzzle": {
         "description": "Drawer entry that skips the current puzzle and loads the next one in the playlist"
     },
+    "emptyPlaylistUserEmpty": "This playlist is empty. Add puzzles before pressing Play.",
+    "@emptyPlaylistUserEmpty": {
+        "description": "Reason shown under the disabled Play button when a freshly-created user_ playlist has no puzzles yet"
+    },
     "emptyPlaylistUserAllPlayed": "All puzzles in this playlist have been played. Pick another collection or create a new playlist.",
     "@emptyPlaylistUserAllPlayed": {
         "description": "Reason shown under the disabled Play button when the current user_ playlist has no unplayed puzzles left"
@@ -839,20 +970,136 @@
     "@emptyPlaylistFiltersTooStrict": {
         "description": "Reason shown under the disabled Play button when filter() returns 0 puzzles"
     },
-    "emptyPlaylistOnboardingPhase": "No puzzle in this collection fits the current onboarding step. Finish the introductory puzzles or switch collection.",
-    "@emptyPlaylistOnboardingPhase": {
-        "description": "Reason shown under the disabled Play button when the onboarding phase eligibility excludes every filtered puzzle"
-    },
-    "emptyPlaylistSoftFilter": "Every remaining puzzle would introduce more than one new rule at once. Play a few more puzzles from earlier collections first.",
-    "@emptyPlaylistSoftFilter": {
-        "description": "Reason shown under the disabled Play button when the post-strict onboarding soft filter rejects every candidate"
-    },
     "emptyPlaylistGeneric": "No puzzle is currently available.",
     "@emptyPlaylistGeneric": {
         "description": "Generic fallback reason shown under the disabled Play button"
     },
+    "bannerOnboardingFiltersDefault": "These filters reflect your learning track. You can override them — tap the reset icon to restore the recommendation.",
+    "@bannerOnboardingFiltersDefault": {
+        "description": "Banner on OpenPage while the player is still in the onboarding journey, explaining that the rule filter chips were preset by the learning track."
+    },
+    "bannerOnboardingFiltersOverridden": "You're using your own filters. Tap reset to return to the learning track's recommendation.",
+    "@bannerOnboardingFiltersOverridden": {
+        "description": "Variant of the onboarding-filters banner shown when the player has manually changed the rule filters away from the learning track defaults."
+    },
     "browse": "Browse",
     "@browse": {
         "description": "Drawer entry that opens the puzzle selection page (filters, collections)"
+    },
+    "onboardingCompleteTitle": "Onboarding complete!",
+    "@onboardingCompleteTitle": {
+        "description": "Title of the dialog shown when the player has completed all onboarding steps (every rule encountered)."
+    },
+    "onboardingCompleteBody": "You've learned all the rules currently available! You can now play freely. When new rules are added to the game, you'll be notified.",
+    "@onboardingCompleteBody": {
+        "description": "Body of the onboarding-complete dialog — congratulates the player and mentions future rule additions."
+    },
+    "scenarioFilterLabel": "Scenario",
+    "@scenarioFilterLabel": {
+        "description": "Label of the scenario filter dropdown in the advanced filters section."
+    },
+    "scenarioAny": "Any scenario",
+    "@scenarioAny": {
+        "description": "Dropdown option meaning 'no scenario filter' — show every scenario."
+    },
+    "scenarioClassic": "Classic",
+    "@scenarioClassic": {
+        "description": "Label for the Classic user scenario."
+    },
+    "scenarioExplainClassic": "General logic puzzle with no dominant gameplay style.",
+    "@scenarioExplainClassic": {
+        "description": "Description of the Classic user scenario."
+    },
+    "scenarioSh": "Shape",
+    "@scenarioSh": {
+        "description": "Label for the Shape (SH) user scenario."
+    },
+    "scenarioExplainSh": "At least one shape constraint defines exact form for a group.",
+    "@scenarioExplainSh": {
+        "description": "Description of the Shape user scenario."
+    },
+    "scenarioBb": "Bounding box",
+    "@scenarioBb": {
+        "description": "Label for the Bounding box (BB) user scenario."
+    },
+    "scenarioExplainBb": "Every group of a colour fits the same bounding box.",
+    "@scenarioExplainBb": {
+        "description": "Description of the Bounding box user scenario."
+    },
+    "scenarioPathBased": "Path",
+    "@scenarioPathBased": {
+        "description": "Label for the Path-based (LT) user scenario."
+    },
+    "scenarioExplainPathBased": "Letter groups route across the grid — find the path.",
+    "@scenarioExplainPathBased": {
+        "description": "Description of the Path-based user scenario."
+    },
+    "scenarioSyBased": "Symmetry",
+    "@scenarioSyBased": {
+        "description": "Label for the Symmetry (SY) user scenario."
+    },
+    "scenarioExplainSyBased": "Symmetry constraints mirror groups across axes.",
+    "@scenarioExplainSyBased": {
+        "description": "Description of the Symmetry user scenario."
+    },
+    "scenarioMinesweeper": "Minesweeper",
+    "@scenarioMinesweeper": {
+        "description": "Label for the Minesweeper-like user scenario."
+    },
+    "scenarioExplainMinesweeper": "Neighbor counts and eye constraints — play it like Minesweeper.",
+    "@scenarioExplainMinesweeper": {
+        "description": "Description of the Minesweeper user scenario."
+    },
+    "scenarioNonogram": "Nonogram",
+    "@scenarioNonogram": {
+        "description": "Label for the Nonogram / Hanjie-like user scenario."
+    },
+    "scenarioExplainNonogram": "Column and row counts — classic hanjie-style deduction.",
+    "@scenarioExplainNonogram": {
+        "description": "Description of the Nonogram user scenario."
+    },
+    "scenarioLocal": "Local",
+    "@scenarioLocal": {
+        "description": "Label for the Local-pattern (DF/FM) user scenario."
+    },
+    "scenarioExplainLocal": "Forbidden patterns and different-from constraints define local rules.",
+    "@scenarioExplainLocal": {
+        "description": "Description of the Local user scenario."
+    },
+    "scenarioGroup": "Group",
+    "@scenarioGroup": {
+        "description": "Label for the Group-topology (GS/GC) user scenario."
+    },
+    "scenarioExplainGroup": "Group sizes and group counts focus on connected-component topology.",
+    "@scenarioExplainGroup": {
+        "description": "Description of the Group user scenario."
+    },
+    "statsSyncDirectory": "Stats sync directory",
+    "@statsSyncDirectory": {
+        "description": "Section header for the stats sync directory setting"
+    },
+    "statsSyncDirectoryChoose": "Choose folder",
+    "@statsSyncDirectoryChoose": {
+        "description": "Button label to pick a stats sync directory"
+    },
+    "statsSyncDirectoryChange": "Change",
+    "@statsSyncDirectoryChange": {
+        "description": "Button label to change the stats sync directory"
+    },
+    "statsSyncDirectoryClear": "Clear",
+    "@statsSyncDirectoryClear": {
+        "description": "Button label to clear the stats sync directory"
+    },
+    "statsSyncDirectoryWebUnsupported": "Not available on web.",
+    "@statsSyncDirectoryWebUnsupported": {
+        "description": "Message shown on the stats sync directory setting when running on web"
+    },
+    "statsSyncDirectoryInvalid": "The selected folder is not accessible. Please choose a new one.",
+    "@statsSyncDirectoryInvalid": {
+        "description": "Error shown in settings when the stats sync directory is inaccessible"
+    },
+    "statsSyncDirectoryAutoCleared": "The stats sync folder was cleared because it is no longer accessible. You can set a new one in the settings.",
+    "@statsSyncDirectoryAutoCleared": {
+        "description": "Snackbar shown at boot when the stats directory has been auto-cleared due to inaccessibility"
     }
 }

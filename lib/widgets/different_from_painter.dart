@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 
 class DifferentFromPainter extends CustomPainter {
   final List<DifferentFromConstraint> constraints;
@@ -31,9 +32,7 @@ class DifferentFromPainter extends CustomPainter {
       final shouldGrayOut = constraint.isComplete;
 
       final Color circleColor;
-      if (shouldGrayOut) {
-        circleColor = Colors.grey;
-      } else if (isHighlighted) {
+      if (isHighlighted) {
         circleColor = highlightColor;
       } else {
         circleColor = constraint.isValid ? defaultColor : Colors.red;
@@ -51,7 +50,9 @@ class DifferentFromPainter extends CustomPainter {
       }
 
       final fillPaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.9)
+        ..color = shouldGrayOut
+            ? Colors.grey.withValues(alpha: 0.3)
+            : mandatoryColor
         ..style = PaintingStyle.fill;
 
       final strokePaint = Paint()

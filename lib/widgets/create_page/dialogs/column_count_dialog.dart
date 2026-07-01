@@ -13,7 +13,7 @@ Future<ColumnCountConstraint?> showColumnCountDialog(
   final cidx = cellIdx % width;
   final result = await showColorCountDialog(
     context,
-    title: loc.constraintColumnCount,
+    title: loc.constraintLineCount,
     initialCount: height,
     minCount: 1,
     maxCount: height,

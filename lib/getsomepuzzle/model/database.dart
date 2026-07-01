@@ -15,6 +15,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/saf_access.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -27,11 +28,10 @@ import 'package:unicons/unicons.dart';
 /// puzzles already in flight, etc.
 enum EmptyPlaylistReason {
   customEmpty,
+  userEmpty,
   userAllPlayed,
   noPuzzlesLoaded,
   filtersTooStrict,
-  onboardingPhase,
-  softFilter,
   generic,
 }
 
@@ -43,6 +43,17 @@ class PuzzleData {
   int filled = 0;
   int cplx = 0;
   List<String> rules = [];
+
+  /// User-facing scenario derived from the constraint slugs. Never
+  /// serialised — recomputed on every construction via
+  /// [equilibrium.detectPuzzleProfile].
+  late final equilibrium.ProfileCategory userScenario;
+  // True when at least one GS (group size) constraint targets size 1 — an
+  // isolated cell. Such instances are trivial and not very instructive, so
+  // the selection sampler demotes them while GS is being introduced during
+  // onboarding (see Database.selectionTrivialGsPenalty). Computed once here
+  // to avoid re-parsing the line on every filter/sampling pass.
+  bool hasTrivialGroupSize = false;
   bool played = false;
   int duration = 0;
   int failures = 0;
@@ -75,9 +86,21 @@ class PuzzleData {
             .toInt();
     final strConstraints = attributesStr[4].split(";");
     for (var strConstraint in strConstraints) {
-      rules.add(strConstraint.split(":")[0]);
+      final parts = strConstraint.split(":");
+      rules.add(parts[0]);
+      // GS params are `idx.size`; the target size is the part after the
+      // last dot. Size 1 means an isolated cell (trivial instance).
+      if (parts[0] == 'GS' && parts.length > 1) {
+        if (int.tryParse(parts[1].split(".").last) == 1) {
+          hasTrivialGroupSize = true;
+        }
+      }
     }
-    cplx = int.tryParse(attributesStr[6]) ?? 0;
+    // Solution + complexity are optional trailing fields. Bare canonical
+    // lines (no `v2_` prefix, no tail — see `normalizeToV2Line`) stop at
+    // index 4. Match the same defensiveness as `Puzzle()` (puzzle.dart).
+    cplx = attributesStr.length > 6 ? (int.tryParse(attributesStr[6]) ?? 0) : 0;
+    userScenario = equilibrium.detectPuzzleProfile(lineRepresentation);
   }
 
   Puzzle getPuzzle() {
@@ -149,7 +172,23 @@ class Filters {
   Set<String> bannedRules;
   Set<String> wantedFlags;
   Set<String> bannedFlags;
+  Set<String> wantedDomains;
+  Set<String> bannedDomains;
+
+  /// Scenario filter: null = any scenario. Persisted via `.name`.
+  equilibrium.ProfileCategory? wantedScenario;
   final log = Logger("Filters");
+
+  /// Default value of [bannedFlags] for a fresh install or a player who
+  /// never customised the filter. Exposed so widgets can compare the
+  /// live filter to the default (e.g. to grey the "reset" button)
+  /// without re-hardcoding the literal — a future change to the
+  /// default would otherwise silently desync the UI.
+  static const Set<String> defaultBannedFlags = {
+    "played",
+    "skipped",
+    "disliked",
+  };
 
   Filters({
     this.minWidth = 2,
@@ -161,7 +200,9 @@ class Filters {
     this.wantedRules = const {},
     this.bannedRules = const {},
     this.wantedFlags = const {},
-    this.bannedFlags = const {"played", "skipped", "disliked"},
+    this.bannedFlags = defaultBannedFlags,
+    this.wantedDomains = const {},
+    this.bannedDomains = const {"d3"},
   });
 
   Future<void> load() async {
@@ -178,8 +219,23 @@ class Filters {
       wantedFlags = (prefs.getStringList("wantedFlagsFilter") ?? []).toSet();
       bannedFlags =
           (prefs.getStringList("bannedFlagsFilter") ??
-                  ["played", "skipped", "disliked"])
+                  defaultBannedFlags.toList())
               .toSet();
+      wantedDomains = (prefs.getStringList("wantedDomainsFilter") ?? [])
+          .toSet();
+      bannedDomains = (prefs.getStringList("bannedDomainsFilter") ?? ["d3"])
+          .toSet();
+      final scenarioStr = prefs.getString("wantedScenarioFilter");
+      equilibrium.ProfileCategory? wanted;
+      if (scenarioStr != null) {
+        for (final p in equilibrium.ProfileCategory.values) {
+          if (p.name == scenarioStr) {
+            wanted = p;
+            break;
+          }
+        }
+      }
+      wantedScenario = wanted;
       // Cleanup of obsolete keys (cplx filter replaced by adaptive player level).
       await prefs.remove("minCplxFilter");
       await prefs.remove("maxCplxFilter");
@@ -202,8 +258,19 @@ class Filters {
     prefs.setStringList("bannedRulesFilter", bannedRules.toList());
     prefs.setStringList("wantedFlagsFilter", wantedFlags.toList());
     prefs.setStringList("bannedFlagsFilter", bannedFlags.toList());
+    prefs.setStringList("wantedDomainsFilter", wantedDomains.toList());
+    prefs.setStringList("bannedDomainsFilter", bannedDomains.toList());
+    if (wantedScenario != null) {
+      prefs.setString("wantedScenarioFilter", wantedScenario!.name);
+    } else {
+      prefs.remove("wantedScenarioFilter");
+    }
   }
 }
+
+/// Filter key for a puzzle's domain size — matches the `"d<n>"` slugs
+/// stored in [Filters.wantedDomains] / [Filters.bannedDomains].
+String domainFilterKey(int domainSize) => 'd$domainSize';
 
 /// Recency-weighted observed distribution over the size and slug axes,
 /// computed from the player's [Database.puzzles] history. Used by
@@ -282,6 +349,13 @@ class CollectionLabels {
 
 class Database {
   List<PuzzleData> puzzles = [];
+
+  /// Fallback pool for the current collection: puzzles from the matching
+  /// `X-level-overfilled.txt` file. Populated by [_loadOverfilledFallback]
+  /// at every [loadPuzzlesFile] call. Never mixed into [puzzles] — only
+  /// consulted by [getPuzzlesByLevel] when the main pool is exhausted.
+  List<PuzzleData> _overfilledPuzzles = [];
+
   String collection = entryCollectionKey;
   Filters currentFilters = Filters();
   bool shouldShuffle = false;
@@ -298,6 +372,17 @@ class Database {
     'custom',
   };
 
+  /// Maps each built-in level collection key to the filename of its
+  /// overfilled fallback asset. Used by [_loadOverfilledFallback].
+  static const _overfilledFilename = {
+    '1-easy': '1-easy-overfilled.txt',
+    '2-player': '2-player-overfilled.txt',
+    '3-advanced': '3-advanced-overfilled.txt',
+    '4-strong': '4-strong-overfilled.txt',
+    '5-expert': '5-expert-overfilled.txt',
+    '6-mad': '6-mad-overfilled.txt',
+  };
+
   /// Slug of the entry-level collection — the default landing collection
   /// for new players, and the fallback target for legacy stored values
   /// like "tutorial" / "default" / "collection2" / "collection3" that no
@@ -312,7 +397,48 @@ class Database {
   /// wiring it.
   final ConstraintProgress? progress;
 
+  /// User-chosen directory for stats file sync. When non-null,
+  /// [writeStats] and [importStats] write here instead of the legacy
+  /// `ApplicationDocumentsDirectory/getsomepuzzle/`. Reads still scan
+  /// both locations so existing local stats are never lost.
+  /// Set by [main.dart] from [Settings.statsDirectory].
+  String? statsDirectory;
+
+  /// Error description when [statsDirectory] is set but inaccessible.
+  /// Set by [validateStatsDirectory], [writeStats] or
+  /// [_readRawStatsFromStorage] when a file operation fails.
+  /// Checked by the UI to display a warning in the settings page.
+  String? statsDirectoryError;
+
   Database({required this.playerLevel, this.progress});
+
+  /// Check whether [statsDirectory] is actually writable.
+  /// Returns true when the path is null or passes a test write.
+  /// On failure sets [statsDirectoryError] and returns false.
+  Future<bool> validateStatsDirectory() async {
+    final dir = statsDirectory;
+    if (dir == null) {
+      statsDirectoryError = null;
+      return true;
+    }
+    try {
+      await SafAccess.writeFile(dir, '.gsp_validate', 'ok');
+      await SafAccess.deleteFiles(dir, '.gsp_validate');
+      statsDirectoryError = null;
+      return true;
+    } on Exception catch (e) {
+      statsDirectoryError = '$e';
+      return false;
+    }
+  }
+
+  /// Clear [statsDirectory] and [statsDirectoryError], flushing
+  /// the merged history to the legacy location first.
+  Future<void> clearStatsDirectory() async {
+    await writeStatsToDefaultLocation();
+    statsDirectory = null;
+    statsDirectoryError = null;
+  }
 
   void setPlayerLevel(int newLevel) {
     playerLevel = newLevel;
@@ -418,10 +544,26 @@ class Database {
   }
 
   void load(List<String> lines) {
-    puzzles = lines
-        .where((e) => e.isNotEmpty && !e.startsWith("#"))
-        .map((e) => PuzzleData(e))
-        .toList();
+    final parsed = <PuzzleData>[];
+    var skipped = 0;
+    for (final e in lines) {
+      if (e.isEmpty || e.startsWith("#")) continue;
+      try {
+        parsed.add(PuzzleData(e));
+      } catch (err) {
+        // A single malformed line (e.g. a truncated `custom.txt` row from a
+        // partial write) must not brick startup. Skip it, but log loudly so
+        // the corruption is visible rather than silently swallowed.
+        skipped++;
+        if (skipped <= 3) {
+          print('Database.load: skipping malformed puzzle line "$e" ($err)');
+        }
+      }
+    }
+    if (skipped > 0) {
+      print('Database.load: skipped $skipped malformed puzzle line(s)');
+    }
+    puzzles = parsed;
   }
 
   /// Number of stats entries that count as "usable plays" — finished,
@@ -445,6 +587,17 @@ class Database {
   /// slugs the player has never seen in any played puzzle.
   int playCountForSlug(String slug) => _playCountBySlug[slug] ?? 0;
 
+  /// Cheap parse of the domain segment of a puzzle line: returns true
+  /// iff the puzzle's domain contains the purple cell value (encoded
+  /// as the integer 3). Used by [loadStats] to backfill
+  /// [hasPlayedThirdColor] from history without instantiating a full
+  /// [PuzzleData] per stat entry. Tolerates malformed lines silently.
+  static bool _puzzleLineHasThirdColor(String line) {
+    final parts = line.split('_');
+    if (parts.length < 2) return false;
+    return parts[1].contains('3');
+  }
+
   /// Count of finished, non-skipped plays attributed to the
   /// onboarding journey. Bumped via [notePuzzleCompleted] and
   /// persisted to `SharedPreferences`. Drives [currentPhase] — every
@@ -454,6 +607,46 @@ class Database {
   Map<String, int> onboardingCompletions = {};
 
   static const _onboardingCompletionsKey = 'onboardingCompletions';
+
+  /// Timestamp at which the player most recently graduated past the
+  /// last onboarding phase. Captured the first time [currentPhase]
+  /// transitions to null after [notePuzzleCompleted], or eagerly by
+  /// [skipOnboarding]. For pre-feature graduates (no recorded
+  /// timestamp), [loadPuzzlesFile] backfills it lazily to "now" so the
+  /// third-color suggestion gate has a baseline to count from. Reset
+  /// by [resetOnboardingProgress].
+  DateTime? onboardingCompletedAt;
+
+  static const _onboardingCompletedAtKey = 'onboardingCompletedAt';
+
+  /// Finished, non-skipped plays accumulated **after** the player
+  /// graduated from the last onboarding phase. Distinct from
+  /// [onboardingCompletions] (which stops growing at graduation) and
+  /// from [_globalUsablePlays] (which includes pre-onboarding history
+  /// too). Drives the third-color suggestion gate. Reset by
+  /// [resetOnboardingProgress].
+  int postOnboardingCompletions = 0;
+
+  static const _postOnboardingCompletionsKey = 'postOnboardingCompletions';
+
+  /// True once the player has finished or skipped at least one puzzle
+  /// whose domain contains the purple cell value (i.e. a 3-colour
+  /// puzzle). Set by [notePuzzleCompleted] for the current session and
+  /// rebuilt from the stats history by [loadStats] — so reinstalls
+  /// reconstruct the flag from the stats file alone. Used as a guard
+  /// to avoid suggesting 3 colours to a player who already plays them.
+  bool hasPlayedThirdColor = false;
+
+  static const _hasPlayedThirdColorKey = 'hasPlayedThirdColor';
+
+  /// True once the "try 3 colours" suggestion modal has been displayed
+  /// at least once. Prevents the modal from firing again after the
+  /// player has chosen "Later" — they can still opt in via the filters
+  /// page. Reset by [resetOnboardingProgress] so a fresh onboarding
+  /// re-arms the suggestion.
+  bool thirdColorSuggestionShown = false;
+
+  static const _thirdColorSuggestionShownKey = 'thirdColorSuggestionShown';
 
   /// Onboarding phase the player is currently in. Returns null once
   /// they've graduated past the last defined phase, in which case
@@ -471,22 +664,61 @@ class Database {
   /// puzzles appear in their tally without waiting for a stats
   /// reload.
   void notePuzzleCompleted(PuzzleData puz) {
+    final oldPhase = currentPhase;
     _globalUsablePlays++;
     for (final slug in puz.rules.toSet()) {
       if (slug.isEmpty || slug == 'TX') continue;
       _playCountBySlug.update(slug, (v) => v + 1, ifAbsent: () => 1);
     }
-    final wasOnboarding = currentPhase != null;
+    // Latch the third-colour flag on the first 3-colour play we ever
+    // see (purple has integer value 3 in `PuzzleData.domain`, which
+    // mirrors the v2 line format). Once true it never flips back:
+    // future puzzles still in the history bear witness even after a
+    // stats reload.
+    if (!hasPlayedThirdColor && puz.domain.contains(3)) {
+      hasPlayedThirdColor = true;
+      _persistHasPlayedThirdColor();
+    }
+    final wasOnboarding = oldPhase != null;
     if (wasOnboarding) {
       for (var slug in puz.rules) {
         onboardingCompletions[slug] = onboardingCompletions[slug] == null
             ? 1
             : onboardingCompletions[slug]! + 1;
       }
-      // Fire-and-forget: persistence failures only mean the counter
-      // resets on next launch, which the player will perceive as a
-      // benign delay (one extra puzzle in the same phase).
       _persistOnboardingCompletions();
+      if (currentPhase == null) {
+        if (_softFilterActive) {
+          _refreshSoftDiscoveryPool();
+        }
+        onboardingCompletedAt = DateTime.now();
+        _persistOnboardingCompletedAt();
+      }
+    } else {
+      postOnboardingCompletions++;
+      _persistPostOnboardingCompletions();
+      if (_softFilterActive) {
+        _softPlaysSinceElectedChange++;
+      }
+    }
+    // Keep currentFilters aligned with the onboarding recommendation.
+    // Without this, the player keeps playing puzzles from the previous
+    // phase even after notePuzzleCompleted advanced currentPhase, and
+    // during the soft-filter phase the banned-rules set stays stale
+    // after progress.noteSeen grows firstSeen.
+    final reco = recommendedOnboardingFilters;
+    if (reco != null &&
+        (!setEquals(currentFilters.wantedRules, reco.wantedRules) ||
+            !setEquals(currentFilters.bannedRules, reco.bannedRules))) {
+      currentFilters.wantedRules = reco.wantedRules;
+      currentFilters.bannedRules = reco.bannedRules;
+      // Fire-and-forget like the _persist* helpers above: Filters.save()
+      // hits SharedPreferences, which throws without a Flutter binding
+      // (some unit tests exercise notePuzzleCompleted's semantics without
+      // booting the app). Swallow that async error so it can't surface as
+      // an unhandled rejection; a real failure just delays the filter
+      // realignment to the next launch.
+      currentFilters.save().catchError((_) {});
     }
   }
 
@@ -509,6 +741,95 @@ class Database {
     }
   }
 
+  Future<void> _persistOnboardingCompletedAt() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final value = onboardingCompletedAt;
+      if (value == null) {
+        await prefs.remove(_onboardingCompletedAtKey);
+      } else {
+        await prefs.setString(
+          _onboardingCompletedAtKey,
+          value.toIso8601String(),
+        );
+      }
+    } catch (e) {
+      log.fine('Failed to persist onboardingCompletedAt: $e');
+    }
+  }
+
+  Future<void> _persistPostOnboardingCompletions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+        _postOnboardingCompletionsKey,
+        postOnboardingCompletions,
+      );
+    } catch (e) {
+      log.fine('Failed to persist postOnboardingCompletions: $e');
+    }
+  }
+
+  Future<void> _persistHasPlayedThirdColor() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_hasPlayedThirdColorKey, hasPlayedThirdColor);
+    } catch (e) {
+      log.fine('Failed to persist hasPlayedThirdColor: $e');
+    }
+  }
+
+  Future<void> _persistThirdColorSuggestionShown() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(
+        _thirdColorSuggestionShownKey,
+        thirdColorSuggestionShown,
+      );
+    } catch (e) {
+      log.fine('Failed to persist thirdColorSuggestionShown: $e');
+    }
+  }
+
+  /// Should the "try 3 colours" suggestion modal be shown right now?
+  /// All four conditions must hold:
+  /// 1. The modal hasn't been shown yet.
+  /// 2. The player has never played a 3-colour puzzle.
+  /// 3. The player has finished onboarding ([currentPhase] is null and
+  ///    a graduation timestamp exists).
+  /// 4. They've completed at least 50 plays since graduation.
+  ///
+  /// The 50-plays threshold matches the spec: enough plays past the
+  /// last rule introduction that the player has built confidence on
+  /// the 2-colour core, and is ready for a fresh challenge.
+  bool shouldSuggestThirdColor() {
+    final result =
+        !thirdColorSuggestionShown &&
+        !hasPlayedThirdColor &&
+        currentPhase == null &&
+        onboardingCompletedAt != null &&
+        postOnboardingCompletions >= _thirdColorSuggestionThreshold;
+    log.fine(
+      'shouldSuggestThirdColor=$result '
+      '(shown=$thirdColorSuggestionShown, '
+      'playedThird=$hasPlayedThirdColor, '
+      'phase=${currentPhase?.index}, '
+      'onbAt=$onboardingCompletedAt, '
+      'postCount=$postOnboardingCompletions/$_thirdColorSuggestionThreshold)',
+    );
+    return result;
+  }
+
+  static const int _thirdColorSuggestionThreshold = 50;
+
+  /// Mark the suggestion as shown so it never fires again. Called by
+  /// the modal regardless of which button the player tapped: dismissal
+  /// is enough — the player has been informed.
+  Future<void> noteThirdColorSuggestionShown() async {
+    thirdColorSuggestionShown = true;
+    await _persistThirdColorSuggestionShown();
+  }
+
   /// Reset the onboarding counter so the player re-enters phase 0.
   /// Pairs with `ConstraintProgress.clear()` for the full
   /// "Rejouer l'onboarding" workflow. Persists immediately because
@@ -516,7 +837,22 @@ class Database {
   /// counter from prefs and would otherwise silently undo the reset.
   Future<void> resetOnboardingProgress() async {
     onboardingCompletions = {};
-    await _persistOnboardingCompletions();
+    onboardingCompletedAt = null;
+    postOnboardingCompletions = 0;
+    // Re-arm the third-colour suggestion so the player who chooses to
+    // start over also gets a fresh chance to discover 3 colours after
+    // the new graduation. [hasPlayedThirdColor] is history-derived and
+    // intentionally NOT reset — it stays true if the player has any
+    // 3-colour play in their stats.
+    thirdColorSuggestionShown = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_onboardingFiltersAppliedKey);
+    await Future.wait([
+      _persistOnboardingCompletions(),
+      _persistOnboardingCompletedAt(),
+      _persistPostOnboardingCompletions(),
+      _persistThirdColorSuggestionShown(),
+    ]);
   }
 
   /// Push the onboarding counter past every defined phase so
@@ -532,17 +868,39 @@ class Database {
     for (var phase in OnboardingPhase.phases) {
       onboardingCompletions[phase.introducing] = OnboardingPhase.phaseLength;
     }
-    await _persistOnboardingCompletions();
+    onboardingCompletedAt ??= DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_onboardingFiltersAppliedKey);
+    await Future.wait([
+      _persistOnboardingCompletions(),
+      _persistOnboardingCompletedAt(),
+    ]);
   }
 
-  /// Mix in puzzles from `assets/overfilled-easy.txt` into the catalog
+  /// Drop the rule filters (`wantedRules`/`bannedRules`) back to their
+  /// empty default and persist. Called when the player leaves
+  /// onboarding so the open page no longer carries the
+  /// onboarding-imposed slug envelope (the last
+  /// [recommendedOnboardingFilters] would otherwise stay pinned —
+  /// nothing re-applies it once `reco` is null, so without this the
+  /// player stays stuck wanting/banning the final onboarding slug).
+  /// Size/flag filters are left untouched. Rebuilds the playlist so the
+  /// widened catalog takes effect immediately.
+  Future<void> resetRuleFilters() async {
+    currentFilters.wantedRules = {};
+    currentFilters.bannedRules = {};
+    await currentFilters.save();
+    preparePlaylist();
+  }
+
+  /// Mix in puzzles from `assets/1-easy-overfilled.txt` into the catalog
   /// while the player is in onboarding on the entry-level collection.
   ///
   /// Why: phases 4 (DF) and 5 (CC) — and likely later phases — are
   /// extremely thin in `1-easy` because the generator naturally
   /// produces simple-rule, small-grid puzzles with high prefill (they
   /// classify as `overfilled` even when their solving trace is
-  /// beginner-level). `overfilled-easy.txt` holds exactly those
+  /// beginner-level). `1-easy-overfilled.txt` holds exactly those
   /// puzzles: `overfilled` by prefill ratio, `beginner` by trace
   /// shape — pedagogically appropriate for onboarding (high prefill
   /// = the rule does most of the work).
@@ -550,7 +908,7 @@ class Database {
   /// The split is decided at generation time by `classifyTrace`
   /// (cf. `lib/getsomepuzzle/level.dart`), so the runtime doesn't
   /// have to second-guess
-  /// classification on every load — anything in `overfilled-easy.txt`
+  /// classification on every load — anything in `1-easy-overfilled.txt`
   /// has been pre-filtered.
   ///
   /// Once the player graduates past the last defined phase
@@ -562,10 +920,10 @@ class Database {
     if (collection != entryCollectionKey) return;
     String content;
     try {
-      content = await rootBundle.loadString('assets/overfilled-easy.txt');
+      content = await rootBundle.loadString('assets/1-easy-overfilled.txt');
     } catch (e) {
       log.fine(
-        'overfilled-easy.txt missing, skipping onboarding augmentation: $e',
+        '1-easy-overfilled.txt missing, skipping onboarding augmentation: $e',
       );
       return;
     }
@@ -582,8 +940,126 @@ class Database {
       }
     }
     log.fine(
-      'Augmented onboarding catalog with $added overfilled-easy puzzles',
+      'Augmented onboarding catalog with $added 1-easy-overfilled puzzles',
     );
+  }
+
+  /// Load the overfilled fallback pool for the current collection.
+  /// Called at every [loadPuzzlesFile] so [_overfilledPuzzles] is always
+  /// in sync with [collection].
+  ///
+  /// The pool is left empty when:
+  /// - the collection has no overfilled mirror (custom, user_*, etc.)
+  /// - we are in the onboarding phase of `1-easy` (the mirror is already
+  ///   mixed into [puzzles] by [_augmentWithOverfilledIfOnboarding])
+  Future<void> _loadOverfilledFallback() async {
+    _overfilledPuzzles = [];
+    final filename = _overfilledFilename[collection];
+    if (filename == null) return;
+    if (collection == entryCollectionKey && currentPhase != null) return;
+    try {
+      final content = await rootBundle.loadString('assets/$filename');
+      for (final line in content.split('\n')) {
+        final t = line.trim();
+        if (t.isEmpty || t.startsWith('#')) continue;
+        try {
+          _overfilledPuzzles.add(PuzzleData(t));
+        } catch (_) {}
+      }
+      log.fine(
+        'Loaded ${_overfilledPuzzles.length} overfilled fallback puzzles '
+        'from $filename',
+      );
+    } catch (_) {
+      // Asset absent (new collection not yet populated) — no fallback.
+    }
+  }
+
+  /// Axe B (soft-discovery widening): when the player has cleared the strict
+  /// phases but not yet met every rule, pre-load a bounded pool of puzzles
+  /// carrying a post-strict slug from the **next** level collection(s) up
+  /// (see [softDiscoveryMaxLevelsAbove]). The soft slugs (`RT`, `SY`, …) are
+  /// scarce in the entry catalog; this pool gives [getPuzzlesByLevel]
+  /// somewhere to draw the elected rule from so onboarding can complete
+  /// without forcing the player to switch collections by hand — while staying
+  /// close to the entry difficulty. No-op outside the soft-filter phase.
+  Future<void> _refreshSoftDiscoveryPool() async {
+    _softDiscoveryPool = [];
+    if (!_softFilterActive) return;
+    final currentLevel = playableCollectionKeyToLevel[collection];
+    if (currentLevel == null) return; // custom / user playlists: skip
+    final softSlugs = OnboardingPhase.postStrictDiscoveryOrder.toSet();
+    final existing = puzzles.map((e) => e.lineRepresentation.trim()).toSet();
+    final perSlug = <String, int>{};
+    final seen = <String>{};
+    for (final entry in playableCollectionKeyToLevel.entries) {
+      final lvl = entry.value.index;
+      // Only the next level(s) up: the current collection (and its
+      // 1-easy-overfilled augmentation) is already in [puzzles], and we must
+      // not serve a beginner a far-harder puzzle just to introduce a rule.
+      if (lvl <= currentLevel.index ||
+          lvl > currentLevel.index + softDiscoveryMaxLevelsAbove) {
+        continue;
+      }
+      String content;
+      try {
+        content = await rootBundle.loadString('assets/${entry.key}.txt');
+      } catch (_) {
+        continue;
+      }
+      for (final line in content.split('\n')) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+        if (existing.contains(trimmed) || !seen.add(trimmed)) continue;
+        // Cheap string pre-filter: skip lines that name no soft slug before
+        // paying for a full PuzzleData parse.
+        if (!softSlugs.any((s) => trimmed.contains('$s:'))) continue;
+        PuzzleData puz;
+        try {
+          puz = PuzzleData(trimmed);
+        } catch (_) {
+          continue;
+        }
+        final carried = puz.rules.toSet().intersection(softSlugs);
+        if (carried.isEmpty) continue;
+        // Respect the per-slug cap so a common slug can't crowd out the rest.
+        if (carried.every(
+          (s) => (perSlug[s] ?? 0) >= softDiscoveryPoolPerSlugCap,
+        )) {
+          continue;
+        }
+        for (final s in carried) {
+          perSlug[s] = (perSlug[s] ?? 0) + 1;
+        }
+        _softDiscoveryPool.add(puz);
+      }
+    }
+    log.fine(
+      'Soft-discovery pool: ${_softDiscoveryPool.length} puzzles '
+      'across slugs ${perSlug.keys.toList()..sort()}',
+    );
+  }
+
+  /// True when [candidate] should supersede [incumbent] as the
+  /// representative play of a puzzle. A finished play always beats an
+  /// unfinished one; between two finished (or two unfinished) plays the
+  /// later timestamp wins. ISO-8601 stamps compare correctly as strings.
+  static bool _isMoreRecentPlay(StatEntry candidate, StatEntry incumbent) {
+    final candFinished = candidate.finished;
+    final incFinished = incumbent.finished;
+    if ((candFinished != null) != (incFinished != null)) {
+      return candFinished != null;
+    }
+    if (candFinished != null && incFinished != null) {
+      return candFinished.compareTo(incFinished) > 0;
+    }
+    // Both unfinished: prefer the more recent skip, else keep the incumbent.
+    final candSkipped = candidate.skipped;
+    final incSkipped = incumbent.skipped;
+    if (candSkipped != null && incSkipped != null) {
+      return candSkipped.compareTo(incSkipped) > 0;
+    }
+    return candSkipped != null && incSkipped == null;
   }
 
   void loadStats(List<String> rawStats) {
@@ -591,15 +1067,41 @@ class Database {
     // Index by canonical key (identity-only): old stats lines that embed
     // a stale complexity score or constraint order still match the current
     // puzzle line. See lib/getsomepuzzle/model/canonical.dart.
+    //
+    // The stats file now keeps the *full* play history (multiple rows per
+    // puzzle — see writeStats). Phase 1 collapses that history back to one
+    // entry per puzzle (the most recent finished play) so every downstream
+    // counter behaves exactly as it did when the file held a single row per
+    // puzzle: we surface the latest play, not an inflated replay count.
     final Map<String, StatEntry> solvedPuzzles = {};
-    int usablePlays = 0;
-    _playCountBySlug.clear();
     for (final line in rawStats) {
       final entry = StatEntry.parse(line);
       if (entry == null) continue;
-      solvedPuzzles[canonicalPuzzleKey(entry.puzzleLine)] = entry;
+      final key = canonicalPuzzleKey(entry.puzzleLine);
+      final existing = solvedPuzzles[key];
+      if (existing == null || _isMoreRecentPlay(entry, existing)) {
+        solvedPuzzles[key] = entry;
+      }
+    }
+    // Phase 2: derive counters from the per-puzzle entries (not the raw
+    // history) so replays don't inflate them.
+    int usablePlays = 0;
+    int postOnboardingFromStats = 0;
+    bool sawThirdColor = false;
+    final onbAt = onboardingCompletedAt;
+    _playCountBySlug.clear();
+    for (final entry in solvedPuzzles.values) {
       if (entry.finished != null && entry.skipped == null) {
         usablePlays++;
+        if (onbAt != null) {
+          final finishedAt = DateTime.tryParse(entry.finished!);
+          if (finishedAt != null && finishedAt.isAfter(onbAt)) {
+            postOnboardingFromStats++;
+          }
+        }
+        if (!sawThirdColor && _puzzleLineHasThirdColor(entry.puzzleLine)) {
+          sawThirdColor = true;
+        }
         final slugs = ConstraintProgress.slugsFromLine(entry.puzzleLine);
         for (final s in slugs) {
           _playCountBySlug.update(s, (v) => v + 1, ifAbsent: () => 1);
@@ -622,8 +1124,33 @@ class Database {
       }
     }
     _globalUsablePlays = usablePlays;
+    // Synchronise hasPlayedThirdColor with the current stats history.
+    // Both directions matter: the up-promote covers a reinstall that
+    // wiped prefs but kept stats; the down-promote covers a stats
+    // reset (or 2-only import) where a stale `true` would otherwise
+    // stick around and silently disqualify the player from the
+    // third-colour suggestion forever. The risk of overriding an
+    // in-session true with a stale-stats false is negligible —
+    // loadStats only fires at boot or after an explicit import, and
+    // neither path has an unpersisted in-session 3-colour play to
+    // protect.
+    if (sawThirdColor != hasPlayedThirdColor) {
+      hasPlayedThirdColor = sawThirdColor;
+      _persistHasPlayedThirdColor();
+    }
+    // Backfill postOnboardingCompletions from history when the stats
+    // count is higher than the live counter. This matters in two
+    // scenarios: (1) the player imports a stats file from another
+    // device — the import folds new history that should bump the
+    // counter, and (2) the live counter was lost (e.g. wiped prefs)
+    // but the stats survived. `max` semantics protect an in-session
+    // counter that has been bumped past the last stats flush.
+    if (onbAt != null && postOnboardingFromStats > postOnboardingCompletions) {
+      postOnboardingCompletions = postOnboardingFromStats;
+      _persistPostOnboardingCompletions();
+    }
     log.finest("solved $solvedPuzzles");
-    for (final puz in puzzles) {
+    for (final puz in [...puzzles, ..._overfilledPuzzles]) {
       final entry = solvedPuzzles[canonicalPuzzleKey(puz.lineRepresentation)];
       if (entry == null) continue;
       puz.played = true;
@@ -646,8 +1173,14 @@ class Database {
     }
   }
 
-  Iterable<PuzzleData> filter() {
-    return puzzles.where((puz) {
+  Iterable<PuzzleData> filter() => puzzles.where(_matchesFilters);
+
+  /// Per-puzzle predicate behind [filter]. Extracted so the soft-discovery
+  /// injection in [getPuzzlesByLevel] can apply the *same* flag / size /
+  /// rule / domain gates to puzzles drawn from the widened pool (which are
+  /// not in [puzzles]).
+  bool _matchesFilters(PuzzleData puz) {
+    {
       if (puz.played && currentFilters.bannedFlags.contains("played")) {
         return false;
       }
@@ -680,10 +1213,15 @@ class Database {
 
       if (puz.filled > currentFilters.maxFilled) return false;
       if (puz.filled < currentFilters.minFilled) return false;
-      if (puz.width > currentFilters.maxWidth) return false;
-      if (puz.width < currentFilters.minWidth) return false;
-      if (puz.height > currentFilters.maxHeight) return false;
-      if (puz.height < currentFilters.minHeight) return false;
+      final w = puz.width;
+      final h = puz.height;
+      final minW = currentFilters.minWidth;
+      final maxW = currentFilters.maxWidth;
+      final minH = currentFilters.minHeight;
+      final maxH = currentFilters.maxHeight;
+      final fitsNormal = w >= minW && w <= maxW && h >= minH && h <= maxH;
+      final fitsRotated = h >= minW && h <= maxW && w >= minH && w <= maxH;
+      if (!fitsNormal && !fitsRotated) return false;
       if (currentFilters.wantedRules.isNotEmpty &&
           currentFilters.wantedRules.intersection(puz.rules.toSet()).length !=
               currentFilters.wantedRules.length) {
@@ -695,8 +1233,18 @@ class Database {
               .isNotEmpty) {
         return false;
       }
+      if (currentFilters.wantedScenario != null &&
+          puz.userScenario != currentFilters.wantedScenario) {
+        return false;
+      }
+      final domainKey = domainFilterKey(puz.domain.length);
+      if (currentFilters.bannedDomains.contains(domainKey)) return false;
+      if (currentFilters.wantedDomains.isNotEmpty &&
+          !currentFilters.wantedDomains.contains(domainKey)) {
+        return false;
+      }
       return true;
-    });
+    }
   }
 
   Future<void> loadPuzzlesFile([String? fileToLoad]) async {
@@ -729,6 +1277,23 @@ class Database {
       // The user probably had this saved in the previous version
       onboardingCompletions = {};
     }
+    final rawCompletedAt = prefs.getString(_onboardingCompletedAtKey);
+    onboardingCompletedAt = rawCompletedAt == null
+        ? null
+        : DateTime.tryParse(rawCompletedAt);
+    postOnboardingCompletions =
+        prefs.getInt(_postOnboardingCompletionsKey) ?? 0;
+    hasPlayedThirdColor = prefs.getBool(_hasPlayedThirdColorKey) ?? false;
+    thirdColorSuggestionShown =
+        prefs.getBool(_thirdColorSuggestionShownKey) ?? false;
+    // Lazy backfill: a player who graduated before this feature shipped
+    // has currentPhase == null but no recorded timestamp. Stamp "now"
+    // so the 50-plays gate starts counting from their first launch on
+    // this version — otherwise they'd never see the suggestion.
+    if (currentPhase == null && onboardingCompletedAt == null) {
+      onboardingCompletedAt = DateTime.now();
+      await _persistOnboardingCompletedAt();
+    }
     await loadUserPlaylists();
     String assetContent;
     if (collection == 'custom' || collection.startsWith('user_')) {
@@ -745,10 +1310,52 @@ class Database {
     }
     load(assetContent.split("\n"));
     await _augmentWithOverfilledIfOnboarding();
+    await _loadOverfilledFallback();
     await currentFilters.load();
     final stats = await _readRawStatsFromStorage();
     loadStats(stats);
+    // After `loadStats` because it populates `progress.firstSeen` from
+    // the play history, which the soft-filter recommendation reads.
+    await maybeApplyOnboardingFilterDefaults(prefs);
+    // Cross-session guard: keep filters aligned when the phase advanced
+    // between sessions (e.g. the player closed the app at a phase
+    // boundary). Covers both strict-phase and soft-filter modes.
+    final reco = recommendedOnboardingFilters;
+    if (reco != null) {
+      currentFilters.wantedRules = reco.wantedRules;
+      currentFilters.bannedRules = reco.bannedRules;
+      await currentFilters.save();
+    }
+    await _refreshSoftDiscoveryPool();
     preparePlaylist();
+  }
+
+  /// SharedPreferences key gating the one-shot application of
+  /// onboarding-derived filters at first launch. Cleared by
+  /// [resetOnboardingProgress] and [skipOnboarding] so the next
+  /// `loadPuzzlesFile` re-applies the fresh recommendation.
+  static const _onboardingFiltersAppliedKey = 'onboardingFiltersApplied';
+
+  /// Apply the onboarding filter recommendation to [currentFilters] the
+  /// first time we see this player post-refactor (flag absent in prefs).
+  /// Subsequent calls are no-ops so the player's manual overrides stick.
+  ///
+  /// We always set the flag — even when the player has already
+  /// graduated and there is no recommendation to apply — so the
+  /// migration probe terminates and we don't pay the recheck cost on
+  /// every boot.
+  @visibleForTesting
+  Future<void> maybeApplyOnboardingFilterDefaults(
+    SharedPreferences prefs,
+  ) async {
+    if (prefs.getBool(_onboardingFiltersAppliedKey) == true) return;
+    final reco = recommendedOnboardingFilters;
+    if (reco != null) {
+      currentFilters.wantedRules = reco.wantedRules;
+      currentFilters.bannedRules = reco.bannedRules;
+      await currentFilters.save();
+    }
+    await prefs.setBool(_onboardingFiltersAppliedKey, true);
   }
 
   /// Read every persisted raw stat line from disk (or `SharedPreferences`
@@ -769,14 +1376,32 @@ class Database {
       }
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
-      final path = p.join(documentsDirectory.path, "getsomepuzzle");
-      final pattern = p.join(path, "stats");
-      await Directory(path).create(recursive: true);
-      for (final entry in Directory(path).listSync()) {
+      final defaultPath = p.join(documentsDirectory.path, "getsomepuzzle");
+      final pattern = p.join(defaultPath, "stats");
+      await Directory(defaultPath).create(recursive: true);
+      for (final entry in Directory(defaultPath).listSync()) {
         if (entry is! File || !entry.path.contains(pattern)) continue;
         log.finer("Loading stats from ${entry.path}");
         final content = await entry.readAsString();
         stats.addAll(content.split("\n"));
+      }
+      // Also read from the custom sync directory when set.
+      // The caller dedupes via _mergedStatHistory / loadStats.
+      if (statsDirectory != null) {
+        try {
+          final fileNames = await SafAccess.listFileNames(
+            statsDirectory!,
+            "stats",
+          );
+          for (final name in fileNames) {
+            log.finer("Loading stats from $statsDirectory/$name");
+            final content = await SafAccess.readFile(statsDirectory!, name);
+            stats.addAll(content.split("\n"));
+          }
+        } on Exception catch (e) {
+          log.warning("Failed to read stats from $statsDirectory: $e");
+          statsDirectoryError = '$e';
+        }
       }
     }
     return stats;
@@ -793,33 +1418,108 @@ class Database {
   /// wiping every other collection's play history.
   ///
   /// Instead we read **every** existing stat line from storage (canonical
-  /// stats files + any imported file), dedupe by canonical puzzle key, and
+  /// stats files + any imported file), dedupe by `(canonical key, finished)`
+  /// so each *distinct play* of a puzzle is kept (the full history), and
   /// overlay the current session's plays on top so they win on conflict.
   /// The result is written back to the canonical `stats.txt` (or the
   /// `"stats"` `SharedPreferences` key on web). Legacy / imported stat
-  /// files are left untouched — the canonical-key dedupe at load time
-  /// keeps everything coherent, and the redundancy survives a `clearAllStats`
-  /// because that helper deletes every `stats*` file outright.
-  Future<void> writeStats() async {
+  /// files are left untouched — the dedupe at load time keeps everything
+  /// coherent, and the redundancy survives a `clearAllStats` because that
+  /// helper deletes every `stats*` file outright.
+  ///
+  /// Keying on the completion timestamp (not the canonical key alone) is
+  /// what preserves replays: two plays of the same puzzle have different
+  /// `finished` stamps → two rows, while the periodic 60 s flush re-emits
+  /// the in-progress play with the *same* stamp → a single row. Unfinished
+  /// plays (skips, abandoned attempts) collapse to one row per puzzle and
+  /// are dropped once a finished play exists for that puzzle, mirroring the
+  /// old "completion replaces the attempt" behaviour and keeping the file
+  /// free of noise the analysis pipeline ignores anyway.
+  /// Build the deduplicated stat history shared by [writeStats] (persisted
+  /// back to disk) and [getAllStats] (shown / exported in the stats page):
+  /// every stored line plus the current session's plays, keyed by
+  /// `(canonical key, completion stamp)` so each distinct play survives,
+  /// with the lone unfinished row of a puzzle dropped once it has a
+  /// finished play. The session is folded in last so it wins on conflict.
+  Future<List<String>> _mergedStatHistory() async {
+    // A play is identified by its completion timestamp. Unfinished plays
+    // (finished == null) share a single per-puzzle slot.
+    String historyKey(StatEntry entry) {
+      final canonical = canonicalPuzzleKey(entry.puzzleLine);
+      return '${entry.finished ?? "unfinished"}|$canonical';
+    }
+
     final raw = await _readRawStatsFromStorage();
     final Map<String, String> byKey = {};
     for (final line in raw) {
       final entry = StatEntry.parse(line);
       if (entry == null) continue;
-      byKey[canonicalPuzzleKey(entry.puzzleLine)] = line;
+      byKey[historyKey(entry)] = line;
     }
     final fromSession = getStats();
     for (final line in fromSession) {
       final entry = StatEntry.parse(line);
       if (entry == null) continue;
-      byKey[canonicalPuzzleKey(entry.puzzleLine)] = line;
+      byKey[historyKey(entry)] = line;
     }
-    final merged = byKey.values.toList()..sort();
+    // Drop the lone unfinished row of any puzzle that also has a finished
+    // play: the completion supersedes the in-progress attempt / skip.
+    final finishedCanonicalKeys = <String>{};
+    for (final line in byKey.values) {
+      final entry = StatEntry.parse(line);
+      if (entry?.finished != null) {
+        finishedCanonicalKeys.add(canonicalPuzzleKey(entry!.puzzleLine));
+      }
+    }
+    byKey.removeWhere((key, line) {
+      if (!key.startsWith('unfinished|')) return false;
+      final entry = StatEntry.parse(line);
+      if (entry == null) return false;
+      return finishedCanonicalKeys.contains(
+        canonicalPuzzleKey(entry.puzzleLine),
+      );
+    });
+    return byKey.values.toList()..sort();
+  }
+
+  Future<void> writeStats() async {
+    final merged = await _mergedStatHistory();
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList("stats", merged);
       return;
     }
+    // Custom sync directory: write there as the single source of truth.
+    // The legacy directory is deliberately not written when a custom
+    // directory is set, avoiding a split-brain scenario where the sync
+    // tool would pick up the stale legacy file on the next sync.
+    if (statsDirectory != null) {
+      try {
+        await SafAccess.writeFile(
+          statsDirectory!,
+          "stats.txt",
+          merged.join("\n"),
+        );
+        statsDirectoryError = null;
+      } on Exception catch (e) {
+        log.warning("Failed to write stats to $statsDirectory: $e");
+        statsDirectoryError = '$e';
+      }
+      return;
+    }
+    await _writeToLegacyDir(merged);
+  }
+
+  /// Write the merged stat history to the default
+  /// `ApplicationDocumentsDirectory/getsomepuzzle/stats.txt`,
+  /// regardless of the current [statsDirectory] setting.
+  /// Used before clearing [statsDirectory] so no plays are orphaned.
+  Future<void> writeStatsToDefaultLocation() async {
+    final merged = await _mergedStatHistory();
+    await _writeToLegacyDir(merged);
+  }
+
+  Future<void> _writeToLegacyDir(List<String> merged) async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = p.join(documentsDirectory.path, "getsomepuzzle");
     await Directory(path).create(recursive: true);
@@ -842,7 +1542,7 @@ class Database {
   /// level collections. End-of-batch is the natural moment to surface
   /// a level-rotation suggestion — capping at 5 avoids the player going
   /// months without seeing it on collections that hold ~1k+ puzzles.
-  /// Custom, and user playlists are not capped.
+  /// Custom and user playlists are not capped.
   static const int playlistBatchSize = 5;
 
   bool _isPlayableLevel(String key) =>
@@ -850,46 +1550,32 @@ class Database {
 
   void preparePlaylist() {
     if (collection == 'custom' || collection.startsWith('user_')) {
-      // User-curated playlists keep their insertion order — the player
-      // chose this sequence explicitly. Filters and shuffle do not
-      // apply; only "already played" is honoured. The onboarding
-      // phase filter is *not* applied here either: importing or
-      // hand-crafting a playlist is an opt-in that supersedes the
-      // curated track.
-      playlist = puzzles.where((p) => !p.played).toList();
+      // User-curated playlists honour the full filter pipeline and the
+      // shuffle toggle exactly like built-in collections — the player
+      // expects an explicit FM ban or an enabled shuffle to take effect
+      // here too. What stays specific to custom/user_* is the absence
+      // of a batch cap (the whole playlist plays as a single flow).
+      // When shuffle is off we keep the catalog order from `filter()`,
+      // which itself iterates `puzzles` in insertion order — so the
+      // "play in the order I imported them" contract still holds.
+      final base = filter().toList();
+      playlist = shouldShuffle ? (base..shuffle()) : base;
     } else {
-      final phase = currentPhase;
-      if (phase != null && _isPlayableLevel(collection)) {
-        if (shouldShuffle) {
-          // Shuffle within phase-eligible puzzles so the player who
-          // explicitly opted into shuffle still doesn't get
-          // multi-constraint surprises during strict onboarding.
-          playlist =
-              filter()
-                  .where((p) => puzzleEligibleForPhase(p.rules, phase))
-                  .toList()
-                ..shuffle();
-        } else {
-          playlist = _getPuzzlesInPhase(phase);
-        }
-      } else {
-        if (shouldShuffle) {
-          playlist = filter().toList()..shuffle();
-        } else {
-          playlist = getPuzzlesByLevel(playerLevel);
-        }
-        // Soft filter applies whether the player went via shuffle or
-        // the regular sampler — the goal is "≤1 unseen slug per
-        // proposed puzzle" regardless of selection mechanism.
-        playlist = _applySoftOnboardingFilter(playlist);
-      }
+      // Sampling Gaussien+variety is the source of truth for the
+      // selection. The shuffle toggle now only reorders the resulting
+      // batch — the top-N puzzles are the same whether the player asked
+      // for ordered or shuffled play, so the level-adaptive contract
+      // holds in both modes. Onboarding gating is no longer applied
+      // here; the recommended filters in `currentFilters` (see
+      // [recommendedOnboardingFilters]) do the gating via `filter()`,
+      // which `getPuzzlesByLevel` already consults.
+      playlist = getPuzzlesByLevel(playerLevel).toList();
       _maybeCapBatch();
+      if (shouldShuffle) playlist.shuffle();
     }
     log.fine(
       "Playlist prepared with ${playlist.length} puzzles "
-      "(shuffled: $shouldShuffle, capped: ${_isPlayableLevel(collection)}, "
-      "phase: ${currentPhase?.index}, "
-      "softFilter: ${_softFilterActive ? 'on' : 'off'})",
+      "(shuffled: $shouldShuffle, capped: ${_isPlayableLevel(collection)})",
     );
   }
 
@@ -911,6 +1597,101 @@ class Database {
   /// end-of-batch and to keep the Apprentissage page actionable.
   bool get isInOnboarding => currentPhase != null || _softFilterActive;
 
+  /// Pre-set filter recommendation derived from the player's onboarding
+  /// state. Null when [isInOnboarding] is false.
+  ///
+  /// **Strict phase**: `wantedRules = {phase.introducing}`,
+  /// `bannedRules = allKnownSlugs \ phase.allowed`. Reproduces the
+  /// previous `puzzleEligibleForPhase` contract exactly as a pair of
+  /// slug filters that the user can inspect and override.
+  ///
+  /// **Soft filter**: `wantedRules = {}`,
+  /// `bannedRules = (notYetSeen \ {elected})`, where `elected` is the
+  /// first slug in [OnboardingPhase.postStrictDiscoveryOrder] still
+  /// missing from `progress.firstSeen`. Lets puzzles with 0 new slugs
+  /// pass (refresh) AND lets the elected slug surface (single new
+  /// rule), while banning every other unseen slug — a faithful
+  /// translation of the old soft-filter "≤1 new slug" contract into
+  /// the visible-filter model.
+  ///
+  /// **Terminal case** (one unseen slug left): `wantedRules =
+  /// {elected}`, `bannedRules = {}`. We flip from "let refresh pass"
+  /// to "force the missing slug" so the open-page banner references a
+  /// real chip and onboarding converges faster.
+  ({Set<String> wantedRules, Set<String> bannedRules})?
+  get recommendedOnboardingFilters {
+    final phase = currentPhase;
+    if (phase != null) return _strictPhaseRecommendation(phase);
+    if (_softFilterActive) return _softFilterRecommendation();
+    return null;
+  }
+
+  ({Set<String> wantedRules, Set<String> bannedRules})
+  _strictPhaseRecommendation(OnboardingPhase phase) => (
+    wantedRules: {phase.introducing},
+    bannedRules: OnboardingPhase.allKnownSlugs.difference(phase.allowed),
+  );
+
+  /// The post-strict soft-discovery slug the player is currently meant to
+  /// meet next, or null when not in the soft-filter phase. Mirrors the
+  /// election in [_softFilterRecommendation] and drives the cadence-based
+  /// injection in [getPuzzlesByLevel].
+  String? get electedSoftSlug {
+    if (currentPhase != null) return null;
+    final p = progress;
+    if (p == null) return null;
+    for (final slug in OnboardingPhase.postStrictDiscoveryOrder) {
+      if (p.isFirstTimeFor(slug)) return slug;
+    }
+    return null;
+  }
+
+  /// Plays served since the elected soft-discovery slug last changed (i.e.
+  /// since the player last met a new rule). In-session only; a relaunch
+  /// restarts the count, at worst delaying one injection by a few plays.
+  int _softPlaysSinceElectedChange = 0;
+
+  /// The elected slug observed on the previous sampling pass, used to reset
+  /// [_softPlaysSinceElectedChange] the moment discovery advances.
+  String? _lastElectedSlug;
+
+  /// Soft-discovery candidates pulled from the level collections *above* the
+  /// current one (Axe B): puzzles carrying a post-strict slug, so a rule too
+  /// scarce in the current collection still has somewhere to come from.
+  /// Populated by [_refreshSoftDiscoveryPool] when the player enters the
+  /// soft-filter phase; empty otherwise.
+  List<PuzzleData> _softDiscoveryPool = [];
+
+  @visibleForTesting
+  set softDiscoveryPoolForTest(List<PuzzleData> pool) =>
+      _softDiscoveryPool = pool;
+
+  ({Set<String> wantedRules, Set<String> bannedRules})?
+  _softFilterRecommendation() {
+    final p = progress;
+    if (p == null) return null;
+    final unseen = <String>{};
+    String? elected;
+    for (final slug in OnboardingPhase.postStrictDiscoveryOrder) {
+      if (!p.isFirstTimeFor(slug)) continue;
+      if (elected == null) {
+        elected = slug;
+      } else {
+        unseen.add(slug);
+      }
+    }
+    if (elected == null) return null;
+    // Terminal case: the elected slug is the only one still unseen.
+    // Force it into wantedRules — leaving the reco as ({}, {}) would
+    // collapse the open-page banner onto a filter set with no visible
+    // chips, and the playlist would lack any pressure to surface the
+    // missing slug.
+    if (unseen.isEmpty) {
+      return (wantedRules: <String>{elected}, bannedRules: <String>{});
+    }
+    return (wantedRules: <String>{}, bannedRules: unseen);
+  }
+
   /// Classifies *why* the current [playlist] is empty, or null if it
   /// isn't. The UI uses this to explain a disabled Play button instead
   /// of just graying it out. Probes are ordered from most specific to
@@ -921,6 +1702,7 @@ class Database {
       return EmptyPlaylistReason.customEmpty;
     }
     if (collection.startsWith('user_')) {
+      if (puzzles.isEmpty) return EmptyPlaylistReason.userEmpty;
       return EmptyPlaylistReason.userAllPlayed;
     }
     if (puzzles.isEmpty) {
@@ -929,76 +1711,7 @@ class Database {
     if (filter().isEmpty) {
       return EmptyPlaylistReason.filtersTooStrict;
     }
-    if (currentPhase != null && _isPlayableLevel(collection)) {
-      return EmptyPlaylistReason.onboardingPhase;
-    }
-    if (_softFilterActive) {
-      return EmptyPlaylistReason.softFilter;
-    }
     return EmptyPlaylistReason.generic;
-  }
-
-  /// Drop puzzles that would force the player to meet two or more new
-  /// constraints in a single grid. Pure pass-through when the soft
-  /// filter is inactive (no [progress] wired, still in a strict phase,
-  /// or every slug already met).
-  List<PuzzleData> _applySoftOnboardingFilter(List<PuzzleData> input) {
-    if (!_softFilterActive) return input;
-    final p = progress!;
-    return input
-        .where((puz) => puzzlePassesSoftFilter(puz.rules, p.isFirstTimeFor))
-        .toList();
-  }
-
-  /// Phase-aware variant of [getPuzzlesByLevel]: same Gaussian-on-cplx
-  /// + variety bias, plus a multiplicative phase weight that filters
-  /// out-of-phase puzzles (weight 0) and gives a 4× boost to puzzles
-  /// containing the slug being introduced (≈ 80/20 expected ratio
-  /// between introduction and refresh puzzles).
-  ///
-  /// The Gaussian still centers on the player's `playerLevel`: the
-  /// catalog itself is bounded to `1-easy + overfilled-easy`, both of
-  /// which are *beginner* by trace shape, so a fast learner's higher
-  /// level just biases sampling toward the upper end of *that*
-  /// bucket — never out of it.
-  ///
-  /// Falls back to the regular [getPuzzlesByLevel] result when the
-  /// phase filter would leave the playlist empty — this avoids
-  /// stranding a player on an out-of-track collection during
-  /// onboarding (e.g., they wandered from `1-easy` into `6-mad` mid
-  /// onboarding; nothing in 6-mad will satisfy a phase 1 filter, so
-  /// we just give them the regular pick).
-  List<PuzzleData> _getPuzzlesInPhase(OnboardingPhase phase) {
-    final mu = playerLevel + selectionOffset;
-    final twoSigmaSq = 2 * selectionSigma * selectionSigma;
-    final filtered = filter().toList();
-    final eligible = filtered
-        .where((p) => puzzleEligibleForPhase(p.rules, phase))
-        .toList();
-    if (eligible.isEmpty) {
-      // Out-of-track collection (e.g., player jumped from 1-easy to
-      // 6-mad mid-onboarding). Fall through to the regular sampler so
-      // they still get something playable, even if the phase filter
-      // produced nothing.
-      return getPuzzlesByLevel(playerLevel);
-    }
-    final varietyStats = _buildRecencyWeightedStats(eligible);
-    final keyed = eligible.map((p) {
-      final d = p.cplx - mu;
-      final wCplx = math.exp(-math.min(d * d / twoSigmaSq, 700));
-      final gap = _varietyGapForPuzzle(p, varietyStats);
-      final wVariety = 1 + selectionVarietyAlpha * gap;
-      final wPhase =
-          (puzzleEligibleForPhase(p.rules, phase) &&
-              p.rules.contains(phase.introducing)
-          ? 1
-          : 0);
-      final w = wCplx * wVariety * wPhase;
-      final u = _samplingRandom.nextDouble() + 1e-300;
-      final key = -math.log(u) / w;
-      return (p, key);
-    }).toList()..sort((a, b) => a.$2.compareTo(b.$2));
-    return keyed.map((e) => e.$1).toList();
   }
 
   void _maybeCapBatch() {
@@ -1052,7 +1765,27 @@ class Database {
   String? get recommendedCollectionKey {
     if (currentPhase != null) return null;
     if (_globalUsablePlays < _minPlaysForRecommendation) return null;
-    final level = recommendedLevelFor(playerLevel);
+
+    var level = recommendedLevelFor(playerLevel);
+
+    // Gradual progression: never suggest a jump of more than one level above
+    // or below the currently played playlist. Without this clamp a fast
+    // player on 1-easy could be sent straight to 6-mad. Since this getter is
+    // re-evaluated at every end-of-batch, a consistently fast player still
+    // climbs one tier per batch up to their natural level. The clamp lives
+    // here (not in the pure `recommendedLevelFor`) because only this getter
+    // knows the current collection. When the active collection is not a
+    // playable level (custom/user_*/tutorial) there is no reference tier, so
+    // the unclamped recommendation is kept.
+    final currentLevel = playableCollectionKeyToLevel[collection];
+    if (currentLevel != null) {
+      final clampedIndex = level.index.clamp(
+        currentLevel.index - 1,
+        currentLevel.index + 1,
+      );
+      level = PuzzleLevel.values[clampedIndex];
+    }
+
     final key = levelToPlayableCollectionKey[level];
     return (key == null || key == collection) ? null : key;
   }
@@ -1090,17 +1823,21 @@ class Database {
       }
     } else {
       final documentsDirectory = await getApplicationDocumentsDirectory();
-      final dirPath = p.join(documentsDirectory.path, 'getsomepuzzle');
-      final dir = Directory(dirPath);
-      if (await dir.exists()) {
-        // Remove every `stats*` file, not just `stats.txt`. Older
-        // collections leave behind `stats_<collection>.txt` files that
-        // are still loaded by `loadPuzzlesFile` — leaving them in place
-        // would silently restore play history on the next launch.
-        for (final entry in dir.listSync()) {
-          if (entry is File && p.basename(entry.path).startsWith('stats')) {
-            await entry.delete();
-          }
+      try {
+        await SafAccess.deleteFiles(
+          p.join(documentsDirectory.path, 'getsomepuzzle'),
+          'stats',
+        );
+      } on Exception catch (e) {
+        log.warning('Failed to clear legacy stats: $e');
+      }
+      if (statsDirectory != null) {
+        try {
+          await SafAccess.deleteFiles(statsDirectory!, 'stats');
+          statsDirectoryError = null;
+        } on Exception catch (e) {
+          log.warning('Failed to clear stats in custom dir: $e');
+          statsDirectoryError = '$e';
         }
       }
     }
@@ -1271,6 +2008,42 @@ class Database {
   /// boost). Set to 0 to disable the variety bias entirely.
   static const double selectionVarietyAlpha = 1.5;
 
+  /// Multiplier applied to the selection weight of a puzzle holding a GS of
+  /// size 1 (an isolated cell), but only while the onboarding phase that
+  /// introduces GS is active (`currentPhase.introducing == 'GS'`). These
+  /// trivial instances teach the rule poorly, so we strongly demote them
+  /// during discovery. Kept small but non-zero: they stay drawable as a last
+  /// resort if no non-trivial GS puzzle is available, so the playlist never
+  /// empties. Once GS is past its phase, the demotion lifts (factor 1).
+  static const double selectionTrivialGsPenalty = 0.05;
+
+  /// Post-strict soft-discovery cadence. The rules introduced after the
+  /// strict phases (`OnboardingPhase.postStrictDiscoveryOrder`) are rare in
+  /// the entry-level catalog and get drowned by the abundant "refresh"
+  /// draws, which stalls onboarding (the elected rule never surfaces). We
+  /// instead inject the elected rule's puzzle into the batch once the player
+  /// has gone this many plays without meeting a new rule — targeting roughly
+  /// one new rule every 10–15 plays given the 5-puzzle batch granularity,
+  /// rather than every batch (too fast) or never (the stall).
+  static const int softElectedInjectPeriod = 10;
+
+  /// Below this many eligible elected-rule puzzles in the *current*
+  /// collection, the injection widens its draw to the harder level
+  /// collections ([_softDiscoveryPool]) so a rule that is scarce at the
+  /// entry level (e.g. `RT`, `CT` in `1-easy`) still surfaces.
+  static const int softElectedMinInCollection = 8;
+
+  /// Per-slug cap when building [_softDiscoveryPool] — enough candidates to
+  /// sample from without holding the whole higher-level corpus in memory.
+  static const int softDiscoveryPoolPerSlugCap = 150;
+
+  /// How many difficulty levels above the current collection the soft-
+  /// discovery pool may reach. Kept at 1 so a beginner meets the rare soft
+  /// rules on `2-player` puzzles, never on `6-mad` ones — the entry +
+  /// next-level corpus already holds ≥ a dozen eligible puzzles for every
+  /// soft slug (RT, the scarcest, has ~12).
+  static const int softDiscoveryMaxLevelsAbove = 1;
+
   // Random source for puzzle sampling. Exposed as a package-private setter
   // so tests can pin it to a seeded Random for reproducibility.
   math.Random _samplingRandom = math.Random();
@@ -1306,8 +2079,19 @@ class Database {
   List<PuzzleData> getPuzzlesByLevel(int level) {
     final mu = level + selectionOffset;
     final twoSigmaSq = 2 * selectionSigma * selectionSigma;
-    final filtered = filter().toList();
+    var filtered = filter().toList();
+
+    // Fallback: if the main collection is exhausted (all played, skipped, or
+    // filtered out), draw from the overfilled mirror — same filters apply so
+    // user preferences (rule bans, dimensions, etc.) are still honoured.
+    if (filtered.isEmpty && _overfilledPuzzles.isNotEmpty) {
+      filtered = _overfilledPuzzles.where(_matchesFilters).toList();
+    }
+
+    if (filtered.isEmpty) return const [];
     final varietyStats = _buildRecencyWeightedStats(filtered);
+    // Only demote trivial GS puzzles while GS is the rule being introduced.
+    final demoteTrivialGs = currentPhase?.introducing == 'GS';
     final keyed = filtered.map((p) {
       final d = p.cplx - mu;
       // Clamp the exponent to avoid `exp` underflow producing key = +∞ for
@@ -1315,14 +2099,79 @@ class Database {
       final wCplx = math.exp(-math.min(d * d / twoSigmaSq, 700));
       final gap = _varietyGapForPuzzle(p, varietyStats);
       final wVariety = 1 + selectionVarietyAlpha * gap;
-      final w = wCplx * wVariety;
+      var w = wCplx * wVariety;
+      if (demoteTrivialGs && p.hasTrivialGroupSize) {
+        w *= selectionTrivialGsPenalty;
+      }
       // The +1e-300 below guards against `nextDouble() == 0`, which would
       // make `−ln(u)` infinite and corrupt the sort.
       final u = _samplingRandom.nextDouble() + 1e-300;
       final key = -math.log(u) / w;
       return (p, key);
     }).toList()..sort((a, b) => a.$2.compareTo(b.$2));
-    return keyed.map((e) => e.$1).toList();
+    final result = keyed.map((e) => e.$1).toList();
+    _injectElectedSoftRule(result, mu.toDouble(), twoSigmaSq);
+    return result;
+  }
+
+  /// Post-strict soft-discovery injection (Axe A + B). The elected new rule
+  /// is rare in the entry catalog and gets drowned by refresh draws, so left
+  /// to the weighted sampler it almost never surfaces — the stall this
+  /// reproduces. Instead, once the player has gone [softElectedInjectPeriod]
+  /// plays without meeting a new rule (or the filtered batch is empty, as in
+  /// the terminal single-slug case), we splice one elected-rule puzzle into
+  /// the upcoming batch. Candidates come from the current collection first
+  /// and, when it is too thin ([softElectedMinInCollection]), from the
+  /// widened [_softDiscoveryPool] (Axe B). No-op outside the soft phase.
+  void _injectElectedSoftRule(
+    List<PuzzleData> result,
+    double mu,
+    double twoSigmaSq,
+  ) {
+    final elected = electedSoftSlug;
+    if (elected == null) return;
+    // Reset the cadence the moment discovery advances to a new rule.
+    if (elected != _lastElectedSlug) {
+      _lastElectedSlug = elected;
+      _softPlaysSinceElectedChange = 0;
+    }
+    final due = _softPlaysSinceElectedChange >= softElectedInjectPeriod;
+    if (!due && result.isNotEmpty) return;
+
+    final inCollection = result
+        .where((p) => p.rules.contains(elected))
+        .toList();
+    final pool = <PuzzleData>[...inCollection];
+    if (inCollection.length < softElectedMinInCollection) {
+      pool.addAll(
+        _softDiscoveryPool.where(
+          (p) => p.rules.contains(elected) && _matchesFilters(p),
+        ),
+      );
+    }
+    if (pool.isEmpty) return; // genuine corpus gap — the test will surface it
+
+    // Weighted pick by the same cplx-Gaussian used above.
+    PuzzleData? pick;
+    var bestKey = double.infinity;
+    for (final p in pool) {
+      final d = p.cplx - mu;
+      final w = math.exp(-math.min(d * d / twoSigmaSq, 700));
+      final u = _samplingRandom.nextDouble() + 1e-300;
+      final key = -math.log(u) / w;
+      if (key < bestKey) {
+        bestKey = key;
+        pick = p;
+      }
+    }
+    if (pick == null) return;
+
+    // Splice the elected puzzle into a random slot inside the upcoming batch
+    // so it is served within the next few plays (≈ period … period+batch).
+    result.remove(pick);
+    final span = math.min(playlistBatchSize, result.length + 1);
+    final slot = span <= 1 ? 0 : _samplingRandom.nextInt(span);
+    result.insert(slot, pick);
   }
 
   /// Build the recency-weighted observed distribution over size and slug
@@ -1360,7 +2209,9 @@ class Database {
       final p = played[i];
       final w = math.pow(0.5, i / selectionVarietyHalfLife).toDouble();
       total += w;
-      final key = (p.width, p.height);
+      // Size is orientation-agnostic: 4x5 and 5x4 share one bin, matching the
+      // generator's equilibrium (see equilibrium.canonicalSize).
+      final key = equilibrium.canonicalSize(p.width, p.height);
       sizeCounts[key] = (sizeCounts[key] ?? 0) + w;
       final distinct = p.rules.toSet();
       for (final s in distinct) {
@@ -1373,7 +2224,7 @@ class Database {
     final allowedSizes = <(int, int)>{};
     for (final p in filteredCatalog) {
       allowedSlugs.addAll(p.rules);
-      allowedSizes.add((p.width, p.height));
+      allowedSizes.add(equilibrium.canonicalSize(p.width, p.height));
     }
 
     return WeightedSelectionStats(
@@ -1425,7 +2276,8 @@ class Database {
           (sum, sz) => sum + equilibrium.sizeRawWeight(sz.$1, sz.$2),
         );
         final expSize = totalRaw > 0 ? raw / totalRaw : 0.0;
-        final c = stats.sizeCounts[(p.width, p.height)] ?? 0;
+        final c =
+            stats.sizeCounts[equilibrium.canonicalSize(p.width, p.height)] ?? 0;
         final share = c / stats.totalPuzzles;
         final gap = expSize - share;
         if (gap > 0) sizeGap = gap;
@@ -1501,15 +2353,19 @@ class Database {
       // _readRawStatsFromStorage — same merge semantics as the native path.
       await prefs.setStringList('stats_imported_$timestamp', validLines);
     } else {
-      final documentsDirectory = await getApplicationDocumentsDirectory();
-      final dirPath = p.join(documentsDirectory.path, 'getsomepuzzle');
-      await Directory(dirPath).create(recursive: true);
-      final filePath = p.join(dirPath, 'stats_imported_$timestamp.txt');
-      File(filePath).writeAsStringSync(
-        validLines.join('\n'),
-        mode: FileMode.writeOnly,
-        flush: true,
-      );
+      final targetDir =
+          statsDirectory ??
+          p.join(
+            (await getApplicationDocumentsDirectory()).path,
+            'getsomepuzzle',
+          );
+      final fileName = 'stats_imported_$timestamp.txt';
+      try {
+        await SafAccess.writeFile(targetDir, fileName, validLines.join('\n'));
+      } on Exception catch (e) {
+        log.warning('Failed to write imported stats to $targetDir: $e');
+        if (statsDirectory != null) statsDirectoryError = '$e';
+      }
     }
     final allStats = await _readRawStatsFromStorage();
     loadStats(allStats);
@@ -1517,29 +2373,19 @@ class Database {
     return validLines.length;
   }
 
-  /// Every persisted stat line across **all** collections, deduplicated by
-  /// canonical puzzle key (the same key used by [loadStats] so legacy lines
-  /// embedding a stale `cplx` still collapse with the current line).
+  /// Every persisted stat line across **all** collections — the full play
+  /// history, deduplicated by `(canonical key, completion stamp)` via the
+  /// shared [_mergedStatHistory] (the same set [writeStats] persists). So
+  /// viewing / exporting the "all" scope surfaces every play of a puzzle,
+  /// not just the latest — that's the channel a mobile player uses to get
+  /// their history out for analysis.
   ///
   /// In-session plays from the currently-loaded collection are folded in
   /// last so they take precedence over any older snapshot still on disk —
   /// otherwise viewing or sharing right after finishing a puzzle would
   /// surface its previous entry (or nothing) instead of the just-recorded
   /// timings.
-  Future<List<String>> getAllStats() async {
-    final raw = await _readRawStatsFromStorage();
-    final Map<String, String> byKey = {};
-    for (final line in raw) {
-      final entry = StatEntry.parse(line);
-      if (entry == null) continue;
-      byKey[canonicalPuzzleKey(entry.puzzleLine)] = line;
-    }
-    for (final puz in puzzles.where((p) => p.played)) {
-      byKey[canonicalPuzzleKey(puz.lineRepresentation)] = puz.getStat();
-    }
-    final result = byKey.values.toList()..sort();
-    return result;
-  }
+  Future<List<String>> getAllStats() => _mergedStatHistory();
 
   String _playlistFileName(String slug) =>
       slug == 'custom' ? 'custom.txt' : 'playlist_$slug.txt';

@@ -1,7 +1,10 @@
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class HintWorker {
-  Future<List<String>> compute({required Puzzle puzzle}) async => [];
+  Future<String?> compute({
+    required Puzzle puzzle,
+    required Set<String> learnedSlugs,
+  }) async => null;
 
   void cancel() {}
 

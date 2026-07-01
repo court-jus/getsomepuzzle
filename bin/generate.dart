@@ -1,11 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/feasibility.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
@@ -20,6 +25,7 @@ Future<void> main(List<String> args) async {
       await _runCheck(
         parsed['checkFile'] as String,
         detailed: parsed['detailed'] as bool,
+        debug: parsed['debug'] as bool,
       );
     case 'read-stats':
       _runReadStats(parsed['statsDir'] as String);
@@ -29,15 +35,17 @@ Future<void> main(List<String> args) async {
 // --- Generate mode ---
 
 Future<void> _runGenerate(Map<String, dynamic> parsed) async {
+  final debug = parsed['debug'] as bool;
+  final showTimingBreakdown = parsed['timingBreakdown'] as bool;
+  final showCompositions = parsed['showCompositions'] as bool;
   final count = parsed['count'] as int;
   final minWidth = parsed['minWidth'] as int;
   final maxWidth = parsed['maxWidth'] as int;
   final minHeight = parsed['minHeight'] as int;
   final maxHeight = parsed['maxHeight'] as int;
   final maxTime = parsed['maxTime'] as int;
+  final maxAttemptTime = parsed['maxAttemptTime'] as int;
   final bossMode = parsed['boss'] as bool;
-  // --boss without -o defaults to assets/boss.txt so Boss puzzles don't
-  // accidentally land in the difficulty-routed default sinks.
   final output =
       (parsed['output'] as String?) ?? (bossMode ? 'assets/boss.txt' : null);
   final bannedRules = (parsed['banned'] as String?)?.split(',').toSet() ?? {};
@@ -52,6 +60,23 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final logDir = parsed['logDir'] as String?;
   final targetLevel = parsed['targetLevel'] as PuzzleLevel?;
   final easingBudget = parsed['easingBudget'] as int;
+  final scenarioPathBased = (parsed['scenario'] as String?) == 'path-based';
+  final scenarioSyBased = (parsed['scenario'] as String?) == 'sy-based';
+  final domainSize = parsed['domain'] as int?;
+  // No flag → both domains eligible: the worker draws each attempt's domain
+  // gap-based (see `pickWeightedDomain`) and the equilibrium domain axis is
+  // active. An explicit `--domain N` freezes the run to that domain.
+  final allowedDomains = domainSize == null
+      ? const <int>[2, 3]
+      : <int>[domainSize];
+  // Placeholder for the per-worker GeneratorConfig — the worker rebuilds
+  // the concrete domain per attempt from `allowedDomains`.
+  final domain = domainSize == 3 ? fullDomain : defaultDomain;
+  final focusAxisName = parsed['focusAxis'] as String?;
+  final strategies = parsed['strategy'] as List<GenerationStrategy>;
+  final maxStall = parsed['maxStall'] as int;
+  final pathRetries = parsed['pathRetries'] as int;
+  final winding = parsed['winding'] as double;
   if (logDir != null) {
     final dir = Directory(logDir);
     if (!dir.existsSync()) dir.createSync(recursive: true);
@@ -131,7 +156,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     if (liveCount >= kEquilibriumWarmupSize) {
       return 'Equilibrium: ON (use --no-equilibrium to disable)';
     }
-    return 'Warmup: small grids (≤$kWarmupMaxWidth×$kWarmupMaxHeight), '
+    return 'Warmup: Gaussian-weighted sizes, '
         '1-2 types — $liveCount/$kEquilibriumWarmupSize';
   }
 
@@ -148,6 +173,26 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   // a puzzle. Their ratio is a live failure-rate signal.
   final attemptCounts = List<int>.filled(jobs, 0);
   final successCounts = List<int>.filled(jobs, 0);
+  // Wall-clock timestamp (ms since the run started) when the worker last
+  // received a `'target'` event. The periodic redraw turns this into a
+  // "running Xs" annotation on each worker line — visibility into how long
+  // the current attempt has been chewing. Null between attempts (after
+  // `'puzzle'` or `'done'`, before the next `'target'`).
+  final attemptStartMs = List<int?>.filled(jobs, null);
+  // Global rejection breakdown — keyed by `GenerationRejectReason`,
+  // aggregated across all workers. The delta between
+  // `sum(attemptCounts) - generated - sum(rejectCounts.values)`
+  // approximates in-flight attempts; usually small.
+  final rejectCounts = <GenerationRejectReason, int>{
+    for (final r in GenerationRejectReason.values) r: 0,
+  };
+  // Per-stage wall-time totals (microseconds) and invocation counts,
+  // summed across all workers and all attempts (success + failure).
+  // Together they yield "total time" and "average µs per call" — the
+  // dashboard prints both at end-of-run alongside the rejection
+  // breakdown so the bottleneck is obvious.
+  final stageTotalsMicros = <String, int>{};
+  final stageTotalsCalls = <String, int>{};
   // Cached corpus stats — only recomputed when a puzzle is appended, so
   // target-only updates (which happen many times per second) avoid the
   // O(N) rescan.
@@ -167,7 +212,40 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   }
   final universeSlugs = allowedSlugs ?? constraintSlugs.toSet();
 
+  // Coordinator for the cross-worker bucket rotation. Lives here in the main
+  // isolate because it needs (a) the *global* corpus stats — workers only see
+  // their own output — and (b) a shared claim ledger so each worker chases a
+  // distinct deficient bucket. `globalEquiStats` is rebuilt whenever a puzzle
+  // lands (same cadence as `cachedStats`), so the rotation always ranks gaps
+  // against the live corpus. Only active in equilibrium mode.
+  var globalEquiStats = EquilibriumStats.fromLines(currentLines);
+  final coordinatorUniverse = TargetUniverse(
+    allowedSlugs: universeSlugs,
+    minWidth: minWidth,
+    maxWidth: maxWidth,
+    minHeight: minHeight,
+    maxHeight: maxHeight,
+    allowedDomains: allowedDomains,
+  );
+  final coordinatorEnabledAxes = focusAxisName != null
+      ? {
+          for (final a in Axis.values)
+            if (a.name == focusAxisName) a,
+        }
+      : Axis.values;
+  final bucketRotation = BucketRotation();
+  // Answers a worker's `requestTarget`: hands out the next deficient bucket
+  // key, or null to let the worker decide locally (no positive-gap bucket).
+  String? assignBucket(int workerIndex) => bucketRotation
+      .next(
+        globalEquiStats,
+        coordinatorUniverse,
+        enabledAxes: coordinatorEnabledAxes,
+      )
+      ?.key;
+
   void render() {
+    if (debug) return;
     final liveCount = currentLines.where((l) => l.trim().isNotEmpty).length;
     _renderDashboard(
       generated: generated,
@@ -186,6 +264,20 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       targets: currentTargets,
       attemptCounts: attemptCounts,
       successCounts: successCounts,
+      attemptStartMs: attemptStartMs,
+      nowMs: totalSw.elapsedMilliseconds,
+      maxAttemptTimeMs: maxAttemptTime * 1000,
+      rejectCounts: rejectCounts,
+      stageTotalsMicros: stageTotalsMicros,
+      stageTotalsCalls: stageTotalsCalls,
+      showTimingBreakdown: showTimingBreakdown,
+      showCompositions: showCompositions,
+      domainSize: domainSize,
+      allowedDomains: allowedDomains,
+      requiredRules: requiredRules,
+      bannedRules: bannedRules,
+      strategies: strategies,
+      allowedRules: allowedSlugsArg,
     );
   }
 
@@ -193,10 +285,16 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   render();
 
   final workers = <GeneratorWorker>[];
+  // Periodic redraw — the dashboard now updates every 10s even when no
+  // worker emits a message, so a worker stuck on a slow attempt still
+  // shows live "running Xs" feedback. Set after the workers spawn,
+  // cancelled in `finish()`.
+  Timer? dashboardTimer;
   bool finished = false;
   void finish() {
     if (finished) return;
     finished = true;
+    dashboardTimer?.cancel();
     stderr.writeln('');
     stderr.writeln(
       'Done: $generated puzzles in ${_fmt(totalSw.elapsed)} (jobs=$jobs)',
@@ -225,10 +323,54 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     exit(0);
   });
 
+  // Append-only telemetry of every attempt (success + abandon). The file
+  // is opened in append mode so re-runs accumulate; the header is emitted
+  // only on creation — re-runs preserve everything already written. The
+  // `commit` column lets us bucket rows by generator version, the `date`
+  // column by run timestamp.
+  final commitHash = _readCommitHash();
+  final statsFile = File('generator_stats.csv');
+  final statsExists = statsFile.existsSync();
+  final statsSink = statsFile.openWrite(mode: FileMode.append);
+  if (!statsExists) {
+    statsSink.writeln(_statsHeader());
+  }
+  // Serializes writes across the parallel worker consumers — without this
+  // chain, concurrent `writeln` calls on the same sink can interleave.
+  Future<void> statsChain = Future.value();
+
+  // Persistent seed for the infeasibility blacklist: combos that have been
+  // tried ≥M times historically without a single success. Distributed to
+  // every worker so they all start the run with the same view of what's
+  // known-impossible. Empty when --no-blacklist or when no prior CSV exists.
+  final useBlacklist = parsed['useBlacklist'] as bool;
+  final blacklistMinAttempts = parsed['blacklistMinAttempts'] as int;
+  final blacklistAdaptiveK = parsed['blacklistAdaptiveK'] as int;
+  final blacklistSkipSafety = parsed['blacklistSkipSafety'] as int;
+  final seedBlacklist = useBlacklist
+      ? readPersistentBlacklist(
+          csvPath: 'generator_stats.csv',
+          minAttempts: blacklistMinAttempts,
+        )
+      : const <String>{};
+  if (seedBlacklist.isNotEmpty) {
+    stderr.writeln(
+      'Blacklist seed: ${seedBlacklist.length} infeasible combo(s) loaded '
+      'from generator_stats.csv (>=$blacklistMinAttempts tries, 0 success)',
+    );
+  }
+  final seedBlacklistList = seedBlacklist.toList(growable: false);
+
   final consumers = <Future<void>>[];
   for (int j = 0; j < jobs; j++) {
+    // `jobs` is clamped to `count`, so `base >= 1` and every worker
+    // produces at least one puzzle — there are no idle slots to skip.
     final workerCount = base + (j < remainder ? 1 : 0);
-    if (workerCount == 0) continue;
+    // Round-robin strategy assignment across the (all active) workers so a
+    // heterogeneous pool (e.g. `--strategy phase-gate,phase-1-oneshot,prop-only`)
+    // splits the work between strategies. With a single-element list
+    // every worker gets the same strategy.
+    final workerStrategy = strategies[j % strategies.length];
     final config = GeneratorConfig(
       width: minWidth,
       height: minHeight,
@@ -237,11 +379,19 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       minHeight: minHeight,
       maxHeight: maxHeight,
       maxTime: Duration(seconds: maxTime),
+      maxAttemptTime: Duration(seconds: maxAttemptTime),
       requiredRules: requiredRules,
       allowedSlugs: allowedSlugs,
       count: workerCount,
       targetLevel: targetLevel,
       easingBudget: Duration(seconds: easingBudget),
+      pathBasedScenario: scenarioPathBased,
+      syBasedScenario: scenarioSyBased,
+      pathWindingProb: winding,
+      pathMaxRetries: pathRetries,
+      domain: domain,
+      strategy: workerStrategy,
+      maxStall: Duration(seconds: maxStall),
       useBossPrefill: bossMode,
     );
     final worker = GeneratorWorker();
@@ -254,6 +404,14 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       jobsCount: jobs,
       workerIndex: j,
       logFilePath: logDir != null ? '$logDir/worker_$j.log' : null,
+      seedBlacklist: seedBlacklistList,
+      adaptiveK: blacklistAdaptiveK,
+      skipSafety: blacklistSkipSafety,
+      // Cross-worker rotation: only wire the coordinator in equilibrium mode.
+      // Off → workers keep the legacy local random/argmax path.
+      assignTarget: equilibriumRequested ? assignBucket : null,
+      allowedDomains: allowedDomains,
+      focusAxisName: focusAxisName,
     );
 
     consumers.add(() async {
@@ -270,7 +428,12 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
             // bin with a different sub-config).
             attemptCounts[j]++;
             currentTargets[j] = label;
-            render();
+            attemptStartMs[j] = totalSw.elapsedMilliseconds;
+            if (debug) {
+              stderr.writeln('[w$j] -> ${label ?? '(idle)'}');
+            } else {
+              render();
+            }
           case GeneratorPuzzleMessage(:final puzzleLine, :final level):
             successCounts[j]++;
             generated++;
@@ -305,35 +468,254 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
               currentLines = [...currentLines, puzzleLine];
             }
             cachedStats = _CollectionStats.fromLines(currentLines);
-            render();
+            globalEquiStats = EquilibriumStats.fromLines(currentLines);
+            if (debug) {
+              stderr.writeln(
+                '[w$j] + generated ${level.name} '
+                'in ${_fmt(totalSw.elapsed)}',
+              );
+            } else {
+              render();
+            }
+          case GeneratorAttemptMessage():
+            // One row per attempt — both successes and abandons. Chained
+            // through `statsChain` so concurrent worker streams don't
+            // interleave their CSV writes. The attempt is finished, so
+            // clear the "running …" timer on the dashboard.
+            attemptStartMs[j] = null;
+            final row = _statsRow(message, commitHash);
+            statsChain = statsChain.then((_) async {
+              statsSink.writeln(row);
+              await statsSink.flush();
+            });
+          case GeneratorRejectMessage(:final reason):
+            rejectCounts[reason] = (rejectCounts[reason] ?? 0) + 1;
+            if (debug) {
+              stderr.writeln('[w$j] reject: ${reason.name}');
+            } else {
+              render();
+            }
+          case GeneratorTimingsMessage(:final micros, :final calls):
+            for (final entry in micros.entries) {
+              stageTotalsMicros[entry.key] =
+                  (stageTotalsMicros[entry.key] ?? 0) + entry.value;
+            }
+            for (final entry in calls.entries) {
+              stageTotalsCalls[entry.key] =
+                  (stageTotalsCalls[entry.key] ?? 0) + entry.value;
+            }
           case GeneratorDoneMessage():
             currentTargets[j] = null;
-            render();
+            attemptStartMs[j] = null;
+            if (debug) {
+              stderr.writeln('[w$j] finished');
+            } else {
+              render();
+            }
         }
       }
     }());
   }
 
+  dashboardTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    render();
+  });
+
   await Future.wait(consumers);
+  // Drain any pending CSV writes before letting `finish()` call exit(0).
+  await statsChain;
+  await statsSink.close();
   finish();
+}
+
+/// Short HEAD commit hash, captured once per CLI run and embedded in every
+/// row of `generator_stats.csv` so post-hoc analysis can tell which version
+/// of the generator produced each attempt. Falls back to `'unknown'` when
+/// not running inside a git checkout (CI tarball, archive, …).
+String _readCommitHash() {
+  try {
+    final r = Process.runSync('git', ['rev-parse', '--short', 'HEAD']);
+    if (r.exitCode == 0) {
+      return (r.stdout as String).trim();
+    }
+  } catch (_) {}
+  return 'unknown';
+}
+
+const _statsColumns = [
+  'date',
+  'commit',
+  'worker',
+  'phase',
+  'target_key',
+  'width',
+  'height',
+  'ntypes_intended',
+  'preferred_slugs',
+  'allowed_slugs',
+  'scenario',
+  'outcome',
+  'reason',
+  'duration_ms',
+  'level',
+  'puzzle_line',
+  // `slug:gap` pairs that biased the secondary candidate sort, joined with
+  // `|`. Empty during warm-up and when equilibrium is off; zero-gap slugs
+  // are not serialized.
+  'slug_deficits',
+  // Colour-domain size the attempt was asked to generate (2 or 3) —
+  // intent, not the emitted line's (possibly auto-shrunk) domain. Appended
+  // last so rows written before the domain axis stay position-compatible;
+  // `readPersistentBlacklist` treats their missing column as 2.
+  'domain',
+  // Path-based per-attempt diagnostics (empty for non-path attempts). Appended
+  // last for position-compatibility with rows written before this change.
+  // `path_retries`: preFillPath retries consumed; `path_routing_calls`: DPLL
+  // completion invocations; `path_routing_ms_max`/`_total`: completion wall-time;
+  // `path_prefill_ms`: total preFillPath time. Calibrate --path-retries from
+  // their distributions.
+  'path_retries',
+  'path_routing_calls',
+  'path_routing_ms_max',
+  'path_routing_ms_total',
+  'path_prefill_ms',
+  // Largest inter-accept gap (ms) in the iterative loop. For successful
+  // attempts this is the peak the no-progress watchdog reached — use its
+  // distribution across successes to calibrate `--max-stall`. Appended last
+  // for position-compatibility with rows written before this change.
+  'max_accept_gap_ms',
+];
+
+String _statsHeader() => _statsColumns.join(',');
+
+String _statsRow(GeneratorAttemptMessage m, String commitHash) {
+  final phase = m.inWarmup
+      ? 'warmup'
+      : (m.targetKey != null ? 'equilibrium' : 'fixed');
+  final level = m.puzzleLevelIndex != null
+      ? PuzzleLevel.values[m.puzzleLevelIndex!].name
+      : '';
+  // Slugs joined with `|` (not `,`) so the column stays single-field even
+  // without CSV-quoting; the escaper still kicks in for `puzzle_line`
+  // (which contains commas via the constraint suffix).
+  final deficits = m.slugDeficitScores;
+  String deficitField = '';
+  if (deficits != null && deficits.isNotEmpty) {
+    final entries = deficits.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    deficitField = entries
+        .map((e) => '${e.key}:${e.value.toStringAsFixed(4)}')
+        .join('|');
+  }
+  final fields = <String>[
+    _csvField(DateTime.now().toUtc().toIso8601String()),
+    _csvField(commitHash),
+    '${m.workerIndex}',
+    _csvField(phase),
+    _csvField(m.targetKey ?? ''),
+    '${m.width}',
+    '${m.height}',
+    m.ntypesIntended?.toString() ?? '',
+    _csvField(m.preferredSlugs.join('|')),
+    _csvField(m.allowedSlugs?.join('|') ?? ''),
+    _csvField(m.scenario),
+    _csvField(m.success ? 'success' : 'failure'),
+    _csvField(m.rejectReason ?? ''),
+    '${m.durationMs}',
+    _csvField(level),
+    _csvField(m.puzzleLine ?? ''),
+    _csvField(deficitField),
+    '${m.domainSize}',
+    m.pathRetries?.toString() ?? '',
+    m.pathRoutingCalls?.toString() ?? '',
+    m.pathRoutingMsMax?.toString() ?? '',
+    m.pathRoutingMsTotal?.toString() ?? '',
+    m.pathPrefillMs?.toString() ?? '',
+    m.maxAcceptGapMs?.toString() ?? '',
+  ];
+  return fields.join(',');
+}
+
+String _csvField(String s) {
+  if (s.contains(',') || s.contains('"') || s.contains('\n')) {
+    return '"${s.replaceAll('"', '""')}"';
+  }
+  return s;
+}
+
+/// Display order of the grid-area buckets. Used both to size the count list in
+/// [_CollectionStats] and to label the rows in the dashboard, so observed
+/// counts and equilibrium targets share the exact same partition.
+const List<String> kSizeBucketLabels = [
+  '≤12',
+  '13-20',
+  '21-30',
+  '31-42',
+  '43-56',
+  '57-72',
+  '73-80',
+  '>80',
+];
+
+/// Map a grid area (width × height) to its display bucket label. The boundaries
+/// match [kSizeBucketLabels] one-to-one.
+String _sizeBucket(int area) {
+  if (area <= 12) return '≤12';
+  if (area <= 20) return '13-20';
+  if (area <= 30) return '21-30';
+  if (area <= 42) return '31-42';
+  if (area <= 56) return '43-56';
+  if (area <= 72) return '57-72';
+  if (area <= 80) return '73-80';
+  return '>80';
 }
 
 /// Aggregated corpus stats across all axes the equilibrium engine watches:
 /// per-slug usage, grid-area buckets, and number-of-distinct-types.
 class _CollectionStats {
   final Map<String, int> slugs;
-  // Bucket counts in fixed display order: ≤20, 21-40, 41-80, >80.
-  final List<int> sizeBuckets;
-  // n=1..5 mapped to '1'..'5'; n>=6 collapsed into '6+' (reliquat bucket,
-  // never targeted by equilibrium).
+  // Per-bucket counts keyed by [kSizeBucketLabels].
+  final Map<String, int> sizeBuckets;
+  // n=1..9 mapped to '1'..'9'; n>=10 collapsed into '10+' so the display order
+  // stays stable. The '10+' bin's target follows whatever the equilibrium
+  // profile declares for keys ≥ 10 (0 when none).
   final Map<String, int> nTypes;
+  // Profile axis: classic / sh / bb / pathBased / syBased (read off the
+  // authoritative `scenario:` v2 suffix via `detectPuzzleProfile` in
+  // equilibrium.dart). Keys match the `ProfileCategory.name` values.
+  final Map<String, int> profiles;
 
-  _CollectionStats(this.slugs, this.sizeBuckets, this.nTypes);
+  // Composition axis: ordered top-3 families joined with '+'. Keyed by the
+  // joined triple (e.g. "path+line-centric+local"); only observed compositions
+  // are present.
+  final Map<String, int> compositions;
+
+  // Domain axis: colour-domain size ('2' / '3') read off the emitted line's
+  // attributes field — an auto-shrunk domain-3 line counts as '2'.
+  final Map<String, int> domains;
+
+  _CollectionStats(
+    this.slugs,
+    this.sizeBuckets,
+    this.nTypes,
+    this.profiles,
+    this.compositions,
+    this.domains,
+  );
 
   factory _CollectionStats.fromLines(List<String> lines) {
     final slugs = {for (final s in constraintSlugs) s: 0};
-    final sizeBuckets = [0, 0, 0, 0];
+    final sizeBuckets = {for (final l in kSizeBucketLabels) l: 0};
     final nTypes = <String, int>{};
+    final profiles = <String, int>{
+      'classic': 0,
+      'sh': 0,
+      'bb': 0,
+      'pathBased': 0,
+      'syBased': 0,
+    };
+    final compositions = <String, int>{};
+    final domains = <String, int>{'2': 0, '3': 0};
 
     for (final line in lines) {
       final trimmed = line.trim();
@@ -345,32 +727,44 @@ class _CollectionStats {
       if (dims.length == 2) {
         final w = int.tryParse(dims[0]) ?? 0;
         final h = int.tryParse(dims[1]) ?? 0;
-        final area = w * h;
-        if (area <= 20) {
-          sizeBuckets[0]++;
-        } else if (area <= 40) {
-          sizeBuckets[1]++;
-        } else if (area <= 80) {
-          sizeBuckets[2]++;
-        } else {
-          sizeBuckets[3]++;
-        }
+        final bucket = _sizeBucket(w * h);
+        sizeBuckets[bucket] = (sizeBuckets[bucket] ?? 0) + 1;
       }
 
-      final puzzleSlugs = fields[4]
+      final rawSlugs = fields[4]
           .split(';')
           .map((c) => c.split(':').first)
           .where((s) => s.isNotEmpty)
-          .toSet();
+          .toList();
+      final puzzleSlugs = rawSlugs.toSet();
       for (final s in puzzleSlugs) {
         slugs[s] = (slugs[s] ?? 0) + 1;
       }
       final n = puzzleSlugs.length;
-      final key = n >= 6 ? '6+' : n.toString();
+      final key = n >= 10 ? '10+' : n.toString();
       nTypes[key] = (nTypes[key] ?? 0) + 1;
+
+      final profile = generationBucket(detectPuzzleProfile(trimmed));
+      profiles[profile.name] = (profiles[profile.name] ?? 0) + 1;
+
+      final comp = compositionOf(rawSlugs);
+      final compKey = comp.join('+');
+      compositions[compKey] = (compositions[compKey] ?? 0) + 1;
+
+      final domainSize = fields[1].length;
+      if (domainSize == 2 || domainSize == 3) {
+        domains['$domainSize'] = (domains['$domainSize'] ?? 0) + 1;
+      }
     }
 
-    return _CollectionStats(slugs, sizeBuckets, nTypes);
+    return _CollectionStats(
+      slugs,
+      sizeBuckets,
+      nTypes,
+      profiles,
+      compositions,
+      domains,
+    );
   }
 }
 
@@ -390,15 +784,53 @@ void _renderDashboard({
   required int maxWidth,
   required int minHeight,
   required int maxHeight,
+  required int? domainSize,
+  List<int> allowedDomains = const [2, 3],
+  required Set<String> requiredRules,
+  required Set<String> bannedRules,
+  required List<GenerationStrategy> strategies,
+  Set<String>? allowedRules,
   List<String?> targets = const [],
   List<int> attemptCounts = const [],
   List<int> successCounts = const [],
+  List<int?> attemptStartMs = const [],
+  int nowMs = 0,
+  int maxAttemptTimeMs = 0,
+  Map<GenerationRejectReason, int> rejectCounts = const {},
+  Map<String, int> stageTotalsMicros = const {},
+  Map<String, int> stageTotalsCalls = const {},
+  bool showTimingBreakdown = false,
+  bool showCompositions = false,
 }) {
   // \x1B[2J clears the screen, \x1B[H homes the cursor.
   stderr.write('\x1B[2J\x1B[H');
   stderr.writeln('Corpus: $existingPuzzles puzzles (live count)');
   stderr.writeln(equilibriumLine);
   stderr.writeln('Jobs: $jobs parallel worker(s)');
+  // Surface the CLI knobs that drove this run, so a glance at the
+  // dashboard explains where the histograms come from. "any" stands in
+  // for an unset filter (no `--require` / no `--ban`).
+  final sizeLabel = (minWidth == maxWidth && minHeight == maxHeight)
+      ? '${minWidth}x$minHeight'
+      : '$minWidth-$maxWidth × $minHeight-$maxHeight';
+  final reqLabel = requiredRules.isEmpty ? 'any' : requiredRules.join(',');
+  final banLabel = bannedRules.isEmpty ? 'none' : bannedRules.join(',');
+  final allowLabel = (allowedRules == null || allowedRules.isEmpty)
+      ? 'all'
+      : allowedRules.join(',');
+  String labelFor(GenerationStrategy s) => switch (s) {
+    GenerationStrategy.singleTier => 'single-tier',
+    GenerationStrategy.phaseGate => 'phase-gate',
+    GenerationStrategy.phase1Oneshot => 'phase-1-oneshot',
+    GenerationStrategy.propOnly => 'prop-only',
+  };
+  // `auto(2/3)` = no --domain flag: the domain axis is active and the
+  // worker draws each attempt's domain gap-based toward the 60/40 profile.
+  final domainLabel = domainSize?.toString() ?? 'auto(2/3)';
+  stderr.writeln(
+    'Config: size $sizeLabel | domain $domainLabel | '
+    'allow $allowLabel | require $reqLabel | ban $banLabel',
+  );
   stderr.writeln('');
   if (durations.isEmpty) {
     stderr.writeln('[${_fmt(elapsed)}] $generated/$count');
@@ -418,7 +850,112 @@ void _renderDashboard({
       final att = i < attemptCounts.length ? attemptCounts[i] : 0;
       final ok = i < successCounts.length ? successCounts[i] : 0;
       final counter = 'att $att/ok $ok';
-      stderr.writeln('  #${i.toString().padLeft(2)} [$counter] → $t');
+      // Live "running Xs / Ys" annotation: visible only while a target
+      // is in flight (between `'target'` and the matching `'attempt'`).
+      // The periodic redraw keeps it growing even when the worker is
+      // not emitting messages — that's the whole point of having it.
+      final startMs = i < attemptStartMs.length ? attemptStartMs[i] : null;
+      String runtime = '';
+      if (startMs != null) {
+        final elapsedS = ((nowMs - startMs) / 1000).round();
+        runtime = maxAttemptTimeMs > 0
+            ? ' (running ${elapsedS}s / ${maxAttemptTimeMs ~/ 1000}s)'
+            : ' (running ${elapsedS}s)';
+      }
+      // Strategy assigned to this worker (round-robin from the
+      // user-supplied list). Same logic as bin/generate.dart's
+      // GeneratorConfig builder, repeated here so the dashboard
+      // stays decoupled from the worker spawn loop.
+      final strat = labelFor(strategies[i % strategies.length]);
+      stderr.writeln(
+        '  #${i.toString().padLeft(2)} [$counter]$runtime '
+        '<${strat.padRight(15)}> → $t',
+      );
+    }
+  }
+
+  // Aggregate rejection breakdown — `att - ok` tells you how often a
+  // worker rejected; this line tells you *why*. A run dominated by
+  // `ratioTooHigh` means the iterative loop isn't picking strong-enough
+  // constraints (or the threshold is too tight) — see `docs/dev/third_color.md`
+  // for the targeted constraint generation plan that addresses this.
+  // Always print the rejection line, even with zero rejects: when
+  // staring at the dashboard mid-run, "no Rejects line" is ambiguous
+  // (no rejects yet? or did I forget to enable that view?). Showing
+  // "Rejects (0)" removes the ambiguity until the run completes.
+  final totalRejects = rejectCounts.values.fold<int>(0, (a, b) => a + b);
+  stderr.writeln('');
+  final parts = <String>[];
+  for (final r in GenerationRejectReason.values) {
+    final n = rejectCounts[r] ?? 0;
+    if (n > 0) parts.add('${r.name}=$n');
+  }
+  final partsStr = parts.isEmpty ? '-' : parts.join(', ');
+  stderr.writeln('Rejects ($totalRejects): $partsStr');
+
+  // Per-stage timing breakdown — summed across every worker and every
+  // attempt (success + failure). Columns:
+  //   * pct       share of CPU time
+  //   * total     cumulative wall time
+  //   * calls     total invocations of the stage across all attempts
+  //                (loop stages run many times per attempt; one-shot
+  //                 stages match the attempt count)
+  //   * avg       µs per call — the per-call cost, the actual "is this
+  //                worth optimising?" signal
+  // Sorted by total time descending so the dominant stage is on top.
+  final totalStageMicros = stageTotalsMicros.values.fold<int>(
+    0,
+    (a, b) => a + b,
+  );
+  if (showTimingBreakdown && totalStageMicros > 0) {
+    stderr.writeln('');
+    stderr.writeln(
+      'Timing breakdown (sum across $jobs workers, '
+      '${(totalStageMicros / 1000000).toStringAsFixed(1)}s of CPU):',
+    );
+    stderr.writeln(
+      '  ${'stage'.padRight(18)}'
+      '${'pct'.padLeft(7)}'
+      '${'total'.padLeft(11)}'
+      '${'calls'.padLeft(11)}'
+      '${'avg'.padLeft(11)}',
+    );
+    final entries = stageTotalsMicros.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    for (final e in entries) {
+      if (e.value == 0) continue;
+      final calls = stageTotalsCalls[e.key] ?? 0;
+      final pct = '${(e.value * 100 / totalStageMicros).toStringAsFixed(1)}%';
+      final secs = '${(e.value / 1000000).toStringAsFixed(2)}s';
+      final avg = calls > 0 ? _humanMicros((e.value / calls).round()) : '-';
+      stderr.writeln(
+        '  ${e.key.padRight(18)}'
+        '${pct.padLeft(7)}'
+        '${secs.padLeft(11)}'
+        '${calls.toString().padLeft(11)}'
+        '${avg.padLeft(11)}',
+      );
+    }
+
+    // Two-tier acceptance breakdown — derived from the timer counts.
+    // `loop_candidate_prop.calls` runs once per candidate tested.
+    // `loop_candidate_full.calls` runs only when the cheap signal was
+    // silent, so `prop - full` is the count of cheap-path accepts.
+    // The remaining calls fall to the expensive path, which itself
+    // either accepts (updating cachedRatioBefore) or rejects to
+    // secondChance. The cheap-accept ratio is the headline number to
+    // decide whether the cheap path is paying off in this run.
+    final propCalls = stageTotalsCalls['loop_candidate_prop'] ?? 0;
+    final fullCalls = stageTotalsCalls['loop_candidate_full'] ?? 0;
+    if (propCalls > 0) {
+      final cheapAccepts = propCalls - fullCalls;
+      final cheapPct = (cheapAccepts * 100 / propCalls).toStringAsFixed(1);
+      stderr.writeln('');
+      stderr.writeln(
+        'Two-tier breakdown: $propCalls candidates tested → '
+        '$cheapAccepts cheap accepts ($cheapPct%), '
+        '$fullCalls fell to expensive path',
+      );
     }
   }
 
@@ -434,28 +971,52 @@ void _renderDashboard({
     maxWidth: maxWidth,
     minHeight: minHeight,
     maxHeight: maxHeight,
+    allowedDomains: allowedDomains,
   );
 
-  // Force a stable display order 1, 2, ..., 5, 6+ even when some buckets are 0.
+  // Force a stable display order 1, 2, ..., 9, 10+ even when some buckets are 0.
   final orderedTypes = <String, int>{
-    for (final k in ['1', '2', '3', '4', '5', '6+']) k: stats.nTypes[k] ?? 0,
+    for (final k in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'])
+      k: stats.nTypes[k] ?? 0,
   };
   final sizeBuckets = {
-    '≤20': stats.sizeBuckets[0],
-    '21-40': stats.sizeBuckets[1],
-    '41-80': stats.sizeBuckets[2],
-    '>80': stats.sizeBuckets[3],
+    for (final l in kSizeBucketLabels) l: stats.sizeBuckets[l] ?? 0,
   };
 
   // Bars now visualize the *gap to target* (= target - observed, clamped to
   // ≥ 0), not the raw count. The longest bar across all histograms marks
-  // the bin the picker is most likely to chase next. Target=0 buckets (e.g.
-  // ntypes 6+) always have gap=0 → no bar, which is the right signal: they
-  // are reliquats, never pushed.
+  // the bin the picker is most likely to chase next. Target=0 buckets always
+  // have gap=0 → no bar, which is the right signal: they are reliquats,
+  // never pushed.
+  // Profile axis: ordered classic → sh → pathBased → syBased to match
+  // the `ProfileCategory` enum order. Missing buckets default to 0
+  // (e.g. early corpus).
+  final orderedProfiles = <String, int>{
+    for (final k in ['classic', 'sh', 'bb', 'pathBased', 'syBased'])
+      k: stats.profiles[k] ?? 0,
+  };
+
+  // Composition gaps: compute the max gap across all possible compositions.
+  double compMaxGap = 0.0;
+  for (final entry in axisTargets.composition.entries) {
+    final observed = stats.compositions[entry.key] ?? 0;
+    final gap = entry.value - observed;
+    if (gap > compMaxGap) compMaxGap = gap;
+  }
+
+  // Domain axis: stable '2' then '3' order; empty targets (frozen domain)
+  // suppress the histogram entirely.
+  final orderedDomains = <String, int>{
+    for (final k in ['2', '3']) k: stats.domains[k] ?? 0,
+  };
+
   final globalMaxGap = [
     _maxGap(stats.slugs, axisTargets.slug),
     _maxGap(sizeBuckets, axisTargets.size),
     _maxGap(orderedTypes, axisTargets.ntypes),
+    _maxGap(orderedProfiles, axisTargets.profile),
+    _maxGap(orderedDomains, axisTargets.domain),
+    compMaxGap,
   ].fold<double>(0.0, max);
 
   stderr.writeln('');
@@ -465,14 +1026,7 @@ void _renderDashboard({
     sortByValue: true,
     targets: axisTargets.slug,
     globalMaxGap: globalMaxGap,
-  );
-  stderr.writeln('');
-  stderr.writeln('Sizes (width×height):');
-  _writeHistogram(
-    sizeBuckets,
-    sortByValue: false,
-    targets: axisTargets.size,
-    globalMaxGap: globalMaxGap,
+    columns: 2,
   );
   stderr.writeln('');
   stderr.writeln('Distinct types per puzzle:');
@@ -481,17 +1035,114 @@ void _renderDashboard({
     sortByValue: false,
     targets: axisTargets.ntypes,
     globalMaxGap: globalMaxGap,
+    columns: 2,
   );
+  // Sizes (left) and Pre-fill profile (right) are short axes, so render them
+  // side by side to keep the dashboard compact.
+  stderr.writeln('');
+  _writeSideBySide(
+    'Sizes (width×height):',
+    _histogramLines(
+      sizeBuckets,
+      sortByValue: false,
+      targets: axisTargets.size,
+      globalMaxGap: globalMaxGap,
+    ),
+    'Pre-fill profile:',
+    _histogramLines(
+      orderedProfiles,
+      sortByValue: false,
+      targets: axisTargets.profile,
+      globalMaxGap: globalMaxGap,
+    ),
+  );
+
+  // Domain axis (2 vs 3 colours) — hidden when frozen by `--domain N`
+  // (empty target map = axis disabled, no deficit to display).
+  if (axisTargets.domain.isNotEmpty) {
+    stderr.writeln('');
+    stderr.writeln('Domain (colours):');
+    _writeHistogram(
+      orderedDomains,
+      sortByValue: false,
+      targets: axisTargets.domain,
+      globalMaxGap: globalMaxGap,
+    );
+  }
+
+  // Composition axis: compact "top deficit" panel — the largest-gap
+  // buckets, sorted by gap descending. Only shown when the universe defines
+  // composition targets.
+  final compositionsToShow = 6;
+  if (showCompositions && axisTargets.composition.isNotEmpty) {
+    stderr.writeln('');
+    stderr.writeln('Compositions (top deficits):');
+    final compGaps = <MapEntry<String, double>>[];
+    for (final entry in axisTargets.composition.entries) {
+      final observed = stats.compositions[entry.key] ?? 0;
+      final gap = entry.value - observed;
+      if (gap > 0) compGaps.add(MapEntry(entry.key, gap));
+    }
+    compGaps.sort((a, b) => b.value.compareTo(a.value));
+    final top = compGaps.length > compositionsToShow
+        ? compGaps.sublist(0, compositionsToShow)
+        : compGaps;
+    final compStats = {
+      for (final e in top) e.key: stats.compositions[e.key] ?? 0,
+    };
+    _writeHistogram(
+      compStats,
+      sortByValue: false,
+      targets: axisTargets.composition,
+      globalMaxGap: globalMaxGap,
+    );
+    if (compGaps.length > compositionsToShow) {
+      stderr.writeln(
+        '  … and ${compGaps.length - compositionsToShow} more compositions with positive deficit',
+      );
+    }
+  }
+}
+
+/// Print two labelled blocks of pre-rendered lines next to each other: the
+/// left block (title + [leftLines]) in a column wide enough for its widest
+/// line plus [gap] spaces, the right block (title + [rightLines]) starting at
+/// that boundary. Shorter block is padded with blank lines.
+void _writeSideBySide(
+  String leftTitle,
+  List<String> leftLines,
+  String rightTitle,
+  List<String> rightLines, {
+  int gap = 2,
+}) {
+  final left = [leftTitle, ...leftLines];
+  final right = [rightTitle, ...rightLines];
+  final leftWidth = left.map((l) => l.length).fold<int>(0, max) + gap;
+  final rows = max(left.length, right.length);
+  for (int i = 0; i < rows; i++) {
+    final l = i < left.length ? left[i] : '';
+    final r = i < right.length ? right[i] : '';
+    stderr.writeln('${l.padRight(leftWidth)}$r');
+  }
 }
 
 class _AxisTargets {
   final Map<String, double> slug;
   final Map<String, double> size;
   final Map<String, double> ntypes;
+  final Map<String, double> profile;
+  final Map<String, double> composition;
+
+  /// Empty when the domain is frozen (`--domain N`) — the axis is disabled
+  /// and its histogram is not rendered.
+  final Map<String, double> domain;
   const _AxisTargets({
     required this.slug,
     required this.size,
     required this.ntypes,
+    required this.profile,
+    required this.composition,
+    this.domain = const {},
   });
 }
 
@@ -506,6 +1157,7 @@ _AxisTargets _computeAxisTargets({
   required int maxWidth,
   required int minHeight,
   required int maxHeight,
+  List<int> allowedDomains = const [2, 3],
 }) {
   // Slug axis: each puzzle contributes to multiple slug bins (one per
   // distinct slug). The "balanced" target per slug is therefore the
@@ -516,6 +1168,7 @@ _AxisTargets _computeAxisTargets({
     final totalSlugUses = slugCounts.values.fold<int>(0, (a, b) => a + b);
     final perSlug = totalSlugUses / universeSlugs.length;
     for (final s in universeSlugs) {
+      if (s == 'SH') continue; // handled by profile axis
       slug[s] = perSlug;
     }
   }
@@ -531,35 +1184,74 @@ _AxisTargets _computeAxisTargets({
     minHeight: minHeight,
     maxHeight: maxHeight,
   );
-  final size = <String, double>{'≤20': 0, '21-40': 0, '41-80': 0, '>80': 0};
+  final size = <String, double>{for (final l in kSizeBucketLabels) l: 0};
   for (final (w, h) in universe.allowedSizes) {
-    final area = w * h;
-    final bucket = area <= 20
-        ? '≤20'
-        : area <= 40
-        ? '21-40'
-        : area <= 80
-        ? '41-80'
-        : '>80';
+    final bucket = _sizeBucket(w * h);
     size[bucket] =
         (size[bucket] ?? 0) + totalCorpus * sizeTargetShare(w, h, universe);
   }
 
-  // Ntypes axis: explicit profile from kTargetNTypesProfile (1..5). The 6+
-  // reliquat bucket has target 0 — surfaced so the dashboard can show
-  // drift without the picker ever pushing those puzzles.
+  // Ntypes axis: explicit profile from kTargetNTypesProfile. Keys 1..9 each
+  // get their own dashboard row; any key ≥ 10 (when the profile defines one)
+  // is collapsed into the '10+' bin so the display order stays stable
+  // (1, 2, ..., 9, 10+) regardless of how many high-n targets the profile
+  // declares. The bin reads 0 when the profile has no ≥10 entry.
   final ntypes = <String, double>{};
+  double tenPlusTargetShare = 0;
   for (final entry in kTargetNTypesProfile.entries) {
-    ntypes['${entry.key}'] = totalCorpus * entry.value;
+    if (entry.key <= 9) {
+      ntypes['${entry.key}'] = totalCorpus * entry.value;
+    } else {
+      tenPlusTargetShare += entry.value;
+    }
   }
-  ntypes['6+'] = 0;
+  ntypes['10+'] = totalCorpus * tenPlusTargetShare;
 
-  return _AxisTargets(slug: slug, size: size, ntypes: ntypes);
+  // Profile axis: three buckets (classic / sh / pathBased) with explicit
+  // targets in kTargetProfile.
+  final profile = <String, double>{};
+  for (final entry in kTargetProfile.entries) {
+    profile[entry.key.name] = totalCorpus * entry.value;
+  }
+
+  // Composition axis: uniform target over all valid triples derived from
+  // the universe's slug families. Each triple gets `totalCorpus / nCompositions`.
+  final composition = <String, double>{};
+  if (universeSlugs.isNotEmpty) {
+    final fams = familiesOf(universeSlugs);
+    final allComps = allCompositions(fams);
+    if (allComps.isNotEmpty) {
+      final perComp = totalCorpus / allComps.length;
+      for (final comp in allComps) {
+        composition[comp.join('+')] = perComp;
+      }
+    }
+  }
+
+  // Domain axis: explicit targets from kTargetDomainProfile. Only when more
+  // than one domain is allowed — a frozen domain disables the axis, so its
+  // histogram (keyed off this map being non-empty) is not rendered.
+  final domain = <String, double>{};
+  if (allowedDomains.length > 1) {
+    for (final d in allowedDomains) {
+      domain['$d'] = totalCorpus * (kTargetDomainProfile[d] ?? 0.0);
+    }
+  }
+
+  return _AxisTargets(
+    slug: slug,
+    size: size,
+    ntypes: ntypes,
+    profile: profile,
+    composition: composition,
+    domain: domain,
+  );
 }
 
 /// Largest `target - observed` across all rows of one histogram, clamped to 0.
-/// Rows whose target is missing or 0 contribute 0 (the 6+ reliquat bucket
-/// must never be flagged as "to push" since its objective is 0 by design).
+/// Rows whose target is missing or 0 contribute 0 — so a bin with an
+/// undeclared objective (e.g. the '10+' bucket when no ≥10 key is set in
+/// `kTargetNTypesProfile`) is never flagged as "to push".
 double _maxGap(Map<String, int> stats, Map<String, double> targets) {
   double m = 0.0;
   for (final entry in stats.entries) {
@@ -571,31 +1263,61 @@ double _maxGap(Map<String, int> stats, Map<String, double> targets) {
   return m;
 }
 
-/// Render one histogram. The bar length encodes the *gap to target*
-/// (= target − observed, clamped to ≥ 0), normalized by [globalMaxGap]
-/// across all displayed histograms so bars are visually comparable
-/// across axes — the longest bar anywhere on the dashboard is the bin
-/// the equilibrium picker is most likely to chase next.
+/// Write one histogram to stderr. Thin wrapper over [_histogramLines].
 void _writeHistogram(
   Map<String, int> stats, {
   required bool sortByValue,
   required double globalMaxGap,
   Map<String, double>? targets,
+  int columns = 1,
+  int columnWidth = 64,
 }) {
-  if (stats.isEmpty) return;
+  for (final line in _histogramLines(
+    stats,
+    sortByValue: sortByValue,
+    globalMaxGap: globalMaxGap,
+    targets: targets,
+    columns: columns,
+    columnWidth: columnWidth,
+  )) {
+    stderr.writeln(line);
+  }
+}
+
+/// Render one histogram into a list of lines (each already indented). The bar
+/// length encodes the *gap to target* (= target − observed, clamped to ≥ 0),
+/// normalized by [globalMaxGap] across all displayed histograms so bars are
+/// visually comparable across axes — the longest bar anywhere on the dashboard
+/// is the bin the equilibrium picker is most likely to chase next.
+/// With [columns] == 2, entries are laid out in two side-by-side columns of
+/// [columnWidth] characters each (column-major: the first half fills the left
+/// column, the second half the right), to keep tall axes (slugs, ntypes)
+/// compact.
+List<String> _histogramLines(
+  Map<String, int> stats, {
+  required bool sortByValue,
+  required double globalMaxGap,
+  Map<String, double>? targets,
+  int columns = 1,
+  int columnWidth = 64,
+}) {
+  if (stats.isEmpty) return const [];
   final entries = stats.entries.toList();
   if (sortByValue) {
     entries.sort((a, b) => b.value.compareTo(a.value));
   }
-  const barWidth = 30;
-  // Fixed label column so the bars align horizontally across all three
-  // histograms (constraints / sizes / ntypes), regardless of which has the
-  // longest key. 10 characters is wide enough for every current label.
+  // Narrower bars in two-column mode so a label + bar + suffix fits within
+  // [columnWidth]; full width when a single column spans the whole line.
+  final barWidth = columns >= 2 ? 20 : 30;
+  // Fixed label column so the bars align horizontally across all histograms
+  // (constraints / sizes / ntypes), regardless of which has the longest key.
+  // 10 characters is wide enough for every current label.
   const keyWidth = 10;
   // Pre-compute the value column width so the "value / target" suffix lines
   // up across rows even when counts have different digit lengths.
   final valWidth = entries.map((e) => '${e.value}'.length).fold<int>(0, max);
-  for (final entry in entries) {
+
+  String cell(MapEntry<String, int> entry) {
     final target = targets?[entry.key];
     final gap = (target == null || target <= 0)
         ? 0.0
@@ -603,12 +1325,46 @@ void _writeHistogram(
     final bar = globalMaxGap > 0
         ? '█' * ((gap / globalMaxGap * barWidth).round())
         : '';
-    final suffix = target == null
-        ? '${entry.value}'
-        : '${'${entry.value}'.padLeft(valWidth)} / ${target.round()}';
-    stderr.writeln('  ${entry.key.padRight(keyWidth)} $bar $suffix');
+    String suffix;
+    if (target == null) {
+      suffix = '${entry.value}';
+    } else {
+      suffix = '${'${entry.value}'.padLeft(valWidth)} / ${target.round()}';
+      // Show the observed/target ratio in percent next to the absolute
+      // counts. Skip when target == 0 (e.g. an undeclared reliquat bin) to
+      // avoid division by zero.
+      if (target > 0) {
+        final pct = (entry.value / target * 100).toStringAsFixed(1);
+        suffix = '$suffix ($pct%)';
+      }
+    }
+    return '${entry.key.padRight(keyWidth)} $bar $suffix';
   }
+
+  final lines = <String>[];
+  if (columns < 2) {
+    for (final entry in entries) {
+      lines.add('  ${cell(entry)}');
+    }
+    return lines;
+  }
+
+  // Two columns, column-major: left column = first half, right = second half.
+  final leftCount = (entries.length + 1) ~/ 2;
+  for (int i = 0; i < leftCount; i++) {
+    final left = _clip(cell(entries[i]), columnWidth);
+    final rightIdx = i + leftCount;
+    final right = rightIdx < entries.length
+        ? _clip(cell(entries[rightIdx]), columnWidth)
+        : '';
+    lines.add('  ${left.padRight(columnWidth)}$right');
+  }
+  return lines;
 }
+
+/// Truncate [s] to at most [width] characters (no-op when already short).
+String _clip(String s, int width) =>
+    s.length <= width ? s : s.substring(0, width);
 
 // --- Check mode ---
 
@@ -635,43 +1391,11 @@ enum _DetailedCategory {
   };
 }
 
-/// Enumerate at most [limit] valid completions of [puzzle] by exhaustive
-/// backtracking over free cells. Cell values are plain ints in the current
-/// API (`0` = free, the puzzle's `domain` holds the legal non-free values).
-/// Lifted from the former `bin/check_uniqueness_batch.dart`.
-List<List<int>> _enumerateSolutions(Puzzle puzzle, {int limit = 2}) {
-  final out = <List<int>>[];
-  final freeIdx = <int>[];
-  for (int i = 0; i < puzzle.cells.length; i++) {
-    if (puzzle.cells[i].value == 0) freeIdx.add(i);
-  }
-
-  void rec(int k) {
-    if (out.length >= limit) return;
-    if (k == freeIdx.length) {
-      if (puzzle.check(saveResult: false).isEmpty) {
-        out.add(List<int>.from(puzzle.cellValues));
-      }
-      return;
-    }
-    final idx = freeIdx[k];
-    for (final v in puzzle.domain) {
-      puzzle.cells[idx].setValue(v);
-      if (puzzle.check(saveResult: false).isEmpty) {
-        rec(k + 1);
-      }
-      if (out.length >= limit) return;
-    }
-    // Untry: cell back to free so the parent frame can pick a different
-    // candidate without leaking state into sibling branches.
-    puzzle.cells[idx].setValue(0);
-  }
-
-  rec(0);
-  return out;
-}
-
-Future<void> _runCheck(String filePath, {bool detailed = false}) async {
+Future<void> _runCheck(
+  String filePath, {
+  bool detailed = false,
+  bool debug = false,
+}) async {
   final file = File(filePath);
   if (!file.existsSync()) {
     stderr.writeln('File not found: $filePath');
@@ -701,6 +1425,16 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
   var stats = _CollectionStats.fromLines(goodLines);
 
   void render() {
+    if (debug) {
+      final pct = lines.isEmpty
+          ? 0
+          : (100 * (valid + invalid + errored) ~/ lines.length);
+      stderr.writeln(
+        '[${valid + invalid + errored}/${lines.length} ($pct%)] '
+        'valid $valid | invalid $invalid | errors $errored',
+      );
+      return;
+    }
     _renderCheckDashboard(
       filePath: filePath,
       goodPath: goodPath,
@@ -748,7 +1482,7 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
           if (!match) {
             invalid++;
             categoryCounts[_DetailedCategory.cachedMismatch] =
-                (categoryCounts[_DetailedCategory.cachedMismatch] ?? 0) + 1;
+                categoryCounts[_DetailedCategory.cachedMismatch]! + 1;
             badSink.writeln(
               '# INVALID (${_DetailedCategory.cachedMismatch.label} — '
               'cached _1: differs from deduced solution)',
@@ -771,7 +1505,7 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
           // completions. 0 → UNSOLVABLE, ≥2 → NON-UNIQUE, exactly 1 →
           // NEEDS-BACKTRACK (the puzzle has a unique mathematical
           // solution but the deductive solver can't reach it).
-          final solutions = _enumerateSolutions(p.clone(), limit: 2);
+          final solutions = enumerateSolutions(p.clone(), limit: 2);
           final _DetailedCategory cat;
           if (solutions.isEmpty) {
             cat = _DetailedCategory.unsolvable;
@@ -780,7 +1514,7 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
           } else {
             cat = _DetailedCategory.needsBacktrack;
           }
-          categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+          categoryCounts[cat] = categoryCounts[cat]! + 1;
           final detail = switch (cat) {
             _DetailedCategory.unsolvable => '0 solutions found',
             _DetailedCategory.nonUnique => '≥2 solutions found',
@@ -819,7 +1553,7 @@ Future<void> _runCheck(String filePath, {bool detailed = false}) async {
   );
   if (detailed && invalid > 0) {
     for (final c in _DetailedCategory.values) {
-      final n = categoryCounts[c] ?? 0;
+      final n = categoryCounts[c]!;
       if (n > 0) stderr.writeln('    ${c.label.padRight(16)} $n');
     }
   }
@@ -870,7 +1604,7 @@ void _renderCheckDashboard({
 
   if (detailed) {
     final breakdown = <String, int>{
-      for (final c in _DetailedCategory.values) c.label: categoryCounts[c] ?? 0,
+      for (final c in _DetailedCategory.values) c.label: categoryCounts[c]!,
     };
     stderr.writeln('');
     stderr.writeln('Invalid breakdown:');
@@ -878,13 +1612,11 @@ void _renderCheckDashboard({
   }
 
   final orderedTypes = <String, int>{
-    for (final k in ['1', '2', '3', '4', '5', '6+']) k: stats.nTypes[k] ?? 0,
+    for (final k in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'])
+      k: stats.nTypes[k] ?? 0,
   };
   final sizeBuckets = {
-    '≤20': stats.sizeBuckets[0],
-    '21-40': stats.sizeBuckets[1],
-    '41-80': stats.sizeBuckets[2],
-    '>80': stats.sizeBuckets[3],
+    for (final l in kSizeBucketLabels) l: stats.sizeBuckets[l] ?? 0,
   };
 
   stderr.writeln('');
@@ -982,15 +1714,26 @@ int _medianMs(List<int> durations) {
   return (sorted[mid - 1] + sorted[mid]) ~/ 2;
 }
 
+/// Compact microseconds → `12µs` / `3.4ms` / `1.2s`, picking the unit
+/// so 2-3 significant digits show. Used by the timing-breakdown table
+/// where space is tight but the dynamic range spans 1µs → 10s.
+String _humanMicros(int micros) {
+  if (micros < 1000) return '$micros µs';
+  if (micros < 1000000) return '${(micros / 1000).toStringAsFixed(1)}ms';
+  return '${(micros / 1000000).toStringAsFixed(2)}s';
+}
+
 Map<String, dynamic> _parseArgs(List<String> args) {
   final result = <String, dynamic>{
     'mode': 'generate',
-    'count': 10,
-    'minWidth': 4,
-    'maxWidth': 7,
-    'minHeight': 4,
-    'maxHeight': 8,
-    'maxTime': 60,
+    'count': 1000,
+    'minWidth': 3,
+    'maxWidth': 10,
+    'minHeight': 3,
+    'maxHeight': 10,
+    'maxTime': 3600,
+    'maxAttemptTime': 360,
+    'focusAxis': null,
     'output': null,
     'banned': null,
     'allowed': null,
@@ -1003,7 +1746,29 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'equilibrium': true,
     'jobs': Platform.numberOfProcessors,
     'logDir': null,
+    'useBlacklist': true,
+    'blacklistMinAttempts': 30,
+    'blacklistAdaptiveK': 20,
+    'blacklistSkipSafety': 100,
+    'debug': false,
+    'timingBreakdown': false,
+    'showCompositions': false,
+    // null = no --domain flag → the domain axis is active on {2, 3} (the
+    // worker draws each attempt's domain gap-based toward
+    // kTargetDomainProfile). An explicit 2 or 3 freezes the domain and
+    // disables the axis.
+    'domain': null,
+    'strategy': <GenerationStrategy>[
+      GenerationStrategy.phaseGate,
+      GenerationStrategy.phase1Oneshot,
+      GenerationStrategy.propOnly,
+    ],
     'boss': false,
+    'maxStall': 15,
+    // Path-based tunables (forwarded to preFillPath). Defaults match
+    // GeneratorConfig so omitting the flags preserves current behaviour.
+    'pathRetries': 30,
+    'winding': 0.5,
   };
 
   for (int i = 0; i < args.length; i++) {
@@ -1034,6 +1799,8 @@ Map<String, dynamic> _parseArgs(List<String> args) {
       case '-T':
       case '--max-time':
         result['maxTime'] = int.parse(args[++i]);
+      case '--max-attempt-time':
+        result['maxAttemptTime'] = int.parse(args[++i]);
       case '-o':
       case '--output':
         result['output'] = args[++i];
@@ -1058,11 +1825,83 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['easingBudget'] = int.parse(args[++i]);
       case '--no-equilibrium':
         result['equilibrium'] = false;
+      case '--no-blacklist':
+        result['useBlacklist'] = false;
+      case '--blacklist-min-attempts':
+        result['blacklistMinAttempts'] = int.parse(args[++i]);
+      case '--blacklist-adaptive-k':
+        result['blacklistAdaptiveK'] = int.parse(args[++i]);
+      case '--blacklist-skip-safety':
+        result['blacklistSkipSafety'] = int.parse(args[++i]);
+      case '--scenario':
+        final scenario = args[++i];
+        const validScenarios = ['path-based', 'sy-based'];
+        if (!validScenarios.contains(scenario)) {
+          stderr.writeln(
+            '--scenario must be one of: ${validScenarios.join(', ')} '
+            '(got "$scenario")',
+          );
+          exit(1);
+        }
+        result['scenario'] = scenario;
       case '-j':
       case '--jobs':
         result['jobs'] = int.parse(args[++i]);
       case '--log-dir':
         result['logDir'] = args[++i];
+      case '--path-retries':
+        result['pathRetries'] = int.parse(args[++i]);
+      case '--winding':
+        result['winding'] = double.parse(args[++i]);
+      case '--debug':
+        result['debug'] = true;
+      case '--timing-breakdown':
+        result['timingBreakdown'] = true;
+      case '--compositions':
+        result['showCompositions'] = true;
+      case '--domain':
+        final raw = args[++i];
+        final v = int.tryParse(raw);
+        if (v != 2 && v != 3) {
+          stderr.writeln('--domain must be 2 or 3 (got $raw)');
+          exit(1);
+        }
+        result['domain'] = v;
+      case '--focus-axis':
+        final raw = args[++i];
+        final validAxes = [for (final a in Axis.values) a.name];
+        if (!validAxes.contains(raw)) {
+          stderr.writeln(
+            '--focus-axis must be one of: ${validAxes.join(", ")} (got "$raw")',
+          );
+          exit(1);
+        }
+        result['focusAxis'] = raw;
+      case '--max-stall':
+        result['maxStall'] = int.parse(args[++i]);
+      case '--strategy':
+        final v = args[++i];
+        // Comma-separated list → round-robin across workers. Single
+        // value → all workers use the same strategy.
+        result['strategy'] = v.split(',').map((p) {
+          switch (p.trim()) {
+            case 'single-tier':
+              return GenerationStrategy.singleTier;
+            case 'phase-gate':
+              return GenerationStrategy.phaseGate;
+            case 'phase-1-oneshot':
+              return GenerationStrategy.phase1Oneshot;
+            case 'prop-only':
+              return GenerationStrategy.propOnly;
+            default:
+              stderr.writeln(
+                "--strategy values must be from "
+                "'single-tier', 'phase-gate', 'phase-1-oneshot', "
+                "'prop-only' (got '$p')",
+              );
+              exit(1);
+          }
+        }).toList();
       case '--boss':
         result['boss'] = true;
       case '-h':
@@ -1110,16 +1949,22 @@ Modes:
   --read-stats DIR        Aggregate play stats, output puzzles sorted by difficulty
 
 Generation options:
-  -n, --count N           Number of puzzles to generate (default: 10)
-  -W, --min-width N       Minimum grid width (default: 4)
-      --max-width N       Maximum grid width (default: 7)
-  -H, --min-height N      Minimum grid height (default: 4)
-      --max-height N      Maximum grid height (default: 8)
-  -T, --max-time S        Maximum generation time (in seconds, default: 60)
+  -n, --count N           Number of puzzles to generate (default: 1000)
+  -W, --min-width N       Minimum grid width (default: 3)
+      --max-width N       Maximum grid width (default: 10)
+  -H, --min-height N      Minimum grid height (default: 3)
+      --max-height N      Maximum grid height (default: 10)
+  -T, --max-time S        Maximum generation time (in seconds, default: 3600)
+      --max-attempt-time S
+                          Wall-clock cap for a single `generateOne` call (in
+                          seconds, default: 360). Once exceeded the attempt
+                          is aborted with reason=attemptTimeout. Prevents a
+                          single slow combo (e.g. CH alone on a medium grid)
+                          from monopolizing the --max-time budget.
   -o, --output FILE       Output file (default: stdout)
       --ban RULES         Comma-separated rule slugs to exclude (e.g. FM,LT)
       --allow RULES       Comma-separated whitelist — when set, only these
-                          slugs are eligible (e.g. NC,EY,CC for a small
+                          slugs are eligible (e.g. NC,EY,RC,CC for a small
                           subset). Combines with --ban: the effective set
                           is (allow minus ban). Useful for bisecting which
                           constraint is making generation slow.
@@ -1137,29 +1982,111 @@ Generation options:
                           the easing loop (default: 30). When exceeded,
                           the candidate is dropped and the worker moves
                           on. No effect without --target-collection.
+      --domain N          Freeze the colour domain size: 2 (black/white) or
+                          3 (adds purple), disabling the equilibrium domain
+                          axis. Without the flag the domain is drawn per
+                          attempt, gap-based toward a 60/40 (2:3) corpus
+                          profile (kTargetDomainProfile). 3-colour puzzles
+                          use option-pruning deductions; see
+                          docs/dev/third_color.md.
+      --strategy S        Candidate-acceptance strategy (default: phase-gate).
+                          Accepts a single value or a comma-separated list;
+                          a list is distributed round-robin across workers
+                          for a heterogeneous pool (e.g.
+                          --strategy phase-gate,phase-1-oneshot,prop-only
+                          on -j 4 → 2× phase-gate + 1× each others). Slugs
+                          unreachable by one strategy (e.g. prop-only on
+                          FM) are picked up by sibling strategies via the
+                          shared equilibrium picker.
+                          Values:
+                            single-tier      Pre-everything baseline. Full
+                                             cloned.solve() per candidate;
+                                             accept iff post-solve ratio
+                                             strictly drops. No cleanup.
+                            phase-gate       Phase 1 cheap prop-only accepts
+                                             then phase 2 full-solve fallback
+                                             + removeUselessRules post-loop.
+                            phase-1-oneshot  Phase 1 limited to one sweep,
+                                             then unconditional transition
+                                             to phase 2. Caps phase-1 cost
+                                             when cheap accepts are sparse.
+                            prop-only        Phase 1 only — no fallback to
+                                             phase 2. Rejects puzzles that
+                                             need force; produces only
+                                             pure-propagation puzzles.
+      --max-stall S       No-progress watchdog: abandon an attempt that
+                          has spent S seconds without accepting a
+                          candidate. Avoids pathological cases where
+                          one worker burns the entire budget on a single
+                          plateaued attempt. Default 15 s. Pass 0 to
+                          disable.
+      --scenario S        Predefined scenario for the pre-fill phase.
+                          Valid values: path-based, sy-based.
+                          When set, the pre-fill paints a structure matching
+                          the scenario (a path for path-based, symmetry
+                          islands for sy-based) instead of a random grid,
+                          making the corresponding constraints satisfiable.
+                          Without the flag the pre-fill uses the classic
+                          random-grid approach (possibly with SH pre-fill if
+                          SH is in the required/preferred slugs).
+      --path-retries N    Max retries inside preFillPath before giving up
+                          (default: 30). Watch path_retries in
+                          generator_stats.csv.
+      --winding P         Path sinuosity for --scenario path-based
+                          (0..1, default: 0.5). 0 ≈ shortest path (easy,
+                          regions trivially separated); higher ≈ winding
+                          snakes (harder LT deductions).
+      --focus-axis AXIS   Restrict equilibrium targets to a single axis.
+                          Valid values: ${Axis.values.map((a) => a.name).join(', ')}.
+                          Default: all axes active.
       --no-equilibrium    Disable the multi-axis equilibrium bias.
                           Default: ON. When OFF, only the legacy slug-usage
                           bias is applied (matches pre-equilibrium behavior).
+      --no-blacklist      Disable the infeasibility filter. By default the
+                          CLI reads `generator_stats.csv` at startup and
+                          skips any (target, slugs, scenario, size-bucket)
+                          tuple that has been tried ≥ M times across past
+                          runs with zero successes; each worker also marks
+                          tuples that fail K times in-session. Use to
+                          unblock a combo after fixing the solver.
+      --blacklist-min-attempts N
+                          M: a combo needs at least N historical tries with
+                          zero successes to enter the persistent seed
+                          blacklist (default: 30).
+      --blacklist-adaptive-k N
+                          K: in-session threshold — a combo joins the
+                          worker's local blacklist after N failures without
+                          success in this run (default: 20).
+      --blacklist-skip-safety N
+                          Safety brake: after N consecutive blacklist
+                          skips, the worker runs the next blacklisted
+                          combo anyway to avoid lock-up if every candidate
+                          tuple has been filtered (default: 100).
   -j, --jobs N            Number of parallel worker isolates
                           (default: number of CPU cores, currently
                           ${Platform.numberOfProcessors}). Clamped to [1, count].
                           Each worker starts from the same initial corpus
                           and evolves its equilibrium state independently.
       --log-dir DIR       Write per-worker diagnostic logs to
-                          DIR/worker_<n>.log (one file per parallel
-                          worker, append mode). Useful to investigate
-                          why a worker is stuck without producing
-                          puzzles. Default: no logging.
+                           DIR/worker_<n>.log (one file per parallel
+                           worker, append mode). Useful to investigate
+                           why a worker is stuck without producing
+                           puzzles. Default: no logging.
       --boss              Use the experimental seed-and-grow prefill
-                          (for large "Boss" grids like 30x20). Plants
-                          seeds weighted toward the centre, grows them
-                          into groups of 15-25 cells, posts one GS
-                          constraint per seed, then random-fills the
-                          rest. Without -o, output goes to
-                          assets/boss.txt. Dumps the prefill state to
-                          /tmp/boss_prefill_<ts>.txt for inspection.
+                           (for large "Boss" grids like 30x20). Plants
+                           seeds weighted toward the centre, grows them
+                           into groups of 15-25 cells, posts one GS
+                           constraint per seed, then random-fills the
+                           rest. Without -o, output goes to
+                           assets/boss.txt. --no-equilibrium is implied.
 
 General:
+      --debug             Enable debug mode: sequential output
+                          instead of the real-time dashboard.
+      --timing-breakdown  Show per-stage timing breakdown in the
+                          dashboard (hidden by default).
+      --compositions      Show composition deficits in the dashboard
+                          (hidden by default).
   -h, --help              Show this help
 
 Rule slugs: $rules

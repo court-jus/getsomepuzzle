@@ -24,6 +24,8 @@ import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
+import '_trace_cache.dart';
+
 const _categories = [
   'Debutant',
   'Joueur',
@@ -52,19 +54,29 @@ class _Verdict {
   );
 }
 
-_Verdict _classify(Puzzle puzzle, {required double maxPrefill}) {
+_Verdict _classify(
+  Puzzle puzzle, {
+  required double maxPrefill,
+  required TraceCache cache,
+}) {
   final prefill =
       puzzle.cells.where((c) => c.readonly).length / puzzle.cells.length;
   if (prefill > maxPrefill) {
     return _Verdict('Pre-rempli', 0, 0, 0, 0, prefill);
   }
   // solveExplained works on a clone so the original puzzle is untouched.
-  final steps = puzzle.solveExplained(timeoutMs: 30000);
+  final traceKey = traceKeyFromPuzzle(puzzle);
+  final steps =
+      cache.lookup(traceKey) ?? puzzle.solveExplained(timeoutMs: 30000);
 
   // Replay on a clone to know whether the puzzle was actually solved.
   final replay = puzzle.clone();
   for (final s in steps) {
-    replay.setValue(s.cellIdx, s.value);
+    if (s.value != null) {
+      replay.setValue(s.cellIdx, s.value!);
+    } else if (s.removeOption != null) {
+      replay.removeOption(s.cellIdx, s.removeOption!);
+    }
   }
   final solved = replay.complete && replay.check(saveResult: false).isEmpty;
 
@@ -188,6 +200,13 @@ void main(List<String> args) {
     'assets/collection3.txt',
     'assets/tutorial.txt',
   ];
+  final cache = TraceCache.load(kTraceCachePath);
+  if (cache.isEmpty) {
+    stderr.writeln(
+      'warn: no solve_traces.tsv — run bin/recompute.dart first to speed up classification.',
+    );
+  }
+
   int pct = 10;
   int seed = 42;
   String? sampleOut;
@@ -286,7 +305,7 @@ void main(List<String> args) {
       _Verdict v;
       try {
         final puzzle = Puzzle(line);
-        v = _classify(puzzle, maxPrefill: maxPrefill);
+        v = _classify(puzzle, maxPrefill: maxPrefill, cache: cache);
       } catch (e) {
         v = _Verdict('Indetermine', 0, 0, 0, 0, 0.0);
       }

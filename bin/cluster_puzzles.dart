@@ -32,6 +32,8 @@ import 'dart:typed_data';
 
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 
+import '_csv.dart';
+
 const _collections = [
   'assets/1-easy.txt',
   'assets/2-player.txt',
@@ -39,12 +41,18 @@ const _collections = [
   'assets/4-strong.txt',
   'assets/5-expert.txt',
   'assets/6-mad.txt',
-  'assets/overfilled-easy.txt',
+  'assets/1-easy-overfilled.txt',
   'assets/overfilled.txt',
+  'assets/2-player-overfilled.txt',
+  'assets/3-advanced-overfilled.txt',
+  'assets/4-strong-overfilled.txt',
+  'assets/5-expert-overfilled.txt',
+  'assets/6-mad-overfilled.txt',
 ];
 
 const _slugs = [
   'CC',
+  'CH',
   'CX',
   'DF',
   'EY',
@@ -137,7 +145,7 @@ void main(List<String> args) {
     exit(1);
   }
 
-  final header = _parseCsvLine(lines.first);
+  final header = parseCsvLine(lines.first);
   final colIdx = <String, int>{};
   for (int i = 0; i < header.length; i++) {
     colIdx[header[i]] = i;
@@ -176,6 +184,28 @@ void main(List<String> args) {
   addFeature('avg_move_complexity');
   addFeature('distinct_constraints_used');
   addFeature('n_constraints');
+  // Solution-geometry power-spectrum signals (translation- and colour-swap-
+  // invariant) — let the clusterer separate globally-regular solutions
+  // (damier, colour bars) that the trace shares alone cannot distinguish.
+  addFeature('spec_peak_frac');
+  addFeature('spec_xbars_frac');
+  addFeature('spec_ybars_frac');
+  addFeature('spec_checker_frac');
+  addFeature('spec_concentration');
+  // Solution-geometry autocorrelation signals (parity-robust companions to the
+  // spectrum) — detect a 2×2 damier on odd block counts (4×6, 6×6) and generic
+  // shifted-motif repetition the fixed spectral bins miss.
+  addFeature('auto_band');
+  addFeature('auto_checker');
+  addFeature('auto_tile');
+  // Solution-geometry interpretable scalars — the designer-confirmed predicates
+  // (period 1 = colour bars, checker_block_k > 0 = damier) plus dihedral
+  // symmetry and run density. Sharpen the grouping of regular-solution families.
+  addFeature('period_x');
+  addFeature('period_y');
+  addFeature('checker_block_k');
+  addFeature('n_symmetries');
+  addFeature('rle_ratio');
   // Optional features.
   if (includeSize) addFeature('cells');
   if (includeLevel) addFeature('level');
@@ -183,13 +213,31 @@ void main(List<String> args) {
 
   stderr.writeln('  ${featureNames.length} features in distance vector');
 
+  // In apply mode the CSV can be a superset of the live corpus: the
+  // maintenance pipeline builds the vector first, then removes puzzles
+  // (dedup / cleanup) before clustering. Restrict to puzzles still present in
+  // the collections so a stale row can never be picked as a cluster
+  // representative — that would delete the whole family from the files.
+  Set<String>? liveKeys;
+  if (apply) {
+    liveKeys = _loadLiveKeys();
+    stderr.writeln('  ${liveKeys.length} live canonical keys in collections');
+  }
+
   // --- 2. Load rows ---
+  // idx must stay a contiguous 0..n-1 range (the Union-Find indexes on it), so
+  // stale rows are skipped here rather than filtered out after construction.
   final rows = <_Row>[];
+  int staleSkipped = 0;
   for (int li = 1; li < lines.length; li++) {
     final raw = lines[li];
     if (raw.trim().isEmpty) continue;
-    final fields = _parseCsvLine(raw);
+    final fields = parseCsvLine(raw);
     if (fields.length < header.length) continue;
+    if (liveKeys != null && !liveKeys.contains(fields[iKey])) {
+      staleSkipped++;
+      continue;
+    }
     final vec = Float64List(featureCols.length);
     for (int k = 0; k < featureCols.length; k++) {
       vec[k] = double.tryParse(fields[featureCols[k]]) ?? 0.0;
@@ -207,6 +255,9 @@ void main(List<String> args) {
     );
   }
   stderr.writeln('  ${rows.length} rows loaded');
+  if (staleSkipped > 0) {
+    stderr.writeln('  $staleSkipped stale rows skipped (not in collections)');
+  }
   if (rows.length < 2) {
     stderr.writeln('Not enough rows to cluster.');
     exit(0);
@@ -742,10 +793,30 @@ void _writeApplyReport(
   }
 }
 
-/// Stream each affected collection through the toRemove filter, write
-/// the survivors to `<file>.cleanup`. Comments and blank lines pass
-/// through verbatim so the .cleanup file stays diff-able with the
-/// original.
+/// Canonical keys of every puzzle currently present in the playable
+/// collections. Used in apply mode to drop stale CSV rows — puzzles removed by
+/// an earlier pipeline step (dedup / cleanup) after the vector was built — so
+/// they can't be picked as a cluster representative and wipe out the family.
+Set<String> _loadLiveKeys() {
+  final keys = <String>{};
+  for (final path in _collections) {
+    final file = File(path);
+    if (!file.existsSync()) continue;
+    for (final line in file.readAsLinesSync()) {
+      if (line.trim().isEmpty || line.startsWith('#')) continue;
+      try {
+        keys.add(canonicalPuzzleKey(line));
+      } catch (_) {
+        // Unparseable line — skip, matching the protect-file loader.
+      }
+    }
+  }
+  return keys;
+}
+
+/// Stream each affected collection through the toRemove filter and
+/// overwrite it in-place (via a `<file>.cleanup` staging file that is
+/// immediately renamed). Comments and blank lines pass through verbatim.
 void _rewriteCollections(Set<String> affectedFiles, Set<String> toRemove) {
   for (final path in affectedFiles) {
     final file = File(path);
@@ -773,9 +844,10 @@ void _rewriteCollections(Set<String> affectedFiles, Set<String> toRemove) {
       }
       kept.add(line);
     }
-    final outPath = '$path.cleanup';
-    File(outPath).writeAsStringSync('${kept.join('\n')}\n');
-    stderr.writeln('  $outPath: $dropped dropped, ${kept.length} kept');
+    final tmpPath = '$path.cleanup';
+    File(tmpPath).writeAsStringSync('${kept.join('\n')}\n');
+    File(tmpPath).renameSync(path);
+    stderr.writeln('  $path: $dropped dropped, ${kept.length} kept (in-place)');
   }
 }
 
@@ -915,37 +987,3 @@ void _writeReport(
 
 String _preview(String line) =>
     line.length > 110 ? '${line.substring(0, 107)}...' : line;
-
-/// Minimal CSV parser: handles double-quoted fields with embedded
-/// quotes ("") and commas. Trailing whitespace stripped.
-List<String> _parseCsvLine(String line) {
-  final out = <String>[];
-  final buf = StringBuffer();
-  bool inQuotes = false;
-  for (int i = 0; i < line.length; i++) {
-    final ch = line[i];
-    if (inQuotes) {
-      if (ch == '"') {
-        if (i + 1 < line.length && line[i + 1] == '"') {
-          buf.write('"');
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        buf.write(ch);
-      }
-    } else {
-      if (ch == ',') {
-        out.add(buf.toString());
-        buf.clear();
-      } else if (ch == '"' && buf.isEmpty) {
-        inQuotes = true;
-      } else {
-        buf.write(ch);
-      }
-    }
-  }
-  out.add(buf.toString());
-  return out;
-}

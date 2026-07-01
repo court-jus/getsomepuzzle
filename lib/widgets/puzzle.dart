@@ -2,22 +2,30 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
-import 'package:getsomepuzzle/widgets/column_count.dart';
-import 'package:getsomepuzzle/widgets/row_count.dart';
-import 'package:getsomepuzzle/widgets/different_from_painter.dart';
-import 'package:getsomepuzzle/widgets/group_count.dart';
-import 'package:getsomepuzzle/widgets/motif.dart';
-import 'package:getsomepuzzle/widgets/quantity.dart';
+import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
+import 'package:getsomepuzzle/widgets/constraints/chain.dart';
+import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
+import 'package:getsomepuzzle/widgets/puzzle_grid_stack.dart';
+import 'package:getsomepuzzle/widgets/constraints/motif.dart';
+import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
+import 'package:getsomepuzzle/widgets/constraints/transition.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
 
 class PuzzleWidget extends StatefulWidget {
@@ -32,6 +40,7 @@ class PuzzleWidget extends StatefulWidget {
     this.hintIsError = false,
     this.onCellRightDrag,
     this.onCellRightDragEnd,
+    this.onCellLongPress,
   });
 
   final Puzzle currentPuzzle;
@@ -44,20 +53,43 @@ class PuzzleWidget extends StatefulWidget {
   final ValueChanged<int>? onCellRightDrag;
   final VoidCallback? onCellRightDragEnd;
 
+  /// Long-press = cycle backward. Mobile equivalent of the right-click
+  /// on desktop — the host wires both to the same `GameModel` entry.
+  final ValueChanged<int>? onCellLongPress;
+
   @override
   State<PuzzleWidget> createState() => _PuzzleWidgetState();
 }
 
 class _PuzzleWidgetState extends State<PuzzleWidget> {
-  final GlobalKey _constraintKey = GlobalKey();
+  final Map<Object, GlobalKey> _arrowKeys = {};
   final GlobalKey _cellKey = GlobalKey();
   final GlobalKey _stackKey = GlobalKey();
-  Offset? _arrowStart;
+  final GlobalKey _gridKey = GlobalKey();
+  List<Offset>? _arrowStarts;
   Offset? _arrowEnd;
 
   void _handleCellTap(int idx, {bool secondary = false}) {
     widget.onCellTap(idx);
     if (secondary) widget.onCellTap(idx);
+  }
+
+  /// Convert a per-cell drag [offset] (in cell units, relative to the
+  /// starting cell at `(rowidx, cellidx)`) into a flat grid index, or
+  /// return `null` when the cursor has left the grid. The bounds check
+  /// is per-axis so a cursor leaving the grid horizontally does NOT
+  /// silently wrap onto the previous/next row via row-major
+  /// arithmetic — that wrap puts the painted cell visually far from
+  /// the pointer and is the symptom the player sees as a "stray paint"
+  /// when their drag exits the side of the grid.
+  int? _dragTargetIdx(int rowidx, int cellidx, Offset offset) {
+    final targetRow = rowidx + offset.dy.floor();
+    final targetCell = cellidx + offset.dx.floor();
+    final w = widget.currentPuzzle.width;
+    final h = widget.currentPuzzle.height;
+    if (targetRow < 0 || targetRow >= h) return null;
+    if (targetCell < 0 || targetCell >= w) return null;
+    return targetRow * w + targetCell;
   }
 
   @override
@@ -68,41 +100,77 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
         _computeArrowPositions();
       });
     } else {
-      _arrowStart = null;
+      _arrowStarts = null;
       _arrowEnd = null;
     }
   }
 
   void _computeArrowPositions() {
-    final constraintBox =
-        _constraintKey.currentContext?.findRenderObject() as RenderBox?;
     final cellBox = _cellKey.currentContext?.findRenderObject() as RenderBox?;
     final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
-    if (constraintBox == null || cellBox == null || stackBox == null) {
-      if (_arrowStart != null || _arrowEnd != null) {
+    if (cellBox == null || stackBox == null) {
+      if (_arrowStarts != null || _arrowEnd != null) {
         setState(() {
-          _arrowStart = null;
+          _arrowStarts = null;
           _arrowEnd = null;
         });
       }
       return;
     }
-    final constraintPos = constraintBox.localToGlobal(
-      Offset.zero,
-      ancestor: stackBox,
-    );
-    final cellPos = cellBox.localToGlobal(Offset.zero, ancestor: stackBox);
-    final start =
-        constraintPos +
-        Offset(constraintBox.size.width / 2, constraintBox.size.height / 2);
+
     final end =
-        cellPos + Offset(cellBox.size.width / 2, cellBox.size.height / 2);
-    if (start != _arrowStart || end != _arrowEnd) {
-      setState(() {
-        _arrowStart = start;
-        _arrowEnd = end;
-      });
+        cellBox.localToGlobal(Offset.zero, ancestor: stackBox) +
+        Offset(cellBox.size.width / 2, cellBox.size.height / 2);
+
+    final starts = <Offset>[];
+    for (final c in widget.currentPuzzle.constraints) {
+      if (!c.isHighlighted) continue;
+      final pos = _computeConstraintOrigin(c, stackBox);
+      if (pos != null) starts.add(pos);
     }
+
+    if (starts.isEmpty) return;
+
+    setState(() {
+      _arrowStarts = starts;
+      _arrowEnd = end;
+    });
+  }
+
+  Offset? _computeConstraintOrigin(Constraint c, RenderObject stackBox) {
+    if (c is MajorityConstraint) return _computeMajorityOrigin(c, stackBox);
+    if (c is CellsCentricConstraint) {
+      return _computeCellCentricOrigin(c, stackBox);
+    }
+    final key = _arrowKeys[c];
+    if (key == null) return null;
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return null;
+    final pos = box.localToGlobal(Offset.zero, ancestor: stackBox);
+    return pos + Offset(box.size.width / 2, box.size.height / 2);
+  }
+
+  Offset _computeMajorityOrigin(MajorityConstraint mj, RenderObject stackBox) {
+    final gridBox = _gridKey.currentContext?.findRenderObject() as RenderBox?;
+    final gridPos = gridBox!.localToGlobal(Offset.zero, ancestor: stackBox);
+    return gridPos +
+        Offset(
+          (mj.c0 + mj.c1 + 1) / 2 * widget.cellSize,
+          (mj.r0 + mj.r1 + 1) / 2 * widget.cellSize,
+        );
+  }
+
+  Offset _computeCellCentricOrigin(
+    CellsCentricConstraint c,
+    RenderObject stackBox,
+  ) {
+    final gridBox = _gridKey.currentContext?.findRenderObject() as RenderBox?;
+    final gridPos = gridBox!.localToGlobal(Offset.zero, ancestor: stackBox);
+    final cellIdx = c.indices.first;
+    final col = cellIdx % widget.currentPuzzle.width;
+    final row = cellIdx ~/ widget.currentPuzzle.width;
+    return gridPos +
+        Offset((col + 0.5) * widget.cellSize, (row + 0.5) * widget.cellSize);
   }
 
   @override
@@ -111,7 +179,11 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     int numberOfTopBarConstraints = widget.currentPuzzle.constraints
         .where(
           (constraint) =>
-              (constraint is Motif || constraint is QuantityConstraint),
+              (constraint is Motif ||
+              constraint is QuantityConstraint ||
+              constraint is GroupCountConstraint ||
+              constraint is BoundingBoxConstraint ||
+              constraint is ChainConstraint),
         )
         .length;
     double totalWidth = MediaQuery.sizeOf(context).width;
@@ -131,20 +203,19 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       adjustedCellSize -= marginNeeded / widget.currentPuzzle.height;
     }
 
-    // Find the highlighted constraint (for arrow source)
-    Constraint? highlightedConstraint;
-    for (var c in widget.currentPuzzle.constraints) {
-      if (c.isHighlighted) {
-        highlightedConstraint = c;
-        break;
-      }
-    }
-
     // Build a map of column index → ColumnCountConstraint for the column header row
     final ccByColumn = <int, ColumnCountConstraint>{};
     for (final c in widget.currentPuzzle.constraints) {
       if (c is ColumnCountConstraint) {
         ccByColumn[c.columnIdx] = c;
+      }
+    }
+
+    // Build a map of column index → ColumnTransitionConstraint for CT in column header
+    final ctByCol = <int, ColumnTransitionConstraint>{};
+    for (final c in widget.currentPuzzle.constraints) {
+      if (c is ColumnTransitionConstraint) {
+        ctByCol[c.columnIdx] = c;
       }
     }
 
@@ -156,36 +227,36 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       }
     }
 
-    // A constraint is "in the top bar" if it's displayed there.
-    // RC is shown on the left side, not in the top bar.
-    final bool constraintIsInTopBar =
-        highlightedConstraint is Motif ||
-        highlightedConstraint is QuantityConstraint ||
-        highlightedConstraint is ColumnCountConstraint ||
-        highlightedConstraint is GroupCountConstraint;
-
-    // For cell-centric constraints, find the constraint's home cell index
-    int? constraintCellIdx;
-    if (highlightedConstraint != null &&
-        !constraintIsInTopBar &&
-        highlightedConstraint is CellsCentricConstraint) {
-      constraintCellIdx = highlightedConstraint.indices.first;
+    // Build a map of row index → RowTransitionConstraint for RT in left bar
+    final rtByRow = <int, RowTransitionConstraint>{};
+    for (final c in widget.currentPuzzle.constraints) {
+      if (c is RowTransitionConstraint) {
+        rtByRow[c.rowIdx] = c;
+      }
     }
 
-    // Only assign arrow keys when there's a highlighted cell (arrow endpoint).
-    // Without a highlighted cell, there's no arrow to draw, so no need for
-    // _constraintKey on a Table cell (avoids GlobalKey migration conflicts).
-    final hasHighlightedCell = widget.currentPuzzle.cells.any(
-      (c) => c.isHighlighted,
-    );
+    // Collect all highlighted constraints for multi-arrow rendering
+    final highlightedConstraints = widget.currentPuzzle.constraints
+        .where((c) => c.isHighlighted)
+        .toList();
+
+    // For MJ zone highlights: union of all highlighted MJ zones
+    Set<int>? mjZoneHighlightIndices;
+    for (final c in highlightedConstraints.whereType<MajorityConstraint>()) {
+      mjZoneHighlightIndices ??= <int>{};
+      mjZoneHighlightIndices.addAll(c.indicesFor(widget.currentPuzzle.width));
+    }
+
+    // For cell-centric constraints: set of home cell indices
+    final constraintHomeCells = <int>{};
+    for (final c
+        in highlightedConstraints.whereType<CellsCentricConstraint>()) {
+      constraintHomeCells.add(c.indices.first);
+    }
 
     // Compute groups once per build so GC widgets and per-cell
     // getCellGroupSize callbacks share a single O(N) flood-fill.
     final groups = getGroups(widget.currentPuzzle);
-
-    final hasDF = widget.currentPuzzle.constraints.any(
-      (c) => c is DifferentFromConstraint,
-    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -227,29 +298,33 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                     for (var constraint in widget.currentPuzzle.constraints)
                       if (constraint is Motif)
                         MotifWidget(
-                          key:
-                              (constraint.isHighlighted && constraintIsInTopBar)
-                              ? _constraintKey
+                          key: constraint.isHighlighted
+                              ? _arrowKeys.putIfAbsent(
+                                  constraint,
+                                  () => GlobalKey(),
+                                )
                               : null,
                           constraint: constraint,
                           cellSize: topBarConstraintsSize,
                         )
                       else if (constraint is QuantityConstraint)
                         QuantityWidget(
-                          key:
-                              (constraint.isHighlighted && constraintIsInTopBar)
-                              ? _constraintKey
+                          key: constraint.isHighlighted
+                              ? _arrowKeys.putIfAbsent(
+                                  constraint,
+                                  () => GlobalKey(),
+                                )
                               : null,
                           constraint: constraint,
                           actualCount: widget.currentPuzzle.cellValues
-                              .where((val) => val == constraint.value)
+                              .where((val) => val == constraint.color)
                               .length,
                           oppositeActual: widget.currentPuzzle.cellValues
                               .where(
                                 (val) =>
                                     val ==
                                     widget.currentPuzzle.domain
-                                        .whereNot((v) => v == constraint.value)
+                                        .whereNot((v) => v == constraint.color)
                                         .first,
                               )
                               .length,
@@ -258,12 +333,15 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                   widget.currentPuzzle.height) -
                               constraint.count,
                           cellSize: topBarConstraintsSize,
+                          domainLength: widget.currentPuzzle.domain.length,
                         )
                       else if (constraint is GroupCountConstraint)
                         GroupCountWidget(
-                          key:
-                              (constraint.isHighlighted && constraintIsInTopBar)
-                              ? _constraintKey
+                          key: constraint.isHighlighted
+                              ? _arrowKeys.putIfAbsent(
+                                  constraint,
+                                  () => GlobalKey(),
+                                )
                               : null,
                           constraint: constraint,
                           actualGroupCount: groups
@@ -275,6 +353,28 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               )
                               .length,
                           cellSize: topBarConstraintsSize,
+                        )
+                      else if (constraint is BoundingBoxConstraint)
+                        BoundingBoxWidget(
+                          key: constraint.isHighlighted
+                              ? _arrowKeys.putIfAbsent(
+                                  constraint,
+                                  () => GlobalKey(),
+                                )
+                              : null,
+                          constraint: constraint,
+                          cellSize: topBarConstraintsSize,
+                        )
+                      else if (constraint is ChainConstraint)
+                        ChainWidget(
+                          key: constraint.isHighlighted
+                              ? _arrowKeys.putIfAbsent(
+                                  constraint,
+                                  () => GlobalKey(),
+                                )
+                              : null,
+                          constraint: constraint,
+                          cellSize: topBarConstraintsSize,
                         ),
                   ],
                 ),
@@ -283,8 +383,8 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Left side: RC indicators (only if any RC constraints exist)
-                    if (rcByRow.isNotEmpty)
+                    // Left side: RC and RT indicators
+                    if (rcByRow.isNotEmpty || rtByRow.isNotEmpty)
                       Column(
                         children: [
                           for (
@@ -292,15 +392,34 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                             row < widget.currentPuzzle.height;
                             row++
                           )
-                            if (rcByRow.containsKey(row))
-                              RowCountWidget(
-                                key:
-                                    (rcByRow[row]!.isHighlighted &&
-                                        !constraintIsInTopBar)
-                                    ? _constraintKey
-                                    : null,
-                                constraint: rcByRow[row]!,
-                                cellSize: adjustedCellSize,
+                            if (rcByRow.containsKey(row) ||
+                                rtByRow.containsKey(row))
+                              Column(
+                                children: [
+                                  if (rcByRow.containsKey(row))
+                                    RowCountWidget(
+                                      key: rcByRow[row]!.isHighlighted
+                                          ? _arrowKeys.putIfAbsent(
+                                              rcByRow[row]!,
+                                              () => GlobalKey(),
+                                            )
+                                          : null,
+                                      constraint: rcByRow[row]!,
+                                      cellSize: adjustedCellSize,
+                                    ),
+                                  if (rtByRow.containsKey(row))
+                                    TransitionWidget(
+                                      key: rtByRow[row]!.isHighlighted
+                                          ? _arrowKeys.putIfAbsent(
+                                              rtByRow[row]!,
+                                              () => GlobalKey(),
+                                            )
+                                          : null,
+                                      constraint: rtByRow[row]!,
+                                      cellSize: adjustedCellSize,
+                                      axis: Axis.horizontal,
+                                    ),
+                                ],
                               )
                             else
                               SizedBox(
@@ -312,7 +431,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                     // Right side: CC row + Grid
                     Column(
                       children: [
-                        if (ccByColumn.isNotEmpty)
+                        if (ccByColumn.isNotEmpty || ctByCol.isNotEmpty)
                           SizedBox(
                             width: gridWidth,
                             child: Row(
@@ -322,15 +441,38 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                   col < widget.currentPuzzle.width;
                                   col++
                                 )
-                                  if (ccByColumn.containsKey(col))
-                                    ColumnCountWidget(
-                                      key:
-                                          (ccByColumn[col]!.isHighlighted &&
-                                              constraintIsInTopBar)
-                                          ? _constraintKey
-                                          : null,
-                                      constraint: ccByColumn[col]!,
-                                      cellSize: adjustedCellSize,
+                                  if (ccByColumn.containsKey(col) ||
+                                      ctByCol.containsKey(col))
+                                    SizedBox(
+                                      width: adjustedCellSize,
+                                      child: Column(
+                                        children: [
+                                          if (ctByCol.containsKey(col))
+                                            TransitionWidget(
+                                              key: ctByCol[col]!.isHighlighted
+                                                  ? _arrowKeys.putIfAbsent(
+                                                      ctByCol[col]!,
+                                                      () => GlobalKey(),
+                                                    )
+                                                  : null,
+                                              constraint: ctByCol[col]!,
+                                              cellSize: adjustedCellSize,
+                                              axis: Axis.vertical,
+                                            ),
+                                          if (ccByColumn.containsKey(col))
+                                            ColumnCountWidget(
+                                              key:
+                                                  ccByColumn[col]!.isHighlighted
+                                                  ? _arrowKeys.putIfAbsent(
+                                                      ccByColumn[col]!,
+                                                      () => GlobalKey(),
+                                                    )
+                                                  : null,
+                                              constraint: ccByColumn[col]!,
+                                              cellSize: adjustedCellSize,
+                                            ),
+                                        ],
+                                      ),
                                     )
                                   else
                                     SizedBox(width: adjustedCellSize),
@@ -338,51 +480,23 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                             ),
                           ),
                         SizedBox(
+                          key: _gridKey,
                           width: gridWidth,
                           height: gridHeight,
-                          child: Stack(
-                            children: [
-                              Table(
-                                border: TableBorder.all(),
-                                defaultColumnWidth: FixedColumnWidth(
-                                  adjustedCellSize,
-                                ),
-                                children: [
-                                  for (var (rowidx, row)
-                                      in widget.currentPuzzle.getRows().indexed)
-                                    TableRow(
-                                      children: [
-                                        for (var (cellidx, cell) in row.indexed)
-                                          _buildCell(
-                                            cell,
-                                            rowidx,
-                                            cellidx,
-                                            adjustedCellSize,
-                                            constraintIsInTopBar,
-                                            constraintCellIdx,
-                                            hasHighlightedCell,
-                                            groups,
-                                          ),
-                                      ],
-                                    ),
-                                ],
-                              ),
-                              if (hasDF)
-                                IgnorePointer(
-                                  child: CustomPaint(
-                                    painter: DifferentFromPainter(
-                                      constraints: widget
-                                          .currentPuzzle
-                                          .constraints
-                                          .whereType<DifferentFromConstraint>()
-                                          .toList(),
-                                      cellSize: adjustedCellSize,
-                                      gridWidth: widget.currentPuzzle.width,
-                                      defaultColor: Colors.black87,
-                                      highlightColor: highlightColor,
-                                    ),
-                                  ),
-                                ),
+                          child: PuzzleGridStack(
+                            puzzle: widget.currentPuzzle,
+                            cellSize: adjustedCellSize,
+                            cellBuilder: (idx) => _buildCell(
+                              widget.currentPuzzle.cells[idx],
+                              idx ~/ widget.currentPuzzle.width,
+                              idx % widget.currentPuzzle.width,
+                              adjustedCellSize,
+                              groups,
+                              mjZoneHighlightIndices,
+                              constraintHomeCells,
+                            ),
+                            overlays: [
+                              _buildOptionDotsOverlay(adjustedCellSize),
                             ],
                           ),
                         ),
@@ -392,22 +506,50 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                 ),
               ],
             ),
-            if (_arrowStart != null && _arrowEnd != null)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: _ArrowPainter(
-                      start: _arrowStart!,
-                      end: _arrowEnd!,
-                      color: highlightColor,
+            if (_arrowStarts != null && _arrowEnd != null)
+              for (final start in _arrowStarts!)
+                Positioned.fill(
+                  key: ValueKey('arrow_${start.hashCode}'),
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _ArrowPainter(
+                        start: start,
+                        end: _arrowEnd!,
+                        color: highlightColor,
+                      ),
                     ),
                   ),
                 ),
-              ),
           ],
         );
       },
     );
+  }
+
+  Widget _buildOptionDotsOverlay(double cellSize) {
+    final puzzle = widget.currentPuzzle;
+    if (puzzle.domain.length <= 2) return const SizedBox.shrink();
+
+    final list = <Widget>[];
+    for (var i = 0; i < puzzle.cells.length; i++) {
+      final cell = puzzle.cells[i];
+      if (cell.value != CellValue.free) continue;
+      final col = i % puzzle.width;
+      final row = i ~/ puzzle.width;
+      list.add(
+        Positioned(
+          left: col * cellSize,
+          width: cellSize,
+          bottom: (puzzle.height - row - 1) * cellSize + cellSize * 0.04,
+          child: IgnorePointer(
+            child: OptionDots(options: cell.options, cellSize: cellSize),
+          ),
+        ),
+      );
+    }
+
+    if (list.isEmpty) return const SizedBox.shrink();
+    return Positioned.fill(child: Stack(children: list));
   }
 
   Widget _buildCell(
@@ -415,24 +557,23 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     int rowidx,
     int cellidx,
     double adjustedCellSize,
-    bool constraintIsInTopBar,
-    int? constraintCellIdx,
-    bool hasHighlightedCell,
     List<List<int>> groups,
+    Set<int>? mjZoneHighlightIndices,
+    Set<int> constraintHomeCells,
   ) {
     final idx = rowidx * widget.currentPuzzle.width + cellidx;
 
-    // Assign _cellKey to highlighted cell, _constraintKey to constraint's home cell.
-    // Only assign _constraintKey when there's also a highlighted cell (arrow endpoint),
-    // otherwise the key can migrate between Table cells and cause GlobalKey conflicts.
+    final Color? zoneTint =
+        mjZoneHighlightIndices != null && mjZoneHighlightIndices.contains(idx)
+        ? highlightColor.withValues(alpha: 0.15)
+        : null;
+
+    // Assign _cellKey to the highlighted cell (arrow endpoint).
+    // Cell-centric constraint origins are computed geometrically
+    // from the grid position — no GlobalKey needed for them.
     GlobalKey? cellKeyToUse;
     if (cell.isHighlighted) {
       cellKeyToUse = _cellKey;
-    }
-    if (!constraintIsInTopBar &&
-        constraintCellIdx == idx &&
-        hasHighlightedCell) {
-      cellKeyToUse = _constraintKey;
     }
 
     return CellWidget(
@@ -447,19 +588,18 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       onSecondaryTap: isDesktopOrWeb
           ? () => _handleCellTap(idx, secondary: true)
           : null,
+      onLongPress: widget.onCellLongPress != null
+          ? () => widget.onCellLongPress!(idx)
+          : null,
       onDrag: (Offset offset) {
-        final int targetRow = (rowidx + offset.dy).floor();
-        final int targetCell = (cellidx + offset.dx).floor();
-        widget.onCellDrag(targetRow * widget.currentPuzzle.width + targetCell);
+        final idx = _dragTargetIdx(rowidx, cellidx, offset);
+        if (idx != null) widget.onCellDrag(idx);
       },
       onDragEnd: widget.onCellDragEnd,
       onRightDrag: widget.onCellRightDrag != null
           ? (Offset offset) {
-              final int targetRow = (rowidx + offset.dy).floor();
-              final int targetCell = (cellidx + offset.dx).floor();
-              widget.onCellRightDrag!(
-                targetRow * widget.currentPuzzle.width + targetCell,
-              );
+              final idx = _dragTargetIdx(rowidx, cellidx, offset);
+              if (idx != null) widget.onCellRightDrag!(idx);
             }
           : null,
       onRightDragEnd: widget.onCellRightDragEnd,
@@ -471,6 +611,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
         }
         return 0;
       },
+      zoneHighlightColor: zoneTint,
     );
   }
 }

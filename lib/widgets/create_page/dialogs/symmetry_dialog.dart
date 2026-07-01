@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
-import 'package:getsomepuzzle/widgets/symmetry.dart';
+import 'package:getsomepuzzle/widgets/constraints/symmetry.dart';
 
 Future<SymmetryConstraint?> showSymmetryDialog(
   BuildContext context, {

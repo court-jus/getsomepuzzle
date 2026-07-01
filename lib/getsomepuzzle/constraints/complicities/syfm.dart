@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
@@ -50,10 +51,10 @@ class SYFMComplicity extends Complicity {
       final anchor = sy.indices.first;
       final c = puzzle.cellValues[anchor];
       Move? move;
-      if (c != 0) {
+      if (c != CellValue.free) {
         move = _solveColouredAnchor(sy, puzzle, fms, anchor, c);
       } else {
-        move = _solveEmptyAnchor(sy, puzzle, anchor);
+        move = _solveEmptyAnchor(sy, puzzle, anchor, fms);
       }
       if (move != null) return move;
     }
@@ -65,10 +66,8 @@ class SYFMComplicity extends Complicity {
     Puzzle puzzle,
     List<ForbiddenMotif> fms,
     int anchor,
-    int c,
+    CellValue c,
   ) {
-    final opposite = puzzle.domain.firstWhere((v) => v != c);
-
     final anchorGroup = getGroups(
       puzzle,
     ).firstWhereOrNull((g) => g.contains(anchor));
@@ -77,33 +76,56 @@ class SYFMComplicity extends Complicity {
     final frontier = <int>{};
     for (final m in anchorGroup) {
       for (final nei in puzzle.getNeighbors(m)) {
-        if (puzzle.cellValues[nei] == 0) frontier.add(nei);
+        if (puzzle.cellValues[nei] == CellValue.free) frontier.add(nei);
       }
     }
 
     for (final a in frontier) {
+      // Already-pruned cells contribute nothing here.
+      if (!puzzle.cells[a].options.contains(c)) continue;
       final mirror = sy.computeSymmetry(puzzle, a);
       if (mirror == null || mirror == a) continue;
-      if (puzzle.cellValues[mirror] == opposite) continue;
+      final mv = puzzle.cellValues[mirror];
+      // If the mirror is already coloured something other than c, plain
+      // SY.apply handles the deduction — nothing for the complicity to
+      // add.
+      if (mv != CellValue.free && mv != c) continue;
 
       final clone = puzzle.clone();
       clone.cells[a].setForSolver(c);
-      if (puzzle.cellValues[mirror] == 0) {
+      if (mv == CellValue.free) {
         clone.cells[mirror].setForSolver(c);
       }
 
       for (final fm in fms) {
         if (!fm.verify(clone)) {
-          return Move(a, opposite, this, complexity: 4);
+          // Colouring a = c (and forcing mirror = c by SY) violates an
+          // FM, so a cannot be c.
+          return RemoveOption(
+            a,
+            c,
+            this,
+            complexity: 4,
+            contributors: [sy, fm],
+          );
         }
       }
     }
     return null;
   }
 
-  Move? _solveEmptyAnchor(SymmetryConstraint sy, Puzzle puzzle, int anchor) {
-    final feasible = <int>[];
-    final colorStates = <int, List<int>>{};
+  Move? _solveEmptyAnchor(
+    SymmetryConstraint sy,
+    Puzzle puzzle,
+    int anchor,
+    List<ForbiddenMotif> fms,
+  ) {
+    final feasible = <CellValue>[];
+    final colorStates = <CellValue, List<CellValue>>{};
+    // Track all constraint instances that participated in the deduction:
+    // those that produced moves during propagation (for any hypothesis)
+    // and those whose verify rejected a hypothesis.
+    final participatingConstraints = <CanApply>{};
 
     for (final color in puzzle.domain) {
       final hyp = puzzle.clone();
@@ -115,24 +137,32 @@ class SYFMComplicity extends Complicity {
       hyp.cells[anchor].setForSolver(color);
 
       bool failed = false;
+      hypLoop:
       for (int step = 0; step < _maxHypothesisSteps; step++) {
         final m = hyp.findAMove(checkErrors: false, tryForce: false);
         if (m == null) break;
-        if (m.isImpossible != null) {
-          failed = true;
-          break;
+        if (m.givenBy is CanApply) {
+          participatingConstraints.add(m.givenBy as CanApply);
         }
-        hyp.setValue(m.idx, m.value);
+        switch (m) {
+          case Impossible():
+            failed = true;
+            break hypLoop;
+          case SetValue(:final idx, :final value):
+            hyp.setValue(idx, value);
+          case RemoveOption(:final idx, :final option):
+            hyp.removeOption(idx, option);
+        }
         if (hyp.complete) break;
       }
       // A hypothesis that ends with at least one constraint failing
       // is also infeasible — propagation may simply have stopped
-      // before noticing.
+      // before noticing. Track the specific failing constraints.
       if (!failed) {
         for (final cst in hyp.constraints) {
           if (!cst.verify(hyp)) {
             failed = true;
-            break;
+            participatingConstraints.add(cst);
           }
         }
       }
@@ -142,19 +172,30 @@ class SYFMComplicity extends Complicity {
       colorStates[color] = hyp.cellValues;
     }
 
+    final contribs = <CanApply>[sy, ...participatingConstraints];
     if (feasible.isEmpty) {
-      return Move(0, 0, this, isImpossible: this);
+      return Impossible(this, contributors: contribs);
     }
     if (feasible.length == 1) {
-      // Only one colour for the anchor leads to a feasible state.
-      return Move(anchor, feasible.first, this, complexity: 4);
+      // Only one colour for the anchor leads to a feasible state. If
+      // that colour has already been pruned from the anchor's options
+      // (3-colour puzzles), no useful deduction here — fall through.
+      if (puzzle.cells[anchor].options.contains(feasible.first)) {
+        return SetValue(
+          anchor,
+          feasible.first,
+          this,
+          complexity: 4,
+          contributors: contribs,
+        );
+      }
     }
-    // Both colours feasible — find a free cell whose value is the
+    // Multiple colours feasible — find a free cell whose value is the
     // same across every feasible hypothesis.
     for (int i = 0; i < puzzle.cellValues.length; i++) {
-      if (puzzle.cellValues[i] != 0) continue;
+      if (puzzle.cellValues[i] != CellValue.free) continue;
       final v = colorStates[feasible.first]![i];
-      if (v == 0) continue;
+      if (v == CellValue.free) continue;
       bool unanimous = true;
       for (final color in feasible.skip(1)) {
         if (colorStates[color]![i] != v) {
@@ -162,8 +203,8 @@ class SYFMComplicity extends Complicity {
           break;
         }
       }
-      if (unanimous) {
-        return Move(i, v, this, complexity: 4);
+      if (unanimous && puzzle.cells[i].options.contains(v)) {
+        return SetValue(i, v, this, complexity: 4, contributors: contribs);
       }
     }
     return null;

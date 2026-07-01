@@ -4,17 +4,27 @@ In this game, your aim is to color the cells of the grid in black or white.
 
 To know which cell has to be which color, you have to follow some constraints (rules are explained below).
 
-Click (or touch on mobile) a cell to change its color.
+Click (or touch on mobile) a cell to change its color. A click cycles through colours: free → black → white → free. On desktop, right-click cycles in the opposite direction (free → white → black → free); on mobile, a long press does the same. Dragging paints several cells in a row with the cycle's colour.
+
+Some puzzles use a third colour, purple, with small coloured dots underneath the free cells showing which colours are still possible. On those puzzles the cycle includes purple: a click is free → black → white → purple → free, and a right-click (or long press) is free → purple → white → black → free — so a single right-click is enough to reach purple.
 
 Some cells can be already filled and you won't be able to change them, they are indicated by a thicker inside border.
 
 You will not be shown when you make a mistake but when the grid is filled, your solution is checked. If you won, another puzzle will start immediately. If you made a mistake, the corresponding constraint will be highlighted and you will be able to change your solution.
 
-If you are stuck, the "restart" icon resets the puzzle to its initial state.
+If you are stuck, several buttons are available in the top bar: **Hint** (the lightbulb icon, see the Hints section below), **Undo** (reverts your last move), **Restart** (resets the grid to its initial state) and **Pause**. In manual validation mode, a **Validate** button on a green background also appears once the grid is filled.
 
 While playing, your timing is recorded (see the Stats section below). If needed, the game can be paused and resumed.
 
-There are about 10,000 puzzles bundled within the app. Each time you run the app, the collection is shuffled and you get random puzzles. The puzzles you already solved won't show up anymore, you'll see your progress below the puzzle.
+There are about 25,000 puzzles bundled within the app. The puzzles you already solved won't show up anymore, and you'll see your progress below the puzzle.
+
+The main menu (icon in the top-left) also offers, while a puzzle is in progress: **Next puzzle** (skip to the next one), **Save progress** (set this one aside in a dedicated playlist to resume later) and **Share puzzle** (send the current puzzle to someone).
+
+## Learning
+
+When you launch the game for the first time, a learning sequence introduces the constraints one at a time. Each new rule is shown in a short dialog the first time you meet it, and the game then keeps offering puzzles centered on that rule until you have played enough of them (5 puzzles by default) before moving on to the next one. You can skip the whole sequence at any time with the "Skip learning" button in the rule dialog, or restart it from scratch from the Settings page.
+
+The **Learning** page, reachable from the main menu, lists every constraint with its description and the date you first met it. The "Refresh my memory" button next to each rule launches a short playlist of puzzles centered on that rule — handy to come back to a constraint you have not seen in a while.
 
 ## Constraints
 
@@ -38,6 +48,10 @@ If you see an arrow in a cell, there must be the same number of black and white 
 
 Cells containing the same letter should be part of the same group. A group must not contain different letters.
 
+### Majority color
+
+A dotted rectangle in a specific colour indicates that most cells inside the zone must be of that colour (more than half). The border colour itself tells you which colour must dominate.
+
 ### Quantity
 
 A black or white number over the puzzle, on a blue background indicates that the total number of cells of that color should match that number.
@@ -52,27 +66,61 @@ The central symmetry (🞋) is identical to a rotation by half a turn.
 
 When two cells are separated by the ≠ symbol, they must be different colors.
 
+### Implication (→)
+
+An arrow from one cell to another means: if the source cell takes the arrow's colour, the target cell must also take that colour. The contrapositive also holds — if the target takes a different colour, the source cannot take the arrow's colour either.
+
 ### Column count
 
 A number in a circle above a column indicates how many cells of that color must be in that specific column.
+
+### Column transition
+
+A square wave with a number in a square above a column tells how many color changes (transitions) must appear in that column. Each step of the wave is one change; a flat wave with 0 means the whole column is a single color.
+
+### Row count
+
+A number in a circle to the left of a row indicates how many cells of that color must be in that specific row. This is the horizontal counterpart of Column count.
+
+### Row transition
+
+A square wave with a number in a square beside a row tells how many color changes (transitions) must appear in that row. Each step of the wave is one change; a flat wave with 0 means the whole row is a single color.
 
 ### Group count
 
 A number in a box with a link icon indicates how many groups (connected components) of that color must be in the solution.
 
+### Bounding box
+
+Every connected group of this colour must occupy a bounding box of exactly the indicated width and height — the smallest rectangle that encloses the group spans exactly that many columns and rows. The group itself does not need to fill the box.
+
+### Neighbor count
+
+A cell containing a digit inside a **plus-shaped cross** indicates how many orthogonal neighbours of that colour the cell must have. The cross is filled with the target colour and outlined in the opposite colour so it stays readable on any background. For instance, a black cross holding the digit 2 means the cell must have exactly 2 black neighbours among its top/bottom/left/right cells.
+
 ### Eyes
 
 A cell with an eye symbol must "see" exactly the indicated number of cells of the eye's color. A cell sees in a straight line in each of the four orthogonal directions until it reaches the edge of the grid or a cell of the opposite color (which blocks the line of sight). The eye's color is the target color; the border around the eye is the opposite color.
+
+### Chain
+
+A mini-grid icon shows two sides of the grid connected by a path. The solution must contain an unbroken orthogonal chain of that color from the marked side to the other marked side. The path does not need to be a straight line — it can bend, branch, or widen, as long as there is at least one continuous connection between the two sides.
+
+## The Open page
+
+The Open page is where you pick what to play. At the top, the *Collection* dropdown lists the difficulty levels (Easy → Mad), followed by your own puzzles and any playlists you have created. Next to it, the `+` button creates a new playlist, the file button imports puzzles from a file, and the trash button deletes the current playlist if you own it.
+
+The *Shuffle* toggle plays puzzles in random order. Below it, filters let you narrow the list: grid size, the constraint types you want to see or avoid, and whether to keep puzzles you have already played or skipped. The number shown above the Play button tells you how many puzzles match the active filters, and a small reset button next to each filter brings the default value back.
 
 ## Custom puzzles
 
 ### Generating puzzles
 
-Open the menu and tap "Generate" to access the puzzle generator. You can choose the grid size, which constraint types to include or exclude, and how many puzzles to generate. You can also choose which playlist to save them to.
+Open the menu and tap "Generate" to make new puzzles on the fly. Pick the grid dimensions, the constraint types to include or exclude, a time limit per puzzle, and how many puzzles to produce. Choose the playlist that will receive them, then tap "Generate" — the progress bar shows how many have been made. Generation runs in the background; you can stop early at any time and keep what has been produced so far.
 
 ### Creating puzzles
 
-Open the menu and tap "Create" to design your own puzzle. You can set the grid dimensions, fix cell colors, add constraints, and the editor will show you in real time which cells are solvable. Green borders mean the cell can be deduced by direct reasoning, orange borders mean it requires elimination.
+Open the menu and tap "Create" to design your own puzzle by hand. Pick the grid dimensions and tap "Start" to enter the editor. Tap a cell to open a menu that lets you fix it black or white, or attach a constraint centered on that cell; the added constraint appears, and you can tap it to remove it. The app tries to solve the puzzle as you make changes. Cells with a green border can be found by direct reasoning, those with an orange border by elimination. The bottom bar shows the current dimensions, the number of constraints, and a rough difficulty score. "Test" lets you play through the puzzle to check it works, and "Save" stores it in the chosen playlist.
 
 ### Playlists
 
@@ -105,10 +153,49 @@ Instead of pointing at a cell, the second tap adds a brand-new constraint to the
 
 After a constraint is added, the next tap restarts the cycle at the error check.
 
+## Keyboard shortcuts
+
+On desktop, these keys control a puzzle while you play:
+
+- **U** — undo the last move
+- **R** — restart the puzzle
+- **P** — pause or resume
+- **H** — show a hint
+- **N** — skip to the next puzzle
+- **Enter** — validate (when manual validation is on)
+- **Esc** — open the menu
+- **Space** — on 3-colour puzzles, switch between setting a colour and removing an option
+
+## Settings
+
+The settings page tunes how the game checks your work and asks for help.
+
+**Language**: choose the app's display language (English, French or Spanish).
+
+**Validation**: choose whether the grid is checked manually (you tap a button) or automatically (as soon as it is fully filled).
+
+**Live check**: how errors are surfaced while you play — show every wrong cell, just an error count, or wait until the grid is complete.
+
+**Show rating**: whether the rating screen appears between puzzles so you can rate what you just played on a five-level scale (very negative → very positive).
+
+**Hint type**: how the hint button helps — by pointing at a cell you can deduce ("Deducible cell"), or by adding a fresh constraint that simplifies the puzzle ("Add constraint"). See the Hints section above for details.
+
+**Idle timeout**: when no input arrives for the chosen delay (or the app loses focus), the timer auto-pauses so it does not keep running while you are away.
+
+**Player level** (0-100): nudges the puzzles you are offered toward your reasoning speed. Higher means harder.
+
+**Auto level**: when on, your level is updated automatically from your completion times. Turn it off to set the level by hand.
+
+**Replay onboarding**: restart the new-player onboarding sequence from phase 0 — useful if you want to revisit the rule-introduction dialogs.
+
+**Clear stats**: wipe the locally stored per-puzzle stats. The action is irreversible and asks for confirmation.
+
 ## Stats
 
 The game records how much time has passed before a puzzle is solved and how many failures were made. This data stays on your device — nothing is collected automatically. If you solve a bunch of puzzles I'd love it if you sent your stats over: I use them to sort the puzzles by difficulty, and that helps a lot.
 
-To send the stats, click the "Journal" icon on the main page, to the left of the help icon, copy the content and send it to me.
+The Stats page is reachable from the main menu, under the **Progress** section. At the top, a selector lets you switch between the current collection and all collections. The **Share** button (or **Open** on desktop) exports the stats to send them over, and the **Import** button lets you re-inject a previously exported stats file.
+
+You can also synchronise your stats between devices by pointing the app to a shared folder and using a file-sync tool like Syncthing or Dropbox — see the [cross-device stats guide](https://leveque.cc/getsomepuzzle/doc/en/crossplay.html) for instructions.
 
 > Thank you very much.

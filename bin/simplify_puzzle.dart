@@ -11,6 +11,7 @@
 import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
@@ -200,7 +201,11 @@ _TraceResult _trace(Puzzle pu) {
   }
   final replay = pu.clone();
   for (final s in steps) {
-    replay.setValue(s.cellIdx, s.value);
+    if (s.value != null) {
+      replay.setValue(s.cellIdx, s.value!);
+    } else if (s.removeOption != null) {
+      replay.removeOption(s.cellIdx, s.removeOption!);
+    }
   }
   final completed = replay.complete && replay.check(saveResult: false).isEmpty;
   final prefillRatio =
@@ -227,7 +232,7 @@ void _printFullTrace(Puzzle pu, _TraceResult r) {
     final s = r.steps[i];
     final row = s.cellIdx ~/ pu.width;
     final col = s.cellIdx % pu.width;
-    final color = s.value == 1 ? 'B' : 'W';
+    final color = s.value == CellValue.black ? 'B' : 'W';
     final String kind;
     if (s.method == SolveMethod.force) {
       kind = 'force depth=${s.forceDepth}';

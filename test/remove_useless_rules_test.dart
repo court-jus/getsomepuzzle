@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 
@@ -12,7 +13,7 @@ void main() {
     test('returns false for a 2x2 grid with no constraints', () {
       // No constraints at all → multiple valid colorings, deductive solver
       // can't pin a unique answer.
-      final p = Puzzle.empty(2, 2, [1, 2]);
+      final p = Puzzle.empty(2, 2, defaultDomain);
       expect(p.isDeductivelyUnique(), isFalse);
     });
   });
@@ -41,5 +42,21 @@ void main() {
       expect(p.constraints.length, lessThanOrEqualTo(originalLength));
       expect(p.isDeductivelyUnique(), isTrue);
     });
+
+    test(
+      'bails without touching constraints when shouldStop is already set',
+      () {
+        // Budget enforcement: each iteration runs a full isDeductivelyUnique
+        // solve, so on a large grid the cumulative cost can overrun the
+        // per-attempt deadline. When shouldStop fires up front, the cleanup
+        // must abort immediately and leave the (still valid) constraint set
+        // exactly as built — never strip a rule it didn't get to verify.
+        final p = Puzzle('v2_12_3x3_000000000_FM:1.2;GS:0.1;PA:8.top_0:0_0');
+        p.addConstraint(ForbiddenMotif('22'));
+        final lengthBefore = p.constraints.length;
+        p.removeUselessRules(shouldStop: () => true);
+        expect(p.constraints.length, lengthBefore);
+      },
+    );
   });
 }

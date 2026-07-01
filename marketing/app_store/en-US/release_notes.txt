@@ -1,0 +1,7 @@
+What's new:
+
+- Clearer colors: blue marks a required cell, purple marks a forbidden one. Solved constraints fade their background but keep their symbols readable.
+- Redundant parity constraints now merge into one for cleaner grids.
+- The confusing letter "I" was removed from letter groups.
+- Chain constraints fade out as soon as they are satisfied.
+- Bug fixes and stability improvements.

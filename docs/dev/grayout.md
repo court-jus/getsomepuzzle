@@ -19,9 +19,10 @@ target on the next move and fire again).
 
 Under this semantics, two classes of constraints emerge:
 
-- **Monotone** constraints (`FM`, `GS`, `LT`, `SY`, `DF`, `CC`, `PA`): their
-  completion criterion is preserved by any future move. Once complete, they
-  stay complete. They gray out meaningfully mid-game.
+- **Monotone** constraints (`FM`, `GS`, `LT`, `SY`, `DF`, `CC`, `PA`, `RC`,
+  `NC`, `MJ`, `EY`, `CH`):
+  their completion criterion is preserved by any future move. Once complete,
+  they stay complete. They gray out meaningfully mid-game.
 - **Non-monotone** constraints (`QA`, `GC`, `SH`): future play can revive
   them. They can only be grayed out once no useful move can trigger them
   again, which for `QA` and `SH` essentially means "puzzle complete", and
@@ -67,9 +68,16 @@ Complete when the indexed group is fully bordered (no empty neighbors) AND has r
 
 #### 2.3 `LetterGroup`
 
-**File:** `lib/getsomepuzzle/constraints/groups.dart`
+**File:** `lib/getsomepuzzle/constraints/letter_group.dart`
 
-Complete when all indexed cells are filled with the same color, forming a connected group, AND the group has no free neighbors (fully bordered).
+Complete when all indexed cells are filled with the same color, forming a
+single connected group, AND no foreign-letter cell is still reachable from that
+group through cells that could join it (a flood over `{groupColor ∪ free}`).
+Once the members are connected and no other letter can ever merge in, no `apply`
+branch can fire again. Free neighbours are allowed as long as they cannot reach
+a foreign letter — the flood's traversable set only shrinks as cells are
+coloured, so the criterion is monotone and grays out as soon as the letters are
+linked and isolated from other letters.
 
 #### 2.4 `SymmetryConstraint`
 
@@ -145,11 +153,61 @@ Complete when column is fully filled.
 
 Complete when BOTH cells are filled (can verify difference).
 
+#### 2.11 `RowCountConstraint` / `ColumnCountConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/base_line_constraint.dart`
+(shared `LineCentricConstraint.isCompleteFor`)
+
+Complete when the constrained line (row or column) has no free cell
+remaining and `verify(puzzle)` holds — i.e. `count` cells of `color`
+are present in the line. Future play cannot disturb a fully filled
+line.
+
+#### 2.12 `NeighborCountConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/neighbor_count.dart`
+
+Complete when the cell carrying the constraint has no free neighbour
+that can still become `color` (options-aware) and `verify(puzzle)`
+holds. The neighbour-counting target cannot change after every
+neighbour is coloured or has lost the option, so the constraint
+can gray out as soon as the local neighbourhood is saturated.
+
+#### 2.13 `MajorityConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/majority.dart`
+
+Complete when every free cell in the majority zone has lost the
+`targetColor` option and `verify(puzzle)` holds. Once no free cell
+can still become the target colour, no future move can flip the
+majority.
+
+#### 2.14 `EyesConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/eyes_constraint.dart`
+
+Complete when the eye sees exactly `count` cells of the target colour
+**and** no empty cell remains in any line of sight. The "view" computed
+by `whatDoIsee` can only shed empties as cells get coloured, never
+gain new ones, so a `(totalSeen == count) ∧ ¬hasEmpty` snapshot is
+stable for the rest of the puzzle.
+
+#### 2.15 `ChainConstraint`
+
+**File:** `lib/getsomepuzzle/constraints/chain.dart`
+
+Complete as soon as a path of already-placed target-color cells connects the
+two sides (flood-fill restricted to cells of value `color`). Placed cells are
+immutable, so a finished path can never be broken: the constraint is
+guaranteed satisfied at the end, and no `apply` branch can ever fire again.
+The criterion is monotone — CH grays out mid-game once the player finishes
+any connecting path.
+
 ### 3. UI Update
 
 **File:** `lib/getsomepuzzle/constraints/to_flutter.dart`
 
-Updated constraint rendering to gray out complete constraints:
+Constraint rendering grays out complete constraints:
 
 ```dart
 final bool shouldGrayOut = constraint.isComplete && constraint.isValid;
@@ -161,3 +219,18 @@ final fgcolor = shouldGrayOut
 ```
 
 Complete constraints display with a grey foreground color instead of green (valid/highlighted) or red (invalid).
+
+#### Background color semantics
+
+Constraint widgets use the background to encode the constraint's nature
+(`lib/getsomepuzzle/model/constants.dart`):
+
+- `forbiddenColor` (purple) — "forbidden" constraints (FM);
+- `mandatoryColor` (light blue) — "mandatory" constraints (QA, GC, SH,
+  CC, RC, CT, RT, DF).
+
+On grayout the background switches to `Colors.grey.withValues(alpha: 0.3)`.
+For the grid-edge widgets (`lib/widgets/constraints/column_count.dart`,
+`lib/widgets/constraints/row_count.dart`, `lib/widgets/constraints/transition.dart`) and the DF
+circles (`lib/widgets/different_from_painter.dart`), **only the background
+is grayed**: the digit, wave glyph, and ≠ symbol keep their normal colors.

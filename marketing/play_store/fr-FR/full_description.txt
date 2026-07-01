@@ -1,0 +1,18 @@
+Get Some Puzzle est un jeu de logique sur grille. Chaque case devient noire ou blanche selon les règles — et la solution est toujours unique.
+
+Pas de hasard, pas de pression. Chaque coup découle logiquement des contraintes du puzzle. Lorsque vous demandez un indice, le jeu vous guide étape par étape dans la déduction plutôt que de vous donner la réponse.
+
+Les règles sont introduites une par une. Vous commencez avec des contraintes simples de parité et de groupes, puis vous découvrez peu à peu les règles de symétrie, les contraintes œil, les comptages de groupes et de voisins, et une douzaine d'autres. Chaque contrainte change votre lecture de la grille ; chaque combinaison ouvre un nouveau type de raisonnement.
+
+Au programme :
+• Des milliers de puzzles fournis, de difficulté progressive.
+• Une liste adaptative qui choisit des puzzles à votre niveau.
+• Un générateur intégré : ajustez la taille et le jeu de contraintes, obtenez un puzzle neuf à chaque fois.
+• Un éditeur intégré : concevez vos puzzles et partagez-les via un lien.
+• Trois langues : anglais, français, espagnol.
+• Disponible sur Android, iOS, Windows, macOS, Linux et le web.
+
+Gratuit, sans publicité, sans tracking, sans compte.
+Get Some Puzzle est open source — tout le code est sur GitHub. L'application ne collecte ni ne transmet aucune donnée : vos statistiques, vos réglages et les puzzles que vous créez restent sur votre appareil.
+
+Bon jeu.

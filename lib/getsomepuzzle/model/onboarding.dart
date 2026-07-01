@@ -2,11 +2,13 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 
 /// Phase definitions for the new-player onboarding.
 ///
-/// Each phase narrows the catalog to a subset of constraint slugs and
-/// nominates one slug as "currently being introduced". The playlist
-/// sampler biases ~80 % of picks toward puzzles containing the
-/// `introducing` slug and ~20 % toward refresh puzzles using only the
-/// previously-unlocked slugs.
+/// Each phase narrows the catalog to a subset of constraint slugs
+/// (`allowed`) and nominates one slug as "currently being introduced".
+/// During strict phases the playlist sampler only surfaces puzzles
+/// that **both** stay within the allowed envelope **and** contain the
+/// introducing slug — see [puzzleEligibleForPhase]. There is no
+/// refresh share: refresh of already-met rules happens organically in
+/// the post-strict soft-filter mode.
 class OnboardingPhase {
   /// Phase index. 0 is the first phase (FM only); the last entry in
   /// [phases] is the latest defined phase.
@@ -34,20 +36,35 @@ class OnboardingPhase {
     OnboardingPhase(
       index: 3,
       introducing: 'CC',
-      allowed: {'FM', 'PA', 'NC', 'CC'},
-    ),
-    OnboardingPhase(
-      index: 4,
-      introducing: 'RC',
       allowed: {'FM', 'PA', 'NC', 'CC', 'RC'},
     ),
     OnboardingPhase(
-      index: 5,
+      index: 4,
       introducing: 'GS',
       allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS'},
     ),
-    // Phases for the remaining slugs (LT, QA, SY, DF, SH, CC, GC, EY)
-    // are not figés as strict envelopes any more. After phase 3
+    OnboardingPhase(
+      index: 5,
+      introducing: 'EY',
+      allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY'},
+    ),
+    OnboardingPhase(
+      index: 6,
+      introducing: 'DF',
+      allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF'},
+    ),
+    OnboardingPhase(
+      index: 7,
+      introducing: 'LT',
+      allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF', 'LT'},
+    ),
+    OnboardingPhase(
+      index: 8,
+      introducing: 'QA',
+      allowed: {'FM', 'PA', 'NC', 'CC', 'RC', 'GS', 'EY', 'DF', 'LT', 'QA'},
+    ),
+    // Phases for the remaining slugs (SY, SH, GC, RT, CT, CH, MJ)
+    // are not fixed as strict envelopes any more. After phase 8
     // the player enters [softFilter] mode: any level collection opens
     // up but the playlist filters out puzzles introducing more than
     // one new constraint at a time. The modal still fires per first
@@ -60,6 +77,16 @@ class OnboardingPhase {
   /// end-of-batch boundary.
   static const int phaseLength = 5;
 
+  /// All slugs introduced by strict onboarding phases.
+  static Set<String> get strictSlugs =>
+      phases.map((p) => p.introducing).toSet();
+
+  /// Map from every strict-phase introducing slug to the number of
+  /// completions required to pass that phase ([phaseLength]).
+  static Map<String, int> get strictCompletionTargets => {
+    for (final p in phases) p.introducing: phaseLength,
+  };
+
   /// All constraint slugs the onboarding system recognises. Mirrors
   /// the registry in `lib/getsomepuzzle/constraints/registry.dart`
   /// (minus the legacy `TX` HelpText slug). Hardcoded here rather than
@@ -68,6 +95,19 @@ class OnboardingPhase {
   static final Set<String> allKnownSlugs = constraintRegistry
       .map((c) => c.slug)
       .toSet();
+
+  /// Slugs not covered by [phases] (the strict-phase introducers), in
+  /// the order they appear in `constraintRegistry`. Used by the soft
+  /// filter to elect the next slug for the player to discover. Adding
+  /// a new constraint to the registry automatically extends this list,
+  /// so post-P5 discovery stays in sync with no manual bookkeeping.
+  static List<String> get postStrictDiscoveryOrder {
+    final strictSlugs = phases.map((p) => p.introducing).toSet();
+    return constraintRegistry
+        .map((c) => c.slug)
+        .where((s) => !strictSlugs.contains(s))
+        .toList();
+  }
 }
 
 /// Returns the strict onboarding phase the player is currently in
@@ -77,10 +117,15 @@ class OnboardingPhase {
 /// collection, ≤1 unseen slug per puzzle).
 OnboardingPhase? phaseForCompletions(Map<String, int> completions) {
   for (var phase in OnboardingPhase.phases) {
-    final slug = phase.introducing;
-    final completed = completions[slug];
-    if (completed == null || completed < OnboardingPhase.phaseLength) {
-      // The player has not played enough puzzle with this slug
+    final int completed;
+    if (phase.introducing == 'CC') {
+      // CC and RC share a single merged phase: combine completions
+      completed = (completions['CC'] ?? 0) + (completions['RC'] ?? 0);
+    } else {
+      completed = completions[phase.introducing] ?? 0;
+    }
+    if (completed < OnboardingPhase.phaseLength) {
+      // The player has not played enough puzzle with this concept
       return phase;
     }
   }
@@ -89,41 +134,32 @@ OnboardingPhase? phaseForCompletions(Map<String, int> completions) {
   return null;
 }
 
-/// Soft-filter check: a puzzle passes when at most one of its declared
-/// slugs is unseen by the player. The unseen count is computed via
-/// [isFirstTimeForSlug], which the caller wires to
-/// `ConstraintProgress.isFirstTimeFor` in the live app and to a fixed
-/// set in tests.
+/// Whether the puzzle can be surfaced during the strict [phase].
 ///
-/// Used after the strict phases to keep introducing new constraints
-/// gradually while letting the player roam freely across collections.
-/// A puzzle with zero unseen slugs trivially passes (refresh) — the
-/// filter only kicks in to block multi-new puzzles.
-bool puzzlePassesSoftFilter(
-  Iterable<String> declaredRules,
-  bool Function(String slug) isFirstTimeForSlug,
-) {
-  int unseen = 0;
-  for (final s in declaredRules) {
-    if (s.isEmpty || s == 'TX') continue;
-    if (isFirstTimeForSlug(s)) {
-      unseen++;
-      if (unseen > 1) return false;
-    }
-  }
-  return true;
-}
-
-/// Whether the puzzle's declared slug set is allowed under [phase].
-/// Puzzles with at least one slug outside [OnboardingPhase.allowed]
-/// are filtered out by the onboarding sampler.
+/// Two conditions, both required:
+/// 1. **Slug envelope** — every declared slug must be in
+///    [OnboardingPhase.allowed]. Empty entries and the legacy `TX`
+///    slug are tolerated (skipped).
+/// 2. **Introducing slug present** — the puzzle must declare
+///    [OnboardingPhase.introducing]. This is the "no refresh share"
+///    contract: during a strict phase, every surfaced puzzle teaches
+///    or re-exercises the slug currently being introduced. Refresh of
+///    previously-met rules is handled in soft-filter mode (post-P5),
+///    not here.
 bool puzzleEligibleForPhase(
   Iterable<String> declaredRules,
   OnboardingPhase phase,
 ) {
+  bool containsIntroducing = false;
   for (final s in declaredRules) {
     if (s.isEmpty || s == 'TX') continue;
     if (!phase.allowed.contains(s)) return false;
+    if (s == phase.introducing) containsIntroducing = true;
+    // CC and RC share a merged phase: either slug satisfies the
+    // introducing condition so puzzle rotation doesn't break eligibility.
+    if (phase.introducing == 'CC' && (s == 'CC' || s == 'RC')) {
+      containsIntroducing = true;
+    }
   }
-  return true;
+  return containsIntroducing;
 }

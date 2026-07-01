@@ -3,6 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
+
+import 'helpers/onboarding_completions.dart';
 
 /// Minimal-but-valid `PuzzleData` line. The constraint section repeats
 /// `FM:12` `nCons` times by default so `PuzzleData.rules.length == nCons`,
@@ -168,6 +171,61 @@ void main() {
       final got = db.getPuzzlesByLevel(16);
       expect(got, hasLength(1));
       expect(got.first, same(unplayed));
+    });
+
+    /// Single-GS 5×5 puzzle with an explicit `idx.size` parameter — the
+    /// `_puz` helper only emits a bare `:1` dummy, which can't express a real
+    /// group size. `size == 1` is the trivial isolated-cell instance.
+    PuzzleData gsPuz(int size, {int cplx = 16}) =>
+        PuzzleData('v2_12_5x5_${'0' * 25}_GS:0.${size}_0:0_$cplx');
+
+    test('demotes trivial size-1 GS while GS is being introduced', () {
+      // During the strict phase that introduces GS, a GS:.1 (isolated cell)
+      // is a poor teaching instance and must be strongly deprioritised vs an
+      // equivalent non-trivial GS:.3 of the same cplx. Both stay in the
+      // catalog (last-resort drawable), but the non-trivial one should top
+      // the sampled order far more often.
+      final db = Database(playerLevel: 0)..samplingRandom = math.Random(42);
+      // Reach phase P5 (introducing GS): every earlier phase's slug cleared,
+      // GS still below the threshold.
+      db.onboardingCompletions = strictCompletionsUpTo(4);
+      expect(db.currentPhase?.introducing, 'GS');
+      final trivial = gsPuz(1);
+      final nonTrivial = gsPuz(3);
+      db.puzzles = [trivial, nonTrivial];
+      var nonTrivialFirst = 0;
+      var trivialFirst = 0;
+      for (var i = 0; i < 200; i++) {
+        final first = db.getPuzzlesByLevel(16).first;
+        if (identical(first, nonTrivial)) nonTrivialFirst++;
+        if (identical(first, trivial)) trivialFirst++;
+      }
+      // With a ×0.05 penalty the trivial puzzle wins the head ~5 % of the
+      // time; require the non-trivial to dominate by a wide margin.
+      expect(nonTrivialFirst, greaterThan(trivialFirst * 3));
+    });
+
+    test('no GS demotion outside the GS introduction phase', () {
+      // Gating check: when GS is not the rule being introduced (here phase
+      // P0/FM, completions empty), trivial and non-trivial GS puzzles of the
+      // same cplx carry the same weight and top the order at comparable
+      // rates. Guards against the penalty leaking into normal play.
+      final db = Database(playerLevel: 0)..samplingRandom = math.Random(42);
+      expect(db.currentPhase?.introducing, isNot('GS'));
+      final trivial = gsPuz(1);
+      final nonTrivial = gsPuz(3);
+      db.puzzles = [trivial, nonTrivial];
+      var nonTrivialFirst = 0;
+      var trivialFirst = 0;
+      for (var i = 0; i < 200; i++) {
+        final first = db.getPuzzlesByLevel(16).first;
+        if (identical(first, nonTrivial)) nonTrivialFirst++;
+        if (identical(first, trivial)) trivialFirst++;
+      }
+      // Neither side should dominate: a ~50/50 split, so each stays well
+      // within 3× of the other (the bound the demotion test relies on).
+      expect(nonTrivialFirst, lessThan(trivialFirst * 3));
+      expect(trivialFirst, lessThan(nonTrivialFirst * 3));
     });
   });
 
@@ -444,11 +502,20 @@ void main() {
     // loaded `puzzles` list), so a returning player who has played 100
     // puzzles in another collection still sees the badge as soon as
     // they switch collections — no need to grind 10 plays again.
-    List<String> nFinishedStatLines(int n) => List.generate(
-      n,
-      (i) =>
-          '2026-01-0${(i % 9) + 1}T12:00:00 30s 0f v2_12_4x4_0000000000000000_FM:1_0:0_$i',
-    );
+    //
+    // Each line must be a genuinely distinct puzzle: `loadStats` now
+    // collapses the full play history to one entry per canonical key, so
+    // lines that differ only by the trailing complexity field (which
+    // `canonicalPuzzleKey` drops) would all fold into a single play. We
+    // vary the grid height instead — a structural field that survives
+    // canonicalization and can't alias another via rotation (rotation
+    // preserves the {w, h} set).
+    List<String> nFinishedStatLines(int n) => List.generate(n, (i) {
+      final height = i + 4;
+      final prefill = '0' * (4 * height);
+      return '2026-01-0${(i % 9) + 1}T12:00:00 30s 0f '
+          'v2_12_4x${height}_${prefill}_FM:1_0:0_$i';
+    });
 
     const enough = 40;
 
@@ -469,19 +536,13 @@ void main() {
     });
 
     test('returns recommended key when it differs from current', () {
-      // playerLevel 80 → mad ('6-mad'). Player is in '2-player'.
+      // playerLevel 80 → mad, but the player is in '2-player' (index 1).
+      // The ±1 gradual clamp caps the suggestion one tier up → '3-advanced'.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
-      db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
-        "RC": 5,
-        "GS": 5,
-      }; // past strict phases
+      db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
       db.loadStats(nFinishedStatLines(enough));
-      expect(db.recommendedCollectionKey, '6-mad');
+      expect(db.recommendedCollectionKey, '3-advanced');
     });
 
     test('counts plays globally — the loaded `puzzles` list is irrelevant', () {
@@ -492,17 +553,11 @@ void main() {
       // fresh plays in the current bucket.
       final db = Database(playerLevel: 80);
       db.collection = '2-player';
-      db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
-        "RC": 5,
-        "GS": 5,
-      }; // past strict phases
+      db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
       db.puzzles = []; // nothing loaded in memory
       db.loadStats(nFinishedStatLines(enough));
-      expect(db.recommendedCollectionKey, '6-mad');
+      // playerLevel 80 → mad, clamped to one tier above '2-player'.
+      expect(db.recommendedCollectionKey, '3-advanced');
     });
 
     test('notePuzzleCompleted clears the gate during a session', () {
@@ -518,15 +573,11 @@ void main() {
       db.loadStats(const []); // fresh stats, 0 plays
       expect(db.recommendedCollectionKey, isNull);
       db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
-        "RC": 5,
+        ...OnboardingPhase.strictCompletionTargets,
         "GS": 4,
       };
       expect(db.recommendedCollectionKey, null);
-      expect(db.currentPhase?.index, 5);
+      expect(db.currentPhase?.index, 4);
       // Synthesize a played puzzle that contains the last constraint that has not been fully onboarded yet.
       // We play it enough times so the recommendation thinks we played enough puzzles
       final puz = PuzzleData('v2_12_3x3_000020000_GS:0.1__');
@@ -534,37 +585,49 @@ void main() {
         db.notePuzzleCompleted(puz);
       }
       expect(db.currentPhase, null);
-      expect(db.recommendedCollectionKey, '6-mad');
+      // playerLevel 80 → mad, clamped to one tier above '2-player'.
+      expect(db.recommendedCollectionKey, '3-advanced');
     });
 
     test('null while still in a strict onboarding phase', () {
-      // A fast learner could otherwise see a "try 6-mad" suggestion at
-      // the end of their first batch even though they've barely met
-      // FM. The recommendation is suppressed for the whole strict
-      // window (P0-P3) regardless of how high `playerLevel` climbs.
+      // A fast learner could otherwise see a level-up suggestion at the
+      // end of their first batch even though they've barely met FM. The
+      // recommendation is suppressed for the whole strict window (P0-P3)
+      // regardless of how high `playerLevel` climbs.
       final db = Database(playerLevel: 80);
       db.collection = '1-easy';
       db.loadStats(nFinishedStatLines(enough));
-      // When the onboarding is not done, even though player level says 6-mad.
+      // When the onboarding is not done, even though player level says mad.
       db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
+        ...strictCompletionsUpTo(5),
         "RC": 4,
         "GS": 2,
       };
       expect(db.recommendedCollectionKey, isNull);
-      // Once across the strict boundary, recommendation resumes.
-      db.onboardingCompletions = {
-        "FM": 5,
-        "NC": 5,
-        "PA": 5,
-        "CC": 5,
-        "RC": 5,
-        "GS": 5,
-      };
-      expect(db.recommendedCollectionKey, '6-mad');
+      // Once across the strict boundary, recommendation resumes — but the
+      // ±1 clamp caps it one tier above '1-easy' → '2-player'.
+      db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+      expect(db.recommendedCollectionKey, '2-player');
+    });
+
+    test('gradual clamp limits the suggestion to one tier up or down', () {
+      // The recommendation never jumps more than one tier from the
+      // currently played playlist, so a player climbs/descends gradually.
+      // Up: a very fast player on '1-easy' (playerLevel 80 → mad) is only
+      // nudged to '2-player', not straight to '6-mad'.
+      final up = Database(playerLevel: 80);
+      up.collection = '1-easy';
+      up.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+      up.loadStats(nFinishedStatLines(enough));
+      expect(up.recommendedCollectionKey, '2-player');
+
+      // Down: a slow player on '6-mad' (playerLevel 0 → beginner) is only
+      // stepped down to '5-expert', not straight to '1-easy'.
+      final down = Database(playerLevel: 0);
+      down.collection = '6-mad';
+      down.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+      down.loadStats(nFinishedStatLines(enough));
+      expect(down.recommendedCollectionKey, '5-expert');
     });
   });
 }

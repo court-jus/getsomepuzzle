@@ -4,11 +4,16 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 base class LineCentricConstraint extends Constraint {
   // A common class for Row/Column constraints
-  int color = 0;
+  CellValue color = CellValue.free;
   int count = 0;
 
+  // Covers CC/RC (count of `color`) and RT/CT (transitions carry a nominal
+  // `color`, kept conservatively so auto-shrink never drops it).
   @override
-  String serialize() => '$slug:${getIdx()}.$color.$count';
+  Set<CellValue> get referencedColors => {color};
+
+  @override
+  String serialize() => '$slug:${getIdx()}.${cellValueToString(color)}.$count';
 
   @override
   String toString() => '$count';
@@ -23,7 +28,13 @@ base class LineCentricConstraint extends Constraint {
     final have = line.where((cell) => cell.value == color).length;
     if (puzzle.complete) return have == count;
     if (have > count) return false;
-    final free = line.where((cell) => cell.value == 0).length;
+    // Only free cells that can still take `color` count toward reachability.
+    final free = line
+        .where(
+          (cell) =>
+              cell.value == CellValue.free && cell.options.contains(color),
+        )
+        .length;
     if (have + free < count) return false;
     return true;
   }
@@ -32,21 +43,36 @@ base class LineCentricConstraint extends Constraint {
   Move? apply(Puzzle puzzle) {
     final line = getLine(puzzle);
     final colorCount = line.where((cell) => cell.value == color).length;
-    final freeCells = line.where((cell) => cell.value == 0);
+    final freeCells = line.where((cell) => cell.value == CellValue.free);
     if (freeCells.isEmpty) return null;
 
-    final opposite = puzzle.domain.firstWhere((v) => v != color);
-
     if (colorCount > count) {
-      return Move(0, 0, this, isImpossible: this);
+      return Impossible(this);
     }
     if (colorCount == count) {
-      // All color cells placed — remaining free cells get the opposite value
-      return Move(freeCells.first.idx, opposite, this, complexity: 0);
+      // All color cells placed — remaining free cells get an opposite color
+      for (var freeCell in freeCells) {
+        if (freeCell.options.contains(color)) {
+          return RemoveOption(freeCell.idx, color, this, complexity: 0);
+        }
+      }
+      // No free cell still has `color` in options — the line is already
+      // closed. The constraint is satisfied; nothing more to do. (Reporting
+      // `isImpossible` here was the same domain-3 trap as in SH Level 2:
+      // domain-2 auto-sets when only one option remains, so free cells
+      // disappear after one round of removeOption; domain-3+ leaves the
+      // cell free with two options and we loop back here with nothing to do.)
+      return null;
     }
     if (count - colorCount == freeCells.length) {
-      // Exactly as many free cells as needed — they must all be color
-      return Move(freeCells.first.idx, color, this, complexity: 0);
+      // Exactly as many free cells as needed — they must all be color.
+      // The cell may have lost the option earlier (3-colour puzzles): in
+      // that case the target is no longer reachable.
+      final target = freeCells.first;
+      if (!target.options.contains(color)) {
+        return Impossible(this);
+      }
+      return SetValue(target.idx, color, this, complexity: 0);
     }
     return null;
   }
@@ -55,6 +81,15 @@ base class LineCentricConstraint extends Constraint {
   bool isCompleteFor(Puzzle puzzle) {
     if (!verify(puzzle)) return false;
     final line = getLine(puzzle);
-    return line.every((cell) => cell.value != 0);
+    // RT/CT keep `color == CellValue.free` (they count transitions, not
+    // a specific colour), so the option filter doesn't apply.
+    if (color == CellValue.free) {
+      return line.every((cell) => cell.value != CellValue.free);
+    }
+    return line.every(
+      (cell) =>
+          cell.value != CellValue.free ||
+          (cell.value == CellValue.free && !cell.options.contains(color)),
+    );
   }
 }

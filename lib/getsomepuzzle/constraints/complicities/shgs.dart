@@ -1,5 +1,6 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -46,24 +47,58 @@ class SHGSComplicity extends Complicity {
     // Map color → mandated group size. In normal generation there is
     // at most one SH per colour; if more were ever added, the first
     // wins (any disagreement would already fail SH.verify on its own).
-    final shapeSizeByColor = <int, int>{};
+    final shapeSizeByColor = <CellValue, int>{};
+    final shapeByColor = <CellValue, ShapeConstraint>{};
     for (final sh in shs) {
       shapeSizeByColor.putIfAbsent(sh.color, () => sh.shapeSize);
+      shapeByColor.putIfAbsent(sh.color, () => sh);
     }
     for (final gs in puzzle.constraints.whereType<GroupSize>()) {
       final cellIdx = gs.indices.first;
-      if (puzzle.cellValues[cellIdx] != 0) continue;
-      final excluded = <int>[];
+      if (puzzle.cellValues[cellIdx] != CellValue.free) continue;
+      final excluded = <CellValue>[];
       for (final entry in shapeSizeByColor.entries) {
         if (entry.value != gs.size) excluded.add(entry.key);
       }
       if (excluded.isEmpty) continue;
-      if (excluded.length >= puzzle.domain.length) {
-        return Move(0, 0, this, isImpossible: this);
+
+      final involvedShs = excluded
+          .map((c) => shapeByColor[c])
+          .whereType<ShapeConstraint>()
+          .toList();
+      final contribs = <CanApply>[gs, ...involvedShs];
+
+      // Impossibility must be judged against the cell's *current options*,
+      // not the full declared domain: a 3-colour cell whose options were
+      // already pruned (by another constraint) down to an all-SH-excluded
+      // subset is impossible even when `excluded.length < domain.length`.
+      // Counting against the domain instead would miss that, and the
+      // removeOption loop below would then collapse the cell onto the last
+      // remaining — excluded — option (an unsound force).
+      final cell = puzzle.cells[cellIdx];
+      final hasViableOption = cell.options.any((o) => !excluded.contains(o));
+      if (!hasViableOption) {
+        return Impossible(this, contributors: contribs);
       }
-      final remaining = puzzle.domain.firstWhere((c) => !excluded.contains(c));
       // Combination deduction: tier 3 (see docs/dev/constraint_complicity.md).
-      return Move(cellIdx, remaining, this, complexity: 3);
+      // Each `exColor` in `excluded` is a colour the cell cannot take. On
+      // 2-colour puzzles `excluded` has one element and we can compute the
+      // single survivor, but on 3-colour we emit one removeOption at a
+      // time. A viable option is guaranteed to remain (checked above), so
+      // pruning an excluded colour never collapses the cell onto another
+      // excluded one. If every excluded colour is already gone from the
+      // cell's options, this GS has no deduction left — fall through.
+      for (final exColor in excluded) {
+        if (cell.options.contains(exColor)) {
+          return RemoveOption(
+            cellIdx,
+            exColor,
+            this,
+            complexity: 3,
+            contributors: contribs,
+          );
+        }
+      }
     }
     return null;
   }

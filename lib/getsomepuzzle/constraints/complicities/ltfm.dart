@@ -1,5 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -46,29 +46,45 @@ class LTFMComplicity extends Complicity {
 
     for (final lt in ltConstraints) {
       // Skip if any LT cell already has a color
-      final hasKnown = lt.indices.any((i) => puzzle.cellValues[i] != 0);
+      final hasKnown = lt.indices.any(
+        (i) => puzzle.cellValues[i] != CellValue.free,
+      );
       if (hasKnown) continue;
 
       final rows = lt.indices.map((i) => i ~/ puzzle.width).toSet();
       final cols = lt.indices.map((i) => i % puzzle.width).toSet();
 
       for (final color in puzzle.domain) {
-        bool blocked = false;
+        final blockingFms = <ForbiddenMotif>[];
 
         if (rows.length > 1) {
-          blocked = fmConstraints.any((fm) => _blocksVertical(fm, color));
+          for (final fm in fmConstraints) {
+            if (_blocksVertical(fm, color)) blockingFms.add(fm);
+          }
         }
-        if (!blocked && cols.length > 1) {
-          blocked = fmConstraints.any((fm) => _blocksHorizontal(fm, color));
+        if (blockingFms.isEmpty && cols.length > 1) {
+          for (final fm in fmConstraints) {
+            if (_blocksHorizontal(fm, color)) blockingFms.add(fm);
+          }
         }
 
-        if (blocked) {
-          final forcedColor = puzzle.domain.where((c) => c != color).first;
+        if (blockingFms.isNotEmpty) {
+          // Combination deduction: requires holding two rules in mind
+          // simultaneously. See docs/dev/complexity.md, "future work".
+          // Iterate LT cells looking for the first free one that still
+          // carries `color` as an option — that's the cell we can prune.
+          // If every free LT cell has already excluded `color`, this
+          // (color, lt) pair has no useful deduction; loop continues.
           for (final idx in lt.indices) {
-            if (puzzle.cellValues[idx] == 0) {
-              // Combination deduction: requires holding two rules in mind
-              // simultaneously. See docs/dev/complexity.md, "future work".
-              return Move(idx, forcedColor, this, complexity: 3);
+            if (puzzle.cellValues[idx] == CellValue.free &&
+                puzzle.cells[idx].options.contains(color)) {
+              return RemoveOption(
+                idx,
+                color,
+                this,
+                complexity: 3,
+                contributors: [lt, ...blockingFms],
+              );
             }
           }
         }
@@ -79,7 +95,7 @@ class LTFMComplicity extends Complicity {
 
   /// True if the motif is exactly [[C],[C]] — the only pattern that
   /// unconditionally blocks all vertical adjacency of color [color].
-  static bool _blocksVertical(ForbiddenMotif fm, int color) {
+  static bool _blocksVertical(ForbiddenMotif fm, CellValue color) {
     final motif = fm.motif;
     if (motif.length != 2) return false;
     if (motif[0].length != 1) return false;
@@ -88,7 +104,7 @@ class LTFMComplicity extends Complicity {
 
   /// True if the motif is exactly [[C,C]] — the only pattern that
   /// unconditionally blocks all horizontal adjacency of color [color].
-  static bool _blocksHorizontal(ForbiddenMotif fm, int color) {
+  static bool _blocksHorizontal(ForbiddenMotif fm, CellValue color) {
     final motif = fm.motif;
     if (motif.length != 1) return false;
     if (motif[0].length != 2) return false;

@@ -1,16 +1,34 @@
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 
-/// Heavy-prefilled 6x7 puzzle that is fully solvable by propagation. Reused
-/// from `solve_explained_test.dart` — guarantees `findAMove` returns a real
-/// deducible move once the help debounce fires.
-PuzzleData _deducibleFixture() => PuzzleData(
-  'v2_12_6x7_002000210001022011020210200200100010202211_FM:12;FM:1.1.2;PA:17.top_0:0_0',
-);
+/// Minimal puzzle whose first deducible move is a **setValue** (not a
+/// `removeOption`). `LT:A.0.4` with cell 0 already coloured black forces
+/// cell 4 to the same colour through a `Move(value: black)`. This shape
+/// matters because `GameModel._applyHelpMove` currently only handles the
+/// `value` branch — applying a `removeOption` hint is a TODO tracked in
+/// `docs/dev/third_color.md`. Any fixture whose first hint were a
+/// `removeOption` (typically FM/PA/CC) would make tap 4 a no-op and the
+/// stage-3-then-apply cycle untestable.
+PuzzleData _deducibleFixture() =>
+    PuzzleData('v2_12_3x3_100000000_LT:A.0.4_0:0_0');
+
+/// Same shape as [_deducibleFixture] but with an embedded solution
+/// (field 5 = `1:<cells>`), so `cachedSolution` is populated straight
+/// from the line. The addConstraint search
+/// ([GameModel.startHintConstraintComputation]) only starts when a
+/// cached solution is present — `_deducibleFixture` alone never yields
+/// one because the lone LT leaves seven cells undeducible, so
+/// `computeComplexity` cannot complete a solve. The all-black solution
+/// is consistent with the given (cell 0 black) and the LT (cells 0, 4
+/// share a colour).
+PuzzleData _searchableFixture() =>
+    PuzzleData('v2_12_3x3_100000000_LT:A.0.4_1:111111111_0');
 
 /// Empty 2x2 with no real constraints. `findAMove` will return null because
 /// nothing is deducible — used to exercise the `helpMove == null` guards.
@@ -27,7 +45,14 @@ const HintTexts _texts = HintTexts(
   hintConstraintAdded: 'constraint added',
   hintConstraintInprogress: 'in progress',
   hintConstraintNone: 'no more constraints',
+  hintCellOptionRemovable: 'cell option removable',
+  hintForceRemoveOption: 'force remove option',
+  hintRemoveOptionDeducedFrom: _hintRemoveOptionDeducedFrom,
 );
+
+String _hintRemoveOptionDeducedFrom(CanApply givenBy) => givenBy is Constraint
+    ? 'remove option from ${givenBy.slug}'
+    : 'remove option from ${givenBy.serialize()}';
 
 String _hintDeducedFrom(CanApply givenBy) => givenBy is Constraint
     ? 'deduced from ${givenBy.slug}'
@@ -88,6 +113,50 @@ void main() {
       });
     });
 
+    test(
+      'on a complete & valid puzzle, tap past stage 1 invokes onPuzzleCompleted',
+      () {
+        fakeAsync((async) {
+          final game = GameModel();
+          final settings = Settings(hintType: HintType.deducibleCell);
+          // Empty 2x2 with no constraints: any filled grid is trivially
+          // valid, so writing a value into every cell brings the puzzle
+          // to the "complete & valid" state needed by the new branch.
+          game.openPuzzle(_emptyFixture(), 1);
+          for (var i = 0; i < 4; i++) {
+            game.currentPuzzle!.setValue(i, CellValue.black);
+          }
+          async.elapse(const Duration(milliseconds: 350));
+
+          var nextPuzzleCalls = 0;
+          // Tap 1: existing "all correct so far" message, no advance.
+          game.onHintTap(
+            settings,
+            _texts,
+            onPuzzleCompleted: () => nextPuzzleCalls++,
+          );
+          expect(game.hintText, 'all correct');
+          expect(nextPuzzleCalls, 0);
+          expect(game.hintStage, 1);
+
+          // Tap 2: puzzle is complete and valid → repurpose as next puzzle.
+          game.onHintTap(
+            settings,
+            _texts,
+            onPuzzleCompleted: () => nextPuzzleCalls++,
+          );
+          expect(nextPuzzleCalls, 1);
+          expect(
+            game.hintStage,
+            0,
+            reason: 'cycle must reset after firing onPuzzleCompleted',
+          );
+
+          game.dispose();
+        });
+      },
+    );
+
     test('reaching stage 3 increments the hint counter exactly once', () {
       fakeAsync((async) {
         final game = GameModel();
@@ -143,44 +212,203 @@ void main() {
       },
     );
 
-    test(
-      'non-useful candidate is delivered when player asks past usefulCount',
-      () {
-        // When the puzzle is already solvable by propagation, the ranker
-        // pushes every candidate to the non-useful tail (usefulCount == 0).
-        // The button must stay enabled and a tap must still attach a
-        // constraint — the player explicitly asked for help, even if the
-        // extra constraint is redundant.
-        final game = GameModel();
-        final settings = Settings(hintType: HintType.addConstraint);
-        game.openPuzzle(_emptyFixture(), 1);
+    test('an already-ready candidate is attached on tap 2', () {
+      // Simulate a completed search: one candidate ready. Tap 1 must NOT
+      // re-trigger the search (it would wipe the ready result); tap 2 must
+      // attach the candidate. We bypass the Isolate path by writing the
+      // public fields directly.
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.openPuzzle(_emptyFixture(), 1);
 
-        // Simulate a completed ranker pass: list populated, but every
-        // candidate landed in the non-useful tail (usefulCount stays 0).
-        // We bypass the Isolate path by writing the public fields directly.
-        game.availableHintConstraints = ['FM:11', 'FM:22'];
-        game.hintConstraintsReady = HintConstraintStatus.ready;
+      game.availableHintConstraints = ['FM:11', 'FM:22'];
+      game.hintConstraintsReady = HintConstraintStatus.ready;
 
-        expect(
-          game.canAddHintConstraint,
-          isTrue,
-          reason: 'button must stay enabled while any candidate remains',
-        );
+      expect(
+        game.canAddHintConstraint,
+        isTrue,
+        reason: 'button must stay enabled while a candidate is ready',
+      );
 
-        final constraintsBefore = game.currentPuzzle!.constraints.length;
-        game.onHintTap(settings, _texts); // stage 0 → 1 (errors pass)
-        game.onHintTap(settings, _texts); // stage 1 → terminal
+      final constraintsBefore = game.currentPuzzle!.constraints.length;
+      game.onHintTap(settings, _texts); // stage 0 → 1 (errors pass)
 
-        expect(
-          game.currentPuzzle!.constraints.length,
-          constraintsBefore + 1,
-          reason: 'a non-useful candidate must still be attached on demand',
-        );
-        expect(game.hintText, 'constraint added');
+      expect(
+        game.hintConstraintsReady,
+        HintConstraintStatus.ready,
+        reason: 'tap 1 must not re-trigger and clobber a ready result',
+      );
 
-        game.dispose();
-      },
-    );
+      game.onHintTap(settings, _texts); // stage 1 → terminal
+
+      expect(
+        game.currentPuzzle!.constraints.length,
+        constraintsBefore + 1,
+        reason: 'the ready candidate must be attached on demand',
+      );
+      expect(game.hintText, 'constraint added');
+
+      game.dispose();
+    });
+
+    test('openPuzzle in addConstraint mode does not start a search', () {
+      // The expensive search is on-demand (first hint tap), never eager on
+      // open — this is what fixes the URL-open freeze on web.
+      final game = GameModel();
+      game.hintType = HintType.addConstraint;
+      game.openPuzzle(_deducibleFixture(), 1);
+
+      expect(
+        game.hintConstraintsReady,
+        isNot(HintConstraintStatus.inprogress),
+        reason: 'no constraint search must run just from opening the puzzle',
+      );
+
+      game.dispose();
+    });
+
+    test('tap 1 in addConstraint mode starts the search', () {
+      // With a cached solution available, tap 1 kicks the search (status
+      // flips to inprogress synchronously, before the isolate completes).
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.hintType = HintType.addConstraint;
+      // Carries an embedded solution so the search has a target to aim at.
+      game.openPuzzle(_searchableFixture(), 1);
+
+      game.onHintTap(settings, _texts); // stage 0 → 1, triggers the search
+      expect(game.hintStage, 1);
+      expect(
+        game.hintConstraintsReady,
+        HintConstraintStatus.inprogress,
+        reason: 'tap 1 must start the constraint search on demand',
+      );
+
+      game.dispose();
+    });
+
+    test('a no-op candidate shows "none", not "added", and is not billed', () {
+      // Regression: `addHintConstraint` used to return true (→ "added") even
+      // when `Puzzle.addConstraint` changed nothing — e.g. an LT permutation
+      // merging into an existing same-letter group. Such a candidate must be
+      // reported as "none" and must not bill a hint.
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.openPuzzle(_emptyFixture(), 1);
+
+      // Existing LT on cells 0,1; the offered candidate is its permutation
+      // (cells 1,0) → merges with no new cell → no-op.
+      game.currentPuzzle!.addConstraint(createConstraint('LT', 'A.0.1')!);
+      final constraintsBefore = game.currentPuzzle!.constraints.length;
+      final hintsBefore = game.currentMeta!.hints;
+
+      game.availableHintConstraints = ['LT:A.1.0'];
+      game.hintConstraintsReady = HintConstraintStatus.ready;
+
+      game.onHintTap(settings, _texts); // stage 0 → 1
+      game.onHintTap(settings, _texts); // stage 1 → terminal
+
+      expect(
+        game.currentPuzzle!.constraints.length,
+        constraintsBefore,
+        reason: 'a no-op merge must not change the constraint set',
+      );
+      expect(
+        game.hintText,
+        'no more constraints',
+        reason: 'nothing was added → show the "none" message, not "added"',
+      );
+      expect(
+        game.currentMeta!.hints,
+        hintsBefore,
+        reason: 'a no-op add must not bill the player a hint',
+      );
+      expect(game.hintConstraintsReady, HintConstraintStatus.canceled);
+
+      game.dispose();
+    });
+
+    test('a constraint computed while waiting is revealed automatically', () {
+      // The player taps to reveal before the (slow) search finishes, so they
+      // see the "computing…" message. When the worker reports a candidate, it
+      // must be attached on its own — no extra tap required.
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.openPuzzle(_emptyFixture(), 1);
+
+      // Simulate a search already running (worker spawned, not yet done) so
+      // tap 1 won't start a real isolate.
+      game.hintConstraintsReady = HintConstraintStatus.inprogress;
+
+      game.onHintTap(settings, _texts); // stage 0 → 1, errors pass
+      game.onHintTap(settings, _texts); // stage 1 → terminal, still computing
+      expect(
+        game.hintText,
+        'in progress',
+        reason: 'with the search unfinished, tap 2 shows the waiting message',
+      );
+
+      final constraintsBefore = game.currentPuzzle!.constraints.length;
+
+      // Worker reports back: the pending reveal must fire automatically.
+      game.onHintConstraintComputed('FM:11');
+      expect(
+        game.currentPuzzle!.constraints.length,
+        constraintsBefore + 1,
+        reason: 'completion must auto-attach the pending constraint',
+      );
+      expect(game.hintText, 'constraint added');
+
+      game.dispose();
+    });
+
+    test('an empty result while waiting auto-shows the "none" message', () {
+      // Same waiting scenario, but the search finds no helpful constraint.
+      // The waiting message must resolve to the terminal "none" feedback
+      // rather than stay stuck on "computing…".
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.openPuzzle(_emptyFixture(), 1);
+      game.hintConstraintsReady = HintConstraintStatus.inprogress;
+
+      game.onHintTap(settings, _texts); // stage 0 → 1
+      game.onHintTap(settings, _texts); // stage 1 → terminal, still computing
+      expect(game.hintText, 'in progress');
+
+      game.onHintConstraintComputed(null); // search found nothing
+      expect(game.hintText, 'no more constraints');
+
+      game.dispose();
+    });
+
+    test('tap 1 does not start the search when the grid has an error', () {
+      // If the error pass surfaces a mistake, the player must fix it first —
+      // launching the (expensive) constraint search on a contradictory state
+      // would be wasted work.
+      final game = GameModel();
+      final settings = Settings(hintType: HintType.addConstraint);
+      game.hintType = HintType.addConstraint;
+      // Embedded solution → the error pass has a reference to diverge from.
+      game.openPuzzle(_searchableFixture(), 1);
+
+      // Fill a free cell with the wrong colour so tap 1 reports an error.
+      final cell = game.currentPuzzle!.cells.firstWhere((c) => !c.readonly);
+      final correct = game.currentPuzzle!.cachedSolution![cell.idx];
+      game.currentPuzzle!.setValue(
+        cell.idx,
+        correct == CellValue.black ? CellValue.white : CellValue.black,
+      );
+
+      game.onHintTap(settings, _texts); // stage 0 → 1, error pass
+      expect(game.hintIsError, isTrue, reason: 'tap 1 must flag the mistake');
+      expect(
+        game.hintConstraintsReady,
+        isNot(HintConstraintStatus.inprogress),
+        reason: 'no search must start while an error is on the grid',
+      );
+
+      game.dispose();
+    });
   });
 
   group('Hint cycle reset', () {
@@ -235,6 +463,66 @@ void main() {
     });
   });
 
+  group(
+    'Hint flow — RemoveOption phrasing depends on domain size (issue 19)',
+    () {
+      // A `removeOption` deduction attributed to a constraint. We assign
+      // `helpMove` directly rather than mine a fixture whose `findAMove`
+      // happens to return a removeOption: the routing under test is purely
+      // (domain size × move type), and a hand-built move makes both branches
+      // deterministic. Cell 4 is free in both fixtures; cell 0 is the given.
+      RemoveOption removeOptionOnCell4() =>
+          RemoveOption(4, CellValue.black, createConstraint('LT', 'A.0.4')!);
+
+      test('domain-2: removeOption is surfaced as a cell deduction', () {
+        // With only two colours, pruning one option ≡ choosing the other, so
+        // every tap must read like a setValue deduction — not "an option can
+        // be removed".
+        final game = GameModel();
+        final settings = Settings(hintType: HintType.deducibleCell);
+        game.openPuzzle(PuzzleData('v2_12_3x3_100000000_LT:A.0.4_0:0_0'), 1);
+        game.helpMove = removeOptionOnCell4();
+
+        game.onHintTap(settings, _texts); // stage 0 → 1: errors pass
+        game.onHintTap(settings, _texts); // stage 1 → 2: cell-only reveal
+        expect(
+          game.hintText,
+          'cell deducible',
+          reason: 'domain 2 tap 2 must use the setValue phrasing',
+        );
+        expect(game.currentPuzzle!.cells[4].isHighlighted, isTrue);
+
+        game.onHintTap(settings, _texts); // stage 2 → 3: cell + constraint
+        expect(
+          game.hintText,
+          'deduced from LT',
+          reason: 'domain 2 tap 3 must also use the setValue phrasing',
+        );
+
+        game.dispose();
+      });
+
+      test('domain-3: removeOption keeps the option-removal phrasing', () {
+        // Regression guard: with three colours a pruned option leaves the cell
+        // genuinely free, so the original "an option can be removed" wording
+        // must stay — the domain-2 shortcut must not leak into domain 3.
+        final game = GameModel();
+        final settings = Settings(hintType: HintType.deducibleCell);
+        game.openPuzzle(PuzzleData('v2_123_3x3_100000000_LT:A.0.4_0:0_0'), 1);
+        game.helpMove = removeOptionOnCell4();
+
+        game.onHintTap(settings, _texts); // stage 0 → 1
+        game.onHintTap(settings, _texts); // stage 1 → 2
+        expect(game.hintText, 'cell option removable');
+
+        game.onHintTap(settings, _texts); // stage 2 → 3
+        expect(game.hintText, 'remove option from LT');
+
+        game.dispose();
+      });
+    },
+  );
+
   group('Hint flow — debounce-race safety', () {
     test('tapping before the help debounce fires is a graceful no-op', () {
       // Tap 4 times in a row immediately after openPuzzle. `_helpDebounce`
@@ -243,7 +531,7 @@ void main() {
       final game = GameModel();
       final settings = Settings(hintType: HintType.deducibleCell);
       game.openPuzzle(_deducibleFixture(), 1);
-      final before = List<int>.from(game.currentPuzzle!.cellValues);
+      final before = List<CellValue>.from(game.currentPuzzle!.cellValues);
       expect(game.helpMove, isNull);
 
       game.onHintTap(settings, _texts); // 0 → 1: errors path always works

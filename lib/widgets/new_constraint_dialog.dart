@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 
 /// Modal shown the first time the player encounters one or more
 /// constraint slugs. Body text per slug is fetched from the localised
@@ -95,40 +96,6 @@ class NewConstraintDialog extends StatelessWidget {
   }
 }
 
-/// Localised display name for a constraint slug.
-String constraintNameForSlug(AppLocalizations l, String slug) {
-  switch (slug) {
-    case 'FM':
-      return l.constraintForbiddenPattern;
-    case 'PA':
-      return l.constraintParity;
-    case 'RC':
-      return l.constraintRowCount;
-    case 'GS':
-      return l.constraintGroupSize;
-    case 'LT':
-      return l.constraintLetterGroup;
-    case 'QA':
-      return l.constraintQuantity;
-    case 'SY':
-      return l.constraintSymmetry;
-    case 'DF':
-      return l.constraintDifferentFrom;
-    case 'SH':
-      return l.constraintShape;
-    case 'CC':
-      return l.constraintColumnCount;
-    case 'GC':
-      return l.constraintGroupCount;
-    case 'NC':
-      return l.constraintNeighborCount;
-    case 'EY':
-      return l.constraintEyes;
-    default:
-      return slug;
-  }
-}
-
 /// Localised body text for a constraint slug. Returns the slug itself
 /// as a fallback so an unknown constraint doesn't break the UI.
 String constraintExplanationForSlug(AppLocalizations l, String slug) {
@@ -138,11 +105,14 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
     case 'PA':
       return l.constraintExplainPA;
     case 'RC':
-      return l.constraintExplainRC;
+    case 'CC':
+      return l.constraintExplainLineCount;
     case 'GS':
       return l.constraintExplainGS;
     case 'LT':
       return l.constraintExplainLT;
+    case 'MJ':
+      return l.constraintExplainMJ;
     case 'QA':
       return l.constraintExplainQA;
     case 'SY':
@@ -151,14 +121,21 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainDF;
     case 'SH':
       return l.constraintExplainSH;
-    case 'CC':
-      return l.constraintExplainCC;
     case 'GC':
       return l.constraintExplainGC;
+    case 'CH':
+      return l.constraintExplainCH;
     case 'NC':
       return l.constraintExplainNC;
     case 'EY':
       return l.constraintExplainEY;
+    case 'IM':
+      return l.constraintExplainIM;
+    case 'BB':
+      return l.constraintExplainBB;
+    case 'RT':
+    case 'CT':
+      return l.constraintExplainTransition;
     default:
       return slug;
   }

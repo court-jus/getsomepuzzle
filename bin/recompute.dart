@@ -2,7 +2,10 @@ import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+
+import '_trace_cache.dart';
 
 void main(List<String> args) {
   final positional = <String>[];
@@ -28,30 +31,40 @@ void main(List<String> args) {
     }
   }
 
+  final cache = TraceCache.load(kTraceCachePath);
+
   if (route) {
-    // --route operates on the full set of playable-level files by
-    // default: redistribute every puzzle into the file matching its
-    // post-sort classification. Positional args are unsupported here
-    // — partial input sets would either lose puzzles (source not
-    // covered) or grow destinations unboundedly across reruns.
-    if (positional.isNotEmpty) {
-      stderr.writeln(
-        '--route ignores positional args; it operates on the six '
-        'playable-level files: ${_playableLevelPaths.join(', ')}',
-      );
-    }
-    _routeFiles(dryRun: dryRun, sample: sample, verbose: verbose);
+    // --route default: redistribute every puzzle from the six
+    // playable-level files into the file matching its post-sort
+    // classification. If positional args are supplied, they replace
+    // the source set — useful to ventilate an unsorted feed
+    // (e.g. /tmp/path6.txt) into the cascade `.tmp` files.
+    _routeFiles(
+      dryRun: dryRun,
+      sample: sample,
+      verbose: verbose,
+      sources: positional,
+      cache: cache,
+    );
+    cache.save(kTraceCachePath);
     return;
   }
 
-  if (positional.isEmpty) {
-    _printUsage();
-    exit(1);
-  }
+  final targets = positional.isEmpty ? _allDefaultPaths : positional;
 
-  for (final path in positional) {
-    _processFile(path, sample: sample, dryRun: dryRun, verbose: verbose);
+  for (final path in targets) {
+    _processFile(
+      path,
+      sample: sample,
+      dryRun: dryRun,
+      verbose: verbose,
+      cache: cache,
+    );
   }
+  cache.save(kTraceCachePath);
+  stderr.writeln(
+    'Trace cache: ${cache.size} entries saved to $kTraceCachePath',
+  );
 }
 
 const _playableLevelPaths = [
@@ -63,13 +76,35 @@ const _playableLevelPaths = [
   'assets/6-mad.txt',
 ];
 
+// Default set: the 6 playable levels interleaved with their overfilled
+// counterparts, used when recompute is invoked with no positional args.
+final _allDefaultPaths = [
+  PuzzleLevel.beginner,
+  PuzzleLevel.overfilledEasy,
+  PuzzleLevel.player,
+  PuzzleLevel.overfilledPlayer,
+  PuzzleLevel.advanced,
+  PuzzleLevel.overfilledAdvanced,
+  PuzzleLevel.strong,
+  PuzzleLevel.overfilledStrong,
+  PuzzleLevel.expert,
+  PuzzleLevel.overfilledExpert,
+  PuzzleLevel.mad,
+  PuzzleLevel.overfilledMad,
+].map((l) => 'assets/${levelFilenames[l]!}').toList();
+
 void _printUsage() {
   stderr.writeln('''
-Usage: dart run bin/recompute.dart [options] <file1> [file2] ...
+Usage: dart run bin/recompute.dart [options] [file1 [file2 ...]]
 
 For each puzzle line: dedup constraints, re-parse, sort constraints
 by real-trace min cplx (`Puzzle.sortConstraintsByDifficulty`),
 re-compute the complexity score, and emit the result.
+
+If no files are given, all 12 default files are processed in order:
+  assets/1-easy.txt, assets/1-easy-overfilled.txt,
+  assets/2-player.txt, assets/2-player-overfilled.txt, …
+  assets/6-mad.txt,  assets/6-mad-overfilled.txt
 
 Options:
   --sample N    Process only the first N non-empty puzzles per file.
@@ -78,18 +113,26 @@ Options:
                 Combined with --sample, gives a fast read on whether
                 the sort / recent code changes shift cplx or
                 classified level.
-  --route       Redistribute every puzzle from the six playable-level
-                files (assets/1-easy.txt … assets/6-mad.txt) into the
-                file matching its post-sort classification. Out-of-
-                cascade puzzles (overfilled, undetermined) go to their
-                dedicated files. Writes to `<dest>.tmp` (append mode);
-                **never modifies the source `.txt` files**. The user
-                migrates manually with `mv <dest>.tmp <dest>` when
-                satisfied. Re-runs are idempotent: puzzles already
-                emitted to a `.tmp` (by `canonicalPuzzleKey`) are
-                skipped, so an interrupted `--route` can be resumed
-                by simply re-launching the command. Positional args
-                are ignored in this mode.
+  --route       Redistribute puzzles into the file matching their
+                post-sort classification, then overwrite the originals
+                in-place. Without positional args, the source set is
+                the six playable-level files
+                (assets/1-easy.txt … assets/6-mad.txt). With positional
+                args, those files are used as the feed instead —
+                useful to ventilate an unsorted feed (e.g.
+                /tmp/path6.txt) into the cascade. In that feed mode the
+                existing destination content is preserved verbatim and
+                the feed puzzles are added (deduped against the corpus
+                by `canonicalPuzzleKey`), never replacing it.
+                Out-of-cascade
+                puzzles (overfilled, undetermined) go to their
+                dedicated files. Writes to `<dest>.tmp` first (append
+                mode); renames each `.tmp` → original only at the
+                very end, after all writes succeed. An interrupted run
+                leaves `.tmp` files on disk; simply re-launch to
+                resume — puzzles already in a `.tmp` (by
+                `canonicalPuzzleKey`) are skipped. Add `--dry-run` to
+                preview routing without touching any file.
   -v, --verbose Emit a per-puzzle diff line whenever the stored cplx,
                 the pre-sort level, or the post-sort level changes.
   -h, --help    Show this help.
@@ -107,6 +150,7 @@ void _processFile(
   int? sample,
   required bool dryRun,
   required bool verbose,
+  required TraceCache cache,
 }) {
   final file = File(path);
   if (!file.existsSync()) {
@@ -170,11 +214,19 @@ void _processFile(
       fields[4] = dedupedConstraintsField;
       final puzzle = Puzzle(fields.join('_'));
 
-      // Step 2 — pre-sort trace. We classify it now so we can later
-      // attribute level changes specifically to the sort (vs to any
-      // other codebase shift, which would already show up here vs the
-      // file's expected level).
-      final preSortSteps = puzzle.solveExplained();
+      // Step 2 — pre-sort trace. Check the cache first (key is computed before
+      // the sort mutates the constraint order). We classify it now so we can
+      // later attribute level changes specifically to the sort.
+      final preSortHash = traceKeyFromPuzzle(puzzle);
+      final cachedPreSort = cache.lookup(preSortHash);
+      final preSortSteps = cachedPreSort ?? puzzle.solveExplained();
+      if (cachedPreSort == null) {
+        cache.update(
+          preSortHash,
+          canonicalPuzzleKey(fields.join('_')),
+          preSortSteps,
+        );
+      }
       final prefillRatio =
           puzzle.cells.where((c) => c.readonly).length / puzzle.cells.length;
       final preSortLevel = classifyTrace(
@@ -184,20 +236,28 @@ void _processFile(
       );
 
       // Step 3 — sort (reusing the pre-sort trace as the signal) and
-      // re-classify on the post-sort trace.
+      // re-classify on the post-sort trace. After sorting, the
+      // constraint order is canonical — compute the trace key now and
+      // skip the second solve if the cache already has the answer.
       puzzle.sortConstraintsByDifficulty(preSortSteps);
-      final postSortSteps = puzzle.solveExplained();
+      final postSortHash = traceKeyFromPuzzle(puzzle);
+      final cachedPostSort = cache.lookup(postSortHash);
+      final postSortSteps = cachedPostSort ?? puzzle.solveExplained();
+      if (cachedPostSort == null) {
+        cache.update(
+          postSortHash,
+          canonicalPuzzleKey(fields.join('_')),
+          postSortSteps,
+        );
+      }
       final postSortLevel = classifyTrace(
         steps: postSortSteps,
         prefillRatio: prefillRatio,
         solved: true,
       );
 
-      // Step 4 — recompute the cplx score. Single internal solve.
-      // `force: true` bypasses the cached value the Puzzle constructor
-      // loaded from the line's field [6] — recompute's entire purpose
-      // is to re-derive that value from scratch.
-      puzzle.computeComplexity(force: true);
+      // Step 4 — recompute the cplx score from the cached trace (no extra solve).
+      puzzle.computeComplexityFromSteps(postSortSteps);
       final newCplx = puzzle.cachedComplexity ?? -1;
 
       processed++;
@@ -229,12 +289,15 @@ void _processFile(
       // fields 5/6 from the post-sort computation.
       fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
       final sol = puzzle.cachedSolution;
-      fields[5] = sol != null ? '1:${sol.join('')}' : '0:0';
+      fields[5] = sol != null
+          ? '1:${sol.map(cellValueToString).join('')}'
+          : '0:0';
       fields[6] = '$newCplx';
       output.add(fields.join('_'));
 
-      if (processed % 100 == 0) {
+      if (processed % 2000 == 0) {
         stderr.write('\r$path: $processed puzzles processed...');
+        cache.save(kTraceCachePath);
       }
     } catch (e) {
       stderr.writeln('\nError on line ${i + 1}: $e');
@@ -292,6 +355,11 @@ String _fmtHistogram(Map<PuzzleLevel, int> hist) {
     PuzzleLevel.expert,
     PuzzleLevel.mad,
     PuzzleLevel.overfilledEasy,
+    PuzzleLevel.overfilledPlayer,
+    PuzzleLevel.overfilledAdvanced,
+    PuzzleLevel.overfilledStrong,
+    PuzzleLevel.overfilledExpert,
+    PuzzleLevel.overfilledMad,
     PuzzleLevel.overfilled,
     PuzzleLevel.undetermined,
   ];
@@ -303,9 +371,13 @@ String _fmtHistogram(Map<PuzzleLevel, int> hist) {
   return '{${parts.join(', ')}}';
 }
 
-/// Route puzzles from the six playable-level files into the file
-/// matching their post-sort classification. Off-cascade puzzles land
-/// in their dedicated `overfilled*` / `undetermined` files.
+/// Route puzzles into the file matching their post-sort
+/// classification. Source defaults to the six playable-level files;
+/// pass [sources] to route from an arbitrary set of files instead
+/// (e.g. an unsorted /tmp/*.txt feed). Off-cascade puzzles land in
+/// their dedicated `overfilled*` / `undetermined` files. In feed mode
+/// the existing destination content is preserved (seeded into each
+/// `.tmp`) and the feed is added to it, deduped by canonical key.
 ///
 /// Algorithm:
 ///   1. Read every line of every input file.
@@ -319,12 +391,39 @@ String _fmtHistogram(Map<PuzzleLevel, int> hist) {
 ///      comments/blanks.
 ///   4. Destinations not in [_playableLevelPaths] (overfilled, etc.)
 ///      get created from scratch — they have no `keepInPlace`.
+///   5. After all writes succeed, rename each `<dest>.tmp` → `<dest>`
+///      in-place. An interrupted run leaves `.tmp` files on disk and
+///      is resumable by re-launching (idempotence via canonical key).
 ///
 /// Idempotency: a second `--route` run on the post-routing files
 /// shouldn't move anything (modulo small numeric drift from the
 /// classification cascade).
-void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
+void _routeFiles({
+  required bool dryRun,
+  int? sample,
+  required bool verbose,
+  List<String> sources = const [],
+  required TraceCache cache,
+}) {
+  // When [sources] is non-empty, we route from an arbitrary feed
+  // (not one of the six level files). The feed's own verbatim noise
+  // (blanks, comments, parse failures) is silently dropped — the feed
+  // is an input, not a destination. The existing destination assets,
+  // however, are preserved: their content is seeded into each `.tmp`
+  // (see the seeding pass below and `sinkFor`) so the feed is added to
+  // the corpus rather than replacing it.
+  final external = sources.isNotEmpty;
+  final srcPaths = external ? sources : _playableLevelPaths;
   final sw = Stopwatch()..start();
+
+  // Which `.tmp` files already exist at startup. A puzzle's `.tmp` that
+  // predates this run means we're resuming an interrupted route: the
+  // preload below rebuilds its idempotence sets from the `.tmp`, and the
+  // external-mode seeding (set population + `sinkFor` copy) must NOT run
+  // for it, or we'd duplicate its content.
+  final preexistingTmp = _allPossibleTmpPaths()
+      .where((p) => File(p).existsSync())
+      .toSet();
 
   // ─── Pre-load: read all existing `.tmp` to build idempotence sets ──
   //
@@ -335,8 +434,9 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
   // parse-failures) are deduped by exact string content so we don't
   // re-append them on every rerun.
   //
-  // Sources are NEVER read or modified here; only the `.tmp` files
-  // are inspected.
+  // The feed sources are NEVER read or modified here; only the `.tmp`
+  // files are inspected. (In external mode the destination asset files
+  // are additionally read below to seed dedup + preserve their content.)
   final existingCanonical = <String>{};
   final existingVerbatim = <String>{};
   int preloadedPuzzles = 0;
@@ -367,11 +467,40 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
     );
   }
 
+  // External feed mode: the destination asset files are not part of the
+  // source set, so seed the idempotence sets from each existing
+  // destination. This makes feed puzzles already present in the corpus
+  // skip (dedup) instead of being appended twice — and pairs with the
+  // verbatim copy done lazily in `sinkFor` so the final rename preserves
+  // the existing content. Skip destinations whose `.tmp` already existed
+  // (a resumed run rebuilt those sets from the `.tmp` preload above).
+  if (external) {
+    for (final tmpPath in _allPossibleTmpPaths()) {
+      if (preexistingTmp.contains(tmpPath)) continue;
+      final destPath = tmpPath.substring(0, tmpPath.length - '.tmp'.length);
+      final destFile = File(destPath);
+      if (!destFile.existsSync()) continue;
+      for (final line in destFile.readAsLinesSync()) {
+        if (line.trim().isEmpty || line.startsWith('#')) {
+          existingVerbatim.add(line);
+          continue;
+        }
+        try {
+          existingCanonical.add(canonicalPuzzleKey(line));
+        } catch (_) {
+          existingVerbatim.add(line);
+        }
+      }
+    }
+  }
+
   // ─── Sinks (append mode) ────────────────────────────────────────────
   //
   // Append so multiple runs accumulate without truncating prior work.
-  // No commit / rename / cleanup at the end — the `.tmp` files stay
-  // in place for the user to verify and migrate manually.
+  // Each `.tmp` is renamed over its destination at the very end (see the
+  // commit block after the route loop). In external feed mode the first
+  // open of a destination seeds its `.tmp` with the current asset content
+  // so that rename adds the feed to — rather than replaces — the corpus.
   final destFiles = <String, RandomAccessFile>{};
   final destStats = <String, _DestStats>{};
   final perFileStats = <String, _RouteStats>{};
@@ -382,7 +511,32 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
       final dir = tmp.parent;
       if (!dir.existsSync()) dir.createSync(recursive: true);
       destStats[destPath] = _DestStats();
-      return tmp.openSync(mode: FileMode.append);
+      final raf = tmp.openSync(mode: FileMode.append);
+      // External feed mode: seed the freshly-opened `.tmp` with the
+      // current destination content so the final rename preserves it
+      // (the asset files are never read as sources in this mode). Skip
+      // when the `.tmp` predates this run (resume: it already holds
+      // seeded + routed content) or when the destination is itself a
+      // feed source (don't clone the input). Only destinations that
+      // actually receive a puzzle are seeded, so untouched assets keep
+      // their `.tmp`-free state and are never rewritten.
+      if (external &&
+          !preexistingTmp.contains('$destPath.tmp') &&
+          !srcPaths.contains(destPath)) {
+        final destFile = File(destPath);
+        if (destFile.existsSync()) {
+          final s = destStats[destPath]!;
+          for (final line in destFile.readAsLinesSync()) {
+            raf.writeStringSync('$line\n');
+            if (line.trim().isEmpty || line.startsWith('#')) {
+              s.verbatim++;
+            } else {
+              s.stayed++;
+            }
+          }
+        }
+      }
+      return raf;
     });
   }
 
@@ -408,7 +562,7 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
   int alreadyProcessed = 0;
   int newlyProcessed = 0;
 
-  for (final srcPath in _playableLevelPaths) {
+  for (final srcPath in srcPaths) {
     final srcFile = File(srcPath);
     if (!srcFile.existsSync()) {
       stderr.writeln('warn: $srcPath not found, skipping');
@@ -420,6 +574,7 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
 
     for (final line in srcFile.readAsLinesSync()) {
       if (line.trim().isEmpty || line.startsWith('#')) {
+        if (external) continue;
         if (existingVerbatim.add(line)) {
           emit(srcPath, line, _DestStatsKind.verbatim);
         }
@@ -451,6 +606,7 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
       try {
         final fields = line.split('_');
         if (fields.length < 7) {
+          if (external) continue;
           if (existingVerbatim.add(line)) {
             emit(srcPath, line, _DestStatsKind.verbatim);
           }
@@ -460,7 +616,16 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
         fields[4] = dedupAndSortConstraints(fields[4]);
         final puzzle = Puzzle(fields.join('_'));
 
-        final preSortSteps = puzzle.solveExplained();
+        final preSortHash = traceKeyFromPuzzle(puzzle);
+        final cachedPreSort2 = cache.lookup(preSortHash);
+        final preSortSteps = cachedPreSort2 ?? puzzle.solveExplained();
+        if (cachedPreSort2 == null) {
+          cache.update(
+            preSortHash,
+            canonicalPuzzleKey(fields.join('_')),
+            preSortSteps,
+          );
+        }
         final prefillRatio =
             puzzle.cells.where((c) => c.readonly).length / puzzle.cells.length;
         final preSortLevel = classifyTrace(
@@ -470,18 +635,29 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
         );
 
         puzzle.sortConstraintsByDifficulty(preSortSteps);
-        final postSortSteps = puzzle.solveExplained();
+        final postSortHash = traceKeyFromPuzzle(puzzle);
+        final cachedPostSort = cache.lookup(postSortHash);
+        final postSortSteps = cachedPostSort ?? puzzle.solveExplained();
+        if (cachedPostSort == null) {
+          cache.update(
+            postSortHash,
+            canonicalPuzzleKey(fields.join('_')),
+            postSortSteps,
+          );
+        }
         final postSortLevel = classifyTrace(
           steps: postSortSteps,
           prefillRatio: prefillRatio,
           solved: true,
         );
 
-        puzzle.computeComplexity(force: true);
+        puzzle.computeComplexityFromSteps(postSortSteps);
 
         fields[4] = puzzle.constraints.map((c) => c.serialize()).join(';');
         final sol = puzzle.cachedSolution;
-        fields[5] = sol != null ? '1:${sol.join('')}' : '0:0';
+        fields[5] = sol != null
+            ? '1:${sol.map(cellValueToString).join('')}'
+            : '0:0';
         fields[6] = '${puzzle.cachedComplexity}';
         final outLine = fields.join('_');
 
@@ -519,10 +695,12 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
         processedThisFile++;
         stats.processed++;
         newlyProcessed++;
-        if (stats.processed % 100 == 0) {
+        if (stats.processed % 2000 == 0) {
           stderr.write('\r$srcPath: ${stats.processed} new processed...');
+          cache.save(kTraceCachePath);
         }
       } catch (e) {
+        if (external) continue;
         if (existingVerbatim.add(line)) {
           emit(srcPath, line, _DestStatsKind.verbatim);
         }
@@ -536,24 +714,35 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
     );
   }
 
-  // Close handles. No rename, no delete — the `.tmp` files remain
-  // on disk for the user to inspect.
+  // Close handles before any rename.
   for (final raf in destFiles.values) {
     raf.closeSync();
   }
 
   stderr.writeln('');
-  final action = dryRun ? '(dry-run, no files written)' : 'appended';
+  final action = dryRun ? '(dry-run, no files written)' : 'written';
   for (final destPath in destStats.keys.toList()..sort()) {
     final s = destStats[destPath]!;
     final total = s.verbatim + s.stayed + s.newcomers;
     if (total == 0) continue;
     stderr.writeln(
-      '$destPath.tmp: $total lines $action — '
+      '$destPath: $total lines $action — '
       '${s.verbatim} verbatim, '
       '${s.stayed} recomputed-and-stayed, '
       '${s.newcomers} recomputed-and-arrived',
     );
+  }
+
+  // Rename .tmp → original now that all writes succeeded.
+  if (!dryRun) {
+    stderr.writeln('');
+    for (final destPath in destFiles.keys.toList()..sort()) {
+      final tmp = File('$destPath.tmp');
+      if (tmp.existsSync()) {
+        tmp.renameSync(destPath);
+        stderr.writeln('  renamed: $destPath.tmp → $destPath');
+      }
+    }
   }
 
   stderr.writeln('');
@@ -567,15 +756,12 @@ void _routeFiles({required bool dryRun, int? sample, required bool verbose}) {
   if (newlyProcessed == 0 && alreadyProcessed > 0) {
     stderr.writeln('');
     stderr.writeln(
-      'All source puzzles are present in the .tmp files. '
-      'You can review them, then migrate with:',
+      'All source puzzles were already processed on a previous run '
+      '(matched via canonical key). Nothing new to route.',
     );
-    for (final p in _playableLevelPaths) {
-      stderr.writeln('  mv $p.tmp $p');
-    }
   }
   stderr.writeln('');
-  for (final srcPath in _playableLevelPaths) {
+  for (final srcPath in srcPaths) {
     final s = perFileStats[srcPath];
     if (s == null) continue;
     stderr.writeln(
@@ -601,6 +787,11 @@ List<String> _allPossibleTmpPaths() {
   // Off-cascade destinations from `levelFilenames`.
   for (final lvl in [
     PuzzleLevel.overfilledEasy,
+    PuzzleLevel.overfilledPlayer,
+    PuzzleLevel.overfilledAdvanced,
+    PuzzleLevel.overfilledStrong,
+    PuzzleLevel.overfilledExpert,
+    PuzzleLevel.overfilledMad,
     PuzzleLevel.overfilled,
     PuzzleLevel.undetermined,
   ]) {

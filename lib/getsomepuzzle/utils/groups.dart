@@ -1,10 +1,60 @@
-import 'dart:collection';
-
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+
+/// Multi-source flood fill over the puzzle grid.
+///
+/// All [starts] are visited unconditionally (even when [canTraverse] would
+/// reject them), then the fill expands through neighbors for which
+/// [canTraverse] returns true. Returns the visited set.
+Set<int> floodFill(
+  Puzzle puzzle,
+  Iterable<int> starts,
+  bool Function(int idx) canTraverse,
+) {
+  final visited = <int>{...starts};
+  final queue = List<int>.from(visited);
+  while (queue.isNotEmpty) {
+    final cur = queue.removeLast();
+    for (final nei in puzzle.getNeighbors(cur)) {
+      if (visited.contains(nei)) continue;
+      if (!canTraverse(nei)) continue;
+      visited.add(nei);
+      queue.add(nei);
+    }
+  }
+  return visited;
+}
+
+/// True iff a cell satisfying [isTarget] is reachable from [starts] through
+/// cells for which [canTraverse] returns true.
+///
+/// [isTarget] is also tested on the start cells themselves (a start can be
+/// its own target, e.g. a cell lying on both borders of a 1-wide grid).
+/// Early-exits on the first target reached. Empty [starts] returns false.
+bool canReach(
+  Puzzle puzzle,
+  Iterable<int> starts,
+  bool Function(int idx) isTarget,
+  bool Function(int idx) canTraverse,
+) {
+  final visited = <int>{...starts};
+  final queue = List<int>.from(visited);
+  while (queue.isNotEmpty) {
+    final cur = queue.removeLast();
+    if (isTarget(cur)) return true;
+    for (final nei in puzzle.getNeighbors(cur)) {
+      if (visited.contains(nei)) continue;
+      if (!canTraverse(nei)) continue;
+      visited.add(nei);
+      queue.add(nei);
+    }
+  }
+  return false;
+}
 
 Set<int> getMyColorGroup(Puzzle puzzle, int idx) {
   final myValue = puzzle.cellValues[idx];
-  if (myValue == 0) return {};
+  if (myValue == CellValue.free) return {};
   final List<int> result = [idx];
   result.addAll(
     puzzle.getNeighbors(idx).where((e) => puzzle.cellValues[e] == myValue),
@@ -54,7 +104,7 @@ List<List<int>> getGroups(Puzzle puzzle) {
   return result;
 }
 
-List<List<int>> getColorGroups(Puzzle puzzle, int color) {
+List<List<int>> getColorGroups(Puzzle puzzle, CellValue color) {
   return getGroups(puzzle).where((grp) {
     if (grp.isEmpty) return false;
     return puzzle.cellValues[grp.first] == color;
@@ -80,7 +130,7 @@ List<List<int>> getColorGroups(Puzzle puzzle, int color) {
 /// group (e.g. a letter group), given the current opposite-color obstacles.
 List<List<int>> toVirtualGroups(Puzzle puzzle) {
   final result = <List<int>>[];
-  final values = <int>{0, ...puzzle.domain};
+  final values = <CellValue>{CellValue.free, ...puzzle.domain};
   for (final v in values) {
     _componentsAnchoredOnValue(puzzle, v, result);
   }
@@ -88,25 +138,21 @@ List<List<int>> toVirtualGroups(Puzzle puzzle) {
 }
 
 /// Append to [out] each connected component of cells whose value is [v] or
-/// 0, where every component is anchored by at least one cell whose value
-/// is exactly [v]. Components are discovered via BFS.
-void _componentsAnchoredOnValue(Puzzle puzzle, int v, List<List<int>> out) {
+/// has the option [v], where every component is anchored by at least one cell
+/// whose value is exactly [v]. Components are discovered via flood fill.
+void _componentsAnchoredOnValue(
+  Puzzle puzzle,
+  CellValue v,
+  List<List<int>> out,
+) {
   final cellValues = puzzle.cellValues;
   final visited = <int>{};
   for (int start = 0; start < cellValues.length; start++) {
     if (cellValues[start] != v) continue;
     if (visited.contains(start)) continue;
-    final component = <int>{start};
-    final queue = Queue<int>()..add(start);
-    while (queue.isNotEmpty) {
-      final cur = queue.removeFirst();
-      for (final nei in puzzle.getNeighbors(cur)) {
-        final nv = cellValues[nei];
-        if (nv != v && nv != 0) continue;
-        if (!component.add(nei)) continue;
-        queue.add(nei);
-      }
-    }
+    final component = floodFill(puzzle, [
+      start,
+    ], (i) => cellValues[i] == v || puzzle.cells[i].options.contains(v));
     visited.addAll(component);
     out.add(component.toList()..sort());
   }
@@ -116,7 +162,8 @@ void _componentsAnchoredOnValue(Puzzle puzzle, int v, List<List<int>> out) {
 /// merge graph) would prevent at least one of [members] from being reachable
 /// from `members.first`.
 ///
-/// The merge graph spans every cell whose value is [color] or 0 (uncoloured).
+/// The merge graph spans every cell whose value is [color] or has the
+/// option [color].
 /// Used by constraints that require a set of cells to end up in the same
 /// same-colour group (`LT`, future `GC`) to detect articulation points —
 /// cells that lie on every possible merge path between [members] and must
@@ -129,50 +176,32 @@ void _componentsAnchoredOnValue(Puzzle puzzle, int v, List<List<int>> out) {
 bool blockingDisconnectsMembers(
   Puzzle puzzle,
   int blocked,
-  int color,
+  CellValue color,
   List<int> members,
 ) {
   if (members.length < 2) return false;
   if (members.contains(blocked)) return false;
-  final start = members.first;
-  final visited = <int>{start};
-  final queue = Queue<int>()..add(start);
-  while (queue.isNotEmpty) {
-    final cur = queue.removeFirst();
-    for (final nei in puzzle.getNeighbors(cur)) {
-      if (nei == blocked) continue;
-      if (visited.contains(nei)) continue;
-      final v = puzzle.cellValues[nei];
-      if (v != color && v != 0) continue;
-      visited.add(nei);
-      queue.add(nei);
-    }
-  }
+  final visited = floodFill(puzzle, [members.first], (i) {
+    if (i == blocked) return false;
+    final v = puzzle.cellValues[i];
+    return v == color || puzzle.cells[i].options.contains(color);
+  });
   return members.any((m) => !visited.contains(m));
 }
 
 /// Size of the connected component reachable from [seed] through cells of
-/// value [color] or 0. [seed] itself is included even when its own value
+/// value [color] or having option [color]. [seed] itself is included even when its own value
 /// differs from [color] (callers typically pass a member of a [color] group).
-int reachableComponentSize(Puzzle puzzle, int seed, int color) {
-  final visited = <int>{seed};
-  final queue = Queue<int>()..add(seed);
-  while (queue.isNotEmpty) {
-    final cur = queue.removeFirst();
-    for (final nei in puzzle.getNeighbors(cur)) {
-      if (visited.contains(nei)) continue;
-      final v = puzzle.cellValues[nei];
-      if (v != color && v != 0) continue;
-      visited.add(nei);
-      queue.add(nei);
-    }
-  }
-  return visited.length;
+int reachableComponentSize(Puzzle puzzle, int seed, CellValue color) {
+  return floodFill(puzzle, [seed], (i) {
+    final v = puzzle.cellValues[i];
+    return v == color || puzzle.cells[i].options.contains(color);
+  }).length;
 }
 
 /// True iff treating [blocked] as the opposite colour (removing it from the
 /// merge graph) leaves fewer than [minSize] cells reachable from [seed]
-/// through cells whose value is [color] or 0.
+/// through cells whose value is [color] or has the option [color].
 ///
 /// Sibling of [blockingDisconnectsMembers]: same BFS, different post-check.
 /// Used by `GS` to detect cells that lie on every possible growth path of
@@ -185,64 +214,32 @@ int reachableComponentSize(Puzzle puzzle, int seed, int color) {
 bool blockingShrinksReachableBelow(
   Puzzle puzzle,
   int blocked,
-  int color,
+  CellValue color,
   int seed,
   int minSize,
 ) {
   if (seed == blocked) return false;
-  final visited = <int>{seed};
-  final queue = Queue<int>()..add(seed);
-  while (queue.isNotEmpty) {
-    final cur = queue.removeFirst();
-    for (final nei in puzzle.getNeighbors(cur)) {
-      if (nei == blocked) continue;
-      if (visited.contains(nei)) continue;
-      final v = puzzle.cellValues[nei];
-      if (v != color && v != 0) continue;
-      visited.add(nei);
-      queue.add(nei);
-    }
-  }
+  final visited = floodFill(puzzle, [seed], (i) {
+    if (i == blocked) return false;
+    final v = puzzle.cellValues[i];
+    return v == color || puzzle.cells[i].options.contains(color);
+  });
   return visited.length < minSize;
 }
 
 bool canMergeGroups(Puzzle puzzle, List<int> groupA, List<int> groupB) {
-  // Check if there exists a path of free cells (value 0 or same color) connecting groupA and groupB
-  // Perform flood fill from all cells in groupA, through cells that are either empty (0) or same color
+  // Check if there exists a path of cells (same color or having that option) connecting groupA and groupB
   final targetColor = puzzle.cellValues[groupA.first];
   final otherColor = puzzle.cellValues[groupB.first];
   if (targetColor != otherColor) return false;
 
-  final Set<int> visited = {};
-  final Queue<int> queue = Queue();
-
-  // Start flood fill from all cells in groupA
-  for (var cell in groupA) {
-    queue.add(cell);
-    visited.add(cell);
-  }
-
-  while (queue.isNotEmpty) {
-    final current = queue.removeFirst();
-    // Check neighbors
-    for (var neighbor in puzzle.getNeighbors(current)) {
-      if (visited.contains(neighbor)) continue;
-      final neighborValue = puzzle.cellValues[neighbor];
-      // Can traverse through empty cells or cells of the same color
-      if (neighborValue == 0 || neighborValue == targetColor) {
-        visited.add(neighbor);
-        queue.add(neighbor);
-        // If we reach any cell in groupB, they can merge
-        if (groupB.contains(neighbor)) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
+  return canReach(puzzle, groupA, groupB.contains, (i) {
+    final v = puzzle.cellValues[i];
+    return v == targetColor || puzzle.cells[i].options.contains(targetColor);
+  });
 }
 
-int calculateMinGroups(Puzzle puzzle, int color) {
+int calculateMinGroups(Puzzle puzzle, CellValue color) {
   // Calculate the minimum possible number of groups of that color
   // that can be made by merging existing groups in puzzle.
   final groups = getColorGroups(puzzle, color);
@@ -279,10 +276,30 @@ int calculateMinGroups(Puzzle puzzle, int color) {
   return roots.length;
 }
 
-List<int> getFreeCellsWithoutNeighborColor(Puzzle puzzle, int color) {
+/// Free cells that could still *start a new* `color` group: free, with no
+/// `color` neighbour (colouring one `color` makes a fresh isolated group
+/// rather than extending an existing one) **and** with `color` still in
+/// their options.
+///
+/// The options filter matters on 3+ colour domains: a cell can be free yet
+/// have `color` already pruned by another constraint's `removeOption`, in
+/// which case it can never become `color` and is not a real new-group
+/// candidate. Counting it would over-estimate how many groups can still
+/// appear, masking real impossibilities and blocking grey-out. This mirrors
+/// the option filter [getCellsThatMergeColorGroups] already applies, so GC's
+/// reachability / completeness reasoning uses one consistent convention.
+///
+/// The returned set is monotone decreasing under forward play: a cell leaves
+/// it when coloured, when it gains a `color` neighbour, or when `color` is
+/// pruned from its options — and nothing can ever re-enter it.
+List<int> getFreeCellsThatCanStartNewColorGroup(
+  Puzzle puzzle,
+  CellValue color,
+) {
   final List<int> result = [];
   for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
-    if (puzzle.cellValues[idx] != 0) continue;
+    if (puzzle.cellValues[idx] != CellValue.free) continue;
+    if (!puzzle.cells[idx].options.contains(color)) continue;
     final neighbors = puzzle.getNeighbors(idx);
     if (!neighbors.any((n) => puzzle.cellValues[n] == color)) {
       result.add(idx);
@@ -291,12 +308,12 @@ List<int> getFreeCellsWithoutNeighborColor(Puzzle puzzle, int color) {
   return result;
 }
 
-List<int> getCellsThatMergeColorGroups(Puzzle puzzle, int color) {
+List<int> getCellsThatMergeColorGroups(Puzzle puzzle, CellValue color) {
   final List<int> result = [];
   final groups = getColorGroups(puzzle, color);
 
   for (var idx = 0; idx < puzzle.cellValues.length; idx++) {
-    if (puzzle.cellValues[idx] != 0) continue;
+    if (!puzzle.cells[idx].options.contains(color)) continue;
 
     final neighbors = puzzle.getNeighbors(idx);
     final neighborGroups = <int>{};

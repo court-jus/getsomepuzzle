@@ -26,6 +26,14 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 /// We enumerate the full orbit of 4 rotations and return the lex-smallest
 /// identity key — which is then invariant under any rotation.
 ///
+/// **Normalization invariance:** every orbit member — the 0° one
+/// included — is re-serialized from a parsed `Puzzle`, so the in-memory
+/// constraint merges (LT per-letter aggregation, PA same-axis merging)
+/// apply before the key is computed. A pre-merge line and its normalized
+/// rewrite therefore share a key, keeping old stats entries attached to
+/// their puzzle. The textual `_identityKey` only serves as fallback for
+/// lines that fail to parse.
+///
 /// Robust to both the legacy v2 line and the bare canonical form
 /// (no version prefix, no solution/complexity tail) — that way old
 /// stats lines and any line previously canonicalized both produce the
@@ -58,15 +66,23 @@ String? _identityKey(String line) {
 /// which is more expensive than `_identityKey` but only runs at
 /// canonicalization time (stats writes and puzzle open) — never inside
 /// the solver hot path. Returns `null` if the line can't be parsed.
+///
+/// All four orbit members go through parse → `rotated()` →
+/// re-serialization — including the 0° member, obtained as the fourth
+/// rotation (360°). This makes the key invariant under the constraint
+/// normalizations `Puzzle.addConstraint` applies in memory (LetterGroup
+/// per-letter aggregation, ParityConstraint same-axis merging): a legacy
+/// line carrying `PA:i.top;PA:i.bottom` and its normalized form
+/// `PA:i.vertical` re-serialize identically, so old stats entries keep
+/// matching the puzzle after its stored line is normalized.
 String? _orbitMinIdentityKey(String line) {
   try {
-    String? best = _identityKey(line);
-    if (best == null) return null;
     var p = Puzzle(line);
-    for (int i = 0; i < 3; i++) {
+    String? best;
+    for (int i = 0; i < 4; i++) {
       p = p.rotated();
       final k = _identityKey(p.lineRepresentation);
-      if (k != null && k.compareTo(best!) < 0) best = k;
+      if (k != null && (best == null || k.compareTo(best) < 0)) best = k;
     }
     return best;
   } catch (_) {
@@ -116,4 +132,54 @@ String dedupAndSortConstraints(String field) {
 bool _isVersionTag(String s) {
   if (s.length < 2 || s[0] != 'v') return false;
   return int.tryParse(s.substring(1)) != null;
+}
+
+/// Accept the three representations a user can paste and return a v2
+/// line that `Puzzle`/`PuzzleData` constructors can parse:
+///   - share URL `https://.../?puzzle=v2_...` → query param value
+///   - bare canonical `<domain>_<wxh>_<prefill>_<constraints>` (no
+///     version prefix, no solution/cplx tail — what `canonicalPuzzleKey`
+///     and the `Puzzle loaded` log emit) → prefixed with `v2_`
+///   - full v2 line `v2_...` (or any `vN_...` version tag) → returned
+///     verbatim
+///
+/// Returns `null` if the input is empty or doesn't structurally look
+/// like any of the three formats. Callers can use that to silently
+/// ignore partial input (e.g. a TextField onChanged that fires on every
+/// keystroke).
+String? normalizeToV2Line(String input) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) return null;
+
+  // 1. URL form: extract the `puzzle` query parameter and recurse so
+  //    the extracted value goes through the canonical/v2 detection too.
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      final fromUrl = Uri.parse(trimmed).queryParameters['puzzle'];
+      if (fromUrl != null && fromUrl.isNotEmpty) {
+        return normalizeToV2Line(fromUrl);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // URL-decode the input in case the user pasted a share link's
+  // encoded form (e.g. %3B → ;, %3A → :) without the full URL wrapper.
+  // This must happen before any use of `trimmed` below so the version-
+  // tag and canonical branches also benefit from the decoded form.
+  final decoded = trimmed.contains('%') ? Uri.decodeFull(trimmed) : trimmed;
+  final parts = decoded.split('_');
+  // 2. Already-versioned line — let the existing parser handle it.
+  if (parts.isNotEmpty && _isVersionTag(parts.first)) return decoded;
+
+  // 3. Bare canonical: need at least domain, wxh, prefill, constraints.
+  if (parts.length < 4) return null;
+  final dim = parts[1];
+  if (!RegExp(r'^\d+x\d+$').hasMatch(dim)) return null;
+  // Domain and prefill must be all digits.
+  if (!RegExp(r'^\d+$').hasMatch(parts[0])) return null;
+  if (!RegExp(r'^\d+$').hasMatch(parts[2])) return null;
+  // Constraint field must contain at least one `slug:params` token.
+  if (!parts[3].contains(':')) return null;
+  return 'v2_$decoded';
 }

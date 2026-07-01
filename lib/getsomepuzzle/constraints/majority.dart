@@ -1,0 +1,201 @@
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+
+class MajorityConstraint extends Constraint {
+  @override
+  String get slug => 'MJ';
+
+  int r0 = 0;
+  int c0 = 0;
+  int r1 = 0;
+  int c1 = 0;
+  CellValue targetColor = CellValue.free;
+
+  @override
+  Set<CellValue> get referencedColors => {targetColor};
+
+  List<int>? _zoneIndices;
+
+  MajorityConstraint(String strParams) {
+    final parts = strParams.split(".");
+    r0 = int.parse(parts[0]);
+    c0 = int.parse(parts[1]);
+    r1 = int.parse(parts[2]);
+    c1 = int.parse(parts[3]);
+    targetColor = cellRepresentationToValue(parts[4]);
+  }
+
+  /// Absolute cell indices contained in the zone for a grid of given [width].
+  /// Cached on first call — callers must not invoke with two different widths
+  /// on the same instance (in practice an instance is tied to one puzzle).
+  List<int> indicesFor(int width) {
+    _zoneIndices ??= () {
+      final indices = <int>[];
+      for (int r = r0; r <= r1; r++) {
+        for (int c = c0; c <= c1; c++) {
+          indices.add(r * width + c);
+        }
+      }
+      return indices;
+    }();
+    return _zoneIndices!;
+  }
+
+  int get zoneSize => (r1 - r0 + 1) * (c1 - c0 + 1);
+
+  /// Minimum target-color cells needed for strict majority:
+  /// floor(N/2) + 1 = (N ~/ 2) + 1
+  int get target => (zoneSize ~/ 2) + 1;
+
+  @override
+  String toString() => 'MJ';
+
+  @override
+  String toHuman(Puzzle puzzle) =>
+      'Zone (${r0 + 1},${c0 + 1})-(${r1 + 1},${c1 + 1}) : majority of ${cellValueToString(targetColor)}';
+
+  @override
+  String serialize() => 'MJ:$r0.$c0.$r1.$c1.${cellValueToString(targetColor)}';
+
+  @override
+  Constraint rotated(int origWidth, int origHeight) {
+    return MajorityConstraint(
+      '$c0.${origHeight - 1 - r1}.$c1.${origHeight - 1 - r0}.${cellValueToString(targetColor)}',
+    );
+  }
+
+  static List<String> generateAllParameters(
+    int width,
+    int height,
+    List<CellValue> domain,
+    Set<int>? excludedIndices,
+  ) {
+    final List<String> result = [];
+    for (int r0 = 0; r0 < height; r0++) {
+      for (int r1 = r0; r1 < height; r1++) {
+        for (int c0 = 0; c0 < width; c0++) {
+          for (int c1 = c0; c1 < width; c1++) {
+            final h = r1 - r0 + 1;
+            final w = c1 - c0 + 1;
+            final zs = h * w;
+            if (zs < 3) continue;
+            if (h == 1 || w == 1) continue;
+            if (zs > (width * height) * 0.6) continue;
+            for (final color in domain) {
+              result.add('$r0.$c0.$r1.$c1.${cellValueToString(color)}');
+            }
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  @override
+  bool verify(Puzzle puzzle) {
+    final indices = indicesFor(puzzle.width);
+    final currentCount = indices
+        .where((i) => puzzle.cellValues[i] == targetColor)
+        .length;
+    // Every coloured cell that is not the target counts against the majority,
+    // regardless of which non-target colour it is (matters on 3+ colours).
+    final nonTargetCount = indices
+        .where(
+          (i) =>
+              puzzle.cellValues[i] != CellValue.free &&
+              puzzle.cellValues[i] != targetColor,
+        )
+        .length;
+    // Only free cells that can still take `targetColor` count toward
+    // reaching the majority; one with `targetColor` pruned is destined to be
+    // a non-target cell and can never raise `currentCount`.
+    final freeCount = indices
+        .where(
+          (i) =>
+              puzzle.cellValues[i] == CellValue.free &&
+              puzzle.cells[i].options.contains(targetColor),
+        )
+        .length;
+
+    if (freeCount == 0) {
+      return currentCount >= target;
+    }
+
+    if (currentCount + freeCount < target) return false;
+    if (nonTargetCount > zoneSize - target) return false;
+    return true;
+  }
+
+  @override
+  Move? apply(Puzzle puzzle) {
+    final indices = indicesFor(puzzle.width);
+    final freeCells = indices
+        .where((i) => puzzle.cellValues[i] == CellValue.free)
+        .toList();
+    if (freeCells.isEmpty) return null;
+
+    final currentCount = indices
+        .where((i) => puzzle.cellValues[i] == targetColor)
+        .length;
+    // Coloured cells that are not the target (any non-target colour).
+    final nonTargetCount = indices
+        .where(
+          (i) =>
+              puzzle.cellValues[i] != CellValue.free &&
+              puzzle.cellValues[i] != targetColor,
+        )
+        .length;
+    final firstFree = freeCells.first;
+
+    /// Too many non-target cells: the majority can no longer be reached.
+    if (nonTargetCount > zoneSize - target) {
+      return Impossible(this);
+    }
+
+    /// Not enough space to grow
+    if (currentCount + freeCells.length < target) {
+      return Impossible(this);
+    }
+
+    /// Just enough space to grow
+    if (currentCount + freeCells.length == target) {
+      // Every free cell must become targetColor. If any has pruned it the
+      // majority is unreachable; otherwise force one (mirrors QA / NC,
+      // instead of emitting an excluded-option setValue caught generically).
+      for (final i in freeCells) {
+        if (!puzzle.cells[i].options.contains(targetColor)) {
+          return Impossible(this);
+        }
+      }
+      return SetValue(firstFree, targetColor, this, complexity: 0);
+    }
+
+    return null;
+  }
+
+  @override
+  bool isCompleteFor(Puzzle puzzle) {
+    if (!verify(puzzle)) return false;
+    final indices = indicesFor(puzzle.width);
+    return indices
+        .where((i) => puzzle.cellValues[i] == CellValue.free)
+        .every((i) => !puzzle.cells[i].options.contains(targetColor));
+  }
+
+  /// Two MJ zones conflict when their dashed borders would overlap visually:
+  /// they share a flush edge on the same side (same top/bottom row, or same
+  /// left/right column) with overlapping perpendicular extent, so both borders
+  /// inset to the same place. Mere adjacency (a shared grid line with the zones
+  /// on opposite sides) or a corner-only touch produces distinct borders and is
+  /// not a conflict.
+  @override
+  bool conflictsWith(Constraint other) {
+    if (other is! MajorityConstraint) return false;
+    final colsOverlap = c0 <= other.c1 && other.c0 <= c1;
+    final rowsOverlap = r0 <= other.r1 && other.r0 <= r1;
+    if ((r0 == other.r0 || r1 == other.r1) && colsOverlap) return true;
+    if ((c0 == other.c0 || c1 == other.c1) && rowsOverlap) return true;
+    return false;
+  }
+}

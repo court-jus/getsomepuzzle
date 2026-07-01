@@ -170,3 +170,13 @@ under `xvfb-run -a flutter test integration_test/... -d linux`.
 `PauseOverlay` accepts the `AutoPauseReason` so the subtitle reflects the
 trigger ("Paused due to inactivity", "Paused because the app lost focus") and
 falls back to the default text when the user paused manually.
+
+The same widget also serves as the **restart confirmation**. Tapping the
+topbar restart icon does not restart immediately: it pauses the game and sets
+`_confirmingRestart`, which passes a non-null `onRestart` to `PauseOverlay`.
+With `onRestart` set, the overlay splits the area into two halves — the usual
+teal resume button (tap to cancel and resume) and a red restart button (tap to
+confirm). The split is horizontal in landscape and vertical otherwise.
+Confirming calls `_confirmRestart` (`restart()` then `resume()`); resuming via
+the teal half clears `_confirmingRestart`. With `onRestart` null the overlay is
+the single full-screen resume button.

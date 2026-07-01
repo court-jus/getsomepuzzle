@@ -1,14 +1,68 @@
 # TODO
 
+## Solver soundness: 3-colour audit, round 2 — DONE (pending corpus `--check`)
+
+The "too-lenient on pruned options" sweep is complete (the dual of the
+2026-05-13 too-strict audit). Every `verify` / `apply` / `isCompleteFor` in
+`constraints/` and every `apply` in `constraints/complicities/` was checked
+for code that counts a still-`free` cell as able to take a colour already
+pruned from its `options`. Fixes shipped (see `third_color.md` § "Solver
+soundness audit, round 2" for the per-constraint record):
+
+* **GC** — the new-group predicate is now the single option-aware helper
+  `getFreeCellsThatCanStartNewColorGroup` (replacing the split
+  `getFreeCellsWithoutNeighborColor` + ad-hoc `.where` convention) at all
+  five sites.
+* **EY** — `_scan` now treats a free cell pruned of `color` as a sight
+  blocker (was: counted as a fillable empty → over-counted `max`, unsound).
+* **SH** — `isOpen` (verify + apply) is option-aware: a group fenced in by
+  cells pruned of its colour is closed, not "still growing" (was: undersized
+  frozen group passed verify, unsound).
+* **NC** — `isCompleteFor` greys out once the only free neighbours are pruned
+  of `color` (invariant alignment, matching GC).
+* **SHGS complicity** — impossibility judged on the cell's options, not the
+  full domain (was: collapsed a cell onto an excluded colour, unsound).
+
+Audited and already sound (no change): QA / NC / PA / MJ / base-line `verify`
+(option-aware), GS growth and LT virtual groups (option-aware `groups.dart`
+helpers), CH `_passable` (round-1), and the other complicities. Conservative
+`isCompleteFor` predicates (QA, MJ, PA, DF, base-line) only ever grey out
+late, never early — sound, left as-is.
+
+Regressions added: `constraints_test.dart` (GC ×2, EY, NC),
+`shape_utils_test.dart` (SH), `complicities_test.dart` (SHGS ×2).
+
+**Remaining (release gate):** re-run `--check` over the 3-colour corpus.
+EY/SH/GC `verify` are now stricter, so some lines previously accepted may be
+flagged as genuinely multi-solution — drop those, exactly as the round-1
+audit did. Unit tests are green but do not substitute for the corpus pass.
+
 ## Solver improvements
 
-### Hint constraint: per-cell constraint contribution score
+### Hint constraint: selection strategy refinements
 
-When the puzzle is already fully solvable by propagation (baseline fills all cells), current ranking reports 0 useful constraints. The button stays enabled and the player can still request a constraint — they just get one from the non-useful tail (a redundant constraint, picked first-come-first-served from the shuffled list).
+The `addConstraint` hint runs on demand (first hint tap) and returns the
+first candidate whose addition lowers `Puzzle.traceEffort()` — enumerated
+in registry order (roughly simplest type first, FM/PA before SY/LT), with
+each type's parameter list shuffled. If none reduces the effort, a random
+valid candidate is offered as a fallback (`pickHintConstraint` in
+`lib/getsomepuzzle/hint_worker_core.dart`).
 
-**Idea:** For each empty cell, trace which constraints participate in its resolution during propagation. A constraint that contributes to resolving many cells is "broadly helpful". A cell that is only resolved through a long chain of deductions could benefit from a more direct constraint. This would replace the random tail-pick with something targeted.
+Refinements to explore:
 
-**Challenge:** Propagation is a chain — constraint A deduces cell X, which enables constraint B to deduce cell Y. Attributing credit requires tracing the dependency graph of the propagation loop. This would require modifying `applyConstraintsPropagation()` to record which constraint resolved each cell, then building a dependency graph to compute per-constraint contribution scores.
+- **Targeting.** We have no way today to know *which constraint touches
+  which cell*. With it, the search could enumerate only candidates whose
+  zone overlaps the player's actual blockage (the next force/complicity
+  step) instead of scanning every type — cheaper and more relevant.
+- **Cheaper candidate enumeration for hints.** A `forHint` flag on
+  `generateAllParameters` returning a smaller, representative parameter
+  set (without changing the constraints' own semantics) would bound the
+  worst case (when no candidate reduces the effort and everything is
+  enumerated). E.g. `MajorityConstraint.generateAllParameters` is
+  O(width²·height²·|domain|) today.
+- **Constraint-type simplicity.** Beyond registry order, weight by type
+  simplicity so the offered constraint is the easiest to understand among
+  those that reduce the effort.
 
 ## Generator: equilibrium failure blacklist
 
@@ -23,9 +77,90 @@ failures (5 is the value used in early sketches) add the target's `key` to
 a session blacklist passed to `pickTarget` so the loop falls back to the
 next-deepest gap. Reset on successful generation or on warm-up.
 
+## Generator code health
+
+* **Refactor `generator/generator.dart`.** The file grew from ~534 to ~1302
+  lines absorbing the strategies (`phaseGate`, `propOnly`, `singleTier`,
+  `phase1Oneshot`), watchdogs, the `secondChance` queue, the targeted sort and
+  the multi-strat round-robin. Well documented in `third_color.md` but dense.
+  Suggested extraction (not urgent — do it if a new strategy is added):
+  * `generator/strategy.dart` — enum `GenerationStrategy` + dispatcher
+  * `generator/strategies/{phase_gate,prop_only,single_tier}.dart`
+  * `generator/targeted_sort.dart` — `_generateTargetedKeys`, `_StageTimer`,
+    the `ratioBefore` cache machinery
+  * `generateOne` stays in `generator.dart` and delegates.
+* **Strategy test coverage.** `propOnly` / `phase1Oneshot` / `singleTier` have
+  no unit test (validated only via external benchmarks — consistent with the
+  "no generator smoke tests" convention, but a silent-regression risk). Idea:
+  a parameterised canary that runs `generateOne` per strategy on a
+  deterministic seed + minimal grid (3x3 domain 2) and checks a valid puzzle
+  is produced within a reasonable budget. Not a quality test, just a tripwire.
+
+## Generator improvements
+
+* Implement 3-color for preFillSy
+
+## Notes and nits
+
+* **`apply()` ordering determinism.** `Puzzle.apply()` iterates sequentially
+  and returns the first match; `sortConstraintsByDifficulty` reorders by min
+  complexity, so the constraint order drives the trace. Documented in that
+  method's docstring. No action — a reminder that determinism holds only while
+  the constraint order is stable between runs; mind it when changing the sort.
+* **`Cell.removeOption` dead state.** Removing a cell's last option leaves
+  `value == free`, `options == []` (an unsignalled dead state). Unreachable
+  via the solver (a 2→1 prune auto-collapses to `setValue`); defensive only.
+
+## Quality of the gameplay
+
+* I noticed that puzzles with only PA constraints are fun
+
 ## QOL
 
-* Allow sharing a puzzle, from scratch or from its current state: need a fix for the web app that is very slow when opening a shared puzzle.
+* Allow opening the app directly with a puzzle on Android (custom URL scheme intent-filter for `getsomepuzzle://`). Web (query string) and Linux desktop (system handler) are already wired.
+
+## UI
+
+* When showing that a cell can be deduced thanks to a constraint and that constraint is DF, the name of the constraint is not shown.
+* Users should be able to disable grayout
+
+## Dev docs to be created
+
+Subsystems complex enough to deserve their own page in `docs/dev/`
+but currently without one (or only mentioned in passing in other
+docs):
+
+- **`verification_gate.md`** — The central invariant "a puzzle is
+  valid iff `solveExplained()` completes from its readonly cells"
+  deserves its own page: consequences for `verify` vs `apply`, why
+  no backtracking, how the replay protects against bogus traces.
+  Currently scattered across `algorithm.md`, `generator.md`, and
+  `CLAUDE.md`.
+- **`stats_persistence.md`** — `stats/stats.txt` format, aggregation
+  by `bin/aggregate_player_stats.dart`, full lifecycle (in-app
+  Stats → write → `stats.zip` backup → telemetry re-ingestion). No
+  dedicated doc today.
+- **`database_lifecycle.md`** — The `Database` class (loading
+  `default.txt`/`tutorial.txt`/`custom.txt`, `Filters`, stats
+  persistence) is central but undocumented. Could be folded into
+  `playlist.md` depending on volume.
+- **`post_processing.md`** — `bin/trace_score.dart`,
+  `bin/filter_score.dart`, `bin/polish.dart` are mentioned in
+  `generator.md` § 3 but without detail on `polish`'s mutations, the
+  budgets, or the thresholds. Given their complexity they deserve
+  their own page — `generator.md` would just point to it.
+- **`in_app_generator.md`** — The `generate_page.dart` widget (the
+  in-game generator UI) and its dedicated worker are described
+  nowhere. Not to be confused with the `bin/generate.dart` CLI.
+- **`workers_isolate.md`** — The native worker architecture (Isolate)
+  vs web (chunked async) is mentioned in passing across several docs
+  but never explained end to end. Small doc, big clarity win for
+  anyone touching progress callbacks.
+- **`i18n_workflow.md`** — ARB → `flutter gen-l10n` → adding a
+  locale. Half a page would suffice, but it would spare every new
+  contributor from rediscovering the pipeline.
+- **`in_app_editor.md`** — `lib/widgets/create_page/` (the integrated
+  puzzle editor) is entirely undocumented.
 
 ## Stats persistence
 
@@ -41,3 +176,7 @@ next-deepest gap. Reset on successful generation or on warm-up.
     without GMS, and the user can disable cloud backup system-wide.
   - Decide whether to opt in for *all* app data (simpler) or whitelist
     only the stats subtree (safer in case we ever persist secrets).
+
+## Editor
+
+* The RowCount constraint is missing

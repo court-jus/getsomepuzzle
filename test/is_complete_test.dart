@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
@@ -66,12 +67,55 @@ void main() {
       expect(c.isCompleteFor(p), isFalse);
     });
 
-    test('not complete when group has free neighbors', () {
+    test('early grayout: connected with free neighbors but no foreign letter '
+        'reachable → complete', () {
+      // Members 0,2 are colour 1, joined through the bottom row, so the group
+      // is connected. Cell 1 is free, so the old "fully bordered" rule would
+      // reject this — but there is no other letter that could ever merge in,
+      // so apply can never fire again: it must gray out now.
       final p = makePuzzle('101\n111');
       final c = LetterGroup('A.0.2');
       c.check(p);
-      expect(c.isCompleteFor(p), isFalse);
+      expect(c.isCompleteFor(p), isTrue);
     });
+
+    test(
+      'not complete when a foreign letter is reachable through free cells',
+      () {
+        // A (cells 0,1) is a connected colour-1 group with a free neighbour at
+        // cell 2. Letter B sits at cell 3 (free): the free corridor 2→3 could
+        // still be coloured 1 to bridge B into A's group, so apply branch 5 can
+        // still fire — not complete yet.
+        //   1 1 0 0   (row 0)
+        //   0 0 0 0   (row 1)
+        final p = makePuzzle('1100\n0000');
+        final a = LetterGroup('A.0.1');
+        final b = LetterGroup('B.3');
+        p.addConstraint(a);
+        p.addConstraint(b);
+        expect(a.isCompleteFor(p), isFalse);
+      },
+    );
+
+    test(
+      'complete when a foreign letter is walled off by the opposite colour',
+      () {
+        // A (cells 0,3) is a connected colour-1 column. Free cells remain
+        // (cells 2,6,8), so the grid is not full. Letter B at cell 5 is colour 1
+        // too, but the colour-2 middle column walls it off: the {colour-1 ∪ free}
+        // flood from A reaches {0,3,6} only — never cell 5 — so no future move
+        // can merge B into A's group → complete despite the free neighbours.
+        //   1 2 0   (row 0)
+        //   1 2 1   (row 1) — cell 5 is B
+        //   0 2 0   (row 2)
+        final p = makePuzzle('120\n121\n020');
+        final a = LetterGroup('A.0.3');
+        final b = LetterGroup('B.5');
+        p.addConstraint(a);
+        p.addConstraint(b);
+        expect(a.isCompleteFor(p), isTrue);
+      },
+    );
 
     test('complete when all filled with same color and group is bordered', () {
       final p = makePuzzle('121\n111');

@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
@@ -46,6 +45,11 @@ class Constraint extends CanApply {
 
   bool isCompleteFor(Puzzle puzzle) => false;
 
+  /// True when this constraint cannot coexist with [other] (an unresolvable
+  /// conflict, e.g. visually overlapping borders). Default: no conflict.
+  /// Only [MajorityConstraint] overrides this.
+  bool conflictsWith(Constraint other) => false;
+
   /// Return a fresh constraint instance equivalent to this one applied to a
   /// puzzle rotated 90° clockwise. The arguments are the dimensions of the
   /// **original** puzzle (before rotation). All positional data — cell
@@ -66,25 +70,42 @@ class Constraint extends CanApply {
 
   @override
   Move? apply(Puzzle puzzle) {
-    final clone = puzzle.clone();
-    for (var cell in clone.cellValues.indexed) {
-      if (cell.$2 != 0) continue;
-      for (var value in puzzle.domain) {
-        clone.setValue(cell.$1, value);
-        if (!verify(clone)) {
-          // We cannot do that
-          final myOpposite = clone.domain.whereNot((v) => v == value).first;
-          return Move(cell.$1, myOpposite, this);
-        }
-        clone.resetCell(cell.$1);
-      }
-    }
-    return null;
+    throw UnimplementedError(
+      '$runtimeType does not implement apply(); '
+      'every Constraint subclass must override apply() with a deduction '
+      'rule appropriate to its semantics — there is no generic fallback '
+      'that is correct on a 3-colour domain.',
+    );
+  }
+
+  /// The colours this constraint depends on — explicitly (a quantity/count
+  /// target colour) or implicitly (the non-free values in an FM/SH motif).
+  /// The auto-shrink pass uses this to decide whether a colour absent from
+  /// the solution can also be dropped from the puzzle's declared domain
+  /// without orphaning a constraint. Colour-agnostic constraints (`PA`,
+  /// `GS`, `LT`, `DF`, `SY`) return the empty set.
+  ///
+  /// No generic fallback: like [apply] and [rotated], every subclass must
+  /// declare its own colours so a new constraint can't silently drop a
+  /// referenced colour from the export.
+  Set<CellValue> get referencedColors {
+    throw UnimplementedError(
+      '$runtimeType does not implement referencedColors; '
+      'every Constraint subclass must declare the colours it references '
+      '(or the empty set) so the domain auto-shrink stays sound.',
+    );
   }
 }
 
 class Motif extends Constraint {
-  List<List<int>> motif = [];
+  List<List<CellValue>> motif = [];
+
+  @override
+  Set<CellValue> get referencedColors => {
+    for (final row in motif)
+      for (final v in row)
+        if (v != CellValue.free) v,
+  };
 
   bool isPresent(Puzzle puzzle) {
     final int mow = motif[0].length;
@@ -92,12 +113,11 @@ class Motif extends Constraint {
     final RegExp motifRe = RegExp(
       motif
           .map(
-            (line) =>
-                line.map((c) => c.toString()).join("").replaceAll("0", "."),
+            (line) => line.map(cellValueToString).join("").replaceAll("0", "."),
           )
           .join("." * pta),
     );
-    final puzzleStr = puzzle.cellValues.map((c) => c.toString()).join("");
+    final puzzleStr = puzzle.cellValues.map(cellValueToString).join("");
     // print("puStr $puzzleStr");
     // print("morif $motifRe");
     for (var idx = 0; idx < puzzleStr.length; idx++) {
@@ -112,7 +132,7 @@ class Motif extends Constraint {
   }
 
   static List<int> findMotifPositions(
-    List<List<int>> searchMotif,
+    List<List<CellValue>> searchMotif,
     Puzzle puzzle,
   ) {
     final int mow = searchMotif[0].length;
@@ -120,12 +140,11 @@ class Motif extends Constraint {
     final RegExp motifRe = RegExp(
       searchMotif
           .map(
-            (line) =>
-                line.map((c) => c.toString()).join("").replaceAll("0", "."),
+            (line) => line.map(cellValueToString).join("").replaceAll("0", "."),
           )
           .join("." * pta),
     );
-    final puzzleStr = puzzle.cellValues.map((c) => c.toString()).join("");
+    final puzzleStr = puzzle.cellValues.map(cellValueToString).join("");
     final List<int> positions = [];
     for (var idx = 0; idx < puzzleStr.length; idx++) {
       if ((puzzle.width - (idx % puzzle.width)) < mow) {

@@ -1,18 +1,30 @@
 import 'dart:io';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
   if (args.isEmpty) {
-    stderr.writeln('Usage: dart run bin/solve.dart <puzzle_file_or_line>');
+    stderr.writeln(
+      'Usage: dart run bin/solve.dart <puzzle_file | puzzle_line | share_url>',
+    );
     exit(1);
   }
 
-  final arg = args[0];
+  String input = args[0];
+  // If the argument doesn't point at an existing file, try to normalize
+  // it as a puzzle representation (share URL, bare canonical key, or
+  // full v2 line). Falls through to the file-loading branch below when
+  // the input looks like a filesystem path.
+  if (!File(input).existsSync()) {
+    final normalized = normalizeToV2Line(input);
+    if (normalized != null) input = normalized;
+  }
+
   final List<String> lines;
-  final file = File(arg);
+  final file = File(input);
   if (file.existsSync()) {
     lines = file
         .readAsLinesSync()
@@ -23,15 +35,15 @@ void main(List<String> args) {
     // Not a file — try to interpret the argument as a single puzzle line.
     // Puzzle(...) throws on a malformed representation.
     try {
-      Puzzle(arg);
+      Puzzle(input);
     } catch (e) {
       stderr.writeln(
-        'Argument is neither an existing file nor a valid puzzle line: $arg',
+        'Argument is neither an existing file nor a valid puzzle line: $input',
       );
       stderr.writeln('Parse error: $e');
       exit(1);
     }
-    lines = [arg];
+    lines = [input];
   }
 
   for (int i = 0; i < lines.length; i++) {
@@ -79,11 +91,19 @@ void _solvePuzzle(String line) {
     step++;
     final r = move.idx ~/ p.width;
     final c = move.idx % p.width;
-    final colorName = move.value == 1 ? 'BLACK' : 'WHITE';
-    p.cells[move.idx].setForSolver(move.value);
-    print(
-      'Step $step: ($r,$c) = $colorName  [$foundBy - ${source.serialize()}]',
-    );
+    if (move.value != null) {
+      final colorName = move.value!.name;
+      p.cells[move.idx].setForSolver(move.value!);
+      print(
+        'Step $step: ($r,$c) = $colorName  [$foundBy - ${source.serialize()}]',
+      );
+    } else if (move.removeOption != null) {
+      final colorName = move.removeOption!.name;
+      p.cells[move.idx].removeOptionForSolver(move.removeOption!);
+      print(
+        'Step $step: ($r,$c) != $colorName  [$foundBy - ${source.serialize()}]',
+      );
+    }
   }
 
   print('');
@@ -113,11 +133,13 @@ void _printGrid(Puzzle p) {
     for (int c = 0; c < p.width; c++) {
       final v = p.cellValues[r * p.width + c];
       row.add(
-        v == 0
+        v == CellValue.free
             ? '.'
-            : v == 1
+            : v == CellValue.black
             ? 'B'
-            : 'W',
+            : v == CellValue.white
+            ? 'W'
+            : 'P',
       );
     }
     print('  ${row.join(" ")}');

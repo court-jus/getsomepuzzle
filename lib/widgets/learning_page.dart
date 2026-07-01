@@ -4,6 +4,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/new_constraint_dialog.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 import 'package:intl/intl.dart';
 
 /// Reference page surfaced as the menu entry "Apprentissage" next to
@@ -55,39 +56,46 @@ class LearningPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(l.learningPageTitle)),
-      body: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: slugs.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final slug = slugs[index];
-          final firstSeen = progress.firstSeen[slug];
-          final playCount = database.playCountForSlug(slug);
-          final name = constraintNameForSlug(l, slug);
-          final status = firstSeen == null
-              ? l.learningNeverSeen
-              : l.learningSeenOn(dateFormat.format(firstSeen));
-          return ListTile(
-            leading: Icon(
-              firstSeen == null ? Icons.lock_outline : Icons.check_circle,
-              color: firstSeen == null
-                  ? Theme.of(context).disabledColor
-                  : Theme.of(context).colorScheme.primary,
-            ),
-            title: Text(_capitalise(name)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [Text(status), Text(l.learningPlayCount(playCount))],
-            ),
-            isThreeLine: true,
-            trailing: TextButton.icon(
-              icon: const Icon(Icons.refresh),
-              label: Text(l.learningRefreshButton),
-              onPressed: () =>
-                  NewConstraintDialog.show(context, <String>{slug}),
-            ),
-          );
-        },
+      body: SafeArea(
+        top: false,
+        child: ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: slugs.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final slug = slugs[index];
+            final firstSeen = progress.firstSeen[slug];
+            final playCount = database.playCountForSlug(slug);
+            final name = constraintNameForSlug(l, slug);
+            final status = firstSeen == null
+                ? l.learningNeverSeen
+                : l.learningSeenOn(dateFormat.format(firstSeen));
+            return ListTile(
+              leading: Icon(
+                firstSeen == null ? Icons.lock_outline : Icons.check_circle,
+                color: firstSeen == null
+                    ? Theme.of(context).disabledColor
+                    : Theme.of(context).colorScheme.primary,
+              ),
+              title: Text(_capitalise(name)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [Text(status), Text(l.learningPlayCount(playCount))],
+              ),
+              isThreeLine: true,
+              trailing: TextButton.icon(
+                icon: const Icon(Icons.refresh),
+                label: Text(l.learningRefreshButton),
+                // Disabled until the player has actually encountered the
+                // constraint in play (same `firstSeen` gate as the lock
+                // icon), so the explanation modal can't spoil a rule early.
+                onPressed: firstSeen == null
+                    ? null
+                    : () => NewConstraintDialog.show(context, <String>{slug}),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

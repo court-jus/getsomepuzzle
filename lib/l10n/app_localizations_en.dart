@@ -92,6 +92,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get labelWidgetBannedrules => 'Banned rules';
 
   @override
+  String get labelWidgetDomain => 'Number of colors';
+
+  @override
+  String get labelDomainTwoColors => '2 colors';
+
+  @override
+  String get labelDomainThreeColors => '3 colors';
+
+  @override
   String get msgCountMatchingPuzzles => 'Puzzles matching filters';
 
   @override
@@ -141,6 +150,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tooltipClue => 'Clue';
 
   @override
+  String get tooltipTapModeIncrValue => 'Tap cycles colour';
+
+  @override
+  String get tooltipTapModeRemoveOption => 'Tap removes an option';
+
+  @override
   String get tooltipUndo => 'Undo';
 
   @override
@@ -187,9 +202,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLiveCheckTypeComplete => 'Wait';
-
-  @override
-  String get settingHintsEnabled => 'Enable hints';
 
   @override
   String get settingGrayoutEnabled => 'Gray out completed constraints';
@@ -296,6 +308,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hintCellDeducible => 'This cell can be deduced';
 
   @override
+  String get hintCellOptionRemovable =>
+      'One of the options for this cell can be ruled out';
+
+  @override
+  String get hintForceRemoveOption =>
+      'An option can be ruled out by combining multiple constraints';
+
+  @override
+  String hintRemoveOptionDeducedFrom(String constraintName) {
+    return 'An option can be ruled out from the $constraintName constraint';
+  }
+
+  @override
+  String hintRemoveOptionComplicity(String c1, String c2) {
+    return 'An option can be ruled out by combining the $c1 and $c2 constraints';
+  }
+
+  @override
+  String hintRemoveOptionComplicityTwin(String c) {
+    return 'An option can be ruled out by combining two $c constraints';
+  }
+
+  @override
   String get constraintForbiddenPattern => 'forbidden pattern';
 
   @override
@@ -303,6 +338,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get constraintLetterGroup => 'letter group';
+
+  @override
+  String get constraintMajority => 'majority color';
 
   @override
   String get constraintParity => 'parity';
@@ -375,6 +413,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createTitle => 'Create a puzzle';
 
   @override
+  String get createNewPuzzle => 'New puzzle';
+
+  @override
   String get createStart => 'Start editing';
 
   @override
@@ -432,6 +473,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createChooseValue => 'Value';
 
   @override
+  String createImplicationSource(int total) {
+    return 'Source cell ($total cells, 0-based)';
+  }
+
+  @override
+  String createImplicationTarget(int total) {
+    return 'Target cell ($total cells, 0-based)';
+  }
+
+  @override
+  String get createImplicationInvalid => 'Invalid source/target';
+
+  @override
+  String get colorBlack => 'Black';
+
+  @override
+  String get colorWhite => 'White';
+
+  @override
+  String get colorPurple => 'Purple';
+
+  @override
   String get createChooseCount => 'Count';
 
   @override
@@ -439,6 +502,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get createMotifHeight => 'Pattern height';
+
+  @override
+  String get createSecondCorner => 'Tap second corner of MJ zone';
+
+  @override
+  String get createZoneTooSmall => 'Zone must be at least 3 cells';
 
   @override
   String createLetterGroupMode(String letter) {
@@ -531,10 +600,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintGroupCount => 'group count';
 
   @override
-  String get constraintColumnCount => 'cells per column';
+  String get constraintLineCount => 'cells per line';
 
   @override
-  String get constraintRowCount => 'cells per row';
+  String get constraintTransition => 'transition';
 
   @override
   String get constraintShape => 'shape';
@@ -546,10 +615,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintEyes => 'eyes';
 
   @override
+  String get constraintChain => 'chain';
+
+  @override
+  String get constraintImplication => 'implication';
+
+  @override
+  String get constraintBoundingBox => 'bounding box';
+
+  @override
   String get newConstraintModalTitle => 'New rule!';
 
   @override
   String get newConstraintModalSkip => 'Skip learning';
+
+  @override
+  String get thirdColorSuggestionTitle => 'Ready for 3 colors?';
+
+  @override
+  String get thirdColorSuggestionBody =>
+      'You\'ve solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. It\'s a fresh kind of challenge built on what you already know.';
+
+  @override
+  String get thirdColorSuggestionTryLabel => 'Try it';
+
+  @override
+  String get thirdColorSuggestionLaterLabel => 'Maybe later';
+
+  @override
+  String get thirdColorSuggestionFiltersReminder =>
+      'Remember that you can always choose the type of puzzles you want from the advanced filters in the library.';
 
   @override
   String get welcomeModalTitle => 'Welcome';
@@ -608,6 +703,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Cells marked with the same letter must belong to the same group. A group must not contain two different letters.';
 
   @override
+  String get constraintExplainMJ =>
+      'A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half).';
+
+  @override
   String get constraintExplainQA =>
       'A number on a blue background above the grid sets the total number of cells of that color the solution must contain.';
 
@@ -620,16 +719,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Two cells separated by a ≠ symbol must be of different colors.';
 
   @override
-  String get constraintExplainCC =>
-      'A circled number above a column tells how many cells of that color must appear in this specific column.';
+  String get constraintExplainLineCount =>
+      'A circled number beside a row or column tells how many cells of that color must appear in that line.';
 
   @override
-  String get constraintExplainRC =>
-      'A circled number to the left of a row tells how many cells of that color must appear in this specific row.';
+  String get constraintExplainTransition =>
+      'A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.';
 
   @override
   String get constraintExplainGC =>
       'A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.';
+
+  @override
+  String get constraintExplainBB =>
+      'Every connected group of this color must occupy a bounding box of exactly this width and height — the smallest rectangle enclosing the group spans exactly that many columns and rows (the group need not fill it).';
 
   @override
   String get constraintExplainNC =>
@@ -638,6 +741,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get constraintExplainEY =>
       'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).';
+
+  @override
+  String get constraintExplainCH =>
+      'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.';
+
+  @override
+  String get constraintExplainIM =>
+      'An arrow from one cell to another means: if the source cell takes the arrow\'s colour, the target cell must also take that colour. The contrapositive also holds: if the target is a different colour, the source cannot take the arrow\'s colour.';
 
   @override
   String get complicityOtherConstraint => 'another constraint';
@@ -737,6 +848,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nextPuzzle => 'Next puzzle';
 
   @override
+  String get emptyPlaylistUserEmpty =>
+      'This playlist is empty. Add puzzles before pressing Play.';
+
+  @override
   String get emptyPlaylistUserAllPlayed =>
       'All puzzles in this playlist have been played. Pick another collection or create a new playlist.';
 
@@ -749,16 +864,115 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your filters exclude every puzzle in this collection. Try relaxing the dimensions, rules or flags.';
 
   @override
-  String get emptyPlaylistOnboardingPhase =>
-      'No puzzle in this collection fits the current onboarding step. Finish the introductory puzzles or switch collection.';
-
-  @override
-  String get emptyPlaylistSoftFilter =>
-      'Every remaining puzzle would introduce more than one new rule at once. Play a few more puzzles from earlier collections first.';
-
-  @override
   String get emptyPlaylistGeneric => 'No puzzle is currently available.';
 
   @override
+  String get bannerOnboardingFiltersDefault =>
+      'These filters reflect your learning track. You can override them — tap the reset icon to restore the recommendation.';
+
+  @override
+  String get bannerOnboardingFiltersOverridden =>
+      'You\'re using your own filters. Tap reset to return to the learning track\'s recommendation.';
+
+  @override
   String get browse => 'Browse';
+
+  @override
+  String get onboardingCompleteTitle => 'Onboarding complete!';
+
+  @override
+  String get onboardingCompleteBody =>
+      'You\'ve learned all the rules currently available! You can now play freely. When new rules are added to the game, you\'ll be notified.';
+
+  @override
+  String get scenarioFilterLabel => 'Scenario';
+
+  @override
+  String get scenarioAny => 'Any scenario';
+
+  @override
+  String get scenarioClassic => 'Classic';
+
+  @override
+  String get scenarioExplainClassic =>
+      'General logic puzzle with no dominant gameplay style.';
+
+  @override
+  String get scenarioSh => 'Shape';
+
+  @override
+  String get scenarioExplainSh =>
+      'At least one shape constraint defines exact form for a group.';
+
+  @override
+  String get scenarioBb => 'Bounding box';
+
+  @override
+  String get scenarioExplainBb =>
+      'Every group of a colour fits the same bounding box.';
+
+  @override
+  String get scenarioPathBased => 'Path';
+
+  @override
+  String get scenarioExplainPathBased =>
+      'Letter groups route across the grid — find the path.';
+
+  @override
+  String get scenarioSyBased => 'Symmetry';
+
+  @override
+  String get scenarioExplainSyBased =>
+      'Symmetry constraints mirror groups across axes.';
+
+  @override
+  String get scenarioMinesweeper => 'Minesweeper';
+
+  @override
+  String get scenarioExplainMinesweeper =>
+      'Neighbor counts and eye constraints — play it like Minesweeper.';
+
+  @override
+  String get scenarioNonogram => 'Nonogram';
+
+  @override
+  String get scenarioExplainNonogram =>
+      'Column and row counts — classic hanjie-style deduction.';
+
+  @override
+  String get scenarioLocal => 'Local';
+
+  @override
+  String get scenarioExplainLocal =>
+      'Forbidden patterns and different-from constraints define local rules.';
+
+  @override
+  String get scenarioGroup => 'Group';
+
+  @override
+  String get scenarioExplainGroup =>
+      'Group sizes and group counts focus on connected-component topology.';
+
+  @override
+  String get statsSyncDirectory => 'Stats sync directory';
+
+  @override
+  String get statsSyncDirectoryChoose => 'Choose folder';
+
+  @override
+  String get statsSyncDirectoryChange => 'Change';
+
+  @override
+  String get statsSyncDirectoryClear => 'Clear';
+
+  @override
+  String get statsSyncDirectoryWebUnsupported => 'Not available on web.';
+
+  @override
+  String get statsSyncDirectoryInvalid =>
+      'The selected folder is not accessible. Please choose a new one.';
+
+  @override
+  String get statsSyncDirectoryAutoCleared =>
+      'The stats sync folder was cleared because it is no longer accessible. You can set a new one in the settings.';
 }

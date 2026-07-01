@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer';
 import 'dart:io' as java_io;
 
@@ -6,10 +7,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart'
+    as equilibrium;
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/plusminus.dart';
 import 'package:getsomepuzzle/widgets/flags_selector.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 
 class OpenPage extends StatefulWidget {
   final Database database;
@@ -31,8 +36,21 @@ class _OpenPageState extends State<OpenPage> {
   bool showAdvanced = false;
   Map<String, bool?> rules = {};
 
+  /// Sentinel for optional applyFilter parameter — null is a valid scenario
+  /// value ("Any"), so we need a different default to detect "not passed".
+  static const _notPassed = Object();
+
   static List<String> get existingRules =>
       constraintRegistry.map((r) => r.slug).toList();
+
+  Widget? _rulePreview(String slug) {
+    for (final r in constraintUIRegistry) {
+      if (r.slug == slug) {
+        return r.buildPreview(Theme.of(context).colorScheme.onSurface, 24);
+      }
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -49,6 +67,9 @@ class _OpenPageState extends State<OpenPage> {
     List<String>? newBRules,
     List<String>? newWFlags,
     List<String>? newBFlags,
+    List<String>? newWDomains,
+    List<String>? newBDomains,
+    Object? newScenario = _notPassed,
   }) {
     setState(() {
       bool changed = false;
@@ -102,6 +123,28 @@ class _OpenPageState extends State<OpenPage> {
             .toSet();
         changed = true;
       }
+      if (newWDomains != null) {
+        widget.database.currentFilters.wantedDomains = newWDomains.toSet();
+        widget.database.currentFilters.bannedDomains.removeAll(
+          widget.database.currentFilters.wantedDomains,
+        );
+        changed = true;
+      }
+      if (newBDomains != null) {
+        widget.database.currentFilters.bannedDomains = newBDomains.toSet();
+        widget.database.currentFilters.wantedDomains = widget
+            .database
+            .currentFilters
+            .wantedDomains
+            .where((d) => !newBDomains.contains(d))
+            .toSet();
+        changed = true;
+      }
+      if (newScenario != _notPassed) {
+        widget.database.currentFilters.wantedScenario =
+            newScenario as equilibrium.ProfileCategory?;
+        changed = true;
+      }
       if (changed) {
         widget.database.currentFilters.save();
         widget.database.preparePlaylist();
@@ -147,16 +190,14 @@ class _OpenPageState extends State<OpenPage> {
     switch (reason) {
       case EmptyPlaylistReason.customEmpty:
         return null;
+      case EmptyPlaylistReason.userEmpty:
+        return loc.emptyPlaylistUserEmpty;
       case EmptyPlaylistReason.userAllPlayed:
         return loc.emptyPlaylistUserAllPlayed;
       case EmptyPlaylistReason.noPuzzlesLoaded:
         return loc.emptyPlaylistNoPuzzlesLoaded;
       case EmptyPlaylistReason.filtersTooStrict:
         return loc.emptyPlaylistFiltersTooStrict;
-      case EmptyPlaylistReason.onboardingPhase:
-        return loc.emptyPlaylistOnboardingPhase;
-      case EmptyPlaylistReason.softFilter:
-        return loc.emptyPlaylistSoftFilter;
       case EmptyPlaylistReason.generic:
         return loc.emptyPlaylistGeneric;
     }
@@ -243,14 +284,22 @@ class _OpenPageState extends State<OpenPage> {
 
   Future<void> _importPlaylistFromFile() async {
     final loc = AppLocalizations.of(context)!;
+    // withData=true so the same code path works on every platform: on web
+    // file_picker only populates `bytes`, on native it populates both.
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['txt'],
+      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
-    if (file.path == null) return;
-    final content = await java_io.File(file.path!).readAsString();
+    String? content;
+    if (file.bytes != null) {
+      content = utf8.decode(file.bytes!, allowMalformed: true);
+    } else if (file.path != null) {
+      content = await java_io.File(file.path!).readAsString();
+    }
+    if (content == null) return;
     final lines = content
         .split('\n')
         .where((l) => l.trim().isNotEmpty && !l.startsWith('#'))
@@ -292,431 +341,707 @@ class _OpenPageState extends State<OpenPage> {
     chooseCollection(key);
   }
 
+  /// True when the live rule filters match the onboarding
+  /// recommendation. Used by the banner (default vs overridden text)
+  /// and by the reset button to decide whether resetting would do
+  /// anything visible. Returns true when there is no recommendation,
+  /// so the banner is naturally hidden once the player has graduated.
+  bool _filtersMatchRecommendation() {
+    final reco = widget.database.recommendedOnboardingFilters;
+    if (reco == null) return true;
+    return setEquals(
+          widget.database.currentFilters.wantedRules,
+          reco.wantedRules,
+        ) &&
+        setEquals(
+          widget.database.currentFilters.bannedRules,
+          reco.bannedRules,
+        ) &&
+        widget.database.currentFilters.wantedScenario == null;
+  }
+
+  /// Restore the recommended onboarding filters. Called by the banner
+  /// reset action and by the existing rules-reset IconButton when the
+  /// player is in onboarding (so the same icon means "back to
+  /// recommendation" or "clear" depending on context).
+  void _resetToRecommendation() {
+    final reco = widget.database.recommendedOnboardingFilters;
+    if (reco == null) return;
+    applyFilter(
+      newWRules: reco.wantedRules.toList(),
+      newBRules: reco.bannedRules.toList(),
+      newScenario: null,
+    );
+  }
+
+  /// Localised label for a scenario dropdown item.
+  String _scenarioLabel(equilibrium.ProfileCategory cat, BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    switch (cat) {
+      case equilibrium.ProfileCategory.classic:
+        return loc.scenarioClassic;
+      case equilibrium.ProfileCategory.sh:
+        return loc.scenarioSh;
+      case equilibrium.ProfileCategory.bb:
+        return loc.scenarioBb;
+      case equilibrium.ProfileCategory.pathBased:
+        return loc.scenarioPathBased;
+      case equilibrium.ProfileCategory.syBased:
+        return loc.scenarioSyBased;
+      case equilibrium.ProfileCategory.minesweeper:
+        return loc.scenarioMinesweeper;
+      case equilibrium.ProfileCategory.nonogram:
+        return loc.scenarioNonogram;
+      case equilibrium.ProfileCategory.local:
+        return loc.scenarioLocal;
+      case equilibrium.ProfileCategory.group:
+        return loc.scenarioGroup;
+    }
+  }
+
+  /// Localised description (subtitle) for a scenario dropdown item.
+  String _scenarioExplain(
+    equilibrium.ProfileCategory cat,
+    BuildContext context,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    switch (cat) {
+      case equilibrium.ProfileCategory.classic:
+        return loc.scenarioExplainClassic;
+      case equilibrium.ProfileCategory.sh:
+        return loc.scenarioExplainSh;
+      case equilibrium.ProfileCategory.bb:
+        return loc.scenarioExplainBb;
+      case equilibrium.ProfileCategory.pathBased:
+        return loc.scenarioExplainPathBased;
+      case equilibrium.ProfileCategory.syBased:
+        return loc.scenarioExplainSyBased;
+      case equilibrium.ProfileCategory.minesweeper:
+        return loc.scenarioExplainMinesweeper;
+      case equilibrium.ProfileCategory.nonogram:
+        return loc.scenarioExplainNonogram;
+      case equilibrium.ProfileCategory.local:
+        return loc.scenarioExplainLocal;
+      case equilibrium.ProfileCategory.group:
+        return loc.scenarioExplainGroup;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final Set<String> defaultWFlags = {};
-    final Set<String> defaultBFlags = {"played", "skipped", "disliked"};
     final bool flagsAreDefault =
-        setEquals(widget.database.currentFilters.wantedFlags, defaultWFlags) &&
-        setEquals(widget.database.currentFilters.bannedFlags, defaultBFlags);
-    final bool rulesAreDefault =
-        widget.database.currentFilters.wantedRules.isEmpty &&
-        widget.database.currentFilters.bannedRules.isEmpty;
+        widget.database.currentFilters.wantedFlags.isEmpty &&
+        setEquals(
+          widget.database.currentFilters.bannedFlags,
+          Filters.defaultBannedFlags,
+        );
+    // Behaviour of the rules-reset IconButton differs in onboarding:
+    // "default" means "matches the recommended preset" rather than
+    // "no filter set". The icon greys out when there is nothing to
+    // reset toward in both cases.
+    final bool inOnboarding = widget.database.isInOnboarding;
+    final bool rulesAreDefault = inOnboarding
+        ? _filtersMatchRecommendation()
+        : (widget.database.currentFilters.wantedRules.isEmpty &&
+              widget.database.currentFilters.bannedRules.isEmpty);
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.titleOpenPuzzlePage),
       ),
-      body: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints viewportConstraints) {
-          return SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: viewportConstraints.maxHeight,
-              ),
-              child: Container(
-                margin: const EdgeInsets.all(8),
-                child: Column(
-                  children: [
-                    Text(AppLocalizations.of(context)!.infoFilterCollection),
-                    const Divider(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          AppLocalizations.of(context)!.labelSelectCollection,
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            DropdownButton<String>(
-                              value: collection,
-                              items: [
-                                for (final item
-                                    in widget.database.getCollections(
-                                      CollectionLabels(
-                                        easy: AppLocalizations.of(
-                                          context,
-                                        )!.collectionEasy,
-                                        player: AppLocalizations.of(
-                                          context,
-                                        )!.collectionPlayer,
-                                        advanced: AppLocalizations.of(
-                                          context,
-                                        )!.collectionAdvanced,
-                                        strong: AppLocalizations.of(
-                                          context,
-                                        )!.collectionStrong,
-                                        expert: AppLocalizations.of(
-                                          context,
-                                        )!.collectionExpert,
-                                        mad: AppLocalizations.of(
-                                          context,
-                                        )!.collectionMad,
-                                        myPuzzles: AppLocalizations.of(
-                                          context,
-                                        )!.collectionMyPuzzles,
-                                        recommendedTooltip: AppLocalizations.of(
-                                          context,
-                                        )!.tooltipRecommendedCollection,
-                                      ),
-                                      recommendedKey: widget
-                                          .database
-                                          .recommendedCollectionKey,
-                                    ))
-                                  DropdownMenuItem(
-                                    value: item.$1,
-                                    child: item.$2,
-                                  ),
-                              ],
-                              onChanged: (newValue) => chooseCollection(
-                                newValue ?? Database.entryCollectionKey,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              tooltip: AppLocalizations.of(
-                                context,
-                              )!.createPlaylist,
-                              onPressed: _showCreatePlaylistDialog,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.file_open),
-                              tooltip: AppLocalizations.of(
-                                context,
-                              )!.importPlaylist,
-                              onPressed: _importPlaylistFromFile,
-                            ),
-                            if (collection.startsWith('user_'))
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
+      body: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints viewportConstraints) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: viewportConstraints.maxHeight,
+                ),
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  child: Column(
+                    children: [
+                      Text(AppLocalizations.of(context)!.infoFilterCollection),
+                      const Divider(),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            AppLocalizations.of(context)!.labelSelectCollection,
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              DropdownButton<String>(
+                                value: collection,
+                                items: [
+                                  for (final item
+                                      in widget.database.getCollections(
+                                        CollectionLabels(
+                                          easy: AppLocalizations.of(
+                                            context,
+                                          )!.collectionEasy,
+                                          player: AppLocalizations.of(
+                                            context,
+                                          )!.collectionPlayer,
+                                          advanced: AppLocalizations.of(
+                                            context,
+                                          )!.collectionAdvanced,
+                                          strong: AppLocalizations.of(
+                                            context,
+                                          )!.collectionStrong,
+                                          expert: AppLocalizations.of(
+                                            context,
+                                          )!.collectionExpert,
+                                          mad: AppLocalizations.of(
+                                            context,
+                                          )!.collectionMad,
+                                          myPuzzles: AppLocalizations.of(
+                                            context,
+                                          )!.collectionMyPuzzles,
+                                          recommendedTooltip:
+                                              AppLocalizations.of(
+                                                context,
+                                              )!.tooltipRecommendedCollection,
+                                        ),
+                                        recommendedKey: widget
+                                            .database
+                                            .recommendedCollectionKey,
+                                      ))
+                                    DropdownMenuItem(
+                                      value: item.$1,
+                                      child: item.$2,
+                                    ),
+                                ],
+                                onChanged: (newValue) => chooseCollection(
+                                  newValue ?? Database.entryCollectionKey,
                                 ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add),
                                 tooltip: AppLocalizations.of(
                                   context,
-                                )!.deletePlaylist,
-                                onPressed: _deleteCurrentPlaylist,
+                                )!.createPlaylist,
+                                onPressed: _showCreatePlaylistDialog,
                               ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(AppLocalizations.of(context)!.labelToggleShuffle),
-                        Switch(
-                          value: widget.database.shouldShuffle,
-                          onChanged: setShuffle,
-                        ),
-                      ],
-                    ),
-                    const Divider(),
-                    Text(
-                      "${AppLocalizations.of(context)!.msgCountMatchingPuzzles}: $matchingCount",
-                    ),
-                    const Divider(),
-                    if (widget.database.collection == "custom" &&
-                        widget.database.puzzles.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          AppLocalizations.of(context)!.noCustomPuzzles,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.grey,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.cyan,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadiusGeometry.circular(16),
-                        ),
-                      ),
-                      onPressed: widget.database.playlist.isNotEmpty
-                          ? () => selectPuzzle(
-                              widget.database.playlist.first,
-                              context,
-                            )
-                          : null,
-                      child: SizedBox(
-                        height: 96,
-                        child: Container(
-                          alignment: AlignmentGeometry.center,
-                          child: FaIcon(FontAwesomeIcons.play, size: 80),
-                        ),
-                      ),
-                    ),
-                    if (_disabledPlayMessage(context) != null)
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          _disabledPlayMessage(context)!,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.grey,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ExpansionPanelList(
-                      expansionCallback: (panelIndex, isExpanded) {
-                        setState(() {
-                          showAdvanced = isExpanded;
-                        });
-                      },
-                      children: [
-                        ExpansionPanel(
-                          isExpanded: showAdvanced,
-                          body: SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                const Divider(),
-                                Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  )!.labelWidgetDimensions,
-                                ),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.labelWidgetWidth,
-                                    ),
-                                    PlusMinusField(
-                                      onChanged: (minValue, maxValue) {
-                                        final value = RangeValues(
-                                          minValue.toDouble(),
-                                          maxValue.toDouble(),
-                                        );
-                                        applyFilter(newWidth: value);
-                                      },
-                                      initialMin: widget
-                                          .database
-                                          .currentFilters
-                                          .minWidth,
-                                      initialMax: widget
-                                          .database
-                                          .currentFilters
-                                          .maxWidth,
-                                      showReset: true,
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.labelWidgetHeight,
-                                    ),
-                                    PlusMinusField(
-                                      onChanged: (minValue, maxValue) {
-                                        final value = RangeValues(
-                                          minValue.toDouble(),
-                                          maxValue.toDouble(),
-                                        );
-                                        applyFilter(newHeight: value);
-                                      },
-                                      initialMin: widget
-                                          .database
-                                          .currentFilters
-                                          .minHeight,
-                                      initialMax: widget
-                                          .database
-                                          .currentFilters
-                                          .maxHeight,
-                                      showReset: true,
-                                    ),
-                                  ],
-                                ),
-                                const Divider(),
-                                Text(
-                                  AppLocalizations.of(context)!.labelChooseOnly,
-                                ),
-                                Row(
-                                  children: [
-                                    const SizedBox(width: 48),
-                                    Expanded(
-                                      child: FlagsSelector(
-                                        choices: [
-                                          ("played", "PL"),
-                                          ("skipped", "SK"),
-                                          ("liked", "LI"),
-                                          ("disliked", "DI"),
-                                        ],
-                                        wanted: widget
-                                            .database
-                                            .currentFilters
-                                            .wantedFlags,
-                                        banned: widget
-                                            .database
-                                            .currentFilters
-                                            .bannedFlags,
-                                        apply: (value) => {
-                                          applyFilter(
-                                            newWFlags: value.$1.toList(),
-                                            newBFlags: value.$2.toList(),
-                                          ),
-                                        },
-                                      ),
-                                    ),
-                                    Focus(
-                                      descendantsAreFocusable: false,
-                                      canRequestFocus: false,
-                                      child: IconButton(
-                                        icon: Icon(
-                                          Icons.restart_alt,
-                                          color: flagsAreDefault
-                                              ? Colors.grey
-                                              : Colors.blue,
-                                        ),
-                                        onPressed: flagsAreDefault
-                                            ? null
-                                            : () {
-                                                applyFilter(
-                                                  newWFlags: defaultWFlags
-                                                      .toList(),
-                                                  newBFlags: defaultBFlags
-                                                      .toList(),
-                                                );
-                                              },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const Divider(),
-                                Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  )!.labelWidgetWantedrules,
-                                ),
-                                Row(
-                                  children: [
-                                    const SizedBox(width: 48),
-                                    Expanded(
-                                      child: FlagsSelector(
-                                        choices: existingRules
-                                            .map((e) => (e, e))
-                                            .toList(),
-                                        wanted: widget
-                                            .database
-                                            .currentFilters
-                                            .wantedRules,
-                                        banned: widget
-                                            .database
-                                            .currentFilters
-                                            .bannedRules,
-                                        apply: (value) => {
-                                          applyFilter(
-                                            newWRules: value.$1.toList(),
-                                            newBRules: value.$2.toList(),
-                                          ),
-                                        },
-                                      ),
-                                    ),
-                                    Focus(
-                                      descendantsAreFocusable: false,
-                                      canRequestFocus: false,
-                                      child: IconButton(
-                                        icon: Icon(
-                                          Icons.restart_alt,
-                                          color: rulesAreDefault
-                                              ? Colors.grey
-                                              : Colors.blue,
-                                        ),
-                                        onPressed: rulesAreDefault
-                                            ? null
-                                            : () {
-                                                applyFilter(
-                                                  newWRules: [],
-                                                  newBRules: [],
-                                                );
-                                              },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const Divider(),
-                                Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  )!.labelWidgetFillRatio,
-                                ),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    PlusMinusField(
-                                      onChanged: (minValue, maxValue) {
-                                        final value = RangeValues(
-                                          minValue.toDouble(),
-                                          maxValue.toDouble(),
-                                        );
-                                        applyFilter(newPrefilled: value);
-                                      },
-                                      initialMin: widget
-                                          .database
-                                          .currentFilters
-                                          .minFilled,
-                                      initialMax: widget
-                                          .database
-                                          .currentFilters
-                                          .maxFilled,
-                                      minimum: 0,
-                                      maximum: 100,
-                                      increment: 5,
-                                      showReset: true,
-                                    ),
-                                  ],
-                                ),
-                                const Divider(),
-                                TextField(
-                                  onChanged: (value) => selectPuzzle(
-                                    PuzzleData(value),
-                                    context,
-                                    false,
-                                  ),
-                                  decoration: InputDecoration(
-                                    label: Text(
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.placeholderWidgetPastePuzzle,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          headerBuilder: (context, isExpanded) {
-                            return ListTile(
-                              title: Text(
-                                AppLocalizations.of(
+                              IconButton(
+                                icon: const Icon(Icons.file_open),
+                                tooltip: AppLocalizations.of(
                                   context,
-                                )!.labelAdvancedFilters,
+                                )!.importPlaylist,
+                                onPressed: _importPlaylistFromFile,
                               ),
-                            );
-                          },
+                              if (collection.startsWith('user_'))
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  tooltip: AppLocalizations.of(
+                                    context,
+                                  )!.deletePlaylist,
+                                  onPressed: _deleteCurrentPlaylist,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            AppLocalizations.of(context)!.labelToggleShuffle,
+                          ),
+                          Switch(
+                            value: widget.database.shouldShuffle,
+                            onChanged: setShuffle,
+                          ),
+                        ],
+                      ),
+                      const Divider(),
+                      Text(
+                        "${AppLocalizations.of(context)!.msgCountMatchingPuzzles}: $matchingCount",
+                      ),
+                      const Divider(),
+                      if (inOnboarding)
+                        _OnboardingFiltersBanner(
+                          overridden: !_filtersMatchRecommendation(),
+                          onReset: _resetToRecommendation,
                         ),
-                      ],
-                    ),
-                  ],
+                      if (widget.database.collection == "custom" &&
+                          widget.database.puzzles.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            AppLocalizations.of(context)!.noCustomPuzzles,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.cyan,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadiusGeometry.circular(16),
+                          ),
+                        ),
+                        onPressed: widget.database.playlist.isNotEmpty
+                            ? () => selectPuzzle(
+                                widget.database.playlist.first,
+                                context,
+                              )
+                            : null,
+                        child: SizedBox(
+                          height: 96,
+                          child: Container(
+                            alignment: AlignmentGeometry.center,
+                            child: FaIcon(FontAwesomeIcons.play, size: 80),
+                          ),
+                        ),
+                      ),
+                      if (_disabledPlayMessage(context) != null)
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            _disabledPlayMessage(context)!,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ExpansionPanelList(
+                        expansionCallback: (panelIndex, isExpanded) {
+                          setState(() {
+                            showAdvanced = isExpanded;
+                          });
+                        },
+                        children: [
+                          ExpansionPanel(
+                            isExpanded: showAdvanced,
+                            body: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  const Divider(),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.scenarioFilterLabel,
+                                      ),
+                                      Expanded(
+                                        child:
+                                            DropdownButton<
+                                              equilibrium.ProfileCategory?
+                                            >(
+                                              isExpanded: true,
+                                              value: widget
+                                                  .database
+                                                  .currentFilters
+                                                  .wantedScenario,
+                                              hint: Text(
+                                                AppLocalizations.of(
+                                                  context,
+                                                )!.scenarioAny,
+                                              ),
+                                              items: [
+                                                DropdownMenuItem(
+                                                  value: null,
+                                                  child: Text(
+                                                    AppLocalizations.of(
+                                                      context,
+                                                    )!.scenarioAny,
+                                                  ),
+                                                ),
+                                                for (final p
+                                                    in equilibrium
+                                                        .ProfileCategory
+                                                        .values)
+                                                  DropdownMenuItem(
+                                                    value: p,
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          _scenarioLabel(
+                                                            p,
+                                                            context,
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          _scenarioExplain(
+                                                            p,
+                                                            context,
+                                                          ),
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    Colors.grey,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                              ],
+                                              onChanged: (v) =>
+                                                  applyFilter(newScenario: v),
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(),
+                                  Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.labelWidgetDimensions,
+                                  ),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.labelWidgetWidth,
+                                      ),
+                                      PlusMinusField(
+                                        onChanged: (minValue, maxValue) {
+                                          final value = RangeValues(
+                                            minValue.toDouble(),
+                                            maxValue.toDouble(),
+                                          );
+                                          applyFilter(newWidth: value);
+                                        },
+                                        initialMin: widget
+                                            .database
+                                            .currentFilters
+                                            .minWidth,
+                                        initialMax: widget
+                                            .database
+                                            .currentFilters
+                                            .maxWidth,
+                                        showReset: true,
+                                      ),
+                                    ],
+                                  ),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.labelWidgetHeight,
+                                      ),
+                                      PlusMinusField(
+                                        onChanged: (minValue, maxValue) {
+                                          final value = RangeValues(
+                                            minValue.toDouble(),
+                                            maxValue.toDouble(),
+                                          );
+                                          applyFilter(newHeight: value);
+                                        },
+                                        initialMin: widget
+                                            .database
+                                            .currentFilters
+                                            .minHeight,
+                                        initialMax: widget
+                                            .database
+                                            .currentFilters
+                                            .maxHeight,
+                                        showReset: true,
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(),
+                                  Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.labelChooseOnly,
+                                  ),
+                                  Row(
+                                    children: [
+                                      const SizedBox(width: 48),
+                                      Expanded(
+                                        child: FlagsSelector(
+                                          choices: [
+                                            ("played", "PL"),
+                                            ("skipped", "SK"),
+                                            ("liked", "LI"),
+                                            ("disliked", "DI"),
+                                          ],
+                                          wanted: widget
+                                              .database
+                                              .currentFilters
+                                              .wantedFlags,
+                                          banned: widget
+                                              .database
+                                              .currentFilters
+                                              .bannedFlags,
+                                          apply: (value) => {
+                                            applyFilter(
+                                              newWFlags: value.$1.toList(),
+                                              newBFlags: value.$2.toList(),
+                                            ),
+                                          },
+                                        ),
+                                      ),
+                                      Focus(
+                                        descendantsAreFocusable: false,
+                                        canRequestFocus: false,
+                                        child: IconButton(
+                                          icon: Icon(
+                                            Icons.restart_alt,
+                                            color: flagsAreDefault
+                                                ? Colors.grey
+                                                : Colors.blue,
+                                          ),
+                                          onPressed: flagsAreDefault
+                                              ? null
+                                              : () {
+                                                  applyFilter(
+                                                    newWFlags: const [],
+                                                    newBFlags: Filters
+                                                        .defaultBannedFlags
+                                                        .toList(),
+                                                  );
+                                                },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(),
+                                  Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.labelWidgetDomain,
+                                  ),
+                                  FlagsSelector(
+                                    choices: [
+                                      (
+                                        "d2",
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.labelDomainTwoColors,
+                                      ),
+                                      (
+                                        "d3",
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.labelDomainThreeColors,
+                                      ),
+                                    ],
+                                    wanted: widget
+                                        .database
+                                        .currentFilters
+                                        .wantedDomains,
+                                    banned: widget
+                                        .database
+                                        .currentFilters
+                                        .bannedDomains,
+                                    apply: (value) => {
+                                      applyFilter(
+                                        newWDomains: value.$1.toList(),
+                                        newBDomains: value.$2.toList(),
+                                      ),
+                                    },
+                                  ),
+                                  const Divider(),
+                                  Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.labelWidgetWantedrules,
+                                  ),
+                                  Row(
+                                    children: [
+                                      const SizedBox(width: 48),
+                                      Expanded(
+                                        child: FlagsSelector(
+                                          choices: existingRules
+                                              .map((e) => (e, e))
+                                              .toList(),
+                                          wanted: widget
+                                              .database
+                                              .currentFilters
+                                              .wantedRules,
+                                          banned: widget
+                                              .database
+                                              .currentFilters
+                                              .bannedRules,
+                                          iconBuilder: _rulePreview,
+                                          apply: (value) => {
+                                            applyFilter(
+                                              newWRules: value.$1.toList(),
+                                              newBRules: value.$2.toList(),
+                                            ),
+                                          },
+                                        ),
+                                      ),
+                                      Focus(
+                                        descendantsAreFocusable: false,
+                                        canRequestFocus: false,
+                                        child: IconButton(
+                                          icon: Icon(
+                                            Icons.restart_alt,
+                                            color: rulesAreDefault
+                                                ? Colors.grey
+                                                : Colors.blue,
+                                          ),
+                                          onPressed: rulesAreDefault
+                                              ? null
+                                              : () {
+                                                  if (inOnboarding) {
+                                                    _resetToRecommendation();
+                                                  } else {
+                                                    applyFilter(
+                                                      newWRules: [],
+                                                      newBRules: [],
+                                                    );
+                                                  }
+                                                },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(),
+                                  Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.labelWidgetFillRatio,
+                                  ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      PlusMinusField(
+                                        onChanged: (minValue, maxValue) {
+                                          final value = RangeValues(
+                                            minValue.toDouble(),
+                                            maxValue.toDouble(),
+                                          );
+                                          applyFilter(newPrefilled: value);
+                                        },
+                                        initialMin: widget
+                                            .database
+                                            .currentFilters
+                                            .minFilled,
+                                        initialMax: widget
+                                            .database
+                                            .currentFilters
+                                            .maxFilled,
+                                        minimum: 0,
+                                        maximum: 100,
+                                        increment: 5,
+                                        showReset: true,
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(),
+                                  TextField(
+                                    onChanged: (value) {
+                                      // Accept full v2 lines, bare canonical
+                                      // keys (the form emitted by `Puzzle
+                                      // loaded` logs and `canonicalPuzzleKey`),
+                                      // or share URLs `?puzzle=v2_...`. Stay
+                                      // silent on partial keystrokes so we
+                                      // don't crash mid-paste.
+                                      final normalized = normalizeToV2Line(
+                                        value,
+                                      );
+                                      if (normalized == null) return;
+                                      selectPuzzle(
+                                        PuzzleData(normalized),
+                                        context,
+                                        false,
+                                      );
+                                    },
+                                    decoration: InputDecoration(
+                                      label: Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.placeholderWidgetPastePuzzle,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            headerBuilder: (context, isExpanded) {
+                              return ListTile(
+                                title: Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  )!.labelAdvancedFilters,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Surface the onboarding-derived rule filters so the player knows
+/// where they come from and how to opt out. Two copy variants:
+/// [overridden] false → "these are your learning track defaults",
+/// [overridden] true → "you've moved away from the recommendation".
+/// Both expose a reset action so the path back is always one tap away.
+class _OnboardingFiltersBanner extends StatelessWidget {
+  final bool overridden;
+  final VoidCallback onReset;
+
+  const _OnboardingFiltersBanner({
+    required this.overridden,
+    required this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final text = overridden
+        ? loc.bannerOnboardingFiltersOverridden
+        : loc.bannerOnboardingFiltersDefault;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        child: Row(
+          children: [
+            const Icon(Icons.school, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(text)),
+            IconButton(
+              icon: Icon(
+                Icons.restart_alt,
+                color: overridden ? Colors.blue : Colors.grey,
+              ),
+              tooltip: text,
+              onPressed: overridden ? onReset : null,
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }

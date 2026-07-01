@@ -137,6 +137,15 @@ few elements of the returned list are very likely to be near `μ`; later
 elements drift toward the tails. With σ=5 the practical reach is
 roughly ±15 cplx (`exp(−4.5) ≈ 0.011`, so ~1 % of the central weight).
 
+The Gaussian weight is further multiplied by the variety bias and, in
+one onboarding case, a demotion factor: while the strict phase that
+introduces `GS` is active (`currentPhase?.introducing == 'GS'`), a
+puzzle flagged `PuzzleData.hasTrivialGroupSize` (a size-1 `GS` —
+isolated cell) is multiplied by `selectionTrivialGsPenalty` (0.05).
+This strongly deprioritises poorly-instructive instances during GS
+discovery while keeping them drawable as a last resort. See
+`docs/dev/onboarding.md`.
+
 `preparePlaylist` uses this when `shouldShuffle` is `false`. When
 `shouldShuffle` is `true`, the player has explicitly asked for the full
 filtered catalog in random order — the Gaussian bias is bypassed
@@ -149,12 +158,13 @@ backfire, `EndOfPlaylist` surfaces it (see below).
 ### Batch cap and `EndOfPlaylist` rotation
 
 On the six built-in level collections (`1-easy` … `6-mad`),
-`preparePlaylist` truncates the result to **`playlistBatchSize = 20`
-puzzles** (`tutorial`, `custom`, and user playlists are exempt). The
-truncation makes `EndOfPlaylist` fire predictably every ~20 plays —
-without the cap, a collection holding ~1 000 puzzles would never
-exhaust, and we'd never get a natural moment to surface the
-cross-collection suggestion below.
+`preparePlaylist` truncates the result to **`playlistBatchSize = 5`
+puzzles** (`custom` and user playlists are exempt; the `tutorial`
+collection itself was removed in the onboarding rework — see
+[`onboarding.md`](onboarding.md)). The truncation makes `EndOfPlaylist`
+fire predictably every ~5 plays — without the cap, a collection holding
+~1 000 puzzles would never exhaust, and we'd never get a natural moment
+to surface the cross-collection suggestion below.
 
 The cap is applied uniformly whether the playlist comes from the
 Gaussian draw or from `shouldShuffle`: it's about pacing the
@@ -254,6 +264,23 @@ The cohort is anchored at `playerLevel = 50`, so an average-paced
 player lands on the `avance` / `balaise` boundary — half the time the
 suggestion will rotate them between those two paliers, which is the
 intended steady state for the typical user.
+
+### Gradual ±1 clamp
+
+`recommendedLevelFor` is a pure mapping and may return any palier; the
+gradual clamp lives in `recommendedCollectionKey` because only that
+getter knows the active collection. The recommendation is bounded to
+one tier above or below the currently played playlist: a very fast
+player on `1-easy` is nudged to `2-player`, never sent straight to
+`6-mad`. Because the getter is re-evaluated at every batch boundary
+and `playerLevel` is refreshed each time, a consistently fast player
+still climbs one palier per batch up to their natural level — the
+progression is gradual rather than a single large jump.
+
+The reference tier comes from `playableCollectionKeyToLevel[collection]`.
+When the active collection is not a playable level (`custom`, `user_*`,
+or the tutorial) there is no reference palier, so the unclamped
+recommendation is kept.
 
 A "closest median" rule was considered but rejected: corpus medians
 for `avance` (36), `balaise` (39), and `expert` (37) are not

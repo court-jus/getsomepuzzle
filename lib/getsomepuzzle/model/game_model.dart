@@ -1,10 +1,8 @@
 import 'dart:async';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/hint_rank_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/hint_worker.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
@@ -86,11 +84,30 @@ class GameModel extends ChangeNotifier {
 
   // --- Hint constraint state ---
   HintWorker? _hintWorker;
-  HintRankWorker? _hintRankWorker;
-  Timer? _hintRankDebounce;
   List<String> availableHintConstraints = [];
   HintConstraintStatus hintConstraintsReady = HintConstraintStatus.inprogress;
-  int _usefulHintCount = 0;
+
+  /// Set when the player taps to reveal an `addConstraint` hint while the
+  /// search is still [HintConstraintStatus.inprogress]: we then show the
+  /// "computing…" message and stash the l10n strings here so the worker's
+  /// completion callback can reveal the result on its own, without making the
+  /// player tap again. Cleared once consumed (or on cancel / cycle reset).
+  HintTexts? _pendingRevealTexts;
+
+  /// Mirrors `settings.hintType` so [startHintConstraintComputation] can
+  /// short-circuit when the player is not in `addConstraint` mode. The
+  /// computation is expensive (clone+solve loop over every candidate
+  /// constraint) and on web it runs on the main isolate, so re-firing it on
+  /// every cell mutation makes the UI feel frozen. Owners must keep this in
+  /// sync with the settings; defaults to `deducibleCell` (cheap mode).
+  HintType hintType = HintType.deducibleCell;
+
+  /// Constraint slugs the player has already learned (the owner's
+  /// `ConstraintProgress.firstSeen` keys). Passed to the hint worker so an
+  /// `addConstraint` hint never offers a type the player has not yet seen
+  /// explained. Owners must keep this in sync; empty means "only reinforce
+  /// types already on the puzzle".
+  Set<String> learnedHintSlugs = const <String>{};
 
   /// Mirrors `Settings.hintsEnabled`. When `false`, all three post-mutation
   /// hint pre-computes (`_scheduleHelpMe`, `startHintConstraintComputation`,
@@ -102,9 +119,9 @@ class GameModel extends ChangeNotifier {
   bool hintsEnabled = true;
 
   // --- Drag state ---
-  int? firstDragValue;
+  CellValue? firstDragValue;
   int? lastDragIdx;
-  int? firstRightDragValue;
+  CellValue? firstRightDragValue;
   int? lastRightDragIdx;
 
   /// Cell index of an in-flight right-click whose toggle is **deferred**
@@ -161,14 +178,13 @@ class GameModel extends ChangeNotifier {
   }
 
   /// Called once a mutation settles into a stable state. Clears hints,
-  /// schedules help/ranking recomputation, notifies listeners, and re-arms
-  /// the idle watchdog. Not called during drag steps — the drag commits
-  /// via [handleDragEnd].
+  /// schedules the help recomputation, notifies listeners, and re-arms the
+  /// idle watchdog. The `addConstraint` hint search is *not* fired here — it
+  /// runs on demand from [onHintTap] (tap 1). Not called during drag steps —
+  /// the drag commits via [handleDragEnd].
   void _afterMutation() {
     _clearHint();
     _scheduleHelpMe();
-    _scheduleHintRanking();
-    startHintConstraintComputation();
     notifyListeners();
     rearmIdleTimer();
   }
@@ -191,13 +207,32 @@ class GameModel extends ChangeNotifier {
     PuzzleData puz,
     int playlistLength, {
     String? progressRestoredText,
+    bool? screenIsLandscape,
   }) {
     _beforeMutation();
+    history = [];
     _cancelIdleTimer();
     dbSize = playlistLength;
     currentMeta = puz;
     currentPuzzle = currentMeta!.begin();
     _isPuzzleRotated = false;
+    // Apply auto-rotation synchronously here — before `_afterMutation`
+    // notifies listeners — so the very first build sees the puzzle in the
+    // correct orientation. Without this, the build-time post-frame
+    // callback in `main.dart` would rotate one frame later, producing a
+    // visible flicker on puzzle open. `Puzzle.rotated()` preserves cell
+    // values, readonly flags, the cached solution, and restored
+    // progress, so this is logically transparent.
+    if (screenIsLandscape != null && currentPuzzle != null) {
+      final p = currentPuzzle!;
+      if (p.width != p.height) {
+        final puzzleLandscape = p.width > p.height;
+        if (puzzleLandscape != screenIsLandscape) {
+          currentPuzzle = p.rotated();
+          _isPuzzleRotated = true;
+        }
+      }
+    }
     paused = false;
     betweenPuzzles = false;
     _stoppedForCompletion = false;
@@ -380,11 +415,21 @@ class GameModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// Returns true if the tap was handled (cell was toggled).
-  bool handleTap(int idx) {
+  ///
+  /// [removeOptionMode] switches a free cell's tap from the regular
+  /// `incrValue` cycle to the option-pruning cycle (only meaningful on
+  /// 3+ colour puzzles — collapses to `incrValue` everywhere else).
+  /// When the cell already has a value, both modes share the same
+  /// behaviour so the player never gets "stuck" on a coloured cell.
+  bool handleTap(int idx, {bool removeOptionMode = false}) {
     if (currentPuzzle == null) return false;
     if (currentPuzzle!.cells[idx].readonly) return false;
     _beforeMutation();
-    currentPuzzle!.incrValue(idx);
+    if (removeOptionMode && currentPuzzle!.domain.length > 2) {
+      currentPuzzle!.cycleRemoveOption(idx);
+    } else {
+      currentPuzzle!.incrValue(idx);
+    }
     currentMeta?.stats?.recordCellEdit();
     currentPuzzle!.clearConstraintsValidity();
     if (history.isEmpty || history.last != idx) history.add(idx);
@@ -400,23 +445,42 @@ class GameModel extends ChangeNotifier {
     _beforeMutation();
     lastDragIdx = idx;
     if (firstDragValue == null) {
-      final myOpposite = currentPuzzle!.domain
-          .whereNot((e) => e == currentPuzzle!.cellValues[idx])
-          .first;
-      firstDragValue = myOpposite;
-      currentPuzzle!.setValue(idx, firstDragValue!);
-      currentMeta?.stats?.recordCellEdit();
-      if (history.isEmpty || history.last != idx) history.add(idx);
-      _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
-    }
-    if (currentPuzzle!.cellValues[idx] != firstDragValue &&
-        currentPuzzle!.cellValues[idx] == 0) {
-      currentPuzzle!.setValue(idx, firstDragValue!);
-      currentMeta?.stats?.recordCellEdit();
-      if (history.isEmpty || history.last != idx) history.add(idx);
-      _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
+      // First cell of the drag: pick the *next* colour in the cycle
+      // (so the drag mirrors what a tap would do). Paint the initial
+      // cell unconditionally, then lock that value for the rest of
+      // the drag.
+      firstDragValue = _nextCycle(currentPuzzle!.cellValues[idx]);
+      _applyLeftDragPaint(idx);
+    } else if (firstDragValue != CellValue.free &&
+        currentPuzzle!.cellValues[idx] == CellValue.free) {
+      // Subsequent cells: only repaint *free* cells, never overwrite
+      // an already-coloured cell. When the cycle's "next" value is
+      // free (drag starting on the domain's last colour), there's no
+      // useful repaint to do — the initial cell was reset, the rest
+      // is left alone.
+      _applyLeftDragPaint(idx);
     }
     notifyListeners();
+  }
+
+  /// Apply [firstDragValue] to cell [idx]. Free target uses [resetCell]
+  /// so the cell's options are restored to the full domain (otherwise it
+  /// would land in the degenerate `value = free, options = []` state).
+  void _applyLeftDragPaint(int idx) {
+    if (firstDragValue == CellValue.free) {
+      if (currentPuzzle!.cells[idx].value == CellValue.free) return;
+      currentPuzzle!.resetCell(idx);
+      currentPuzzle!.updateConstraintStatus();
+    } else {
+      // `ignoreOptions` because painting overrides any option-pruning the
+      // player did on that cell — and an already-coloured start cell has
+      // empty options, so the unguarded setValue would throw RangeError.
+      // Mirrors the right-drag path (`_commitRightPaint` / `decrValue`).
+      currentPuzzle!.setValue(idx, firstDragValue!, ignoreOptions: true);
+    }
+    currentMeta?.stats?.recordCellEdit();
+    if (history.isEmpty || history.last != idx) history.add(idx);
+    _log.fine('drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
   }
 
   void handleDragEnd() {
@@ -435,45 +499,69 @@ class GameModel extends ChangeNotifier {
     if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
     if (lastRightDragIdx != null && idx == lastRightDragIdx) return;
     final currentValue = currentPuzzle!.cellValues[idx];
-    if (firstRightDragValue == null && currentValue == 1) return;
 
     if (firstRightDragValue == null) {
-      // First event of a right-button gesture (pointer-down on a cell
-      // whose value is not black). Defer the toggle: we don't know
-      // yet whether this is a single click (commit on release) or a
-      // drag (commit at the moment the user moves to another cell).
-      firstRightDragValue = currentValue == 0 ? 2 : 0;
+      // First event of a right-button gesture. The deferred-commit
+      // dance with [_pendingRightClickIdx] is kept: a lone press-and-
+      // release acts as a right-click (committed at pointer-up), while
+      // a move to another cell flushes the initial cell and starts
+      // painting. The cached value is the *paint target* used on the
+      // subsequent cells of a right-drag — derived from the initial
+      // cell's colour through the cycle's previous step so the right
+      // gesture mirrors the right-click cycle (free → domain.last,
+      // domain[i] → domain[i-1], domain[0] → free).
+      firstRightDragValue = _prevCycle(currentValue);
       _pendingRightClickIdx = idx;
       lastRightDragIdx = idx;
       return;
     }
 
     // Subsequent event on a *different* cell: a drag is happening.
-    // Flush the deferred initial click first (logged as a click,
-    // since at the time it was committed the user hadn't moved yet),
-    // then paint the new cell if it sits at the opposite value.
+    // Flush the deferred initial cell (which applies a [decrValue],
+    // i.e. one step backward in the cycle), then paint the new cell
+    // if it is free. We never overwrite an already-coloured cell on
+    // a right-drag — symmetric with the left-drag.
     _beforeMutation();
     lastRightDragIdx = idx;
     if (_pendingRightClickIdx != null) {
-      _commitRightToggle(_pendingRightClickIdx!, isDrag: false);
+      _commitRightDecr(_pendingRightClickIdx!, isDrag: false);
       _pendingRightClickIdx = null;
     }
-    final oppositeValue = firstRightDragValue == 0 ? 2 : 0;
-    if (currentValue == oppositeValue) {
-      _commitRightToggle(idx, isDrag: true);
+    if (firstRightDragValue != CellValue.free &&
+        currentValue == CellValue.free) {
+      _commitRightPaint(idx);
     }
     notifyListeners();
   }
 
-  void _commitRightToggle(int idx, {required bool isDrag}) {
-    final changed = currentPuzzle!.setValue(idx, firstRightDragValue!);
+  /// Apply [Puzzle.decrValue] to the initial cell of a right gesture.
+  /// Used both for a pure right-click (release without move) and as
+  /// the deferred commit when a right-drag starts moving away from
+  /// the initial cell.
+  void _commitRightDecr(int idx, {required bool isDrag}) {
+    final before = currentPuzzle!.cellValues[idx];
+    currentPuzzle!.decrValue(idx);
+    final after = currentPuzzle!.cellValues[idx];
+    if (before != after) {
+      currentMeta?.stats?.recordCellEdit();
+      if (history.isEmpty || history.last != idx) history.add(idx);
+      _log.fine('${isDrag ? "right-drag" : "right-click"} cell $idx → $after');
+    }
+  }
+
+  /// Paint the [firstRightDragValue] colour on a free cell traversed
+  /// during a right-drag. Caller must have already checked the target
+  /// is not free and the cell currently holds [CellValue.free].
+  void _commitRightPaint(int idx) {
+    final changed = currentPuzzle!.setValue(
+      idx,
+      firstRightDragValue!,
+      ignoreOptions: true,
+    );
     if (changed) {
       currentMeta?.stats?.recordCellEdit();
       if (history.isEmpty || history.last != idx) history.add(idx);
-      _log.fine(
-        '${isDrag ? "right-drag" : "right-click"} cell $idx '
-        '→ ${currentPuzzle!.cellValues[idx]}',
-      );
+      _log.fine('right-drag cell $idx → ${currentPuzzle!.cellValues[idx]}');
     }
   }
 
@@ -490,13 +578,62 @@ class GameModel extends ChangeNotifier {
     // left button live.
     if (_pendingRightClickIdx != null) {
       _beforeMutation();
-      _commitRightToggle(_pendingRightClickIdx!, isDrag: false);
+      _commitRightDecr(_pendingRightClickIdx!, isDrag: false);
       _pendingRightClickIdx = null;
     }
     _log.fine('right-drag end');
     firstRightDragValue = null;
     lastRightDragIdx = null;
     _afterMutation();
+  }
+
+  /// Long-press on a cell — mobile fallback for the right-click cycle.
+  /// On desktop the right-click reaches the same goal, but mobile has
+  /// no secondary mouse button so the player needs another way to step
+  /// backward through the cycle (most importantly: reach `domain.last`
+  /// in one tap instead of N). Mode-agnostic: it stays a "go to the
+  /// previous colour" shortcut even when [removeOptionMode] is on.
+  bool handleLongPress(int idx, {bool removeOptionMode = false}) {
+    if (currentPuzzle == null) return false;
+    if (currentPuzzle!.cells[idx].readonly) return false;
+    _beforeMutation();
+    final before = currentPuzzle!.cellValues[idx];
+    currentPuzzle!.decrValue(idx);
+    final after = currentPuzzle!.cellValues[idx];
+    if (before == after) {
+      // No change (degenerate domain or already-blocked cell) — skip
+      // the recordCellEdit / history bookkeeping but still flush state.
+      _afterMutation();
+      return false;
+    }
+    currentMeta?.stats?.recordCellEdit();
+    currentPuzzle!.clearConstraintsValidity();
+    if (history.isEmpty || history.last != idx) history.add(idx);
+    _log.fine('long-press cell $idx → $after');
+    _afterMutation();
+    return true;
+  }
+
+  /// One step forward in the puzzle's colour cycle. Used to derive a
+  /// left-drag's paint target from the first touched cell's colour, so
+  /// the drag stays in sync with a regular tap.
+  CellValue _nextCycle(CellValue v) {
+    final domain = currentPuzzle!.domain;
+    if (domain.isEmpty) return CellValue.free;
+    if (v == CellValue.free) return domain.first;
+    final i = domain.indexOf(v);
+    if (i < 0 || i == domain.length - 1) return CellValue.free;
+    return domain[i + 1];
+  }
+
+  /// Mirror of [_nextCycle] used by right-drag and long-press handlers.
+  CellValue _prevCycle(CellValue v) {
+    final domain = currentPuzzle!.domain;
+    if (domain.isEmpty) return CellValue.free;
+    if (v == CellValue.free) return domain.last;
+    final i = domain.indexOf(v);
+    if (i <= 0) return CellValue.free;
+    return domain[i - 1];
   }
 
   // ---------------------------------------------------------------------------
@@ -535,24 +672,25 @@ class GameModel extends ChangeNotifier {
     required String Function(int count) errorsCountText,
     required void Function() onPuzzleCompleted,
   }) {
-    // Two independent early-returns when no manual button was pressed:
-    //
-    //   - `validateType == manual` means the player asked for zero
-    //     auto-validation. Even on a fully-filled grid we must stay
-    //     silent until they click the "Valider" button (`manualCheck`).
-    //     Without this gate, every mutation that happens to fill the
-    //     last cell triggers a full constraint scan and surfaces errors
-    //     uninvited.
-    //
-    //   - `liveCheckType == complete` (« Attendre ») holds off any
-    //     validation feedback until the grid is fully filled. Cheap
-    //     `currentPuzzle.complete` check covers it.
-    if (!manualCheck) {
-      if (settings.validateType == ValidateType.manual) return;
-      if (settings.liveCheckType == LiveCheckType.complete &&
-          !currentPuzzle!.complete) {
-        return;
-      }
+    // Manual-validation mode holds back *all* automatic feedback
+    // (errors, count, completion transition) until the player presses
+    // « Valider » — which calls us back with manualCheck=true. Without
+    // this gate, the debounce would surface errors as soon as the grid
+    // is full, even though the player explicitly opted out of automatic
+    // validation.
+    if (!manualCheck && settings.validateType == ValidateType.manual) {
+      return;
+    }
+    // In `complete` (« Attendre ») mode the player asked us to hold
+    // off any validation feedback until the grid is fully filled. The
+    // only useful check before that is "is the puzzle complete?"
+    // (a O(N) "no zero cells" scan) — we skip the full constraint
+    // check entirely in that case. Manual validate-button clicks
+    // bypass the gate so the player can still force a check.
+    if (!manualCheck &&
+        settings.liveCheckType == LiveCheckType.complete &&
+        !currentPuzzle!.complete) {
+      return;
     }
     final shouldShowErrors =
         settings.liveCheckType == LiveCheckType.all || currentPuzzle!.complete;
@@ -617,7 +755,18 @@ class GameModel extends ChangeNotifier {
   /// modes only differ on what subsequent taps do. The caller pre-resolves
   /// every l10n string into [texts]; this method picks the right one for the
   /// stage being entered.
-  void onHintTap(Settings settings, HintTexts texts) {
+  ///
+  /// [onPuzzleCompleted] is invoked when the player taps the hint button on
+  /// a fully-and-validly-completed puzzle past stage 1. Tap 1 still shows
+  /// the "everything filled so far is correct" message (since no error /
+  /// no wrong cell can be surfaced); the next tap repurposes the hint
+  /// button as a "next puzzle" trigger so the player keeps moving without
+  /// having to find a separate UI control.
+  void onHintTap(
+    Settings settings,
+    HintTexts texts, {
+    void Function()? onPuzzleCompleted,
+  }) {
     if (currentPuzzle == null) return;
     final mode = settings.hintType;
     _log.fine('hint tap: stage=$hintStage mode=$mode');
@@ -626,7 +775,32 @@ class GameModel extends ChangeNotifier {
     if (hintStage == 0) {
       _revealErrors(texts);
       hintStage = 1;
+      // On-demand: in `addConstraint` mode, kick off the (expensive) search
+      // for a simplifying constraint now — while the player reads the "all
+      // correct" pass — so tap 2 can consume it. Skip when:
+      //  - the error pass surfaced a mistake (`hintIsError`): the player must
+      //    fix it first, and a contradictory state has no useful candidate;
+      //  - a pass is already ready or in flight (e.g. fields pre-populated, or
+      //    a slow web pass still running) → don't wipe a usable result.
+      if (mode == HintType.addConstraint &&
+          !hintIsError &&
+          hintConstraintsReady != HintConstraintStatus.ready &&
+          hintConstraintsReady != HintConstraintStatus.inprogress) {
+        startHintConstraintComputation();
+      }
       notifyListeners();
+      return;
+    }
+
+    // Past stage 1, on a complete-and-valid puzzle there is nothing left
+    // to deduce — repurpose the next tap as "advance to the next puzzle"
+    // so the player doesn't get stuck pressing a no-op button.
+    if (currentPuzzle!.complete &&
+        currentPuzzle!.check(saveResult: false).isEmpty) {
+      if (onPuzzleCompleted != null) {
+        onPuzzleCompleted();
+        resetHintCycle();
+      }
       return;
     }
 
@@ -661,6 +835,7 @@ class GameModel extends ChangeNotifier {
     hintText = "";
     hintIsError = false;
     hintStage = 0;
+    _pendingRevealTexts = null;
     notifyListeners();
   }
 
@@ -697,10 +872,26 @@ class GameModel extends ChangeNotifier {
   /// No-op if [helpMove] hasn't been computed (debounce race or puzzle
   /// already solved); the next tap will retry from the current stage.
   void _revealCellOnly(HintTexts texts) {
-    if (helpMove == null) return;
+    final move = helpMove;
+    if (move == null) return;
     currentPuzzle!.clearHighlights();
-    currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-    hintText = texts.hintCellDeducible;
+    switch (move) {
+      case SetValue(:final idx):
+        currentPuzzle!.cells[idx].isHighlighted = true;
+        hintText = texts.hintCellDeducible;
+      case RemoveOption(:final idx):
+        currentPuzzle!.cells[idx].isHighlighted = true;
+        // In a 2-colour domain, removing one option ≡ choosing the other, so
+        // present the move as a cell deduction rather than an option removal.
+        hintText = currentPuzzle!.domain.length == 2
+            ? texts.hintCellDeducible
+            : texts.hintCellOptionRemovable;
+      case Impossible():
+        // A contradiction has no single deducible cell to highlight at this
+        // stage; tap 3 (_revealCellAndConstraint) surfaces it as
+        // `hintImpossible`.
+        break;
+    }
     hintIsError = false;
   }
 
@@ -708,27 +899,36 @@ class GameModel extends ChangeNotifier {
   /// triggers the arrow widget (see `widgets/puzzle.dart`). Increment the
   /// hint counter here: this is the "real" reveal — tap 1 is diagnostic only.
   void _revealCellAndConstraint(HintTexts texts) {
-    if (helpMove == null) return;
+    final move = helpMove;
+    if (move == null) return;
     currentPuzzle!.clearHighlights();
-    if (helpMove!.isImpossible != null) {
-      final impossibleSource = helpMove!.isImpossible;
-      // Only Constraints carry the `isValid` UI flag; complicities
-      // currently have no on-screen representation, so we just skip the
-      // highlight in that branch.
-      if (impossibleSource is Constraint) impossibleSource.isValid = false;
-      hintText = texts.hintImpossible;
-      hintIsError = true;
-    } else {
-      if (helpMove!.isForce) {
-        currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
-        hintText = texts.hintForce;
-      } else {
-        final givenBy = helpMove!.givenBy;
-        if (givenBy is Constraint) givenBy.isHighlighted = true;
-        currentPuzzle!.cells[helpMove!.idx].isHighlighted = true;
+    switch (move) {
+      case Impossible(:final givenBy):
+        if (givenBy is Constraint) givenBy.isValid = false;
+        hintText = texts.hintImpossible;
+        hintIsError = true;
+      case RemoveOption(
+        :final idx,
+        :final isForce,
+        :final givenBy,
+        :final contributors,
+      ):
+        currentPuzzle!.cells[idx].isHighlighted = true;
+        final domain2 = currentPuzzle!.domain.length == 2;
+        if (isForce) {
+          hintText = domain2 ? texts.hintForce : texts.hintForceRemoveOption;
+        } else {
+          _highlightContributors(contributors, givenBy);
+          hintText = domain2
+              ? texts.hintDeducedFrom(givenBy)
+              : texts.hintRemoveOptionDeducedFrom(givenBy);
+        }
+        hintIsError = false;
+      case SetValue(:final idx, :final givenBy, :final contributors):
+        _highlightContributors(contributors, givenBy);
+        currentPuzzle!.cells[idx].isHighlighted = true;
         hintText = texts.hintDeducedFrom(givenBy);
-      }
-      hintIsError = false;
+        hintIsError = false;
     }
     if (currentMeta != null) {
       currentMeta!.hints += 1;
@@ -736,13 +936,36 @@ class GameModel extends ChangeNotifier {
     }
   }
 
+  void _highlightContributors(List<CanApply> contributors, CanApply givenBy) {
+    final targets = contributors.isEmpty ? <CanApply>[givenBy] : contributors;
+    for (final c in targets) {
+      if (c is Constraint) c.isHighlighted = true;
+    }
+  }
+
   /// Tap 4 of `deducibleCell` — apply the move. Triggers `_afterMutation`,
   /// which resets [hintStage] and recomputes the next [helpMove].
+  ///
+  /// Two move shapes are supported: `setValue` (the cell takes a concrete
+  /// colour) and `removeOption` (the cell loses one possible colour but
+  /// stays free, unless it was the last option in which case
+  /// `Cell.removeOption` auto-collapses to a setValue).
   void _applyHelpMove() {
-    if (helpMove == null) return;
-    currentPuzzle!.setValue(helpMove!.idx, helpMove!.value);
-    history.add(helpMove!.idx);
-    _afterMutation();
+    final move = helpMove;
+    if (move == null) return;
+    switch (move) {
+      case SetValue(:final idx, :final value):
+        currentPuzzle!.setValue(idx, value, ignoreOptions: true);
+        history.add(idx);
+        _afterMutation();
+      case RemoveOption(:final idx, :final option):
+        currentPuzzle!.removeOption(idx, option);
+        history.add(idx);
+        _afterMutation();
+      case Impossible():
+        // Nothing to apply for a contradiction (matches the prior no-op).
+        break;
+    }
   }
 
   /// Tap 2 of `addConstraint` — attach the next useful constraint, or
@@ -753,6 +976,9 @@ class GameModel extends ChangeNotifier {
     if (hintConstraintsReady == HintConstraintStatus.inprogress) {
       hintText = texts.hintConstraintInprogress;
       hintIsError = false;
+      // Remember we're waiting on this pass: its completion callback will
+      // reveal the constraint for us (no extra tap needed).
+      _pendingRevealTexts = texts;
     } else if (addHintConstraint()) {
       hintText = texts.hintConstraintAdded;
       hintIsError = false;
@@ -787,28 +1013,26 @@ class GameModel extends ChangeNotifier {
   void startHintConstraintComputation() {
     if (!hintsEnabled) return;
     cancelHintConstraintComputation();
+    // Skip the expensive clone+solve loop entirely when the player is in
+    // `deducibleCell` mode — the resulting list is never shown to them, and
+    // on web the work runs on the main isolate (no true background thread),
+    // which froze the UI when `_afterMutation` re-fired this on every tap.
+    if (hintType != HintType.addConstraint) return;
     final puzzle = currentPuzzle;
     if (puzzle == null || puzzle.cachedSolution == null) return;
 
     hintConstraintsReady = HintConstraintStatus.inprogress;
     availableHintConstraints = [];
-    _usefulHintCount = 0;
 
     final worker = HintWorker();
     _hintWorker = worker;
     worker
-        .compute(puzzle: puzzle)
+        .compute(puzzle: puzzle, learnedSlugs: learnedHintSlugs)
         .then((result) {
           // Drop stale results: the worker we awaited is no longer the
           // active one (cancelled or replaced by a newer call).
           if (!identical(worker, _hintWorker)) return;
-          result.shuffle();
-          availableHintConstraints = result;
-          hintConstraintsReady = availableHintConstraints.isEmpty
-              ? HintConstraintStatus.nohint
-              : HintConstraintStatus.ready;
-          _hintWorker = null;
-          _computeHintRanking();
+          onHintConstraintComputed(result);
         })
         .catchError((Object _) {
           // Cancellation closes the receive port → first throws StateError.
@@ -816,77 +1040,39 @@ class GameModel extends ChangeNotifier {
         });
   }
 
+  /// Settle the state once a constraint search returns [result] (the
+  /// serialized constraint, or null when none was found). Visible for testing
+  /// — production code reaches it only through the worker's completion
+  /// callback in [startHintConstraintComputation].
+  void onHintConstraintComputed(String? result) {
+    availableHintConstraints = result == null ? [] : [result];
+    hintConstraintsReady = result == null
+        ? HintConstraintStatus.nohint
+        : HintConstraintStatus.ready;
+    _hintWorker = null;
+    // If the player is parked on the "computing…" message, reveal the
+    // freshly-computed constraint immediately instead of waiting for another
+    // tap. `_revealAddedConstraint` now sees a settled status (ready/nohint),
+    // so it adds the constraint or shows "none".
+    final pending = _pendingRevealTexts;
+    if (pending != null) {
+      _pendingRevealTexts = null;
+      _revealAddedConstraint(pending);
+    }
+    notifyListeners();
+  }
+
   void cancelHintConstraintComputation() {
-    _cancelHintRanking();
     _hintWorker?.dispose();
     _hintWorker = null;
     hintConstraintsReady = HintConstraintStatus.canceled;
     availableHintConstraints = [];
-    _usefulHintCount = 0;
+    // Drop any pending auto-reveal: the pass it was waiting on is gone.
+    _pendingRevealTexts = null;
   }
 
-  // ---------------------------------------------------------------------------
-  // Hint constraint ranking
-  // ---------------------------------------------------------------------------
-
-  void _scheduleHintRanking() {
-    if (!hintsEnabled) return;
-    if (hintConstraintsReady != HintConstraintStatus.ready ||
-        availableHintConstraints.isEmpty)
-      return;
-    _hintRankDebounce?.cancel();
-    _hintRankDebounce = Timer(
-      const Duration(milliseconds: 300),
-      _computeHintRanking,
-    );
-  }
-
-  void _computeHintRanking() {
-    _hintRankWorker?.dispose();
-    _hintRankWorker = null;
-    final puzzle = currentPuzzle;
-    if (puzzle == null || availableHintConstraints.isEmpty) return;
-
-    final worker = HintRankWorker();
-    _hintRankWorker = worker;
-    worker
-        .rank(
-          width: puzzle.width,
-          height: puzzle.height,
-          domain: puzzle.domain,
-          cellValues: puzzle.cellValues,
-          existingConstraints: puzzle.constraints
-              .map((c) => c.serialize())
-              .toList(),
-          candidateConstraints: availableHintConstraints,
-        )
-        .then((result) {
-          // Drop stale results: this worker may have been cancelled and
-          // replaced by a newer one mid-flight (rapid cell changes).
-          if (!identical(worker, _hintRankWorker)) return;
-          availableHintConstraints = result.ranked;
-          _usefulHintCount = result.usefulCount;
-          _hintRankWorker = null;
-          notifyListeners();
-        })
-        .catchError((Object _) {
-          // Cancellation closes the receive port → first throws StateError.
-          // A newer ranker has already taken over (or none is needed).
-        });
-  }
-
-  void _cancelHintRanking() {
-    _hintRankDebounce?.cancel();
-    _hintRankWorker?.dispose();
-    _hintRankWorker = null;
-  }
-
-  /// Pick the front candidate and add it to the puzzle. Useful candidates
-  /// (those that unlock new propagation) come first; once they're exhausted
-  /// the player can still request a constraint and gets one from the
-  /// non-useful tail — adding redundant constraints is harmless and lets a
-  /// player who asks for help past the propagation horizon receive
-  /// something rather than a blank "none available" message.
+  /// Add the offered hint constraint to the puzzle, then reset the hint state
+  /// so the next tap-1 recomputes a fresh suggestion against the new state.
   /// Returns true if a constraint was added.
   bool addHintConstraint() {
     if (currentPuzzle == null || availableHintConstraints.isEmpty) {
@@ -896,9 +1082,7 @@ class GameModel extends ChangeNotifier {
     // Clear previous highlights before adding a new one
     currentPuzzle!.clearHighlights();
 
-    // Front of the list: useful first, then non-useful tail.
     final serialized = availableHintConstraints.removeAt(0);
-    if (_usefulHintCount > 0) _usefulHintCount--;
 
     // Parse "SLUG:params" and create the constraint
     final colonIdx = serialized.indexOf(':');
@@ -908,19 +1092,34 @@ class GameModel extends ChangeNotifier {
     if (constraint == null) return false;
 
     constraint.isHighlighted = true;
+    final before = currentPuzzle!.constraints
+        .map((c) => c.serialize())
+        .join('|');
     currentPuzzle!.addConstraint(constraint);
+    final after = currentPuzzle!.constraints
+        .map((c) => c.serialize())
+        .join('|');
+    if (before == after) {
+      // The add changed nothing (e.g. an LT merge with no new cell). Don't
+      // claim a constraint was added and don't bill the hint; reset so the
+      // next tap-1 recomputes a fresh suggestion against the current state.
+      hintConstraintsReady = HintConstraintStatus.canceled;
+      notifyListeners();
+      return false;
+    }
     if (currentMeta != null) {
       currentMeta!.hints += 1;
       currentMeta!.stats?.hints += 1;
     }
-    _scheduleHintRanking();
+    // The suggestion is consumed and the puzzle changed; force the next
+    // tap-1 to recompute from scratch rather than reuse a stale state.
+    hintConstraintsReady = HintConstraintStatus.canceled;
     notifyListeners();
     return true;
   }
 
   /// Whether the "add constraint" hint button should be enabled.
-  /// True as long as any candidate remains, regardless of whether it's
-  /// "useful" — the player can opt to add a redundant constraint anyway.
+  /// True as long as a computed candidate is available.
   bool get canAddHintConstraint =>
       hintConstraintsReady == HintConstraintStatus.ready &&
       availableHintConstraints.isNotEmpty;
@@ -949,7 +1148,6 @@ class GameModel extends ChangeNotifier {
     _cancelCheckDebounce();
     _cancelIdleTimer();
     _hintWorker?.dispose();
-    _cancelHintRanking();
     super.dispose();
   }
 }
@@ -969,6 +1167,13 @@ class HintTexts {
   final String hintConstraintInprogress;
   final String hintConstraintNone;
 
+  /// Variants used when the help move is a `removeOption` rather than a
+  /// `setValue`. Same shape as their siblings above, but phrased in terms
+  /// of "an option can be removed" rather than "the cell can be deduced".
+  final String hintCellOptionRemovable;
+  final String hintForceRemoveOption;
+  final String Function(CanApply givenBy) hintRemoveOptionDeducedFrom;
+
   const HintTexts({
     required this.someConstraintsInvalid,
     required this.hintCellWrong,
@@ -980,5 +1185,8 @@ class HintTexts {
     required this.hintConstraintAdded,
     required this.hintConstraintInprogress,
     required this.hintConstraintNone,
+    required this.hintCellOptionRemovable,
+    required this.hintForceRemoveOption,
+    required this.hintRemoveOptionDeducedFrom,
   });
 }

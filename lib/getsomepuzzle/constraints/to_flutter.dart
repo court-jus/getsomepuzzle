@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
-import 'package:getsomepuzzle/widgets/eyes.dart';
-import 'package:getsomepuzzle/widgets/neighbor_count.dart';
-import 'package:getsomepuzzle/widgets/row_count.dart';
-import 'package:getsomepuzzle/widgets/symmetry.dart';
-import 'package:getsomepuzzle/widgets/group_size.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
+import 'package:getsomepuzzle/widgets/constraints/chain.dart';
+import 'package:getsomepuzzle/widgets/constraints/eyes.dart';
+import 'package:getsomepuzzle/widgets/constraints/neighbor_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/symmetry.dart';
+import 'package:getsomepuzzle/widgets/constraints/group_size.dart';
+import 'package:getsomepuzzle/widgets/constraints/transition.dart';
 
 // Arrows for the parity constraint appear smaller so we add a zoom factor
 const _parityFontSizeRatio = 40.0 / 36.0;
@@ -60,6 +68,18 @@ Widget constraintToFlutter(
   }
   if (constraint is RowCountConstraint) {
     return _rowCountWidget(constraint, cellSize, count);
+  }
+  if (constraint is ChainConstraint) {
+    return _chainWidget(constraint, fgcolor, cellSize, count);
+  }
+  if (constraint is RowTransitionConstraint) {
+    return _transitionWidget(constraint, cellSize, count, Axis.horizontal);
+  }
+  if (constraint is ColumnTransitionConstraint) {
+    return _transitionWidget(constraint, cellSize, count, Axis.vertical);
+  }
+  if (constraint is ImplicationConstraint) {
+    return const SizedBox.shrink();
   }
 
   // Default: use toString()
@@ -182,5 +202,41 @@ Widget _rowCountWidget(
     width: widgetSize,
     height: widgetSize,
     child: RowCountWidget(constraint: constraint, cellSize: widgetSize),
+  );
+}
+
+Widget _chainWidget(
+  ChainConstraint constraint,
+  Color fgcolor,
+  double cellSize,
+  int count,
+) {
+  final double widgetSize = cellSize / count;
+  return SizedBox(
+    width: widgetSize,
+    height: widgetSize,
+    child: ChainWidget(
+      constraint: constraint,
+      fgcolor: fgcolor,
+      cellSize: widgetSize,
+    ),
+  );
+}
+
+Widget _transitionWidget(
+  LineCentricConstraint constraint,
+  double cellSize,
+  int count,
+  Axis axis,
+) {
+  final double widgetSize = cellSize / count;
+  return SizedBox(
+    width: widgetSize,
+    height: widgetSize,
+    child: TransitionWidget(
+      constraint: constraint,
+      cellSize: widgetSize,
+      axis: axis,
+    ),
   );
 }

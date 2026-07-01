@@ -1,14 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/groups.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart';
 
 import 'helpers/make_puzzle.dart';
@@ -70,6 +75,66 @@ void main() {
       expect(GroupSize('0.1').verify(p), isFalse);
       expect(GroupSize('1.2').verify(p), isFalse);
       expect(GroupSize('0.3').verify(p), isFalse);
+    });
+  });
+
+  group('GroupSize.apply', () {
+    test('does not re-emit a removeOption for an already-pruned colour', () {
+      // Regression (3-colour, June 2026): the per-colour feasibility sweep
+      // emitted RemoveOption(anchor, colour) without checking the anchor's
+      // options. Once the colour was pruned (here: white, because joining
+      // the white neighbour would overshoot size=1), apply() re-emitted the
+      // same no-op move forever and the solver stalled on it — a generated
+      // puzzle then failed --check with "not deductively unique".
+      // Only reachable on 3+ colours: on 2 colours a prune collapses the
+      // cell to a value and the anchor is no longer free.
+      final p = Puzzle.empty(3, 3, fullDomain);
+      p.cells[5].setForSolver(CellValue.white); // white neighbour of anchor
+      p.addConstraint(GroupSize('4.1')); // anchor idx 4 (center), size 1
+      p.cells[4].removeOptionForSolver(CellValue.white);
+      final move = p.constraints.first.apply(p);
+      // Any emitted removeOption must target an option still present —
+      // otherwise the move is a no-op and the solve loop livelocks.
+      if (move is RemoveOption) {
+        expect(
+          p.cells[move.idx].options.contains(move.option),
+          isTrue,
+          reason:
+              'no-op removeOption re-emitted: '
+              'cell ${move.idx} != ${move.option}',
+        );
+      }
+    });
+  });
+
+  group('DifferentFrom.apply', () {
+    test('does not re-emit a removeOption for an already-pruned colour', () {
+      // Same no-op livelock class as GroupSize.apply (3-colour, June 2026):
+      // with cell 0 coloured, DF kept emitting RemoveOption(1, black) even
+      // after black was pruned from cell 1's options. Once pruned, there is
+      // nothing left to deduce — apply must return null.
+      final p = Puzzle.empty(2, 1, fullDomain);
+      p.cells[0].setForSolver(CellValue.black);
+      p.addConstraint(DifferentFromConstraint('0.right'));
+      p.cells[1].removeOptionForSolver(CellValue.black);
+      expect(p.constraints.first.apply(p), isNull);
+    });
+  });
+
+  group('LetterGroup.apply', () {
+    test('articulation cell with pruned colour → Impossible, not SetValue', () {
+      // 3x1 line, both letter members black at the ends: cell 1 is the
+      // articulation point every connecting path crosses, so it must take
+      // black. With black pruned from its options (3-colour domains) the
+      // letter can never connect: apply must surface Impossible. It used
+      // to emit SetValue(1, black) — a value the state already
+      // contradicts, which the solver treats as a silent dead end.
+      final p = Puzzle.empty(3, 1, fullDomain);
+      p.cells[0].setForSolver(CellValue.black);
+      p.cells[2].setForSolver(CellValue.black);
+      p.addConstraint(LetterGroup('F.0.2'));
+      p.cells[1].removeOptionForSolver(CellValue.black);
+      expect(p.constraints.first.apply(p), isA<Impossible>());
     });
   });
 
@@ -186,7 +251,9 @@ void main() {
       // 3x3: 101 / 001 / 000
       // GS at idx 0 (value=1), target=2. myGroup={0}, margin=1.
       // Free neighbors: idx 1 and idx 3 (two exits, so single-exit rule doesn't fire).
-      // idx 1 touches group {2,5} (size 2, ≥ margin 1) → blocked.
+      // idx 1 touches group {2,5} (size 2, ≥ margin 1) → blocked: idx 1
+      // must drop the colour-1 option (which collapses it to colour 2 on a
+      // 2-colour domain).
       final p = makePuzzle('''
         101
         001
@@ -197,7 +264,7 @@ void main() {
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 1);
-      expect(move.value, 2);
+      expect(move.removeOption, CellValue.black);
     });
 
     test('multi-group merge blocked', () {
@@ -205,7 +272,8 @@ void main() {
       // GS at idx 3 (row1,col0, value=1), target=3. myGroup={3}, margin=2.
       // Free neighbor idx 4 (center) touches two separate groups: {1} and {5}, each size 1.
       // Each individually < margin (1 < 2), but sum = 2 ≥ margin → blocked.
-      // Coloring idx 4 as 1 would create a merged group of size 4 > target 3.
+      // Colouring idx 4 as 1 would create a merged group of size 4 > target 3,
+      // so idx 4 must drop the colour-1 option.
       final p = makePuzzle('''
         010
         101
@@ -216,7 +284,7 @@ void main() {
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 4);
-      expect(move.value, 2);
+      expect(move.removeOption, CellValue.black);
     });
 
     test('merge within limit is not blocked', () {
@@ -237,7 +305,7 @@ void main() {
       // Should NOT return a merge-blocking move on idx 4
       // (it might return null or a different deduction, but not blocking idx 4)
       if (move != null) {
-        expect(move.idx != 4 || move.value != 2, isTrue);
+        expect(move.idx != 4 || move.value != CellValue.white, isTrue);
       }
     });
   });
@@ -251,7 +319,8 @@ void main() {
       //   Reachable = {7, 10, 9, 11} (4 cells) < 5 → impossible.
       // Color=1: flood-fill spans the full grid via empty + value-1 cells.
       //   Reachable = all 12 cells ≥ 5 → OK.
-      // → cell 7 forced to value 1.
+      // → cell 7 must drop the colour-2 option (collapses to colour 1 on a
+      // 2-colour domain).
       final p = makePuzzle('''
         010
         010
@@ -263,7 +332,7 @@ void main() {
       final move = gs.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 7);
-      expect(move.value, 1);
+      expect(move.removeOption, CellValue.white);
     });
 
     test('multi-merge: groups reachable via intermediate empty cell', () {
@@ -277,7 +346,8 @@ void main() {
       //   the three adjacent value-1 singletons {4},{6},{8} give only 1+3=4<6.
       // Correct flood-fill through empty-or-color-1 reaches {7,4,6,8,5,2} = 6,
       // because c5 (empty) bridges c4/c8 to c2 (value 1).
-      // Color=2 reachable = {7} alone → impossible. → c7 forced to value 1.
+      // Color=2 reachable = {7} alone → infeasible → c7 must drop the
+      // colour-2 option (collapses to colour 1 on a 2-colour domain).
       final p = makePuzzle('''
         121
         210
@@ -289,7 +359,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 7);
-      expect(move.value, 1);
+      expect(move.removeOption, CellValue.white);
     });
 
     test('no deduction when both colors reachable', () {
@@ -320,7 +390,8 @@ void main() {
       // mandatory starter {6} is cell 7, and cell 7 is adjacent to the
       // existing colour-1 group {4,5,8} (size 3). Extending into 7 would
       // make a group ≥ 5 > target 2 → no viable boundary cell, so colour 1
-      // is infeasible at the anchor and cell 6 must take colour 2.
+      // is infeasible at the anchor and cell 6 must drop the colour-1
+      // option (which collapses it to colour 2 on a 2-colour domain).
       final p = makePuzzle('''
         000
         211
@@ -332,7 +403,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 6);
-      expect(move.value, 2);
+      expect(move.removeOption, CellValue.black);
     });
 
     test('mandatoryGroup absorbs same-colour neighbour with margin left', () {
@@ -366,9 +437,13 @@ void main() {
       // immediate-too-big rule does NOT intercept.
       // Colour 1: mandatoryGroup absorbs all four singleton colour-1
       //           neighbours → {1,3,4,5,7} size 5 > target 2 → infeasible.
-      // Colour 2: reachable from 4 through (free|2) = {4} only (the four
-      //           orthogonal neighbours are colour 1) → 1 < 2 → infeasible.
-      // Both colours infeasible → apply must report impossible.
+      // Colour 2: reachable from 4 through (option-2|value 2) = {4} only
+      //           (the four orthogonal neighbours are colour 1) → 1 < 2 →
+      //           infeasible.
+      // Apply walks the colours in order: it first emits `removeOption:
+      // black` on cell 4 (collapses it to colour 2), and the next call
+      // surfaces the resulting impossibility now that cell 4 is white
+      // with a frozen singleton group of size 1 < 2.
       final p = makePuzzle('''
         010
         101
@@ -376,9 +451,15 @@ void main() {
       ''');
       final gs = GroupSize('4.2');
       p.addConstraint(gs);
-      final move = gs.apply(p);
-      expect(move, isNotNull);
-      expect(move!.isImpossible, isNotNull);
+      final first = gs.apply(p);
+      expect(first, isNotNull);
+      expect(first!.idx, 4);
+      expect(first.removeOption, CellValue.black);
+
+      p.removeOption(first.idx, first.removeOption!);
+      final second = gs.apply(p);
+      expect(second, isNotNull);
+      expect(second!.isImpossible, isNotNull);
     });
   });
 
@@ -427,7 +508,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 1);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
   });
 
@@ -456,7 +537,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 4);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('no force when multiple disjoint completions exist', () {
@@ -528,10 +609,12 @@ void main() {
       // idx 0 → right (0,1), down (0,2)
       // idx 1 → down (1,3)
       // idx 2 → right (2,3)
-      final params = DifferentFromConstraint.generateAllParameters(2, 2, [
-        1,
+      final params = DifferentFromConstraint.generateAllParameters(
         2,
-      ], null);
+        2,
+        defaultDomain,
+        null,
+      );
       expect(params, contains('0.right'));
       expect(params, contains('0.down'));
       expect(params, contains('1.down'));
@@ -544,13 +627,67 @@ void main() {
       final params = DifferentFromConstraint.generateAllParameters(
         2,
         2,
-        [1, 2],
+        defaultDomain,
         {0, 1},
       );
       expect(params.contains('0.right'), isFalse);
       expect(params.contains('0.down'), isFalse);
       expect(params.contains('1.down'), isFalse);
       expect(params, contains('2.right'));
+    });
+
+    test('domain==2: any readonly cell excludes the pair', () {
+      // Cell 0 is readonly, cells 1, 2, 3 are free. On a 2-colour
+      // domain, a DF between readonly cell 0 and any free neighbour
+      // would collapse the free cell to the other value in one step
+      // — too trivial to be worth offering as a player puzzle. So
+      // every pair touching cell 0 is dropped.
+      final params = DifferentFromConstraint.generateAllParameters(
+        2,
+        2,
+        defaultDomain,
+        {0},
+      );
+      expect(params.contains('0.right'), isFalse); // 0-readonly  → drop
+      expect(params.contains('0.down'), isFalse); //  0-readonly  → drop
+      expect(params, contains('1.down')); // (1, 3) both free
+      expect(params, contains('2.right')); // (2, 3) both free
+    });
+
+    test('domain==3: pair with one readonly cell is kept', () {
+      // Same setup as above on a 3-colour domain. A DF between
+      // readonly cell 0 and a free neighbour now leaves the free
+      // cell with 2 options out of 3 — a real partial deduction —
+      // so the pair stays in the candidate pool. Only pairs where
+      // BOTH cells are readonly get filtered.
+      final params = DifferentFromConstraint.generateAllParameters(
+        2,
+        2,
+        fullDomain,
+        {0},
+      );
+      expect(params, contains('0.right')); // (0-readonly, 1-free) → keep
+      expect(params, contains('0.down')); //  (0-readonly, 2-free) → keep
+      expect(params, contains('1.down')); //  (1-free, 3-free)     → keep
+      expect(params, contains('2.right')); // (2-free, 3-free)     → keep
+      expect(params.length, 4);
+    });
+
+    test('domain==3: pair with BOTH readonly is still excluded', () {
+      // Cells 0 and 1 both readonly. The DF between them either
+      // violates verify(solved) or is trivially satisfied — no
+      // useful deduction either way — so we drop it even on 3-colour.
+      // The DF between cells 0 and 2 (readonly, free) survives.
+      final params = DifferentFromConstraint.generateAllParameters(
+        2,
+        2,
+        fullDomain,
+        {0, 1},
+      );
+      expect(params.contains('0.right'), isFalse); // both readonly → drop
+      expect(params, contains('0.down')); // (0-readonly, 2-free)  → keep
+      expect(params, contains('1.down')); // (1-readonly, 3-free)  → keep
+      expect(params, contains('2.right')); // (2-free, 3-free)     → keep
     });
   });
 
@@ -560,10 +697,10 @@ void main() {
       // on a 4-wide grid. The prior implementation hardcoded width=100,
       // which would have produced "3 ≠ 4" only by luck (idx+1 for right).
       // Here we verify the down direction where width matters.
-      final p = Puzzle.empty(4, 4, [1, 2]);
+      final p = Puzzle.empty(4, 4, defaultDomain);
       expect(DifferentFromConstraint('2.down').toHuman(p), '3 ≠ 7');
       // For comparison: on a 5-wide grid, down from idx 2 is idx 7 → "3 ≠ 8".
-      final p5 = Puzzle.empty(5, 4, [1, 2]);
+      final p5 = Puzzle.empty(5, 4, defaultDomain);
       expect(DifferentFromConstraint('2.down').toHuman(p5), '3 ≠ 8');
     });
   });
@@ -614,12 +751,60 @@ void main() {
     });
   });
 
+  group('GroupCountConstraint 3-colour option-awareness', () {
+    // Regressions for the round-2 soundness fix: a free cell with `color`
+    // pruned from its options can never start (or extend) a `color` group, so
+    // the new-group candidate set must be option-aware. Counting pruned cells
+    // made apply() miss deductions and isCompleteFor() refuse to grey out.
+    test('apply forces removeOption on the merge-cell when no new group can '
+        'form', () {
+      // 1x5 row: black _ black _ _ , target 2 black groups. cell1 is the only
+      // merge-cell (between the two black groups); colouring it black would
+      // drop the count to 1. cell4 is the only free cell with no black
+      // neighbour, but black is pruned from its options → no new black group
+      // can ever appear. So the count is locked and cell1 must not be black.
+      // Before the fix cell4 counted as a possible new group, routing apply()
+      // to the simulation branch which found nothing → deduction missed.
+      final p = Puzzle.empty(5, 1, fullDomain);
+      p.cells[0].setForSolver(CellValue.black);
+      p.cells[2].setForSolver(CellValue.black);
+      p.cells[4].removeOption(CellValue.black);
+      final move = GroupCountConstraint('1.2').apply(p);
+      expect(move, isNotNull);
+      expect(move!.idx, 1);
+      expect(move.removeOption, CellValue.black);
+    });
+
+    test('isCompleteFor greys out when the remaining free cells are pruned of '
+        'the colour', () {
+      // 3x3: two black corners on the top row, separated and walled off by a
+      // committed white middle row, so the two black groups can never merge
+      // (target 2). The bottom row is free but black is pruned from every
+      // cell → no third black group can appear and the count is locked at 2.
+      // apply() can never fire again, so isCompleteFor must be true. Before
+      // the fix the pruned bottom cells counted as possible new groups and
+      // isCompleteFor wrongly returned false.
+      final p = Puzzle.empty(3, 3, fullDomain);
+      p.cells[0].setForSolver(CellValue.black);
+      p.cells[2].setForSolver(CellValue.black);
+      for (final i in [1, 3, 4, 5]) {
+        p.cells[i].setForSolver(CellValue.white);
+      }
+      for (final i in [6, 7, 8]) {
+        p.cells[i].removeOption(CellValue.black);
+      }
+      expect(GroupCountConstraint('1.2').isCompleteFor(p), isTrue);
+    });
+  });
+
   group('GroupCountConstraint.generateAllParameters', () {
     test('generates valid parameters', () {
-      final params = GroupCountConstraint.generateAllParameters(2, 2, [
-        1,
+      final params = GroupCountConstraint.generateAllParameters(
         2,
-      ], null);
+        2,
+        defaultDomain,
+        null,
+      );
       expect(params, contains('1.1'));
       expect(params, contains('1.2'));
       expect(params, contains('2.1'));
@@ -628,10 +813,12 @@ void main() {
 
     test('max count is ceil(width*height/2)', () {
       // 3x3 = 9 cells → max 5 groups (ceil(9/2))
-      final params = GroupCountConstraint.generateAllParameters(3, 3, [
-        1,
-        2,
-      ], null);
+      final params = GroupCountConstraint.generateAllParameters(
+        3,
+        3,
+        defaultDomain,
+        null,
+      );
       expect(params, contains('1.5'));
       expect(params, isNot(contains('1.6')));
     });
@@ -655,7 +842,7 @@ void main() {
       final move = gc.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 3);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('impossible when unique merge overshoots target', () {
@@ -706,7 +893,7 @@ void main() {
         p.addConstraint(gc);
         final move = gc.apply(p);
         if (move != null) {
-          expect(move.idx != 23 || move.value != 1, isTrue);
+          expect(move.idx != 23 || move.value != CellValue.black, isTrue);
         }
       },
     );
@@ -732,6 +919,43 @@ void main() {
       final move = gc.apply(p);
       if (move != null) expect(move.isImpossible, isNull);
     });
+
+    test(
+      'chain-merges-only, no addable cell → falls back to calculateMinGroups',
+      () {
+        // Companion to the addable-cell test above: this one exercises the
+        // OTHER reason `_safeReachableCountsByMerges` can return null —
+        // when at least one mergeable group pair has no single direct
+        // merge-cell, only multi-step chains through intermediate free
+        // cells. The helper falls back to `calculateMinGroups > count` as
+        // its always-sound lower bound.
+        //
+        // Grid (0=empty, 1=black, 2=white) with `GC:2.2`:
+        //
+        //   2 0 2
+        //   2 0 0
+        //   1 1 2
+        //
+        // White groups: A={(0,0),(1,0)}, B={(0,2)}, C={(2,2)} (count=3,
+        // target=2). The free cells (0,1), (1,1), (1,2) each have at
+        // least one white neighbour → no addable cell. A↔C can be merged
+        // only via the 3-cell chain (1,0)→(1,1)→(1,2)→(2,2): no single
+        // free cell is adjacent to both A and C, so
+        // `_mergesAreDirectOnly` is false and the direct-merge
+        // enumeration is unsafe.
+        //
+        // `calculateMinGroups` flood-fills through free-or-white cells
+        // and reaches every white cell from any starting point →
+        // minGroups = 1 ≤ target 2 → the state is NOT impossible.
+        // `verify` must return true.
+        final p = makePuzzle('202\n200\n112');
+        final gc = GroupCountConstraint('2.2');
+        p.addConstraint(gc);
+        expect(gc.verify(p), isTrue);
+        final move = gc.apply(p);
+        if (move != null) expect(move.isImpossible, isNull);
+      },
+    );
   });
 
   group('GroupCountConstraint.apply - not enough groups', () {
@@ -751,7 +975,7 @@ void main() {
       final move = gc.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 2);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test(
@@ -781,7 +1005,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 0);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
   });
 
@@ -791,15 +1015,16 @@ void main() {
       // Empty cell idx 1: neighbor black=0 → would merge, not create new
       // Empty cell idx 2: neighbor black=3 → would merge, not create new
       // getFreeCellsWithoutNeighborColor = none
-      // current=2, target=2, candidates=0 → force opposite (color 2) on any cell that would merge
+      // current=2, target=2, candidates=0 → every merge-cell must drop
+      // the colour-1 option (which collapses it to colour 2 on a 2-colour
+      // domain).
       final p = makePuzzle('10\n01');
       final gc = GroupCountConstraint('1.2');
       p.addConstraint(gc);
       final move = gc.apply(p);
       expect(move, isNotNull);
-      // Any cell that would merge, force to white instead
       expect(move!.idx, isIn([1, 2]));
-      expect(move.value, 2);
+      expect(move.removeOption, CellValue.black);
     });
 
     test('no deduction on candidates even with no merge-cell present', () {
@@ -837,7 +1062,8 @@ void main() {
         // 3x3: 1 2 2 / 2 . 2 / 2 2 1 — cell 4 is the only free cell and the
         // only candidate. Colouring cell 4 = 1 completes the puzzle with 3
         // isolated color-1 groups ({0}, {4}, {8}); no merge-cell remains,
-        // so reachable = {3}. Target 2 is unreachable, so cell 4 must be 2.
+        // so reachable = {3}. Target 2 is unreachable, so cell 4 must drop
+        // the colour-1 option (collapses to colour 2 on a 2-colour domain).
         final p = makePuzzle('122\n202\n221');
         final gc = GroupCountConstraint('1.2');
         p.addConstraint(gc);
@@ -845,7 +1071,7 @@ void main() {
         expect(move, isNotNull);
         expect(move!.isImpossible, isNull);
         expect(move.idx, 4);
-        expect(move.value, 2);
+        expect(move.removeOption, CellValue.black);
       },
     );
   });
@@ -899,13 +1125,14 @@ void main() {
       () {
         // Neighbors of idx 4: 1=1, 3=0, 5=0, 7=1. count=2 already satisfied
         // by the two color-1 neighbors, so any remaining free neighbor must
-        // be color-2. `apply` returns one such deduction.
+        // drop the colour-1 option (collapses to colour 2 on a 2-colour
+        // domain). `apply` returns one such deduction.
         final p = makePuzzle('010\n000\n010');
         final move = NeighborCountConstraint('4.1.2').apply(p);
         expect(move, isNotNull);
         expect(move!.isImpossible, isNull);
         expect([3, 5], contains(move.idx));
-        expect(move.value, 2);
+        expect(move.removeOption, CellValue.black);
       },
     );
 
@@ -917,7 +1144,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect([5, 7], contains(move.idx));
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('already too many target-color neighbors → reports impossibility', () {
@@ -969,6 +1196,23 @@ void main() {
       final p = makePuzzle('010\n111\n000');
       expect(NeighborCountConstraint('4.1.2').isCompleteFor(p), isFalse);
     });
+
+    test('3-colour: greys out when the last free neighbour is pruned of the '
+        'colour', () {
+      // Eye cell 4 (centre) with one black neighbour above (cell 1) and
+      // count 1 — already satisfied. The other neighbours are committed
+      // white except cell 7 (below), which stays free but has black pruned
+      // from its options, so it can never raise the black-neighbour count and
+      // apply() can no longer fire. The constraint must grey out. Before the
+      // option-aware fix the still-free (but pruned) neighbour blocked it.
+      final p = Puzzle.empty(3, 3, fullDomain);
+      p.cells[1].setForSolver(CellValue.black);
+      for (final i in [3, 5]) {
+        p.cells[i].setForSolver(CellValue.white);
+      }
+      p.cells[7].removeOption(CellValue.black);
+      expect(NeighborCountConstraint('4.1.1').isCompleteFor(p), isTrue);
+    });
   });
 
   group('EyesConstraint.verify', () {
@@ -1001,6 +1245,20 @@ void main() {
       final p = makePuzzle('020\n202\n020');
       expect(EyesConstraint('4.1.1').verify(p), isFalse);
     });
+
+    test('3-colour: a free neighbour pruned of the colour blocks the line of '
+        'sight', () {
+      // 1x3 row, eye at cell 0 looking right, colour black, count 1. cell2 is
+      // black, but cell1 (between the eye and cell2) is free with black pruned
+      // from its options, so it can never be black and the eye can never see a
+      // black cell → count 1 is unreachable. Before the fix the scan treated
+      // the pruned cell as a fillable empty and counted cell2 as reachable
+      // (max ≥ 1), so verify wrongly returned true.
+      final p = Puzzle.empty(3, 1, fullDomain);
+      p.cells[2].setForSolver(CellValue.black);
+      p.cells[1].removeOption(CellValue.black);
+      expect(EyesConstraint('0.1.1').verify(p), isFalse);
+    });
   });
 
   group('EyesConstraint.apply - lower-bound deductions', () {
@@ -1013,7 +1271,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 5);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test(
@@ -1036,7 +1294,7 @@ void main() {
         expect(move, isNotNull);
         expect(move!.isImpossible, isNull);
         expect(move.idx, 7);
-        expect(move.value, 1);
+        expect(move.value, CellValue.black);
       },
     );
 
@@ -1056,20 +1314,21 @@ void main() {
       final move = EyesConstraint('2.1.4').apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 12);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
   });
 
   group('EyesConstraint.apply - upper-bound deductions', () {
     test('totalSeen == count forces remaining empty to opposite', () {
       // 3x3 eye sees 1 up + 1 left = 2 = count. The single empty in line of
-      // sight (idx 5 to the right) must therefore become opposite so the
-      // count cannot grow past 2.
+      // sight (idx 5 to the right) must therefore drop the colour-1 option
+      // (collapses to colour 2 on a 2-colour domain) so the count cannot
+      // grow past 2.
       final p = makePuzzle('010\n100\n020');
       final move = EyesConstraint('4.1.2').apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 5);
-      expect(move.value, 2);
+      expect(move.removeOption, CellValue.black);
     });
 
     test(
@@ -1078,12 +1337,13 @@ void main() {
         // 5x3, eye at idx 7. count=1; right side already shows 1 colour-1
         // (cell 8). Up/down are blocked by opposite cells. The left direction
         // therefore must contribute 0 colour-1 cells, and there is exactly one
-        // empty at position 0 in line of sight → force it to opposite.
+        // empty at position 0 in line of sight → it must drop the colour-1
+        // option (collapses to colour 2 on a 2-colour domain).
         final p = makePuzzle('00200\n00010\n00200');
         final move = EyesConstraint('7.1.1').apply(p);
         expect(move, isNotNull);
         expect(move!.idx, 6);
-        expect(move.value, 2);
+        expect(move.removeOption, CellValue.black);
       },
     );
   });
@@ -1156,7 +1416,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 1);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('cell on the unique merge path is forced (corridor)', () {
@@ -1170,7 +1430,7 @@ void main() {
       final move = lt.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 1);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
     });
 
     test('opposite-colour wall splits the corridor → impossible', () {
@@ -1195,33 +1455,78 @@ void main() {
       final move = lt.apply(p);
       expect(move, isNotNull);
       expect(move!.idx, 1);
-      expect(move.value, 1);
+      expect(move.value, CellValue.black);
+    });
+  });
+
+  group('LetterGroup.apply - distinct letters stay separate', () {
+    test('3-colour: a rival letter touching my group only loses my colour', () {
+      // 1×3: cell 0 = black is letter A; cells 1,2 are letter B. Cell 1 is
+      // adjacent to A's group. Taking black there would bridge B into A's
+      // black group (merging two letters), so black is ruled out for cell 1 —
+      // but on 3 colours it could still be white or purple, so the deduction
+      // prunes the option instead of forcing one specific "opposite" (the
+      // port previously forced `value: domain.first-non-black` = white, an
+      // unsound guess that broke valid 3-colour LT puzzles).
+      final p = Puzzle('v2_123_3x1_100_LT:A.0;LT:B.1.2_0:0_0');
+      final lt = p.constraints.whereType<LetterGroup>().firstWhere(
+        (c) => c.letter == 'A',
+      );
+      final move = lt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 1);
+      expect(move.removeOption, CellValue.black);
+      expect(move.value, isNull);
+    });
+
+    test('2-colour: the prune collapses the rival cell to the other colour', () {
+      // Same shape on a 2-colour domain: removeOption black leaves only white,
+      // so applying the move sets cell 1 white — the pre-3-colour behaviour is
+      // preserved through the collapse.
+      final p = makePuzzle('100');
+      p.addConstraint(LetterGroup('A.0'));
+      p.addConstraint(LetterGroup('B.1.2'));
+      final lt = p.constraints.whereType<LetterGroup>().firstWhere(
+        (c) => c.letter == 'A',
+      );
+      final move = lt.apply(p);
+      expect(move, isNotNull);
+      expect(move!.removeOption, CellValue.black);
+      p.removeOption(move.idx, move.removeOption!);
+      expect(p.cells[1].value, CellValue.white);
     });
   });
 
   group('SymmetryConstraint.apply with empty anchor', () {
-    test('coloured neighbour with free mirror forces the mirror', () {
-      // 5×3 grid, anchor cell 7 (centre row 1) with axis 5 (point).
-      // Cell 6 (left of anchor) = 1. Mirror via point centre = cell 8.
-      //   . . . . .
-      //   . 1 ? . .   anchor at col 2; we expect cell 8 = 1
-      //   . . . . .
-      // Whether the anchor ends up 1 (cell 6 in group, sym=1) or 2
-      // (cell 6 = myOpposite, sym must mirror to myOpposite = 1), the
-      // mirror is forced to 1 in both branches.
-      final p = makePuzzle('''
+    test(
+      'coloured neighbour with free mirror forces the mirror (2-colour)',
+      () {
+        // 5×3 grid, anchor cell 7 (centre row 1) with axis 5 (point).
+        // Cell 6 (left of anchor) = 1. Mirror via point centre = cell 8.
+        //   . . . . .
+        //   . 1 ? . .   anchor at col 2; cell 8 is free
+        //   . . . . .
+        // On a 2-colour domain SY forces cell 8 = 1 even with the anchor
+        // still empty: if anchor = 1, cell 6 joins the group and its mirror
+        // must match; if anchor = 2, cell 6 is on the frontier and its
+        // mirror can't be 2 (it would connect into the group), so it is 1.
+        // Both outcomes agree. This is unsound on 3+ colours (a third colour
+        // escapes the frontier rule), so it is gated to domain 2.
+        final p = makePuzzle('''
         00000
         01000
         00000
       ''');
-      final sy = SymmetryConstraint('7.5');
-      p.addConstraint(sy);
-      final move = sy.apply(p);
-      expect(move, isNotNull);
-      expect(move!.isImpossible, isNull);
-      expect(move.idx, 8);
-      expect(move.value, 1);
-    });
+        final sy = SymmetryConstraint('7.5');
+        p.addConstraint(sy);
+        final move = sy.apply(p);
+        expect(move, isNotNull);
+        expect(move!.isImpossible, isNull);
+        expect(move.idx, 8);
+        expect(move.value, CellValue.black);
+      },
+    );
 
     test('coloured neighbour with out-of-bounds mirror forces anchor', () {
       // 3×3 grid, anchor cell 4 (centre) axis 2 = vertical mirror through
@@ -1230,8 +1535,8 @@ void main() {
       // 5-wide row with anchor at col 4 (rightmost), neighbour at col 3.
       //   . . . 1 ?   neighbour cell 3 (col 3), anchor cell 4 (col 4)
       // Mirror of (0,3) via vertical axis col 4 → (0,5) → out of bounds.
-      // So anchor cannot be 1 (would require neighbour's mirror) → must
-      // be 2.
+      // So anchor cannot be 1: it must drop the colour-1 option (which
+      // collapses to colour 2 on a 2-colour domain).
       final p = makePuzzle('''
         00010
       ''');
@@ -1241,7 +1546,7 @@ void main() {
       expect(move, isNotNull);
       expect(move!.isImpossible, isNull);
       expect(move.idx, 4);
-      expect(move.value, 2);
+      expect(move.removeOption, CellValue.black);
     });
 
     test(
@@ -1249,9 +1554,10 @@ void main() {
       () {
         // 5-wide row, anchor cell 2 axis 2 = vertical mirror through col 2.
         // Cell 1 = 1, cell 3 = 2. Mirror of cell 1 via col 2 = cell 3.
-        // No anchor colour can satisfy SY: anchor=1 would need sym(1)=1
-        // but sym=2; anchor=2 would force sym(neighbour myOpposite=1)=1
-        // but sym=2.
+        // On a 2-colour domain no anchor colour can satisfy SY: anchor=1
+        // would need sym(1)=1 but sym=2; anchor=2 would force sym(1) ≠ 2
+        // but sym=2. The mirror of the coloured neighbour is already a
+        // conflicting colour, so apply reports the contradiction at once.
         final p = makePuzzle('''
         01020
       ''');
@@ -1288,7 +1594,8 @@ void main() {
         // free, so the existing single-step rules can't conclude. But if
         // cell 4 = 1, the anchor's group would absorb cell 3 (=1, adjacent
         // to cell 4); cell 3's mirror = cell 5 = 2 ≠ 1, so the merged
-        // group could never be symmetric. Therefore cell 4 must be 2.
+        // group could never be symmetric. Therefore cell 4 must drop the
+        // colour-1 option (collapses to colour 2 on a 2-colour domain).
         final p = makePuzzle('''
         000
         102
@@ -1300,7 +1607,7 @@ void main() {
         expect(move, isNotNull);
         expect(move!.isImpossible, isNull);
         expect(move.idx, 4);
-        expect(move.value, 2);
+        expect(move.removeOption, CellValue.black);
         expect(move.complexity, 3);
       },
     );
@@ -1318,6 +1625,406 @@ void main() {
       final sy = SymmetryConstraint('7.2');
       p.addConstraint(sy);
       expect(sy.apply(p), isNull);
+    });
+  });
+
+  group('MajorityConstraint.conflictsWith', () {
+    // Params are 'r0.c0.r1.c1.targetColor'. Only the rectangle corners matter
+    // for conflictsWith; targetColor is irrelevant to border geometry.
+    MajorityConstraint mj(String corners) => MajorityConstraint('$corners.1');
+
+    test('shared top/bottom edge with overlapping columns conflicts', () {
+      // Top-left 2x2 (rows0-1,cols0-1) and top-right 2x2 (rows0-1,cols1-2):
+      // both share top row 0 and bottom row 1 over overlapping column 1, so
+      // their horizontal borders inset to the same place -> overlap.
+      expect(mj('0.0.1.1').conflictsWith(mj('0.1.1.2')), isTrue);
+    });
+
+    test('corner-only touch (no shared edge) does not conflict', () {
+      // Top-left 2x2 (rows0-1,cols0-1) and bottom-right 2x2 (rows1-2,cols1-2)
+      // share a single cell at their corner but no rectangle edge is
+      // collinear, so the borders merely cross — readable, not a conflict.
+      expect(mj('0.0.1.1').conflictsWith(mj('1.1.2.2')), isFalse);
+    });
+
+    test(
+      'side-by-side zones (shared grid line, no overlap) do not conflict',
+      () {
+        // Top-left 2x2 (rows0-1,cols0-1) and the right column (rows0-2,col2):
+        // they share the grid line x=2 but sit on opposite sides, so the inset
+        // pushes their borders apart into distinct cells — not a conflict.
+        expect(mj('0.0.1.1').conflictsWith(mj('0.2.2.2')), isFalse);
+      },
+    );
+
+    test('conflict relation is symmetric', () {
+      final a = mj('0.0.1.1');
+      final b = mj('0.1.1.2');
+      expect(a.conflictsWith(b), b.conflictsWith(a));
+    });
+
+    test('a non-MJ constraint never conflicts', () {
+      expect(mj('0.0.1.1').conflictsWith(SymmetryConstraint('7.2')), isFalse);
+    });
+  });
+
+  group('ImplicationConstraint.verify', () {
+    test('both black (same as colour) → valid', () {
+      final p = makePuzzle('11');
+      expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+    });
+
+    test('source black, target white → invalid', () {
+      final p = makePuzzle('12');
+      expect(ImplicationConstraint('0.1.1').verify(p), isFalse);
+    });
+
+    test('source white, target black → valid (vacuously true)', () {
+      final p = makePuzzle('21');
+      expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+    });
+
+    test('source black, target free with black option → valid (reachable)', () {
+      final p = makePuzzle('20');
+      expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+    });
+
+    test(
+      'source black, target free without black option → invalid (unreachable)',
+      () {
+        final p = Puzzle.empty(2, 1, fullDomain);
+        p.cells[0].setForSolver(CellValue.black);
+        p.cells[1].removeOption(CellValue.black);
+        expect(ImplicationConstraint('0.1.1').verify(p), isFalse);
+      },
+    );
+
+    test(
+      'source free with colour, target white → valid (source can avoid colour)',
+      () {
+        final p = makePuzzle('02');
+        expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+      },
+    );
+
+    test('both free → valid (reachable)', () {
+      final p = makePuzzle('00');
+      expect(ImplicationConstraint('0.1.1').verify(p), isTrue);
+    });
+  });
+
+  group('ImplicationConstraint.apply', () {
+    test('forward: source is colour → set target', () {
+      final p = makePuzzle('10');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      final move = im.apply(p);
+      expect(move, isNotNull);
+      expect(move, isA<SetValue>());
+      expect(move!.idx, 1);
+      expect(move.value, CellValue.black);
+    });
+
+    test(
+      'forward impossible: source colour, target can never be → Impossible',
+      () {
+        final p = Puzzle.empty(2, 1, fullDomain);
+        p.cells[0].setForSolver(CellValue.black);
+        p.cells[1].removeOption(CellValue.black);
+        final im = ImplicationConstraint('0.1.1');
+        p.addConstraint(im);
+        expect(im.apply(p), isA<Impossible>());
+      },
+    );
+
+    test('contrapositive: target not colour → remove colour from source', () {
+      final p = makePuzzle('02');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      final move = im.apply(p);
+      expect(move, isNotNull);
+      expect(move, isA<RemoveOption>());
+      expect(move!.idx, 0);
+      expect(move.removeOption, CellValue.black);
+    });
+
+    test('contrapositive: target not colour, source already pruned → null', () {
+      final p = Puzzle.empty(2, 1, fullDomain);
+      p.cells[1].setForSolver(CellValue.white);
+      p.cells[0].removeOption(CellValue.black);
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('both determined same colour → null', () {
+      final p = makePuzzle('11');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('both determined, source not colour → null', () {
+      final p = makePuzzle('22');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('both free → null', () {
+      final p = makePuzzle('00');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('source not colour, target free → null (vacuously true)', () {
+      final p = makePuzzle('20');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isNull);
+    });
+
+    test('both determined, source colour, target wrong → Impossible', () {
+      final p = makePuzzle('12');
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.apply(p), isA<Impossible>());
+    });
+
+    test(
+      '3-colour: forward with source colour removes other colour option',
+      () {
+        final p = Puzzle.empty(2, 1, fullDomain);
+        p.cells[0].setForSolver(CellValue.black);
+        final im = ImplicationConstraint('0.1.1');
+        p.addConstraint(im);
+        final move = im.apply(p);
+        expect(move, isNotNull);
+        expect(move, isA<SetValue>());
+        expect(move!.idx, 1);
+        expect(move.value, CellValue.black);
+      },
+    );
+
+    test('3-colour: contrapositive removes colour from source options', () {
+      final p = Puzzle.empty(2, 1, fullDomain);
+      p.cells[1].setForSolver(CellValue.white);
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      final move = im.apply(p);
+      expect(move, isNotNull);
+      expect(move, isA<RemoveOption>());
+      expect(move!.idx, 0);
+      expect(move.removeOption, CellValue.black);
+    });
+  });
+
+  group('ImplicationConstraint.isCompleteFor', () {
+    test('source determined a different colour → complete', () {
+      final p = makePuzzle('20');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isTrue);
+    });
+
+    test('source can never be the colour → complete', () {
+      final p = Puzzle.empty(2, 1, fullDomain);
+      p.cells[0].removeOption(CellValue.black);
+      final im = ImplicationConstraint('0.1.1');
+      p.addConstraint(im);
+      expect(im.isCompleteFor(p), isTrue);
+    });
+
+    test('target is already the colour → complete', () {
+      final p = makePuzzle('01');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isTrue);
+    });
+
+    test('source colour, target free with colour → not complete', () {
+      final p = makePuzzle('10');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isFalse);
+    });
+
+    test('target not colour, source free with colour → not complete', () {
+      final p = makePuzzle('02');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isFalse);
+    });
+
+    test('both free with colour option → not complete (arrow visible)', () {
+      final p = makePuzzle('00');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isFalse);
+    });
+
+    test('both determined same colour → complete', () {
+      final p = makePuzzle('11');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isTrue);
+    });
+
+    test('invalid state → not complete', () {
+      final p = makePuzzle('12');
+      expect(ImplicationConstraint('0.1.1').isCompleteFor(p), isFalse);
+    });
+  });
+
+  group('BoundingBoxConstraint.verify', () {
+    test('complete puzzle, box equals target → valid', () {
+      // Single 3×3 black group filling its box exactly.
+      final p = makePuzzle('111\n111\n111');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isTrue);
+    });
+
+    test('box larger than target → invalid', () {
+      // 3×4 black group: width 4 exceeds the target width 3. Over-large is
+      // broken now (boxes only grow, never shrink).
+      final p = makePuzzle('1111\n1111\n1111');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isFalse);
+    });
+
+    test('incomplete, box too small but reachable → valid', () {
+      // Lone black corner (box 1×1) on an otherwise free 2×2 grid: the
+      // reachable region still spans 2×2, so the 2×2 target is reachable.
+      final p = makePuzzle('10\n00');
+      expect(BoundingBoxConstraint('1.2.2').verify(p), isTrue);
+    });
+
+    test('complete puzzle, box smaller than target → invalid', () {
+      // Finished 2×2 black block against a 3×3 target.
+      final p = makePuzzle('11\n11');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isFalse);
+    });
+
+    test('incomplete, box too small and walled off → invalid', () {
+      // Black corner boxed in by white; no reachable black-capable cell can
+      // extend it, so a 3×3 box is unreachable even though free cells remain
+      // elsewhere (puzzle is not complete).
+      final p = makePuzzle('120\n220\n000');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isFalse);
+    });
+
+    test('hollow connected shape spanning the target → valid', () {
+      // A ring of black cells reaches all four sides of a 3×3 box without
+      // filling it (the holes stay free). Box == target ⇒ valid.
+      final p = makePuzzle('101\n111\n101');
+      expect(BoundingBoxConstraint('1.3.3').verify(p), isTrue);
+    });
+  });
+
+  group('BoundingBoxConstraint.apply', () {
+    test('box exceeds target → reports impossibility', () {
+      final p = makePuzzle('1111\n1111\n1111');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('box at target, free cell adjacent outside box → prunes colour', () {
+      // 3×3 black group in a 4-wide grid; the free cell at (1,3)=idx 7 is
+      // orthogonally adjacent to group cell (1,2) and lies right of the box.
+      // Colouring it would push the width to 4, so `colour` must be removed.
+      final p = makePuzzle('1112\n1110\n1112');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNull);
+      expect(move.idx, 7);
+      expect(move.removeOption, CellValue.black);
+    });
+
+    test('box at target, free cell only diagonal to box → no deduction', () {
+      // The lone free cell (3,3) is diagonally off the box corner, not
+      // orthogonally adjacent to any group cell, so it could start a separate
+      // group — it must not be pruned.
+      final p = makePuzzle('1112\n1112\n1112\n2220');
+      expect(BoundingBoxConstraint('1.3.3').apply(p), isNull);
+    });
+
+    test('box too small and walled off → reports impossibility', () {
+      final p = makePuzzle('120\n220\n000');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('box too small with several growth directions → no deduction', () {
+      // Lone black centre on an open grid: it can still grow up/down/left/
+      // right, so no single cell is forced and nothing overshoots yet.
+      final p = makePuzzle('0000\n0100\n0000\n0000');
+      expect(BoundingBoxConstraint('1.2.2').apply(p), isNull);
+    });
+
+    test('pinned box, edge with a single reachable cell → forces it', () {
+      // Black corner at (0,0) on a 6×4 grid pins the 3×3 box to rows 0-2 ×
+      // cols 0-2. Column 2 (the box's right edge) is walled by white at (0,2)
+      // and (1,2), so (2,2)=idx 14 is the only cell that can reach it — forced
+      // black. This is the unique-box growth deduction.
+      final p = makePuzzle('102000\n002000\n000000\n000000');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isA<SetValue>());
+      expect(move!.idx, 14);
+      expect(move.value, CellValue.black);
+    });
+
+    test('pinned box, edge with no reachable cell → impossible', () {
+      // Same pinned 3×3 box, but the entire right-edge column 2 is white
+      // (no cell can reach the box's right side) → unsatisfiable.
+      final p = makePuzzle('102000\n002000\n002000\n000000');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isNotNull);
+      expect(move!.isImpossible, isNotNull);
+    });
+
+    test('pinned box, lone edge cell connects only through one cell → forces '
+        'it', () {
+      // Continuation of the unique-edge case: (2,2)=idx 14 is now black. It is
+      // the box's only right-edge cell, and within the pinned 3×3 box its only
+      // `color`-capable neighbour is (2,1)=idx 13 ((1,2) is white). So idx 13
+      // is forced to keep idx 14 connected to the rest of the group.
+      final p = makePuzzle('102000\n002000\n001000\n000000');
+      final move = BoundingBoxConstraint('1.3.3').apply(p);
+      expect(move, isA<SetValue>());
+      expect(move!.idx, 13);
+      expect(move.value, CellValue.black);
+    });
+  });
+
+  group('BoundingBoxConstraint.isCompleteFor', () {
+    test('complete puzzle at target → complete', () {
+      final p = makePuzzle('111\n111\n111');
+      expect(BoundingBoxConstraint('1.3.3').isCompleteFor(p), isTrue);
+    });
+
+    test('box at target but adjacent free cell can still grow it → not '
+        'complete', () {
+      // 3×3 black group with the col-3 cells free and `black`-capable: `apply`
+      // case 2 can still fire, so grey-out must wait.
+      final p = makePuzzle('1110\n1110\n1110');
+      expect(BoundingBoxConstraint('1.3.3').isCompleteFor(p), isFalse);
+    });
+
+    test('group smaller than target → not complete', () {
+      final p = makePuzzle('11\n11');
+      expect(BoundingBoxConstraint('1.3.3').isCompleteFor(p), isFalse);
+    });
+  });
+
+  group('BoundingBoxConstraint.generateAllParameters', () {
+    test('keeps boxes strictly inside the grid in both dimensions', () {
+      final params = BoundingBoxConstraint.generateAllParameters(
+        4,
+        7,
+        defaultDomain,
+        null,
+      );
+      // Each extent is bounded to [2, dim-1]: w∈[2,3] (2) × h∈[2,6] (5) = 10
+      // per colour, two colours.
+      expect(params.length, 2 * 5 * 2);
+      // No 1-wide/1-tall rule, and no box spanning a full grid dimension —
+      // the generator should attach none of these.
+      expect(params, isNot(contains('2.1.1'))); // 1-wide and 1-tall
+      expect(params, isNot(contains('1.4.6'))); // W == width
+      expect(params, isNot(contains('1.3.7'))); // H == height
+      expect(params, isNot(contains('1.4.7'))); // full grid
+      // Largest allowed box is one cell short of the grid in each dimension.
+      expect(params, contains('1.3.6'));
+      expect(params, contains('1.2.2'));
     });
   });
 }

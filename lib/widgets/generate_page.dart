@@ -7,6 +7,7 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/worker.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/flags_selector.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 
 class GeneratePage extends StatefulWidget {
   final Database database;
@@ -45,7 +46,16 @@ class _GeneratePageState extends State<GeneratePage> {
   Timer? _uiTimer;
 
   static List<(String, String)> get _ruleOptions =>
-      constraintRegistry.map((r) => (r.slug, r.label)).toList();
+      constraintUIRegistry.map((r) => (r.slug, r.slug)).toList();
+
+  Widget? _rulePreview(String slug) {
+    for (final r in constraintUIRegistry) {
+      if (r.slug == slug) {
+        return r.buildPreview(Theme.of(context).colorScheme.onSurface, 24);
+      }
+    }
+    return null;
+  }
 
   @override
   void dispose() {
@@ -115,6 +125,18 @@ class _GeneratePageState extends State<GeneratePage> {
           });
         case GeneratorTargetMessage():
           break;
+        case GeneratorAttemptMessage():
+          // Per-attempt telemetry is consumed only by the CLI (writes a row
+          // to `generator_stats.csv`). The in-app generator ignores it.
+          break;
+        case GeneratorRejectMessage():
+          // In-app generator UI doesn't surface a rejection breakdown
+          // (the CLI dashboard does). Counts are still implicit in the
+          // attempt counter vs. generated count.
+          break;
+        case GeneratorTimingsMessage():
+          // Stage timings are CLI-only diagnostics.
+          break;
       }
     });
   }
@@ -155,7 +177,10 @@ class _GeneratePageState extends State<GeneratePage> {
 
   void _playGenerated() {
     if (_generatedLines.isEmpty || widget.onPuzzleSelected == null) return;
-    // Set the database playlist to only the generated puzzles
+    // Direct playlist assignment: the player asked to play exactly these
+    // freshly-generated puzzles in generation order, so we deliberately
+    // skip preparePlaylist (which would re-filter and re-sort them). The
+    // ordering is transient; the next loadPuzzlesFile rebuilds normally.
     final generatedPuzzles = _generatedLines.map((l) => PuzzleData(l)).toList();
     widget.database.playlist = generatedPuzzles.sublist(1);
     Navigator.pop(context);
@@ -177,191 +202,197 @@ class _GeneratePageState extends State<GeneratePage> {
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.generateTitle)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Width
-            _buildSliderRow(loc.generateWidth, _width, 3, 10, (v) {
-              setState(() => _width = v);
-            }),
-            const SizedBox(height: 8),
-            // Height
-            _buildSliderRow(loc.generateHeight, _height, 3, 10, (v) {
-              setState(() => _height = v);
-            }),
-            const SizedBox(height: 16),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Width
+              _buildSliderRow(loc.generateWidth, _width, 3, 10, (v) {
+                setState(() => _width = v);
+              }),
+              const SizedBox(height: 8),
+              // Height
+              _buildSliderRow(loc.generateHeight, _height, 3, 10, (v) {
+                setState(() => _height = v);
+              }),
+              const SizedBox(height: 16),
 
-            Text(AppLocalizations.of(context)!.labelWidgetWantedrules),
-            FlagsSelector(
-              choices: _ruleOptions,
-              wanted: _requiredRules,
-              banned: _excludedRules,
-              apply: (value) {
-                setState(() {
-                  _requiredRules.clear();
-                  _requiredRules.addAll(value.$1);
-                  _excludedRules.clear();
-                  _excludedRules.addAll(value.$2);
-                });
-              },
-            ),
+              Text(AppLocalizations.of(context)!.labelWidgetWantedrules),
+              FlagsSelector(
+                choices: _ruleOptions,
+                wanted: _requiredRules,
+                banned: _excludedRules,
+                iconBuilder: _rulePreview,
+                apply: (value) {
+                  setState(() {
+                    _requiredRules.clear();
+                    _requiredRules.addAll(value.$1);
+                    _excludedRules.clear();
+                    _excludedRules.addAll(value.$2);
+                  });
+                },
+              ),
 
-            // Max time
-            _buildSliderRow(loc.generateMaxTime, _maxTimeSeconds, 10, 300, (v) {
-              setState(() => _maxTimeSeconds = v);
-            }, suffix: 's'),
-            const SizedBox(height: 8),
+              // Max time
+              _buildSliderRow(loc.generateMaxTime, _maxTimeSeconds, 10, 300, (
+                v,
+              ) {
+                setState(() => _maxTimeSeconds = v);
+              }, suffix: 's'),
+              const SizedBox(height: 8),
 
-            // Count
-            _buildSliderRow(loc.generateCount, _count, 1, 50, (v) {
-              setState(() => _count = v);
-            }),
-            const SizedBox(height: 16),
+              // Count
+              _buildSliderRow(loc.generateCount, _count, 1, 50, (v) {
+                setState(() => _count = v);
+              }),
+              const SizedBox(height: 16),
 
-            // Target playlist
-            Row(
-              children: [
-                SizedBox(width: 120, child: Text(loc.targetPlaylist)),
-                Expanded(
-                  child: DropdownButton<String>(
-                    value: _targetPlaylist,
-                    isExpanded: true,
-                    items: [
-                      for (final (key, label)
-                          in widget.database.getWritablePlaylistOptions(
-                            loc.collectionMyPuzzles,
-                          ))
-                        DropdownMenuItem(value: key, child: Text(label)),
-                      DropdownMenuItem(
-                        value: '__new__',
-                        child: Text(
-                          loc.newPlaylist,
-                          style: const TextStyle(fontStyle: FontStyle.italic),
+              // Target playlist
+              Row(
+                children: [
+                  SizedBox(width: 120, child: Text(loc.targetPlaylist)),
+                  Expanded(
+                    child: DropdownButton<String>(
+                      value: _targetPlaylist,
+                      isExpanded: true,
+                      items: [
+                        for (final (key, label)
+                            in widget.database.getWritablePlaylistOptions(
+                              loc.collectionMyPuzzles,
+                            ))
+                          DropdownMenuItem(value: key, child: Text(label)),
+                        DropdownMenuItem(
+                          value: '__new__',
+                          child: Text(
+                            loc.newPlaylist,
+                            style: const TextStyle(fontStyle: FontStyle.italic),
+                          ),
+                        ),
+                      ],
+                      onChanged: _isGenerating
+                          ? null
+                          : (v) {
+                              if (v == '__new__') {
+                                _createNewPlaylist();
+                              } else if (v != null) {
+                                setState(() => _targetPlaylist = v);
+                              }
+                            },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Generate / Stop button
+              if (!_isGenerating)
+                ElevatedButton.icon(
+                  onPressed: _startGeneration,
+                  icon: const Icon(Icons.auto_fix_high),
+                  label: Text(loc.generateStart),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.cyan,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                )
+              else
+                ElevatedButton.icon(
+                  onPressed: _stopGeneration,
+                  icon: const Icon(Icons.stop),
+                  label: Text(loc.generateStop),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+
+              const SizedBox(height: 16),
+
+              // Progress section
+              if (_isGenerating || _generated > 0) ...[
+                LinearProgressIndicator(
+                  value: _count > 0 ? _generated / _count : 0,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  loc.generateProgress(_generated, _count),
+                  textAlign: TextAlign.center,
+                ),
+                if (_isGenerating && _stopwatch != null)
+                  Text(
+                    '${_stopwatch!.elapsed.inSeconds}s / ${_maxTimeSeconds}s',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                if (_isGenerating && _constraintsTotal > 0)
+                  Text(
+                    '${loc.generateConstraints}: $_constraintsTried / $_constraintsTotal (${(_currentRatio * 100).toInt()}%)',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                if (_isDone && _generated > 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      loc.generateComplete,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _playGenerated,
+                          icon: const Icon(Icons.play_arrow),
+                          label: Text(loc.generatePlay),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => setState(() {
+                            _isDone = false;
+                          }),
+                          icon: const Icon(Icons.auto_fix_high),
+                          label: Text(loc.generateMore),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
                         ),
                       ),
                     ],
-                    onChanged: _isGenerating
-                        ? null
-                        : (v) {
-                            if (v == '__new__') {
-                              _createNewPlaylist();
-                            } else if (v != null) {
-                              setState(() => _targetPlaylist = v);
-                            }
-                          },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Generate / Stop button
-            if (!_isGenerating)
-              ElevatedButton.icon(
-                onPressed: _startGeneration,
-                icon: const Icon(Icons.auto_fix_high),
-                label: Text(loc.generateStart),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.cyan,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              )
-            else
-              ElevatedButton.icon(
-                onPressed: _stopGeneration,
-                icon: const Icon(Icons.stop),
-                label: Text(loc.generateStop),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-
-            const SizedBox(height: 16),
-
-            // Progress section
-            if (_isGenerating || _generated > 0) ...[
-              LinearProgressIndicator(
-                value: _count > 0 ? _generated / _count : 0,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                loc.generateProgress(_generated, _count),
-                textAlign: TextAlign.center,
-              ),
-              if (_isGenerating && _stopwatch != null)
-                Text(
-                  '${_stopwatch!.elapsed.inSeconds}s / ${_maxTimeSeconds}s',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-              if (_isGenerating && _constraintsTotal > 0)
-                Text(
-                  '${loc.generateConstraints}: $_constraintsTried / $_constraintsTotal (${(_currentRatio * 100).toInt()}%)',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              if (_isDone && _generated > 0) ...[
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    loc.generateComplete,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _playGenerated,
-                        icon: const Icon(Icons.play_arrow),
-                        label: Text(loc.generatePlay),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
+                ],
+                if (_isDone && _generated == 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      loc.generateFailed,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => setState(() {
-                          _isDone = false;
-                        }),
-                        icon: const Icon(Icons.auto_fix_high),
-                        label: Text(loc.generateMore),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              if (_isDone && _generated == 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    loc.generateFailed,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.orange,
-                      fontWeight: FontWeight.bold,
-                    ),
                   ),
-                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

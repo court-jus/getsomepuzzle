@@ -21,10 +21,16 @@ grid, then collects the constraints that characterise it best.
 ### 1.1. Pipeline
 
 1. **Build a random solution grid.** Each cell is filled with a random domain
-   value (`{1, 2}`). Special case for the `SH` (Shape) constraint: when SH
-   is required or pushed by the equilibrium target, the grid is pre-seeded
-   with a valid Shape motif before completion, so a Shape constraint will
-   always be satisfiable.
+   value (`{1, 2}`) by `preFillRegular`. Themed pre-fills replace the
+   random grid for specific scenarios: `preFillSh` when SH is required
+   (or pushed by the equilibrium target), `preFillPath` when
+   `pathBasedScenario` is set, `preFillSy` when `syBasedScenario` is
+   set. Each themed pre-fill stamps a `scenario:<name>` suffix on the
+   emitted v2 line and may exit early with `pathPrefillFailed` /
+   `syPrefillFailed` if it can't converge within its retry budget.
+   See `equilibrium.md` "Pre-fill scenarios" for the dispatch table
+   and [`path_based.md`](path_based.md) / [`prefill_sy.md`](prefill_sy.md) for the
+   themed algorithms.
 
 2. **Pre-fill a few cells.** A random ratio in `[0.75, 1.0]` decides what
    fraction of cells stays empty for the player; the others are locked
@@ -32,18 +38,35 @@ grid, then collects the constraints that characterise it best.
    as hints.
 
 3. **Enumerate every valid constraint.** For each registered slug
-   (`FM, PA, RC, GS, LT, QA, SY, DF, SH, CC, GC, NC, EY` — see
-   `constraintRegistry` in `lib/getsomepuzzle/constraints/registry.dart`
-   for the authoritative list), `generateAllParameters` yields every
-   parametric instance for the grid dimensions; the generator keeps only
-   the ones that **verify against the solution grid**. This is the "true"
-   constraint set for that solution.
+   (`FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC, RC`),
+   `generateAllParameters` yields every parametric instance for the
+   grid dimensions; the generator keeps only the ones that **verify
+   against the solution grid**. This is the "true" constraint set for
+   that solution. The candidate enumeration honours `--allow`
+   (whitelist) and `--ban` (blacklist) CLI flags: the effective set is
+   `allow.difference(ban)`, or every registered slug minus `ban` when
+   `--allow` is unset.
 
-4. **Sort the candidates.** Random shuffle, then a stable sort that pushes
-   `prioritySlugs` (= `requiredRules ∪ preferredSlugs`) to the front and
-   breaks ties by a global usage counter (rare slugs first). `requiredRules`
-   is what the user demanded; `preferredSlugs` is what the equilibrium /
-   warm-up targeting *would like* to see, but never strictly enforces.
+4. **Sort the candidates.** Random shuffle, then a stable three-level sort:
+   - **Level 1 — priority**: `prioritySlugs` (= `requiredRules ∪
+     preferredSlugs`) bubble to the front. `requiredRules` is what the user
+     demanded via `--require`; `preferredSlugs` is what the equilibrium /
+     warm-up target *would like* to see, but never strictly enforces.
+   - **Level 2 — corpus deficit** (descending): among non-priority candidates,
+     slugs whose share in the corpus falls furthest below their target
+     (`deficitScore = expected_share − observed_share`, clamped to ≥ 0)
+     come next. This soft secondary bias pulls in other globally
+     under-represented slugs alongside the one pinned by the target — not
+     just the target slug alone.
+   - **Level 3 — local usage** (ascending): tie-breaker. Slugs already present
+     fewer times in the puzzle-under-construction come first, promoting
+     intra-puzzle diversity.
+
+   The deficit snapshot (`GeneratorConfig.slugDeficitScores`) is computed
+   once per attempt in `worker_io.dart` via `slugDeficits(equiStats,
+   universe)` before the call to `generateOne`. It is `null` during warm-up
+   and when equilibrium is disabled, which collapses the sort back to the
+   original two-level ordering (priority + local usage).
 
 5. **Greedy cherry-picking.** While the puzzle is not fully determined:
    - Pop the next candidate.
@@ -54,8 +77,10 @@ grid, then collects the constraints that characterise it best.
    - If `ratio_after < ratio_before`, the constraint is "useful" and is
      kept.
    - After each accepted constraint, the remaining candidates are
-     reshuffled and re-sorted by *local* usage (favouring diversity
-     within the puzzle).
+     reshuffled and re-sorted by corpus deficit (descending) then *local*
+     usage (ascending). The priority layer is absent from the re-sort
+     because the priority candidate was consumed at the very start of the
+     loop.
 
 6. **Finalisation.**
    - If the residual ratio reaches 0: the puzzle is fully determined by
@@ -74,6 +99,21 @@ grid, then collects the constraints that characterise it best.
      to assign a difficulty level — no extra solve is performed.
    - `generateOne` returns `({String line, PuzzleLevel level})?` so that
      callers receive the classification alongside the serialised puzzle.
+
+7. **Target-collection filter** (optional, `--target-collection NAME`).
+   When the player has asked for a specific level, the just-classified
+   puzzle is routed (each branch maps to a `GenerationRejectReason`):
+   - level matches the target → emit.
+   - level is *lower* (too easy) → reject with `targetTooEasy`; the
+     caller retries with a fresh seed.
+   - level is *higher* (too hard) → enter the **easing loop** described
+     in § 4. The loop attempts to lower the trace difficulty by adding
+     constraints, bounded by `--easing-budget` (default 30 s). If
+     easing plateaus or times out, reject with `targetEasingFailed`.
+   - level is `overfilled`, `overfilledEasy`, or `undetermined` →
+     reject with `targetOutOfCascade`. The prefill ratio doesn't
+     change with more constraints, so these puzzles cannot be eased
+     into a playable collection.
 
 ### 1.2. Why this design
 
@@ -106,70 +146,96 @@ grid, then collects the constraints that characterise it best.
   notable structure, which under-uses structural constraints
   (`GS`, `SY`, `SH`, `GC`).
 
-### 1.4. Boss mode
+### 1.4. Reject reasons
 
-For very large grids (target: 30×20, ~600 cells), the standard pipeline
-above becomes intractable. A few targeted changes are activated when
-`GeneratorConfig.useBossPrefill = true` (CLI flag `--boss`):
+When a `generateOne` attempt returns `null`, the generator now reports
+*why* via the `onReject(GenerationRejectReason, Puzzle)` callback.
+`GenerationRejectReason` (see `generator.dart`) enumerates the exits:
 
-- **Seed-and-grow prefill** (step 1). Replaces the random `{1,2}` grid
-  with a deterministic "plant seeds, grow each one to ~15–25 cells"
-  algorithm. Yields coherent blobs instead of white-noise. GS
-  constraints are posted on the resulting components, capped at 3 per
-  component to avoid redundancy. See [`boss.md`](boss.md) for details.
+| Reason                | Trigger                                                                              |
+|-----------------------|--------------------------------------------------------------------------------------|
+| `noCandidates`        | `generateAllParameters ∩ verify(solution)` was empty (extreme `--allow`/`--ban`).    |
+| `ratioTooHigh`        | Iterative loop finished but `solve()` left > 25 % of cells free.                    |
+| `requiredMissing`     | A `--require RULES` slug was never accepted by the iterative cherry-pick.           |
+| `notUnique`           | Defensive: trace replay didn't reach a clean completion. Should be unreachable after the ratio check. |
+| `targetOutOfCascade`  | `--target-collection` set and the puzzle classified into `overfilled`, `overfilledEasy`, or `undetermined`. |
+| `targetTooEasy`       | `--target-collection` set and the puzzle classified strictly easier than the target (can't be made harder by adding constraints). |
+| `targetEasingFailed`  | `--target-collection` set and `Puzzle.simplify` couldn't reach the target within `--easing-budget`. |
+| `cancelled`           | The caller's `shouldStop` callback fired between candidates, mid-`solve()`, or during the finalisation `solveExplained()`. |
+| `attemptTimeout`      | The per-attempt wall-clock budget (`maxAttemptTime`) was exceeded. Distinct from `cancelled` for post-run analysis. |
+| `attemptStalled`      | The no-progress watchdog (`maxStall`) fired: iterative loop ran for `maxStall` without accepting any new candidate. |
+| `pathPrefillFailed`   | `preFillPath` exhausted its retry budget without producing a valid puzzle (catch-all when `dominantCause` is null). |
+| `pathPlacementFailed` | `preFillPath` could not place at least 2 anchors for some letter in the residual graph (all retries failed at region construction). |
+| `pathRoutingTimeout`  | `preFillPath`'s DPLL background completion hit the `completionTimeoutMs` wall-clock budget. |
+| `pathRoutingInfeasible` | `preFillPath`'s DPLL background completion proved the current backbone infeasible (search exhausted). |
+| `syPrefillFailed`     | `preFillSy` exhausted its retry budget without producing a deductively-unique puzzle.  |
 
-- **Candidate cap per slug** (step 3). On a 30×20 grid, GS alone
-  produces ~8 400 candidates. The generator now shuffles each slug's
-  parameter list and keeps only the first `maxConstraintParameters`
-  (default 1 000) that verify against the solution; the rest goes into
-  a per-slug **reserve** consumed on demand (`refillFromReserve`) when
-  the iterative loop runs out of candidates.
+The worker (`worker_io.dart`) persists every rejected puzzle to
+`assets/<reason>.txt` for post-run analysis. The path is currently
+hard-coded; see the "Caveats" section below. Per-reason counters surface
+in the `FAILURE in Nms (..., reason=<name>)` line the worker logs after
+each failed attempt.
 
-- **Batch addition in the greedy loop** (step 5). Instead of
-  testing one candidate at a time (2 solves per candidate), boss mode
-  groups candidates by batches of `addConstraintsInBatch` (default 30).
-  Trade-off: the final puzzle may carry "passenger" constraints (kept
-  because the batch as a whole helped, not because each member was
-  strictly required). Acceptable because boss puzzles are not asked to
-  be minimal. An anti-infinite-loop guard rejects after
-  `maxConsecutiveFailedBatches` (default 20) rejected batches in a row,
-  triggering a reserve refill or stopping.
+**Caveats on reject persistence:**
 
-- **Incremental `bossSolvedState`** (step 5). Standard mode re-clones
-  `pu` and re-solves from scratch on every test (`solve(pre) → ratioBefore`,
-  `solve(pre + candidate) → ratioAfter`). Deductive propagation is
-  monotone — once a cell is deduced from constraint set C₁, it stays
-  valid under any superset C₁∪C₂. Boss mode exploits this: a persistent
-  `bossSolvedState` holds the cumulative post-propagation state, each
-  batch is tested on `bossSolvedState.clone() + batch`, and on accept
-  the just-solved clone is promoted to the new state. **One solve per
-  batch instead of two.**
+- The path is `assets/<reason>.txt` relative to the working directory
+  of the worker process. Callers not running from the repo root may
+  create a stray `assets/` next to their CWD. Plan to make this
+  configurable via `GeneratorConfig`.
+- Append writes are not atomic across worker isolates when a v2 line
+  exceeds `PIPE_BUF` (4096 bytes on Linux); large lines from multiple
+  workers can theoretically interleave. Acceptable for human inspection
+  but not for downstream re-ingestion without a sanity pass.
 
-- **Propagation-only solves** (step 5 and step 6). `_forceOneCell()`
-  clones the puzzle once per `(free cell, value)` pair — on a 600-cell
-  grid that's >1 000 clones per `findAMove` call. Boss mode passes
-  `tryForce: false` to every `solve()` in the iterative loop and to the
-  final ratio check. Propagation may plateau higher than full-solve
-  would, but the batch loop compensates by adding more constraints.
-
-- **No constraint-set cleanup**. `sortConstraintsByDifficulty` (the
-  final easier-first reorder) is skipped in boss mode — sort cost is
-  non-trivial on big grids, and the easier-first invariant isn't
-  required of boss puzzles.
-
-The instrumentation hooks (`onLog` on `generateOne`, `onIter` /
-`onForceProgress` on `Puzzle.solve` / `findAMove`) were added to make
-the boss flow debuggable on these long generations.
-
-## 2. Equilibrium
+## 2. Equilibrium and the per-worker main loop
 
 `bin/generate.dart` invokes the generator inside a per-iteration loop
-that rebalances the corpus across four axes (slug, number of types,
-pair of types, size). The full description lives in
+that rebalances the corpus across five axes (slug, number of types,
+pair of types, size, profile). The full description lives in
 [`equilibrium.md`](equilibrium.md). In short: every iteration picks the
 most under-represented `(axis, category)`, configures the generator
 accordingly, and lets the greedy algorithm produce a puzzle for that
 target.
+
+### 2.1. Infeasibility skip
+
+Before emitting the `'target'` event — and therefore before any attempt
+counter is incremented — the worker builds an `AttemptKey` (the tuple
+`(target_key, sorted_preferred_slugs, scenario, size_bucket)`) and checks
+it against two sources:
+
+1. **Persistent seed blacklist** — serialized keys loaded from
+   `generator_stats.csv` at CLI startup via `readPersistentBlacklist`.
+   Covers combos that historically produced zero successes across past
+   runs (threshold: `--blacklist-min-attempts`, default 30).
+2. **In-session adaptive tracker** — an `InfeasibilityTracker` owned by
+   each worker that accumulates `{attempts, successes}` per key within
+   the current run (threshold: `--blacklist-adaptive-k`, default 20).
+
+If either source flags the combo as infeasible, the iteration executes
+`continue` immediately — no `'target'` event, no `'attempt'` event, no
+CSV row. From the CLI's point of view the attempt never happened. A
+consecutive-skip counter enforces a safety brake (`--blacklist-skip-safety`,
+default 100): after that many consecutive skips, the next blacklisted combo
+runs anyway to prevent deadlock.
+
+Full details on `AttemptKey` granularity, the `generator_stats.csv` schema,
+and the CLI flags are in [`feasibility.md`](feasibility.md).
+
+### 2.2. Per-attempt telemetry
+
+After every `generateOne` call (success or abandon) the worker emits a
+`GeneratorAttemptMessage` (`lib/getsomepuzzle/generator/messages.dart`).
+The CLI receives it in the `GeneratorAttemptMessage` branch of its consumer
+loop and appends one row to `generator_stats.csv` (append-only;
+header written only on first creation). Multiple CLI runs accumulate rows
+naturally, and concurrent workers serialize their CSV writes through a
+`statsChain` Future to avoid interleaving.
+
+The CSV schema and its role in seeding the next run's blacklist are described
+in [`feasibility.md`](feasibility.md). The in-app generator
+(`lib/widgets/generate_page.dart`) ignores `GeneratorAttemptMessage` with a
+no-op case — the CSV is CLI-only telemetry.
 
 ## 3. Post-generation scoring and polishing
 
@@ -251,23 +317,72 @@ These two tools are intentionally separate from the generator inner
 loop: post-processing is opt-in and runs offline on collections, not on
 every interactive generation.
 
-## 4. Future directions
+The CLI also reorders constraints by trace-min `Move.complexity` via
+`Puzzle.sortConstraintsByDifficulty` (`bin/recompute.dart`,
+`bin/dedup_puzzles.dart`, `bin/aggregate_player_stats.dart`). Shipped
+puzzles therefore carry their constraints in "easiest first" order on
+disk, which in turn drives what the hint system surfaces — see
+[`algorithm.md`](algorithm.md) § "Constraint ordering".
 
-The bigger ideas explored during the trace-score design are tracked as
-TODOs in [`todo.md`](todo.md):
+## 4. Easing loop (`Puzzle.simplify`)
 
-- Extend the score by separating "true C2" interleaving from accidental
-  switches (would need a second solver pass).
-- Detect *meta-inferences* (`M`): a new constraint logically implied by
-  the existing ones, independent of the grid (e.g. `FM:112 + FM:122`
-  implies `FM:102`).
-- Theme-first generation: pick a thematic skeleton (`SY`, `SH`,
-  FM-duo, …) and search for a grid that makes it uniquely solvable —
-  the inverse of the current grid-first approach.
-- Local search on the joint `(grid, constraint set)` space, with a
-  tunable quality function that combines trace score, parsimony, and
-  starting-point guarantees.
+When `--target-collection NAME` is set and a freshly-generated puzzle
+classifies at a higher difficulty tier than `NAME`, the worker invokes
+`Puzzle.simplify(targetLevel: NAME, maxTime: easingBudget)` to try to
+lower the puzzle's difficulty by **adding** constraints. (Adding a
+constraint can only restrict the search space, so the trace can only
+get shorter or simpler — never harder.)
 
-These are not blocking the current pipeline. The combination of
-greedy generation + equilibrium bias + post-generation polish covers
-the practical needs for the corpus shipped today.
+### 4.1. Strategy: indispensable-by-exploration
+
+Naïvely adding every candidate that doesn't break uniqueness reaches
+the target but bloats the constraint list with "scaffolding" rules. The
+adopted strategy is surgical:
+
+1. Trace `this` via `solveExplained()` and classify. If the level is
+   already at or below the target, stop.
+2. On a **clone**, naively expand: add candidates one by one until the
+   clone's classified level drops by at least one tier. The candidate
+   that triggered the drop is marked **indispensable** — every
+   candidate added before it served only as *context* and is discarded.
+3. Graft only the indispensable onto the original via
+   `prependConstraint`. Front insertion is required so the cheaper
+   deduction consults `apply` before any pre-existing dominant
+   constraint (e.g. an SH that the player asked for via `--require`).
+4. Reclassify the original. Whether or not its level actually dropped
+   (the indispensable may have needed clone-context to fire alone),
+   loop back to step 1.
+
+Candidates are drawn from `generateAllParameters` over `allowedSlugs`
+(default: every registered slug), filtered to those compatible with
+the puzzle's unique solution and not already present. Stable
+serialize-order so the same puzzle yields the same simplification trace.
+
+### 4.2. Important invariants
+
+- **Mutates `this`** by prepending each accepted indispensable. Cell
+  values (including readonly) are never modified.
+- **`removeUselessRules` is never invoked.** Calling it would strip the
+  very constraints we just added.
+- **Bounded.** The loop honours both a `maxSteps` cap (default 50) and
+  a wall-clock `maxTime` budget (the CLI `--easing-budget`, default
+  30 s). The `shouldStop` callback lets the worker cancel from outside
+  if its global watchdog fires.
+- **Returns `SimplifyResult`** — `additionsCount`, the final
+  `PuzzleLevel`, a `reachedTarget` flag, and the solve trace of the
+  final state (so the caller can reuse it for
+  `sortConstraintsByDifficulty` without paying for another
+  `solveExplained()`).
+
+## 5. Future directions
+
+A handful of bigger ideas were sketched during the trace-score
+design — refining the C2-interleaving signal, detecting
+meta-inferences (`M`: a new constraint logically implied by the
+existing ones, independent of the grid), theme-first generation
+(skeleton-first instead of grid-first), and local search on the joint
+`(grid, constraint set)` space.
+
+None are blocking. The combination of greedy generation + equilibrium
+bias + post-generation polish covers the practical needs for the
+corpus shipped today.

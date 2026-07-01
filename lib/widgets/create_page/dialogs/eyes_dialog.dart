@@ -10,13 +10,7 @@ Future<EyesConstraint?> showEyesDialog(
   required int height,
 }) async {
   final loc = AppLocalizations.of(context)!;
-  final row = cellIdx ~/ width;
-  final col = cellIdx % width;
-  final maxCount =
-      (col > 0 ? 1 : 0) +
-      (col < width - 1 ? 1 : 0) +
-      (row > 0 ? 1 : 0) +
-      (row < height - 1 ? 1 : 0);
+  final maxCount = (width - 1) + (height - 1);
   final result = await showColorCountDialog(
     context,
     title: "Eyes",

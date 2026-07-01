@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 
 void main() {
@@ -69,6 +70,16 @@ void main() {
       // Single-type puzzle does NOT add to pair counts.
       expect(stats.totalPairs, 1);
     });
+
+    test('size axis is orientation-agnostic: 4x5 and 5x4 share one bin', () {
+      var stats = EquilibriumStats.empty();
+      stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 5);
+      stats = stats.withPuzzle(slugs: {'FM'}, width: 5, height: 4);
+      // Both transposes land in the canonical (4, 5) bin; the transpose key
+      // never appears.
+      expect(stats.sizeCounts[(4, 5)], 2);
+      expect(stats.sizeCounts[(5, 4)], isNull);
+    });
   });
 
   group('targetShare', () {
@@ -79,11 +90,10 @@ void main() {
     });
 
     test('ntypes profile reads from kTargetNTypesProfile (1..5 only)', () {
-      expect(targetShare(Axis.ntypes, 1, 0), 0.25);
+      expect(targetShare(Axis.ntypes, 1, 0), 0.35);
       expect(targetShare(Axis.ntypes, 2, 0), 0.30);
       expect(targetShare(Axis.ntypes, 5, 0), 0.10);
-      // 6+ reliquat bucket has share 0 — never pushed.
-      expect(targetShare(Axis.ntypes, 6, 0), 0.0);
+      expect(targetShare(Axis.ntypes, 6, 0), 0.02);
       expect(targetShare(Axis.ntypes, 99, 0), 0.0);
     });
   });
@@ -98,10 +108,16 @@ void main() {
         maxHeight: 5,
       );
       expect(u.allowedSlugs, ['FM', 'SH']);
-      // Width: 3..10 = 8 values; height: 4..5 = 2 values; total = 16.
-      expect(u.allowedSizes.length, 8 * 2);
-      expect(u.allowedSizes.contains((kMinSide, 4)), isTrue);
-      expect(u.allowedSizes.contains((kMaxSide, 5)), isTrue);
+      // Width 3..10 (8) × height 4..5 (2) = 16 ordered pairs, but sizes are
+      // canonicalized to width ≤ height and deduped, so the only transpose
+      // collision is 5x4 ≡ 4x5 → 15 distinct bins.
+      expect(u.allowedSizes.length, 15);
+      expect(u.allowedSizes.contains((kMinSide, 4)), isTrue); // 3x4
+      // 10x5 is stored canonically as 5x10, never as 10x5.
+      expect(u.allowedSizes.contains((5, kMaxSide)), isTrue); // 5x10
+      expect(u.allowedSizes.contains((kMaxSide, 5)), isFalse);
+      // Every bin is canonical (width ≤ height).
+      expect(u.allowedSizes.every((s) => s.$1 <= s.$2), isTrue);
     });
 
     test('allowedPairs are sorted and unordered (a<b only)', () {
@@ -120,21 +136,25 @@ void main() {
   group('pickTarget', () {
     // 6 slugs (gap each ≤ 1/6 ≈ 0.167 < 0.30) and 9 sizes (3x3..5x5,
     // gap each ≤ 1/9 ≈ 0.111 < 0.30) so ntypes=2 (target 0.30) is the
-    // dominant gap on an empty corpus.
+    // dominant gap on an empty corpus. The domain axis is frozen to [2]
+    // so its 0.40 gap (the corpus here is all-dom2) doesn't shadow the
+    // axes these tests actually exercise.
     final universe = TargetUniverse(
       allowedSlugs: ['FM', 'PA', 'GS', 'SY', 'QA', 'CC'],
       minWidth: 3,
       maxWidth: 5,
       minHeight: 3,
       maxHeight: 5,
+      allowedDomains: const [2],
     );
 
     test('on an empty corpus, picks the bin with highest expected share', () {
-      // total=0 → observed=0 → gap = expected. With this universe,
-      // ntypes=2 (target 0.30) is the maximum.
+      // total=0 → observed=0 → gap = expected. The profile axis
+      // dominates on an empty corpus: classic target is 0.90 (well
+      // above ntypes=2 at 0.30 or any slug/size share).
       final t = pickTarget(EquilibriumStats.empty(), universe);
-      expect(t, isA<NTypesTarget>());
-      expect((t as NTypesTarget).n, 2);
+      expect(t, isA<ProfileTarget>());
+      expect((t as ProfileTarget).profile, ProfileCategory.classic);
     });
 
     test('over-represented categories are ignored (gap clamped to 0)', () {
@@ -162,6 +182,7 @@ void main() {
         maxWidth: 4,
         minHeight: 4,
         maxHeight: 4,
+        allowedDomains: const [2], // keep the 0.40 domain gap out of the race
       );
       var stats = EquilibriumStats.empty();
       stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
@@ -176,15 +197,15 @@ void main() {
 
     test('blacklist filters out the requested target', () {
       final stats = EquilibriumStats.empty();
-      // Without blacklist: top is ntypes=2.
+      // Without blacklist: top is ProfileTarget(classic) (gap 0.90).
       final top = pickTarget(stats, universe)!;
-      expect(top, isA<NTypesTarget>());
-      expect((top as NTypesTarget).n, 2);
-      // Blacklist ntypes=2 → a different target wins.
+      expect(top, isA<ProfileTarget>());
+      expect((top as ProfileTarget).profile, ProfileCategory.classic);
+      // Blacklist that target → a different target wins.
       final next = pickTarget(
         stats,
         universe,
-        blacklistedKeys: {const NTypesTarget(2).key},
+        blacklistedKeys: {const ProfileTarget(ProfileCategory.classic).key},
       );
       expect(next!.key, isNot(equals(top.key)));
     });
@@ -284,10 +305,11 @@ void main() {
 
     test('biased toward positive-gap bins on a sample of 1000 draws', () {
       // 100 puzzles all on (3,3): that bin is heavily over-represented; the
-      // other three each have a positive gap (their target share is
-      // unobserved). With Option B's asymmetric Gaussian on area, (4,4)
-      // (area 16, closest to peak 20) carries the largest gap, so it gets
-      // the most picks — but all three still get sampled at least once.
+      // remaining canonical bins each have a positive gap (target share
+      // unobserved). The 3..4 × 3..4 universe has only THREE bins —
+      // (3,3), (3,4), (4,4) — because 4x3 is canonicalized into 3x4. With
+      // the asymmetric Gaussian on area, (4,4) (area 16, closest to peak 20)
+      // carries the largest gap, so it gets the most picks.
       var stats = EquilibriumStats.empty();
       for (int i = 0; i < 100; i++) {
         stats = stats.withPuzzle(slugs: {'FM'}, width: 3, height: 3);
@@ -300,14 +322,14 @@ void main() {
       }
       // (3,3) is saturated → never returned.
       expect(counts[(3, 3)] ?? 0, 0);
-      // The other three have positive gaps, all eligible.
+      // pickWeightedSize only ever returns canonical bins — the 4x3 transpose
+      // is never produced; its draws fold into (3,4).
+      expect(counts[(4, 3)] ?? 0, 0);
+      // Both remaining bins have positive gaps, so both get sampled.
       expect(counts[(3, 4)] ?? 0, greaterThan(0));
-      expect(counts[(4, 3)] ?? 0, greaterThan(0));
       expect(counts[(4, 4)] ?? 0, greaterThan(0));
       // (4,4) has the biggest gap → most-picked.
-      final cMax = counts[(4, 4)] ?? 0;
-      expect(cMax, greaterThan(counts[(3, 4)] ?? 0));
-      expect(cMax, greaterThan(counts[(4, 3)] ?? 0));
+      expect(counts[(4, 4)] ?? 0, greaterThan(counts[(3, 4)] ?? 0));
     });
   });
 
@@ -356,10 +378,10 @@ void main() {
   group('pickWarmupConfig', () {
     final allowed = const ['FM', 'PA', 'GS', 'SY', 'QA'];
 
-    test('clamps grid sides to kWarmupMaxWidth/Height', () {
+    test('samples from full user range weighted by Gaussian-on-area', () {
       final rng = Random(0);
-      // User asks for 3..10 / 3..10 — warm-up clamps the upper end.
-      for (int i = 0; i < 50; i++) {
+      bool seenLarge = false; // width > 4 or height > 5 (was impossible before)
+      for (int i = 0; i < 100; i++) {
         final wc = pickWarmupConfig(
           minWidth: 3,
           maxWidth: 10,
@@ -369,30 +391,31 @@ void main() {
           baseRequired: const {},
           rng: rng,
         );
-        expect(wc.width, inInclusiveRange(3, kWarmupMaxWidth));
-        expect(wc.height, inInclusiveRange(3, kWarmupMaxHeight));
+        expect(wc.width, inInclusiveRange(3, 10));
+        expect(wc.height, inInclusiveRange(3, 10));
+        if (wc.width > 4 || wc.height > 5) seenLarge = true;
       }
+      // With the Gaussian-weighted distribution, larger sizes should appear
+      // within 100 draws (the right tail is wide enough).
+      expect(seenLarge, isTrue);
     });
 
-    test(
-      'falls back to user min when it exceeds the cap (still respects --min-width)',
-      () {
-        // User explicitly asked for ≥7 wide grids — we can't honor the warm-up
-        // cap, so the floor wins (8 in this case is locked).
-        final rng = Random(1);
-        final wc = pickWarmupConfig(
-          minWidth: 8,
-          maxWidth: 8,
-          minHeight: 8,
-          maxHeight: 8,
-          baseAllowedSlugs: allowed,
-          baseRequired: const {},
-          rng: rng,
-        );
-        expect(wc.width, 8);
-        expect(wc.height, 8);
-      },
-    );
+    test('respects user-specified exact size when min==max', () {
+      // When the user pins width and height to a single value, warm-up
+      // must use that exact size (the weighted pool has one candidate).
+      final rng = Random(1);
+      final wc = pickWarmupConfig(
+        minWidth: 8,
+        maxWidth: 8,
+        minHeight: 8,
+        maxHeight: 8,
+        baseAllowedSlugs: allowed,
+        baseRequired: const {},
+        rng: rng,
+      );
+      expect(wc.width, 8);
+      expect(wc.height, 8);
+    });
 
     test(
       'pool size is drawn from kWarmupNTypesPool when baseRequired is empty',
@@ -454,6 +477,578 @@ void main() {
       expect(kWarmupNTypesPool, contains(wc.allowedSlugs.length));
       expect(wc.allowedSlugs.contains('XX'), isFalse);
       expect(wc.allowedSlugs.contains('YY'), isFalse);
+    });
+  });
+
+  group('detectPuzzleProfile', () {
+    // Base 3x3 line with 7 strict fields. We append `_scenario:…` and/or
+    // `_p:…` to exercise the different suffix combinations.
+    const base = 'v2_12_3x3_100000000_FM:11_1:122122122_0';
+
+    test('reads scenario:syBased as the last suffix', () {
+      // Authoritative case: a freshly generated puzzle carries
+      // `_scenario:syBased` at the end of its line.
+      expect(
+        detectPuzzleProfile('${base}_scenario:syBased'),
+        ProfileCategory.syBased,
+      );
+    });
+
+    test('reads scenario: before a play-state suffix (order-agnostic)', () {
+      // After `lineWithPlayState` the play-state is appended and the
+      // scenario marker shifts up. Detection must still find it.
+      expect(
+        detectPuzzleProfile('${base}_scenario:pathBased_p:000000000'),
+        ProfileCategory.pathBased,
+      );
+    });
+
+    test('reads scenario: after a play-state suffix (order-agnostic)', () {
+      // A v2 line can carry `p:` before `scenario:` (e.g. produced by a
+      // tool that always appends play-state first). Position must not
+      // matter as long as both prefixes are recognised.
+      expect(
+        detectPuzzleProfile('${base}_p:000000000_scenario:sh'),
+        ProfileCategory.sh,
+      );
+    });
+
+    test('legacy line with only p: now detects local (FM-dominant)', () {
+      // The base line has FM:11 as the only constraint. The new emergent
+      // detection sees FM in the `local` group ({DF, FM}) at 1.0 ≥ kEmergentThreshold
+      // and classifies it as `local` instead of `classic`.
+      expect(detectPuzzleProfile('${base}_p:000000000'), ProfileCategory.local);
+    });
+
+    test('legacy line without any suffix now detects local (FM-dominant)', () {
+      // Same reasoning: FM:11 alone crosses the 80 % threshold for the `local`
+      // emergent bucket. Puzzles whose slugs are all from {DF, FM} are `local`.
+      expect(detectPuzzleProfile(base), ProfileCategory.local);
+    });
+
+    test('two well-spread LT constraints alone are no longer pathBased', () {
+      // Regression on the old heuristic: LT is not in any emergent group, so
+      // the puzzle resolves to `classic`.
+      const ltLine =
+          'v2_12_4x4_2210000010000000_LT:A.0.5;LT:B.10.15_1:1212121212121212_2';
+      expect(detectPuzzleProfile(ltLine), ProfileCategory.classic);
+    });
+
+    test('unknown scenario name runs emergent detection (FM→local)', () {
+      // `scenario:martian` is not pathBased/syBased/sh, so the function does
+      // NOT court-circuit. Emergent detection runs and FM:11 triggers `local`.
+      expect(
+        detectPuzzleProfile('${base}_scenario:martian'),
+        ProfileCategory.local,
+      );
+    });
+  });
+
+  group('slugDeficits', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'PA', 'GS', 'SY'],
+      minWidth: 4,
+      maxWidth: 4,
+      minHeight: 4,
+      maxHeight: 4,
+    );
+
+    test('empty corpus → every slug has zero deficit', () {
+      // The generator iterates the map without null-checking, so we need a
+      // full entry per slug even when nothing has been seen yet.
+      final deficits = slugDeficits(EquilibriumStats.empty(), universe);
+      expect(deficits.keys, unorderedEquals(universe.allowedSlugs));
+      expect(deficits.values.every((v) => v == 0.0), isTrue);
+    });
+
+    test('saturated slugs at zero, missing slugs strictly positive', () {
+      // 100 puzzles using only FM + PA: GS and SY were never sampled, so
+      // they must be flagged as under-represented while FM/PA stay at 0.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 100; i++) {
+        stats = stats.withPuzzle(slugs: {'FM', 'PA'}, width: 4, height: 4);
+      }
+      final deficits = slugDeficits(stats, universe);
+      expect(deficits['FM'], 0.0);
+      expect(deficits['PA'], 0.0);
+      expect(deficits['GS']!, greaterThan(0.0));
+      expect(deficits['SY']!, greaterThan(0.0));
+      // Two symmetrically-missing slugs share the same gap value.
+      expect(deficits['GS'], deficits['SY']);
+    });
+
+    test('argmax matches the slug pickTarget would prefer', () {
+      // The generator's secondary sort must use the same notion of
+      // "under-represented" as the picker — otherwise we could push slugs
+      // the picker considers already balanced. We check that the highest-
+      // deficit slug here is the same one pickTarget surfaces on a
+      // slug-only universe.
+      var stats = EquilibriumStats.empty();
+      // FM heavily over-represented.
+      for (int i = 0; i < 50; i++) {
+        stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
+      }
+      // PA and SY get a small seed each → GS is the most starved.
+      for (int i = 0; i < 5; i++) {
+        stats = stats.withPuzzle(slugs: {'PA'}, width: 4, height: 4);
+        stats = stats.withPuzzle(slugs: {'SY'}, width: 4, height: 4);
+      }
+      final deficits = slugDeficits(stats, universe);
+      final argmax = deficits.entries
+          .reduce((a, b) => a.value >= b.value ? a : b)
+          .key;
+      expect(argmax, 'GS');
+    });
+  });
+
+  group('parseTargetKey', () {
+    // Round-trip: every concrete Target must reconstruct from its own `key`,
+    // since that key is what crosses the isolate boundary to the worker.
+    test('round-trips every Target subtype through its key', () {
+      // Target subclasses don't override ==, so assert on the reconstructed
+      // key (the stable identity the coordinator and blacklist rely on) and
+      // on the runtime type.
+      final targets = <Target>[
+        const SlugTarget('CH'),
+        const NTypesTarget(3),
+        const SizeTarget(4, 7),
+        const ProfileTarget(ProfileCategory.syBased),
+        const DomainTarget(3),
+        // PairTarget.from normalizes order — key is sorted FM+PA.
+        PairTarget.from('PA', 'FM'),
+      ];
+      for (final t in targets) {
+        final parsed = parseTargetKey(t.key);
+        expect(parsed, isNotNull, reason: t.key);
+        expect(parsed!.key, equals(t.key));
+        expect(parsed.runtimeType, equals(t.runtimeType));
+      }
+    });
+
+    test('SizeTarget canonicalizes transposed sizes to one key', () {
+      // A 7x4 target is the same size bin as 4x7, so both expose key
+      // 'size:4x7' — the coordinator/blacklist can't tell them apart.
+      expect(const SizeTarget(7, 4).key, 'size:4x7');
+      expect(parseTargetKey('size:7x4')!.key, 'size:4x7');
+    });
+
+    test('returns null for unknown or malformed keys', () {
+      expect(parseTargetKey('bogus:CH'), isNull); // unknown kind
+      expect(parseTargetKey('CH'), isNull); // no colon
+      expect(parseTargetKey('ntypes:abc'), isNull); // non-numeric n
+      expect(parseTargetKey('size:4xZ'), isNull); // bad height
+      expect(parseTargetKey('pair:FM'), isNull); // missing second slug
+      expect(parseTargetKey('profile:nope'), isNull); // unknown profile
+    });
+  });
+
+  group('weightedPickTarget', () {
+    test('never returns a non-positive-gap candidate', () {
+      // Only the middle candidate has a positive gap → it must always win,
+      // regardless of the rng draw.
+      final candidates = <({Target target, double gap})>[
+        (target: const SlugTarget('A'), gap: 0.0),
+        (target: const SlugTarget('B'), gap: 0.5),
+        (target: const SlugTarget('C'), gap: -1.0),
+      ];
+      final rng = Random(1);
+      for (int i = 0; i < 20; i++) {
+        expect(weightedPickTarget(candidates, rng), const SlugTarget('B'));
+      }
+    });
+
+    test('returns null when no candidate has a positive gap', () {
+      final candidates = <({Target target, double gap})>[
+        (target: const SlugTarget('A'), gap: 0.0),
+        (target: const SlugTarget('B'), gap: -0.2),
+      ];
+      expect(weightedPickTarget(candidates, Random(0)), isNull);
+      expect(weightedPickTarget(const [], Random(0)), isNull);
+    });
+  });
+
+  group('BucketRotation', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'CH'],
+      minWidth: 4,
+      maxWidth: 4,
+      minHeight: 4,
+      maxHeight: 4,
+    );
+
+    test('hands out every deficient bucket once before any repeat', () {
+      // Seed 20 single-FM 4x4 puzzles. This makes avgK > 0 (the slug axis is
+      // silent on an empty corpus), leaving CH under-represented on the slug
+      // axis while syBased stays under-represented on the profile axis —
+      // exactly the cross-axis mix we want to exercise.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 20; i++) {
+        stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
+      }
+      final positive = rankTargets(
+        stats,
+        universe,
+      ).where((c) => c.gap > 0).map((c) => c.target.key).toSet();
+      // Sanity: the deficit spans several buckets across axes (slugs, pairs,
+      // profiles, …) — otherwise the coverage property would be vacuous.
+      expect(positive.length, greaterThan(3));
+
+      final rot = BucketRotation(Random(7));
+      final firstCycle = [
+        for (int i = 0; i < positive.length; i++)
+          rot.next(stats, universe)!.key,
+      ];
+      // One full cycle covers exactly the positive-gap set, with no repeats.
+      expect(firstCycle.toSet(), equals(positive));
+      expect(firstCycle.length, equals(firstCycle.toSet().length));
+
+      // Core fix: the small-target syBased profile bucket is served in the
+      // SAME cycle as the much larger slug deficits — never starved behind
+      // them the way the raw-argmax picker starved it.
+      expect(firstCycle, contains('profile:syBased'));
+      expect(firstCycle.any((k) => k.startsWith('slug:')), isTrue);
+
+      // The next draw opens a fresh cycle: the claim ledger was reset, so it
+      // now holds just the one bucket we just claimed.
+      final afterReset = rot.next(stats, universe)!;
+      expect(rot.claimedThisCycle, equals({afterReset.key}));
+    });
+
+    test('never hands out a bucket whose gap is already non-positive', () {
+      // Saturate FM so its slug gap clamps to 0 — it must never be assigned,
+      // not even after the cycle resets.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 200; i++) {
+        stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
+      }
+      final rot = BucketRotation(Random(3));
+      final seen = <String>{};
+      for (int i = 0; i < 200; i++) {
+        final t = rot.next(stats, universe);
+        if (t != null) seen.add(t.key);
+      }
+      expect(seen, isNot(contains('slug:FM')));
+      // But the under-represented CH slug and syBased profile still surface.
+      expect(seen, contains('slug:CH'));
+      expect(seen, contains('profile:syBased'));
+    });
+  });
+
+  group('compositionCounts', () {
+    test('fromLines counts compositions from raw slug instances', () {
+      // 2 puzzles: (3×LT, 2×PA) → path + line-centric, and (1×QA) →
+      // global + none + none.
+      final stats = EquilibriumStats.fromLines([
+        'v2_12_4x4_2210000010000000_LT:A.0.5;LT:B.10.15;LT:C.3.7;PA:0.left;PA:1.right_1:1212121212121212_2',
+        'v2_12_4x4_1000000000000000_QA:10_1:1111111111111111_2',
+      ]);
+      expect(stats.compositionCounts['path+line-centric+none'], 1);
+      expect(stats.compositionCounts['global+none+none'], 1);
+      expect(stats.totalPuzzles, 2);
+    });
+
+    test('withPuzzle uses rawSlugs when provided', () {
+      var stats = EquilibriumStats.empty();
+      // Two LT instances → path with count 2, no other family.
+      stats = stats.withPuzzle(
+        slugs: {'LT'},
+        rawSlugs: ['LT', 'LT'],
+        width: 4,
+        height: 4,
+      );
+      expect(stats.compositionCounts['path+none+none'], 1);
+    });
+
+    test(
+      'withPuzzle falls back to deduplicated slugs when rawSlugs is null',
+      () {
+        var stats = EquilibriumStats.empty();
+        stats = stats.withPuzzle(slugs: {'LT', 'FM'}, width: 4, height: 4);
+        // Deduplicated: path count=1, local count=1 → tie, path wins the
+        // kConstraintFamilies tie-break (path before local in the list).
+        // Actually: path has index 2, local has index 1. So local wins.
+        expect(stats.compositionCounts['local+path+none'], 1);
+      },
+    );
+  });
+
+  group('TargetUniverse.allowedCompositions', () {
+    test('full 6-family universe yields 156 compositions', () {
+      final u = TargetUniverse(
+        allowedSlugs: kConstraintFamily.keys,
+        minWidth: 4,
+        maxWidth: 4,
+        minHeight: 4,
+        maxHeight: 4,
+      );
+      expect(u.allowedCompositions.length, 156);
+      // Every triple has length 3 and starts with a real family.
+      for (final t in u.allowedCompositions) {
+        expect(t.length, 3);
+        expect(t.first, isNot(kEmptyFamily));
+      }
+    });
+
+    test('subset of families yields fewer compositions', () {
+      // Only 'FM' (local) and 'LT' (path) slugs → 2 families.
+      final u = TargetUniverse(
+        allowedSlugs: ['FM', 'LT'],
+        minWidth: 4,
+        maxWidth: 4,
+        minHeight: 4,
+        maxHeight: 4,
+      );
+      // P(2,3)=0 (need 3 distinct families) + P(2,2)=2 + 2 = 4
+      expect(u.allowedCompositions.length, 4);
+    });
+  });
+
+  group('CompositionTarget', () {
+    test('key and label format', () {
+      const t = CompositionTarget(['path', 'line-centric', 'local']);
+      expect(t.key, 'comp:path+line-centric+local');
+      expect(t.label, 'comp=path+line-centric+local');
+      expect(t.axis, Axis.composition);
+    });
+
+    test('round-trips through parseTargetKey', () {
+      const families = ['path', 'local', 'none'];
+      final t = CompositionTarget(families);
+      final parsed = parseTargetKey(t.key);
+      expect(parsed, isA<CompositionTarget>());
+      expect((parsed as CompositionTarget).key, t.key);
+    });
+
+    test('parseTargetKey returns null for malformed comp key', () {
+      expect(parseTargetKey('comp:'), isNull);
+      expect(parseTargetKey('comp:path+'), isNull);
+      expect(parseTargetKey('comp:+local'), isNull);
+    });
+  });
+
+  group('targetShare with composition', () {
+    test('uniform over category count', () {
+      expect(targetShare(Axis.composition, '', 85), closeTo(1 / 85, 1e-9));
+      expect(targetShare(Axis.composition, '', 4), closeTo(0.25, 1e-9));
+      expect(targetShare(Axis.composition, '', 0), 0.0);
+    });
+  });
+
+  group('pickTarget with composition axis', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'PA'],
+      minWidth: 4,
+      maxWidth: 4,
+      minHeight: 4,
+      maxHeight: 4,
+      // Frozen domain: the missing-composition gap (0.25) must stay the
+      // largest — an active domain axis would put domain:3 (0.40) on top.
+      allowedDomains: const [2],
+    );
+
+    test('emits CompositionTarget when composition is most under-represented', () {
+      // FM and PA are both local or both line-centric? FM=local, PA=line-centric.
+      // 2 slugs → 2 families (local, line-centric).
+      // allCompositions over 2 families: P(2,3)=0 + P(2,2)=2 + 2 = 4 entries.
+      // Target share per comp = 1/4 = 0.25.
+      //
+      // Start with 100 puzzles balanced across three of the four compositions.
+      // The fourth has 0 → gap should make it the top target.
+      final usedUnion = familiesOf(['FM', 'PA']);
+      final allComps = allCompositions(usedUnion);
+      // 4 comps: [local+none+none], [line-centric+none+none],
+      // [local+line-centric+none], [line-centric+local+none]
+      expect(allComps.length, 4);
+      final three = allComps.take(3).toList();
+      final missing = allComps[3];
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 20; i++) {
+        for (final comp in three) {
+          // Create a puzzle matching this composition. We need slug instances
+          // that produce the desired composition. For comp = [family1, family2, ...]:
+          // pick one slug from each real family.
+          final raw = <String>[];
+          for (final f in comp) {
+            if (f == kEmptyFamily) continue;
+            final slug = universe.allowedSlugs.firstWhere(
+              (s) => kConstraintFamily[s] == f,
+            );
+            raw.add(slug);
+          }
+          stats = stats.withPuzzle(
+            slugs: raw.toSet(),
+            rawSlugs: raw,
+            width: 4,
+            height: 4,
+          );
+        }
+      }
+      // The missing composition should have the largest gap.
+      final t = pickTarget(stats, universe);
+      expect(t, isA<CompositionTarget>());
+      expect((t as CompositionTarget).key, 'comp:${missing.join('+')}');
+    });
+  });
+
+  group('domain axis', () {
+    final universe = TargetUniverse(
+      allowedSlugs: ['FM', 'PA'],
+      minWidth: 4,
+      maxWidth: 4,
+      minHeight: 4,
+      maxHeight: 4,
+      // Default, spelled out: both domains eligible — the axis is active.
+      allowedDomains: const [2, 3],
+    );
+
+    test('fromLines reads the domain size off the v2 attributes field', () {
+      // The domain field is parts[1]: "12" → 2 colours, "123" → 3 colours.
+      // An auto-shrunk domain-3 attempt emits "12", so counting the line
+      // (not the attempt intent) is what keeps the stats honest.
+      final stats = EquilibriumStats.fromLines([
+        'v2_12_4x4_2210000010000000_FM:11_1:1212121212121212_2',
+        'v2_123_4x4_2210000010000000_FM:11_1:1212121212121212_2',
+      ]);
+      expect(stats.domainCounts[2], 1);
+      expect(stats.domainCounts[3], 1);
+    });
+
+    test('withPuzzle defaults to domain 2 (legacy callers stay correct)', () {
+      // Every pre-existing call site omits domainSize; they all describe
+      // 2-colour puzzles, so the default must land in the dom-2 bin.
+      final stats = EquilibriumStats.empty().withPuzzle(
+        slugs: {'FM'},
+        width: 4,
+        height: 4,
+      );
+      expect(stats.domainCounts[2], 1);
+      expect(stats.domainCounts[3], isNull);
+    });
+
+    test('withPuzzle(domainSize: 3) lands in the dom-3 bin', () {
+      final stats = EquilibriumStats.empty().withPuzzle(
+        slugs: {'FM'},
+        width: 4,
+        height: 4,
+        domainSize: 3,
+      );
+      expect(stats.domainCounts[3], 1);
+    });
+
+    test('targetShare reads kTargetDomainProfile', () {
+      expect(targetShare(Axis.domain, 2, 0), 0.60);
+      expect(targetShare(Axis.domain, 3, 0), 0.40);
+      // Outside the profile (defensive — never a real bin) → 0.
+      expect(targetShare(Axis.domain, 4, 0), 0.0);
+    });
+
+    test('an all-dom2 corpus surfaces DomainTarget(3) with the full gap', () {
+      // 100 % dom-2 → observed(3) = 0 → gap = the full 0.40 target share.
+      var stats = EquilibriumStats.empty();
+      for (int i = 0; i < 50; i++) {
+        stats = stats.withPuzzle(slugs: {'FM'}, width: 4, height: 4);
+      }
+      final ranked = rankTargets(stats, universe);
+      final dom3 = ranked.firstWhere((c) => c.target.key == 'domain:3');
+      expect(dom3.gap, closeTo(0.40, 1e-9));
+      // dom-2 is over target (share 1.0 > 0.60) → clamped to 0, never pushed.
+      final dom2 = ranked.firstWhere((c) => c.target.key == 'domain:2');
+      expect(dom2.gap, 0.0);
+    });
+
+    test('a singleton allowedDomains disables the axis entirely', () {
+      // CLI `--domain N` freezes the domain: no DomainTarget may ever be
+      // picked, regardless of how skewed the corpus is.
+      final frozen = TargetUniverse(
+        allowedSlugs: ['FM', 'PA'],
+        minWidth: 4,
+        maxWidth: 4,
+        minHeight: 4,
+        maxHeight: 4,
+        allowedDomains: const [2],
+      );
+      final ranked = rankTargets(EquilibriumStats.empty(), frozen);
+      expect(ranked.any((c) => c.target is DomainTarget), isFalse);
+    });
+
+    test('parseTargetKey accepts domain:2/3 and rejects anything else', () {
+      expect(parseTargetKey('domain:3'), isA<DomainTarget>());
+      expect((parseTargetKey('domain:3') as DomainTarget).size, 3);
+      expect(parseTargetKey('domain:2')!.key, 'domain:2');
+      expect(parseTargetKey('domain:5'), isNull); // no such domain
+      expect(parseTargetKey('domain:x'), isNull); // non-numeric
+    });
+  });
+
+  group('pickWeightedDomain', () {
+    test('singleton allowedDomains short-circuits', () {
+      // Frozen domain: the draw must be deterministic whatever the stats.
+      expect(pickWeightedDomain(const [2], const {}, Random(0)), 2);
+      expect(pickWeightedDomain(const [3], const {2: 100}, Random(0)), 3);
+    });
+
+    test('an all-dom2 corpus always draws domain 3 (fill the gap)', () {
+      // gap(2) = 0 (over target), gap(3) = 0.40 → dom3 is the only
+      // positive-weight candidate. This is the whole point of the
+      // gap-based draw: while the corpus lags, every off-target
+      // iteration works on the deficit.
+      final rng = Random(11);
+      for (int i = 0; i < 100; i++) {
+        expect(pickWeightedDomain(const [2, 3], const {2: 100}, rng), 3);
+      }
+    });
+
+    test('a corpus at the profile falls back to the maintenance draw', () {
+      // Exactly 60/40: both gaps are 0 → the static profile takes over so
+      // the corpus *stays* at the profile instead of degenerating to
+      // whichever bin drifts below target first.
+      final rng = Random(42);
+      int threes = 0;
+      for (int i = 0; i < 1000; i++) {
+        if (pickWeightedDomain(const [2, 3], const {2: 60, 3: 40}, rng) == 3) {
+          threes++;
+        }
+      }
+      // ≈ 0.40 within sampling noise (deterministic seed keeps this stable).
+      expect(threes, inInclusiveRange(350, 450));
+    });
+  });
+
+  group('pickWarmupConfig domain draw', () {
+    test('warm-up fills the domain deficit like the main loop', () {
+      // The warm-up corpus seeds equilibrium's distributions; if it stayed
+      // all-dom2 the axis would start with the maximal 0.40 gap. With an
+      // all-dom2 count snapshot, every warm-up attempt must go dom3.
+      final rng = Random(5);
+      for (int i = 0; i < 20; i++) {
+        final wc = pickWarmupConfig(
+          minWidth: 4,
+          maxWidth: 5,
+          minHeight: 4,
+          maxHeight: 5,
+          baseAllowedSlugs: const ['FM', 'PA'],
+          baseRequired: const {},
+          rng: rng,
+          allowedDomains: const [2, 3],
+          domainCounts: const {2: 100},
+        );
+        expect(wc.domainSize, 3);
+      }
+    });
+
+    test('defaults keep legacy callers on domain 2', () {
+      // Callers that don't pass allowedDomains (tests, legacy paths) must
+      // keep producing 2-colour warm-up configs.
+      final wc = pickWarmupConfig(
+        minWidth: 4,
+        maxWidth: 4,
+        minHeight: 4,
+        maxHeight: 4,
+        baseAllowedSlugs: const ['FM'],
+        baseRequired: const {},
+        rng: Random(0),
+      );
+      expect(wc.domainSize, 2);
     });
   });
 }

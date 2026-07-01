@@ -24,6 +24,8 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 |------|------|-------------|
 | FM | Forbidden Motif | A 2D pattern that must NOT appear in the grid |
 | PA | Parity | Equal count of black/white cells on one side of a cell |
+| RC | Row Count | A given row must contain exactly N cells of a color |
+| RT | Row Transition | A given row must contain exactly N adjacent colour changes (transitions between differently-coloured cells) |
 | GS | Group Size | Connected same-color group must have exact size |
 | LT | Letter Group | Cells with same letter must be in one connected group |
 | QA | Quantity | Total count of a color in the entire grid |
@@ -31,8 +33,14 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 | DF | Different From | Two adjacent cells must have different colors |
 | SH | Shape | One color's group(s) must match a mandatory 2D shape |
 | CC | Column Count | A given column must contain exactly N cells of a color |
+| CH | Chain | A continuous orthogonal path of one colour must connect two specified grid sides |
+| CT | Column Transition | A given column must contain exactly N adjacent colour changes |
 | GC | Group Count | The grid must contain exactly N connected groups of a color |
+| MJ | Majority | A rectangular zone must contain a strict majority of a given colour |
 | NC | Neighbor Count | A given cell must have exactly N orthogonal neighbors of a color |
+| EY | Eyes | A given cell must "see" exactly N cells of a colour through straight lines of same-colour cells |
+| IM | Implication | If the source cell is a given colour, the target cell must be that colour too (directional; contrapositive also fires) |
+| BB | Bounding Box | Every connected group of a colour must occupy a bounding box of exactly W×H (extent, not fill; global) |
 
 ## Solving Algorithm
 
@@ -90,14 +98,33 @@ Select a random subset of cells (controlled by a ratio parameter, randomly drawn
 
 ### Step 3: Enumerate Valid Constraints
 
-For each constraint type (FM, PA, GS, LT, QA, SY, DF, SH, CC, GC, NC), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
+For each constraint type (FM, PA, RC, RT, GS, LT, QA, SY, DF, SH, CC, CH, CT, GC, MJ, NC, EY, IM, BB), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
 
 ### Step 4: Iterative Constraint Selection
 
-Starting with one constraint, iteratively try adding each candidate:
+Before the iterative loop begins, the full candidate pool is shuffled then
+sorted by a three-level key:
+
+1. **Priority** — `prioritySlugs` (= `requiredRules ∪ preferredSlugs`) are
+   placed first. These are the slugs the equilibrium engine or the user
+   explicitly wants in the puzzle.
+2. **Corpus-level deficit** (descending) — slugs that are globally
+   under-represented in the corpus (highest `deficitScore` first). This
+   soft secondary bias encourages the puzzle to pull in other slugs lagging
+   behind in the corpus, not just the one forced by the target.
+3. **Local usage** (ascending) — tie-breaker among candidates of equal
+   deficit; less-used slugs within the puzzle-under-construction come first,
+   promoting diversity.
+
+The `deficitScore` for each slug is computed once per attempt by
+`slugDeficits()` in `equilibrium.dart` (the same gap metric used by
+`pickTarget` on the slug axis: `expected_share − observed_share`, clamped
+to ≥ 0). The snapshot is taken before the loop starts and does not change
+during the attempt, so the target slug's position in the priority layer is
+never undermined by deficit updates.
 
 ```
-for each candidate constraint:
+for each candidate constraint (in priority-then-deficit-then-usage order):
   1. Clone the puzzle (with all constraints added so far)
   2. Solve the clone → compute ratio of free cells (ratio_before)
   3. Add the candidate constraint to the clone
@@ -105,7 +132,10 @@ for each candidate constraint:
   5. If ratio_after < ratio_before: keep the constraint
 ```
 
-After each successful addition, remaining candidates are reshuffled with priority given to less-used constraint types (to encourage diversity).
+After each accepted constraint the remaining pool is reshuffled and
+re-sorted. The re-sort uses only the deficit and local-usage levels — the
+priority layer is omitted because the priority candidate was consumed before
+the loop started.
 
 ### Step 5: Finalization
 
@@ -131,6 +161,52 @@ was deductively determined, leaving no ambiguity).
 ### Retry Strategy
 
 The worker retries generation with new random grids until the requested number of puzzles is produced or the time limit is reached.
+
+## Constraint Ordering
+
+The order in which constraints appear in a puzzle's constraint list is
+significant. `Puzzle.apply()` iterates the list in order on every solver
+step and returns the first deduction it finds, so earlier constraints
+get first dibs on any cell they can determine. `lineExport` serialises
+constraints in list order, so the on-disk representation round-trips
+through `Puzzle(...)` with the order preserved.
+
+Two APIs on `Puzzle` let maintenance tooling and the generator reshape
+that order:
+
+- **`prependConstraint(c)`** — insert at index 0 so `apply()` consults
+  `c` before any pre-existing constraint. Used by `Puzzle.simplify` when
+  grafting an "indispensable" candidate onto a puzzle that is already
+  dominated by a high-complexity constraint (e.g. `--require SH`): the
+  cheaper deduction must run first, otherwise the dominant constraint
+  fires first and the easier deduction never surfaces. Honours the
+  LetterGroup-aggregation contract from `addConstraint` (one entry per
+  letter).
+- **`sortConstraintsByDifficulty(steps)`** — reorder constraints by the
+  *minimum* `Move.complexity` each contributed in `steps` (ascending,
+  ties broken lexicographically on `serialize()`). Steps with empty
+  `constraint` (force) and steps credited to Complicity instances are
+  ignored. Constraints that contributed nothing to `steps` are pushed
+  to the tail via a `1 << 30` sentinel rank. Side effect: drops
+  `cachedComplexity` because reordering changes the trace `apply()`
+  produces and thus the per-move complexities.
+
+The hint system in `addConstraint` mode picks the front of
+`availableHintConstraints`, so reordering directly affects which
+constraints the player sees first. `bin/recompute.dart`,
+`bin/dedup_puzzles.dart`, and `bin/aggregate_player_stats.dart` run
+`sortConstraintsByDifficulty` over the trace they already computed for
+classification, so shipped puzzles carry the easier-first ordering on
+disk.
+
+`PuzzleGenerator.generateOne` also calls
+`sortConstraintsByDifficulty` before returning the serialised line, so
+freshly generated puzzles ship with the same easier-first contract as
+the maintenance-tool output. When the easing loop ran (`simplify`),
+the sort uses `SimplifyResult.finalSteps` rather than the pre-simplify
+trace — it is a fresher signal that accounts for any constraint
+grafted by `prependConstraint` during easing, which would not appear
+in the earlier trace.
 
 ## Complexity Scoring
 

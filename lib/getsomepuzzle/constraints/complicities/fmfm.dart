@@ -32,9 +32,10 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 class FMFMComplicity extends Complicity {
   static const int _maxSynth = 50;
 
-  /// FMs synthesized for the current puzzle, populated by
-  /// `isPresent` and reused by `apply`.
-  List<ForbiddenMotif> _synthesized = const [];
+  /// Nodes synthesized for the current puzzle, populated by `isPresent`
+  /// and reused by `apply`. Each node carries the synthesized FM and
+  /// the set of *original* FMs whose combination produced it.
+  List<_SynthNode> _synthesized = const [];
 
   @override
   String serialize() => "FMFMComplicity";
@@ -52,20 +53,30 @@ class FMFMComplicity extends Complicity {
 
   @override
   Move? apply(Puzzle puzzle) {
-    for (final fm in _synthesized) {
-      final move = fm.apply(puzzle);
+    for (final node in _synthesized) {
+      final move = node.fm.apply(puzzle);
       if (move == null) continue;
       // Re-attribute the move to the complicity itself; the
       // synthesized FM is internal and must not surface in hints.
       // Tier 4 — the player has to recognise the shared structure
       // of two FMs and combine them mentally.
-      return Move(
-        move.idx,
-        move.value,
-        this,
-        isImpossible: move.isImpossible == null ? null : this,
-        complexity: 4,
-      );
+      return switch (move) {
+        SetValue(:final idx, :final value) => SetValue(
+          idx,
+          value,
+          this,
+          complexity: 4,
+          contributors: node.origins,
+        ),
+        RemoveOption(:final idx, :final option) => RemoveOption(
+          idx,
+          option,
+          this,
+          complexity: 4,
+          contributors: node.origins,
+        ),
+        Impossible() => Impossible(this, contributors: node.origins),
+      };
     }
     return null;
   }
@@ -73,12 +84,14 @@ class FMFMComplicity extends Complicity {
   /// Iteratively combine pairs of FMs that differ in exactly one
   /// position whose two values cover the domain. Stops at a fixed
   /// point or when [_maxSynth] synthesized FMs have been produced.
-  static List<ForbiddenMotif> _synthesizeAll(
+  static List<_SynthNode> _synthesizeAll(
     List<ForbiddenMotif> fms,
-    List<int> domain,
+    List<CellValue> domain,
   ) {
-    final result = <ForbiddenMotif>[];
-    final pool = List<ForbiddenMotif>.from(fms);
+    final result = <_SynthNode>[];
+    final pool = <_SynthNode>[
+      for (final f in fms) _SynthNode(f, [f]),
+    ];
     final seen = <String>{for (final f in fms) f.serialize()};
 
     bool changed = true;
@@ -88,7 +101,7 @@ class FMFMComplicity extends Complicity {
         for (int j = i + 1; j < pool.length; j++) {
           final synth = _trySynthesize(pool[i], pool[j], domain);
           if (synth == null) continue;
-          if (!seen.add(synth.serialize())) continue;
+          if (!seen.add(synth.fm.serialize())) continue;
           pool.add(synth);
           result.add(synth);
           changed = true;
@@ -99,19 +112,22 @@ class FMFMComplicity extends Complicity {
     return result;
   }
 
-  /// Returns the synthesized FM if [f1] and [f2] differ in exactly
-  /// one cell whose values cover the [domain], else null.
-  static ForbiddenMotif? _trySynthesize(
-    ForbiddenMotif f1,
-    ForbiddenMotif f2,
-    List<int> domain,
+  /// Returns the synthesized FM (with its merged origins) if [a] and
+  /// [b] differ in exactly one cell whose values cover the [domain],
+  /// else null.
+  static _SynthNode? _trySynthesize(
+    _SynthNode a,
+    _SynthNode b,
+    List<CellValue> domain,
   ) {
+    final f1 = a.fm;
+    final f2 = b.fm;
     if (f1.motif.length != f2.motif.length) return null;
     if (f1.motif[0].length != f2.motif[0].length) return null;
 
     int? diffR;
     int? diffC;
-    int? v1, v2;
+    CellValue? v1, v2;
     for (int r = 0; r < f1.motif.length; r++) {
       for (int c = 0; c < f1.motif[0].length; c++) {
         if (f1.motif[r][c] == f2.motif[r][c]) continue;
@@ -123,18 +139,40 @@ class FMFMComplicity extends Complicity {
       }
     }
     if (diffR == null) return null; // identical
-    if (v1 == 0 || v2 == 0) return null; // one side is already wildcard
-    final values = <int>{v1!, v2!};
-    if (values.length != domain.length) return null;
+    if (v1 == CellValue.free || v2 == CellValue.free) {
+      return null;
+    } // one side is already wildcard
+    final values = <CellValue>{v1!, v2!};
+    if (values.length != domain.length) {
+      return null;
+    }
     for (final d in domain) {
-      if (!values.contains(d)) return null;
+      if (!values.contains(d)) {
+        return null;
+      }
     }
 
-    final newMotif = f1.motif.map((row) => List<int>.from(row)).toList();
-    newMotif[diffR][diffC!] = 0;
+    final newMotif = f1.motif.map((row) => List<CellValue>.from(row)).toList();
+    newMotif[diffR][diffC!] = CellValue.free;
     final paramStr = newMotif
-        .map((row) => row.map((v) => v.toString()).join(''))
+        .map((row) => row.map(cellValueToString).join(''))
         .join('.');
-    return ForbiddenMotif(paramStr);
+    // Merge origins from both parents (remove duplicates via LinkedHashSet
+    // order-preserving semantics — we use the List uniqueness guarantee
+    // since every origin is a distinct object).
+    final mergedOrigins = <ForbiddenMotif>[
+      ...a.origins,
+      ...b.origins.where((o) => !a.origins.contains(o)),
+    ];
+    return _SynthNode(ForbiddenMotif(paramStr), mergedOrigins);
   }
+}
+
+/// A synthesized FM together with the original (puzzle-declared) FMs
+/// whose combination chain produced it.
+class _SynthNode {
+  final ForbiddenMotif fm;
+  final List<ForbiddenMotif> origins;
+
+  const _SynthNode(this.fm, this.origins);
 }

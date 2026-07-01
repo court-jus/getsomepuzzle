@@ -3,11 +3,15 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/feasibility.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/generator.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
+import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/path.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 
 class GeneratorWorker {
   StreamController<GeneratorMessage>? _controller;
@@ -21,6 +25,12 @@ class GeneratorWorker {
     int jobsCount = 1,
     int workerIndex = 0,
     String? logFilePath,
+    List<String> seedBlacklist = const <String>[],
+    int adaptiveK = 20,
+    int skipSafety = 100,
+    String? Function(int workerIndex)? assignTarget,
+    List<int>? allowedDomains,
+    String? focusAxisName,
   }) {
     _controller = StreamController<GeneratorMessage>();
 
@@ -32,6 +42,12 @@ class GeneratorWorker {
       jobsCount,
       workerIndex,
       logFilePath,
+      seedBlacklist,
+      adaptiveK,
+      skipSafety,
+      assignTarget,
+      allowedDomains,
+      focusAxisName,
     );
 
     return _controller!.stream;
@@ -55,8 +71,17 @@ class GeneratorWorker {
     int jobsCount,
     int workerIndex,
     String? logFilePath,
+    List<String> seedBlacklist,
+    int adaptiveK,
+    int skipSafety,
+    String? Function(int workerIndex)? assignTarget,
+    List<int>? allowedDomains,
+    String? focusAxisName,
   ) async {
     final receivePort = ReceivePort();
+    // Reply port to this worker, captured from its `ready` handshake. The
+    // worker awaits an `assignTarget` answer for every `requestTarget`.
+    SendPort? workerReplyPort;
 
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
@@ -71,23 +96,43 @@ class GeneratorWorker {
         requiredRules: config.requiredRules.toList(),
         allowedSlugs: config.allowedSlugs?.toList(),
         maxTimeMs: config.maxTime.inMilliseconds,
+        maxAttemptTimeMs: config.maxAttemptTime.inMilliseconds,
+        maxStallMs: config.maxStall.inMilliseconds,
         count: config.count,
         targetLevelIndex: config.targetLevel?.index,
         easingBudgetMs: config.easingBudget.inMilliseconds,
+        pathBasedScenario: config.pathBasedScenario,
+        syBasedScenario: config.syBasedScenario,
+        pathMaxRetries: config.pathMaxRetries,
+        pathWindingProb: config.pathWindingProb,
+        // No explicit list → freeze the domain to the config's: legacy
+        // callers (in-app generator) keep their exact behaviour.
+        allowedDomains: allowedDomains ?? [config.domain.length],
+        strategy: config.strategy,
         usageStats: usageStats,
         puzzleLines: puzzleLines,
         equilibriumRequested: equilibriumRequested,
         jobsCount: jobsCount,
         workerIndex: workerIndex,
         logFilePath: logFilePath,
-        useBossPrefill: config.useBossPrefill,
+        seedBlacklist: seedBlacklist,
+        focusAxisName: focusAxisName,
+        adaptiveK: adaptiveK,
+        skipSafety: skipSafety,
       ),
     );
 
     receivePort.listen((message) {
       if (message is Map<String, dynamic>) {
         final type = message['type'] as String;
-        if (type == 'progress') {
+        if (type == 'ready') {
+          workerReplyPort = message['port'] as SendPort;
+        } else if (type == 'requestTarget') {
+          // Hand the worker its next bucket. The coordinator (when wired) owns
+          // the cross-worker rotation; a null answer means "decide locally".
+          final key = assignTarget?.call(message['worker'] as int);
+          workerReplyPort?.send({'type': 'assignTarget', 'targetKey': key});
+        } else if (type == 'progress') {
           _controller?.add(
             GeneratorProgressMessage(
               GeneratorProgress(
@@ -108,6 +153,49 @@ class GeneratorWorker {
           );
         } else if (type == 'target') {
           _controller?.add(GeneratorTargetMessage(message['label'] as String?));
+        } else if (type == 'attempt') {
+          final preferred = (message['preferredSlugs'] as List).cast<String>();
+          final allowed = (message['allowedSlugs'] as List?)?.cast<String>();
+          final rawDeficits = message['slugDeficits'] as Map?;
+          final Map<String, double>? deficits = rawDeficits?.map(
+            (k, v) => MapEntry(k as String, (v as num).toDouble()),
+          );
+          _controller?.add(
+            GeneratorAttemptMessage(
+              workerIndex: message['worker'] as int,
+              inWarmup: message['inWarmup'] as bool,
+              targetKey: message['targetKey'] as String?,
+              width: message['width'] as int,
+              height: message['height'] as int,
+              ntypesIntended: message['ntypesIntended'] as int?,
+              preferredSlugs: preferred,
+              allowedSlugs: allowed,
+              scenario: message['scenario'] as String,
+              domainSize: message['domain'] as int? ?? 2,
+              success: message['success'] as bool,
+              rejectReason: message['rejectReason'] as String?,
+              durationMs: message['durationMs'] as int,
+              puzzleLevelIndex: message['puzzleLevel'] as int?,
+              puzzleLine: message['puzzleLine'] as String?,
+              slugDeficitScores: deficits,
+              pathRetries: message['pathRetries'] as int?,
+              pathRoutingCalls: message['pathRoutingCalls'] as int?,
+              pathRoutingMsMax: message['pathRoutingMsMax'] as int?,
+              pathRoutingMsTotal: message['pathRoutingMsTotal'] as int?,
+              pathPrefillMs: message['pathPrefillMs'] as int?,
+              maxAcceptGapMs: message['maxAcceptGapMs'] as int?,
+            ),
+          );
+        } else if (type == 'reject') {
+          _controller?.add(
+            GeneratorRejectMessage(
+              GenerationRejectReason.values[message['reason'] as int],
+            ),
+          );
+        } else if (type == 'timings') {
+          final micros = (message['micros'] as Map).cast<String, int>();
+          final calls = (message['calls'] as Map).cast<String, int>();
+          _controller?.add(GeneratorTimingsMessage(micros, calls));
         } else if (type == 'done') {
           _controller?.add(GeneratorDoneMessage(message['generated'] as int));
           _controller?.close();
@@ -126,9 +214,31 @@ class _IsolateParams {
   final List<String> requiredRules;
   final List<String>? allowedSlugs;
   final int maxTimeMs;
+
+  /// Per-`generateOne` wall-clock cap. Caps any single attempt so a
+  /// pathological combo can't monopolize [maxTimeMs].
+  final int maxAttemptTimeMs;
+
+  /// Watchdog: if no candidate is accepted within this duration, the
+  /// attempt is abandoned.
+  final int maxStallMs;
   final int count;
   final int? targetLevelIndex;
   final int easingBudgetMs;
+  final bool pathBasedScenario;
+  final bool syBasedScenario;
+
+  /// Path-based tunables forwarded to `preFillPath` (see `GeneratorConfig`
+  /// / `docs/dev/path_based.md`): retry budget and path sinuosity.
+  final int pathMaxRetries;
+  final double pathWindingProb;
+
+  /// Colour-domain sizes this run may emit. A singleton freezes the domain
+  /// (CLI `--domain N`, or any caller without an explicit list); `[2, 3]`
+  /// activates the per-attempt gap-based draw and the equilibrium domain
+  /// axis. Plain ints so the list crosses the isolate boundary trivially.
+  final List<int> allowedDomains;
+  final GenerationStrategy strategy;
   final Map<String, int>? usageStats;
   final List<String>? puzzleLines;
   final bool equilibriumRequested;
@@ -136,6 +246,25 @@ class _IsolateParams {
   final int workerIndex;
   final String? logFilePath;
   final bool useBossPrefill;
+
+  /// `AttemptKey.serialized` strings loaded at CLI startup from
+  /// `generator_stats.csv` (combos with ≥ M tries and 0 successes across
+  /// past runs). Each worker checks this set before every attempt.
+  final List<String> seedBlacklist;
+
+  /// When non-null, restricts equilibrium targets to this single axis.
+  /// The string is an [Axis] enum name (e.g. `"composition"`), serialised
+  /// so it crosses the isolate boundary as a plain primitive.
+  final String? focusAxisName;
+
+  /// In-session blacklist threshold: a worker blacklists a combo locally
+  /// once it has attempted it [adaptiveK] times with no successes.
+  final int adaptiveK;
+
+  /// After [skipSafety] consecutive blacklist-skips, the worker runs the
+  /// next blacklisted combo anyway. Avoids deadlocks when most candidate
+  /// tuples have been filtered out.
+  final int skipSafety;
 
   _IsolateParams({
     required this.sendPort,
@@ -148,20 +277,31 @@ class _IsolateParams {
     required this.requiredRules,
     this.allowedSlugs,
     required this.maxTimeMs,
+    required this.maxAttemptTimeMs,
+    required this.maxStallMs,
     required this.count,
     this.targetLevelIndex,
     required this.easingBudgetMs,
+    this.pathBasedScenario = false,
+    this.syBasedScenario = false,
+    this.pathMaxRetries = 30,
+    this.pathWindingProb = 0.5,
+    this.allowedDomains = const [2],
+    required this.strategy,
     this.usageStats,
     this.puzzleLines,
     this.equilibriumRequested = false,
     this.jobsCount = 1,
     this.workerIndex = 0,
     this.logFilePath,
-    this.useBossPrefill = false,
+    this.seedBlacklist = const <String>[],
+    this.focusAxisName,
+    this.adaptiveK = 20,
+    this.skipSafety = 100,
   });
 }
 
-void _isolateEntryPoint(_IsolateParams params) {
+Future<void> _isolateEntryPoint(_IsolateParams params) async {
   // Each log line is written and flushed synchronously: this is the explicit
   // tradeoff for diagnosing hangs. If a worker is stuck inside `solve()` or
   // its inner constraint propagation, every line emitted before the hang
@@ -195,8 +335,26 @@ void _isolateEntryPoint(_IsolateParams params) {
     'sizeRange=${effectiveMinW}x$effectiveMinH..${effectiveMaxW}x$effectiveMaxH, '
     'allowedSlugs=${baseAllowedSlugs ?? "*"}, required=$requiredSet, '
     'equilibriumRequested=${params.equilibriumRequested}, '
-    'maxTime=${maxTime.inSeconds}s',
+    'maxTime=${maxTime.inSeconds}s, '
+    'maxAttemptTime=${params.maxAttemptTimeMs / 1000}s',
   );
+
+  // Domain-axis counts, maintained even when equilibrium is off: the
+  // per-attempt gap-based domain draw (`pickWeightedDomain`) needs the
+  // corpus distribution regardless of the bias being active. Lenient parse
+  // (any line with a domain field counts) — close enough to the stricter
+  // `EquilibriumStats.fromLines` tally for share computation.
+  final domainCounts = <int, int>{};
+  if (params.allowedDomains.length > 1) {
+    for (final raw in params.puzzleLines ?? const <String>[]) {
+      final line = raw.trim();
+      if (line.isEmpty || line.startsWith('#')) continue;
+      final parts = line.split('_');
+      if (parts.length < 2) continue;
+      final d = parts[1].length;
+      if (d == 2 || d == 3) domainCounts[d] = (domainCounts[d] ?? 0) + 1;
+    }
+  }
 
   // Equilibrium state. We always build it when equilibrium is requested —
   // even during warm-up — so the live switch from warm-up to equilibrium
@@ -206,6 +364,22 @@ void _isolateEntryPoint(_IsolateParams params) {
   final initialCorpusSize = (params.puzzleLines ?? const [])
       .where((l) => l.trim().isNotEmpty && !l.startsWith('#'))
       .length;
+  // When [focusAxisName] is set, restrict equilibrium targets to that axis.
+  // `null` means all axes participate — the default behaviour.
+  final enabledAxes = () {
+    if (params.focusAxisName == null) return Axis.values;
+    final matched = {
+      for (final a in Axis.values)
+        if (a.name == params.focusAxisName) a,
+    };
+    if (matched.isNotEmpty) return matched;
+    log(
+      'WARNING: unknown focus axis "${params.focusAxisName}", '
+      'falling back to all axes',
+    );
+    return Axis.values;
+  }();
+
   if (params.equilibriumRequested) {
     equiStats = EquilibriumStats.fromLines(params.puzzleLines ?? const []);
     universe = TargetUniverse(
@@ -214,7 +388,52 @@ void _isolateEntryPoint(_IsolateParams params) {
       maxWidth: effectiveMaxW,
       minHeight: effectiveMinH,
       maxHeight: effectiveMaxH,
+      allowedDomains: params.allowedDomains,
     );
+  }
+
+  // Infeasibility plumbing. `seedSet` is the persistent CSV-loaded blacklist
+  // (frozen for this run); `tracker` accumulates fresh in-session evidence.
+  // A combo is skipped when either source flags it. `consecutiveSkips` is
+  // the safety brake (see [skipSafety]).
+  final seedSet = params.seedBlacklist.toSet();
+  final tracker = InfeasibilityTracker();
+  int consecutiveSkips = 0;
+  if (seedSet.isNotEmpty) {
+    log('seed blacklist: ${seedSet.length} combo(s) loaded');
+  }
+
+  // Bidirectional channel to the coordinator (main isolate). The worker asks
+  // for its next equilibrium bucket and awaits the assignment so the main can
+  // hand out distinct deficient buckets to each worker (cross-worker
+  // rotation). Requests are strictly sequential — one outstanding at a time —
+  // so a single pending completer suffices. The `ready` handshake hands the
+  // main our reply port; closing `replyPort` at the end lets the isolate exit.
+  final replyPort = ReceivePort();
+  Completer<String?>? pendingAssign;
+  replyPort.listen((msg) {
+    if (msg is Map && msg['type'] == 'assignTarget') {
+      pendingAssign?.complete(msg['targetKey'] as String?);
+      pendingAssign = null;
+    }
+  });
+  params.sendPort.send({
+    'type': 'ready',
+    'worker': params.workerIndex,
+    'port': replyPort.sendPort,
+  });
+
+  // Ask the coordinator for the next bucket key. Returns the assigned
+  // `Target.key`, or `null` when the coordinator declines (no positive-gap
+  // bucket, or no coordinator wired — the caller then falls back locally).
+  Future<String?> requestAssignedTargetKey() {
+    final c = Completer<String?>();
+    pendingAssign = c;
+    params.sendPort.send({
+      'type': 'requestTarget',
+      'worker': params.workerIndex,
+    });
+    return c.future;
   }
 
   int generated = 0;
@@ -226,6 +445,8 @@ void _isolateEntryPoint(_IsolateParams params) {
     int h;
     Set<String>? allowedSlugs = baseAllowedSlugs;
     Set<String> preferredSlugs = const {};
+    bool attemptPathBased = false;
+    bool attemptSyBased = false;
 
     // Estimate the global corpus size: this worker only sees its own output,
     // so we approximate other workers' contributions by `generated × jobsCount`.
@@ -234,6 +455,11 @@ void _isolateEntryPoint(_IsolateParams params) {
     final estimatedCorpus = initialCorpusSize + generated * params.jobsCount;
     final inWarmup =
         params.equilibriumRequested && estimatedCorpus < kEquilibriumWarmupSize;
+
+    // Colour-domain size for this attempt, resolved in priority order
+    // below: warm-up draw → DomainTarget → gap-based draw. Both the path-
+    // and sy-based pre-fills are domain-aware, so neither overrides the draw.
+    int attemptDomainSize = 2;
 
     if (inWarmup) {
       final wc = pickWarmupConfig(
@@ -244,15 +470,33 @@ void _isolateEntryPoint(_IsolateParams params) {
         baseAllowedSlugs: baseAllowedSlugs ?? constraintSlugs.toSet(),
         baseRequired: requiredSet,
         rng: rng,
+        allowedDomains: params.allowedDomains,
+        domainCounts: domainCounts,
       );
       w = wc.width;
       h = wc.height;
       allowedSlugs = wc.allowedSlugs;
       preferredSlugs = wc.preferredSlugs;
+      attemptDomainSize = wc.domainSize;
     } else if (params.equilibriumRequested &&
         universe != null &&
         equiStats != null) {
-      target = pickTarget(equiStats, universe);
+      // The coordinator (main isolate) owns the cross-worker bucket rotation
+      // and global stats. When it declines (null), fall back to this worker's
+      // local argmax so a missing coordinator degrades gracefully.
+      final assignedKey = await requestAssignedTargetKey();
+      target = assignedKey != null
+          ? parseTargetKey(assignedKey)
+          : pickTarget(equiStats, universe, enabledAxes: enabledAxes);
+      // Safety net: if the coordinator assigned a target outside the focus
+      // axis (e.g. during a rotation cycle boundary), fall back to local.
+      if (target != null && !enabledAxes.contains(target.axis)) {
+        log(
+          'coordinator assigned ${target.key} (${target.axis}), '
+          'but focus is ${params.focusAxisName ?? "all"} — falling back',
+        );
+        target = pickTarget(equiStats, universe, enabledAxes: enabledAxes);
+      }
       if (target != null) {
         final resolved = _resolveTarget(
           target,
@@ -263,20 +507,43 @@ void _isolateEntryPoint(_IsolateParams params) {
         );
         allowedSlugs = resolved.allowedSlugs;
         preferredSlugs = resolved.preferredSlugs;
+        attemptPathBased = resolved.pathBasedScenario;
+        attemptSyBased = resolved.syBasedScenario;
         if (resolved.width != null && resolved.height != null) {
-          w = resolved.width!;
-          h = resolved.height!;
+          // Size targets are canonical bins (width ≤ height); pick a concrete
+          // orientation so both portrait and landscape grids keep appearing.
+          final o = _orientSize(
+            resolved.width!,
+            resolved.height!,
+            effectiveMinW,
+            effectiveMaxW,
+            effectiveMinH,
+            effectiveMaxH,
+            rng,
+          );
+          w = o.$1;
+          h = o.$2;
         } else {
           // Target leaves the size axis free — sample a size weighted by
           // its gap so the attempt advances both axes. Fall back to random
           // when no size has a positive gap.
           final picked = pickWeightedSize(equiStats, universe, rng);
-          w =
-              picked?.$1 ??
-              effectiveMinW + rng.nextInt(effectiveMaxW - effectiveMinW + 1);
-          h =
-              picked?.$2 ??
-              effectiveMinH + rng.nextInt(effectiveMaxH - effectiveMinH + 1);
+          if (picked != null) {
+            final o = _orientSize(
+              picked.$1,
+              picked.$2,
+              effectiveMinW,
+              effectiveMaxW,
+              effectiveMinH,
+              effectiveMaxH,
+              rng,
+            );
+            w = o.$1;
+            h = o.$2;
+          } else {
+            w = effectiveMinW + rng.nextInt(effectiveMaxW - effectiveMinW + 1);
+            h = effectiveMinH + rng.nextInt(effectiveMaxH - effectiveMinH + 1);
+          }
         }
       } else {
         // No target (every axis balanced) — random.
@@ -288,19 +555,97 @@ void _isolateEntryPoint(_IsolateParams params) {
       h = effectiveMinH + rng.nextInt(effectiveMaxH - effectiveMinH + 1);
     }
 
-    // Tell the UI what this worker is currently chasing so the dashboard can
-    // show per-worker progress. Includes the resolved size when relevant.
-    final String? targetLabel;
-    if (inWarmup) {
-      targetLabel = 'warmup ${w}x$h (${preferredSlugs.length}t)';
-    } else if (target != null) {
-      targetLabel = '${target.label} ${w}x$h';
-    } else if (params.equilibriumRequested) {
-      targetLabel = '(no target) ${w}x$h';
-    } else {
-      targetLabel = '${w}x$h';
+    if (!inWarmup) {
+      // `DomainTarget` pins the attempt's domain; every other iteration
+      // (other target, balanced, equilibrium off) draws it gap-based so the
+      // corpus converges on `kTargetDomainProfile` no matter which axis is
+      // being pushed. A frozen singleton short-circuits inside the picker.
+      attemptDomainSize = target is DomainTarget
+          ? target.size
+          : pickWeightedDomain(params.allowedDomains, domainCounts, rng);
     }
+
+    // Tell the UI what this worker is currently chasing so the dashboard can
+    // show per-worker progress. We always report the 5 axes (size, domain,
+    // ntypes, slugs, scenario) so any attempt is fully identifiable,
+    // regardless of which axis the equilibrium picker chose to push.
+    final scenario = _resolveScenario(
+      pathBased: params.pathBasedScenario || attemptPathBased,
+      syBased: params.syBasedScenario || attemptSyBased,
+      preferredSlugs: preferredSlugs,
+      requiredSlugs: requiredSet,
+    );
+    final resolvedTarget = target;
+    // `ntypesIntended` is the explicit target.n when chasing NTypesTarget,
+    // otherwise the soft cap implied by the preferred slug set (`≤` in the
+    // label). `null` when no slug preference is active.
+    final int? ntypesIntended = resolvedTarget is NTypesTarget
+        ? resolvedTarget.n
+        : (preferredSlugs.isNotEmpty ? preferredSlugs.length : null);
+    final ntypesLabel = ntypesIntended == null
+        ? 'ntypes=free'
+        : (resolvedTarget is NTypesTarget
+              ? 'ntypes=$ntypesIntended'
+              : 'ntypes≤$ntypesIntended');
+    final slugsLabel = 'slugs={${preferredSlugs.join(',')}}';
+    final body =
+        '${w}x$h dom$attemptDomainSize $ntypesLabel $slugsLabel '
+        'scenario=$scenario';
+    final String targetLabel;
+    if (inWarmup) {
+      targetLabel = 'warmup $body';
+    } else if (target != null) {
+      targetLabel = '[${target.label}] $body';
+    } else if (params.equilibriumRequested) {
+      targetLabel = '[balanced] $body';
+    } else {
+      targetLabel = body;
+    }
+
+    // Skip-then-continue when the combo is known infeasible (seeded by a
+    // prior run's CSV, or learned in-session via the tracker). A skipped
+    // iteration emits no `'target'` / `'attempt'` event — from the CLI's
+    // point of view the attempt simply never happened. The safety brake
+    // releases the filter after [skipSafety] consecutive skips so the
+    // worker can't deadlock if every candidate tuple has been blacklisted.
+    final attemptKey = AttemptKey(
+      targetKey: resolvedTarget?.key ?? 'none',
+      sortedSlugs: preferredSlugs.toList()..sort(),
+      // The `+d3` suffix separates the dom-2 / dom-3 populations in the
+      // blacklist (very different success rates) without touching the
+      // `scenario` column or the profile axis.
+      scenario: attemptScenarioKey(scenario, attemptDomainSize),
+      sizeBucket: bucketForArea(w, h),
+    );
+    final blacklisted =
+        seedSet.contains(attemptKey.serialized) ||
+        tracker.isBlacklisted(attemptKey, kThreshold: params.adaptiveK);
+    if (blacklisted) {
+      if (consecutiveSkips < params.skipSafety) {
+        consecutiveSkips++;
+        log('  skip blacklisted combo: ${attemptKey.serialized}');
+        continue;
+      }
+      log(
+        '  skip safety triggered after $consecutiveSkips skips — '
+        'running blacklisted combo to avoid lockup: ${attemptKey.serialized}',
+      );
+    }
+    consecutiveSkips = 0;
+
     params.sendPort.send({'type': 'target', 'label': targetLabel});
+
+    // Snapshot the per-slug deficit map for this attempt. Equilibrium-only
+    // (skipped during warm-up: corpus too sparse for meaningful gaps). The
+    // map drives the generator's secondary candidate-sort key so under-
+    // represented slugs are pulled into the puzzle alongside the target.
+    final Map<String, double>? slugDeficitMap =
+        (params.equilibriumRequested &&
+            !inWarmup &&
+            equiStats != null &&
+            universe != null)
+        ? slugDeficits(equiStats, universe)
+        : null;
 
     final config = GeneratorConfig(
       width: w,
@@ -314,14 +659,26 @@ void _isolateEntryPoint(_IsolateParams params) {
           ? PuzzleLevel.values[params.targetLevelIndex!]
           : null,
       easingBudget: Duration(milliseconds: params.easingBudgetMs),
-      useBossPrefill: params.useBossPrefill,
+      // CLI flag (`--scenario path-based`) OR equilibrium-driven choice
+      // (`ProfileTarget(pathBased)`) both activate the path-based pre-fill.
+      pathBasedScenario: params.pathBasedScenario || attemptPathBased,
+      // Same OR pattern for the SY-based scenario.
+      syBasedScenario: params.syBasedScenario || attemptSyBased,
+      slugDeficitScores: slugDeficitMap,
+      domain: attemptDomainSize == 3 ? fullDomain : defaultDomain,
+      pathMaxRetries: params.pathMaxRetries,
+      pathWindingProb: params.pathWindingProb,
+      strategy: params.strategy,
+      maxStall: Duration(milliseconds: params.maxStallMs),
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;
+    final attemptDeadlineMs = attemptStartMs + params.maxAttemptTimeMs;
     log(
       'attempt #${generated + 1}: $targetLabel '
       'allowedSlugs=$allowedSlugs preferred=$preferredSlugs '
-      'userRequired=$requiredSet',
+      'userRequired=$requiredSet '
+      'budget=${params.maxAttemptTimeMs}ms',
     );
 
     // Throttle progress logs to one entry per [progressLogIntervalMs] inside
@@ -337,13 +694,36 @@ void _isolateEntryPoint(_IsolateParams params) {
     // so the callback fires at most once per attempt. Reset every
     // iteration so a previous attempt's reason doesn't leak forward.
     GenerationRejectReason? lastReject;
+    // Path-based per-attempt diagnostics (retries, routing timings, failure
+    // cause tally). Filled on success and failure; null for non-path attempts.
+    PathPrefillStats? lastPathStats;
+    // Largest inter-accept gap (ms) seen in the iterative loop. Used to
+    // calibrate `maxStall`: any successful attempt had every gap below the
+    // configured `maxStall`, so the distribution of this across successes
+    // is the safe floor for lowering it.
+    int? lastMaxGapMs;
+    // Set inside `shouldStop` when the per-attempt deadline (not the
+    // global maxTime) is what triggered the abort. Used after the
+    // attempt to relabel the reject from `cancelled` to `attemptTimeout`.
+    bool attemptDeadlineHit = false;
 
     ({String line, PuzzleLevel level})? result;
     try {
       result = PuzzleGenerator.generateOne(
         config,
         usageStats: usageStats,
-        onLog: log,
+        onPathStats: (s) => lastPathStats = s,
+        onStallStats: (g) => lastMaxGapMs = g,
+        onTimings: (micros, calls) {
+          // One message per attempt. The CLI aggregates both maps
+          // additively across workers and attempts so `total_micros /
+          // total_calls` yields a meaningful average per stage.
+          params.sendPort.send({
+            'type': 'timings',
+            'micros': micros,
+            'calls': calls,
+          });
+        },
         onProgress: (p) {
           lastTried = p.constraintsTried;
           lastTotalConstraints = p.constraintsTotal;
@@ -370,9 +750,18 @@ void _isolateEntryPoint(_IsolateParams params) {
             lastProgressLogMs = now;
           }
         },
-        shouldStop: () => stopwatch.elapsed > maxTime,
+        shouldStop: () {
+          final nowMs = stopwatch.elapsedMilliseconds;
+          if (nowMs > params.maxTimeMs) return true;
+          if (nowMs >= attemptDeadlineMs) {
+            attemptDeadlineHit = true;
+            return true;
+          }
+          return false;
+        },
         onReject: (r, rejectedPu) {
           lastReject = r;
+          params.sendPort.send({'type': 'reject', 'reason': r.index});
           // Persist every rejected puzzle to `assets/<reason>.txt` so
           // post-run analysis can inspect each failure mode (why did
           // the easing plateau? what did the ratio-too-high puzzles
@@ -405,25 +794,86 @@ void _isolateEntryPoint(_IsolateParams params) {
       result = null;
     }
 
+    // When the abort was triggered by the per-attempt deadline rather than
+    // the global maxTime, relabel `cancelled` → `attemptTimeout` so the
+    // CSV row carries the more precise reason. The global maxTime case
+    // keeps `cancelled` because the worker is about to exit the loop.
+    if (attemptDeadlineHit &&
+        result == null &&
+        lastReject == GenerationRejectReason.cancelled) {
+      lastReject = GenerationRejectReason.attemptTimeout;
+    }
+
     final attemptDurationMs = stopwatch.elapsedMilliseconds - attemptStartMs;
+    // `reason=unknown` covers the rare "exception during generateOne" path
+    // (the catch above sets result=null without firing onReject). Anything
+    // else points at a specific reject site — see `GenerationRejectReason`.
+    final rejectReason = result != null
+        ? null
+        : (lastReject?.name ?? 'unknown');
+    // Path-based diagnostics suffix for the log (empty for non-path attempts).
+    final ps = lastPathStats;
+    final pathStatsLog = ps == null
+        ? ''
+        : ' [path retries=${ps.retriesUsed} routingMaxMs=${ps.routingMsMax} '
+              'routingTotalMs=${ps.routingMsTotal} prefillMs=${ps.prefillMs}]';
     if (result != null) {
       log(
         '  result: SUCCESS in ${attemptDurationMs}ms '
-        '(tried=$lastTried/$lastTotalConstraints)',
+        '(tried=$lastTried/$lastTotalConstraints)$pathStatsLog',
       );
     } else {
-      // `reason=unknown` covers the rare "exception during generateOne"
-      // path (the catch above sets result=null without firing
-      // onReject). Anything else points at a specific reject site —
-      // see `GenerationRejectReason` for the inventory.
-      final reason = lastReject?.name ?? 'unknown';
       log(
         '  result: FAILURE in ${attemptDurationMs}ms '
         '(tried=$lastTried/$lastTotalConstraints, '
         'lastRatio=${lastRatio.toStringAsFixed(3)}, '
-        'reason=$reason)',
+        'reason=$rejectReason)$pathStatsLog',
       );
     }
+
+    // Emit one attempt event per loop iteration so the CLI can append a row
+    // to `generator_stats.csv` — both on success and on abandon. All values
+    // are primitives so the Map passes cleanly through the SendPort.
+    // Only forward slugs whose deficit was strictly positive — zero entries
+    // would just inflate the payload and the downstream CSV column.
+    final Map<String, double>? deficitsToReport = slugDeficitMap == null
+        ? null
+        : {
+            for (final e in slugDeficitMap.entries)
+              if (e.value > 0) e.key: e.value,
+          };
+    params.sendPort.send({
+      'type': 'attempt',
+      'worker': params.workerIndex,
+      'inWarmup': inWarmup,
+      'targetKey': resolvedTarget?.key,
+      'width': w,
+      'height': h,
+      'ntypesIntended': ntypesIntended,
+      'preferredSlugs': preferredSlugs.toList(),
+      'allowedSlugs': allowedSlugs?.toList(),
+      'scenario': scenario,
+      'domain': attemptDomainSize,
+      'success': result != null,
+      'rejectReason': rejectReason,
+      'durationMs': attemptDurationMs,
+      'puzzleLevel': result?.level.index,
+      'puzzleLine': result?.line,
+      'slugDeficits': deficitsToReport,
+      // Path-based per-attempt metrics (null for non-path attempts).
+      'pathRetries': lastPathStats?.retriesUsed,
+      'pathRoutingCalls': lastPathStats?.routingCalls,
+      'pathRoutingMsMax': lastPathStats?.routingMsMax,
+      'pathRoutingMsTotal': lastPathStats?.routingMsTotal,
+      'pathPrefillMs': lastPathStats?.prefillMs,
+      // Largest inter-accept gap (ms) in the iterative loop; null when no
+      // accept happened (e.g. prefill-stage failures).
+      'maxAcceptGapMs': lastMaxGapMs,
+    });
+
+    // Feed the in-session tracker so a combo with K failures and zero
+    // successes joins the local blacklist for the rest of this run.
+    tracker.record(attemptKey, success: result != null);
 
     if (result != null) {
       generated++;
@@ -447,6 +897,15 @@ void _isolateEntryPoint(_IsolateParams params) {
           usageStats[slug] = (usageStats[slug] ?? 0) + 1;
         }
       }
+      // Honest domain accounting: read the domain off the *emitted* line,
+      // not the attempt intent — `generateOne` auto-shrinks a domain-3
+      // puzzle to `v2_12_…` when the third colour ends up unused, and that
+      // shrunk line is what the corpus (and the next run's stats) will see.
+      final emittedDomainSize = parts.length >= 2 ? parts[1].length : 2;
+      if (emittedDomainSize == 2 || emittedDomainSize == 3) {
+        domainCounts[emittedDomainSize] =
+            (domainCounts[emittedDomainSize] ?? 0) + 1;
+      }
       // Update equilibrium stats (used to pick the next target). We keep
       // them current during warm-up too so the switch to equilibrium picks
       // up where the warm-up corpus left off.
@@ -455,6 +914,8 @@ void _isolateEntryPoint(_IsolateParams params) {
           slugs: producedSlugs,
           width: w,
           height: h,
+          profile: generationBucket(detectPuzzleProfile(line)),
+          domainSize: emittedDomainSize,
         );
       }
     }
@@ -464,6 +925,7 @@ void _isolateEntryPoint(_IsolateParams params) {
     'worker done: generated=$generated/${params.count}, '
     'elapsed=${stopwatch.elapsed.inMilliseconds}ms',
   );
+  replyPort.close();
   params.sendPort.send({'type': 'done', 'generated': generated});
 }
 
@@ -478,12 +940,84 @@ class _ResolvedTarget {
   /// `generateOne` separately.
   final Set<String> preferredSlugs;
 
+  /// True when the equilibrium picked `ProfileTarget(pathBased)` — the
+  /// next attempt should route through `preFillPath`. Combined with the
+  /// CLI flag via OR.
+  final bool pathBasedScenario;
+
+  /// True when the equilibrium picked `ProfileTarget(syBased)` — the
+  /// next attempt should route through `preFillSy`. Combined with the
+  /// CLI flag via OR.
+  final bool syBasedScenario;
+
   const _ResolvedTarget({
     this.width,
     this.height,
     this.allowedSlugs,
     this.preferredSlugs = const {},
+    this.pathBasedScenario = false,
+    this.syBasedScenario = false,
   });
+}
+
+/// Slugs whose observed share in `stats` exceeds [k] × uniform target
+/// share (1 / nSlugs). Used to *hard-ban* those slugs from the
+/// `allowedSlugs` of an attempt, so the iterative loop cannot quietly
+/// add them on top of a target slug. Without this, propagation-friendly
+/// slugs (NC, EY, …) pile up in every generated puzzle even when the
+/// equilibrium picker is actively targeting under-represented slugs —
+/// the picker's preference is "soft" for SlugTarget / SizeTarget cases
+/// (those leave `allowedSlugs` unrestricted by design).
+///
+/// Returns an empty set when the corpus is too small for shares to
+/// stabilise (< 20 puzzles): on a sparse corpus a single outlier slug
+/// would trip the threshold and lock out an otherwise-balanced
+/// generation.
+Set<String> _overrepresentedSlugs(
+  EquilibriumStats stats,
+  TargetUniverse universe,
+  double k,
+) {
+  if (stats.totalPuzzles < 20) return const {};
+  if (universe.allowedSlugs.isEmpty) return const {};
+  final target = 1.0 / universe.allowedSlugs.length;
+  final threshold = k * target;
+  return {
+    for (final s in universe.allowedSlugs)
+      if ((stats.slugCounts[s] ?? 0) / stats.totalPuzzles > threshold) s,
+  };
+}
+
+/// Multiplier on the uniform target share that defines "over-represented"
+/// for the hard-ban path. `k=3` bans a slug once its observed share
+/// exceeds 3× its target — on a 13-slug universe that's ≈ 23 %. Picked
+/// to bite the worst offenders (NC, EY in our preseed corpus at 54 % /
+/// 39 %) without starving the iterative loop on more moderate slugs
+/// (RC, CC sit just under at ≈ 24 %).
+const double kOverrepBanRatio = 3.0;
+
+/// Pick a concrete orientation for a canonical size bin `(width ≤ height)`.
+/// The size axis is orientation-agnostic, so both `4x5` and `5x4` should be
+/// produced from the `(4, 5)` bin — flip 50/50, but only to an orientation
+/// that still fits the configured width/height bounds (an asymmetric range
+/// must never yield an out-of-range grid). Squares are returned as-is.
+(int, int) _orientSize(
+  int width,
+  int height,
+  int minW,
+  int maxW,
+  int minH,
+  int maxH,
+  Random rng,
+) {
+  if (width == height) return (width, height);
+  bool fits(int w, int h) => w >= minW && w <= maxW && h >= minH && h <= maxH;
+  final keepOk = fits(width, height);
+  final swapOk = fits(height, width);
+  if (keepOk && swapOk) {
+    return rng.nextBool() ? (width, height) : (height, width);
+  }
+  return swapOk ? (height, width) : (width, height);
 }
 
 /// Translate an abstract [Target] into the concrete restrictions
@@ -492,6 +1026,14 @@ class _ResolvedTarget {
 /// the slug or size axis so each attempt advances multiple axes at once,
 /// without making it deterministic enough that workers collide on the same
 /// sub-config.
+///
+/// Over-represented slugs (see [_overrepresentedSlugs]) are hard-banned
+/// from `allowedSlugs` for `SlugTarget`, `SizeTarget` and `NTypesTarget` —
+/// those used to leave `allowedSlugs` unrestricted (Slug/Size) or pinned
+/// to a tight 3-4 slug pool (NTypes), both of which collapsed productivity
+/// once the corpus left warmup. `PairTarget` keeps its hard restriction:
+/// the picker only chooses two under-represented slugs there, so the pair
+/// is by construction free of over-rep entries.
 _ResolvedTarget _resolveTarget(
   Target target,
   TargetUniverse universe,
@@ -499,19 +1041,46 @@ _ResolvedTarget _resolveTarget(
   EquilibriumStats stats,
   Random rng,
 ) {
+  final banned = _overrepresentedSlugs(stats, universe, kOverrepBanRatio);
   switch (target) {
     case SlugTarget(:final slug):
       // Slug axis fixed (X). Size axis is filled by the worker loop after
-      // resolve. allowedSlugs stays unrestricted so the iterative loop has
-      // room to add other slugs naturally.
-      return _ResolvedTarget(preferredSlugs: {slug});
+      // resolve.
+      if (slug == 'SH') {
+        // SH is handled by the profile axis (5%). Don't give it preferred
+        // status from the slug axis — only ProfileTarget(sh) should.
+        return const _ResolvedTarget();
+      }
+      // allowedSlugs is restricted to "everything except the
+      // over-represented" — the iterative loop can still pick anything
+      // else, but propagation-dominant slugs can't piggyback.
+      // Re-add the explicitly-targeted slug even if it is itself
+      // over-represented: otherwise the ban would strip it from both
+      // `allowedSlugs` and (after the downstream `preferred ∩ allowed`) the
+      // preferred set, leaving the attempt chasing a slug it can't place.
+      final allowed =
+          universe.allowedSlugs.where((s) => !banned.contains(s)).toSet()
+            ..add(slug);
+      return _ResolvedTarget(allowedSlugs: allowed, preferredSlugs: {slug});
 
     case NTypesTarget():
-      // Ntypes axis fixed (N). Pick the N slugs by slug-axis gap so this
-      // attempt also advances the slug axis. The 6+ bucket is never
-      // targeted, so target.n is always in [1, 5] here.
+      // Ntypes axis fixed (N). Pick N slugs by slug-axis gap so this attempt
+      // also advances the slug axis. Those N slugs are passed as `preferred`
+      // (priority in candidate ranking) but `allowedSlugs` stays open
+      // (everything except over-represented). Locking `allowedSlugs` to the
+      // chosen N tanked productivity to < 1 % on a balanced 3-colour corpus
+      // (bench final-r1, 2026-05-13): every constraint slot competed for the
+      // same 3-4 slug pool, and once propagation closed the puzzle there was
+      // no fallback. Soft target trades exact ntypes guarantee for
+      // productivity — the picker self-corrects via the stats feedback loop.
       final chosen = pickWeightedSlugs(stats, universe, target.n, rng);
-      return _ResolvedTarget(allowedSlugs: chosen, preferredSlugs: chosen);
+      // Re-add the chosen slugs even if some are over-represented, so the
+      // ban can't strip a targeted slug out from under the downstream
+      // `preferred ∩ allowed` intersection.
+      final allowed =
+          universe.allowedSlugs.where((s) => !banned.contains(s)).toSet()
+            ..addAll(chosen);
+      return _ResolvedTarget(allowedSlugs: allowed, preferredSlugs: chosen);
 
     case PairTarget(:final slugA, :final slugB):
       // Slugs fixed (the pair). Size filled by worker loop.
@@ -520,13 +1089,123 @@ _ResolvedTarget _resolveTarget(
 
     case SizeTarget(:final width, :final height):
       // Size axis fixed. Push one weighted slug as soft preference so this
-      // attempt also nudges the slug axis. allowedSlugs stays unrestricted
-      // (the iterative loop can still draw from the full pool).
+      // attempt also nudges the slug axis. allowedSlugs is restricted to
+      // exclude over-represented slugs (same rationale as SlugTarget).
       final extra = pickWeightedSlugs(stats, universe, 1, rng);
+      final allowed = universe.allowedSlugs
+          .where((s) => !banned.contains(s))
+          .toSet();
       return _ResolvedTarget(
         width: width,
         height: height,
+        allowedSlugs: allowed,
         preferredSlugs: extra,
       );
+
+    case ProfileTarget(:final profile):
+      // Profile axis fixed. The pre-fill mode is picked up by the
+      // generator config; other axes (slug / ntypes / pair / size) are
+      // filled by the worker loop's secondary push.
+      switch (profile) {
+        case ProfileCategory.classic:
+          // No special restriction — default flow. The profile axis is
+          // "satisfied" by any non-SH non-path-based puzzle the loop
+          // produces.
+          return const _ResolvedTarget();
+        case ProfileCategory.sh:
+          // Push SH as soft preference; `_preFillSh` activates whenever
+          // SH ∈ prioritySlugs (cf. `generator.dart` dispatch).
+          return const _ResolvedTarget(preferredSlugs: {'SH'});
+        case ProfileCategory.bb:
+          // Push BB as soft preference; `preFillBB` activates whenever
+          // BB ∈ prioritySlugs (cf. `generator.dart` dispatch).
+          return const _ResolvedTarget(preferredSlugs: {'BB'});
+        case ProfileCategory.pathBased:
+          // Activate path-based pre-fill. The path generator picks its
+          // own L / K / colors / topology — slug-level preferences are
+          // ignored.
+          return const _ResolvedTarget(pathBasedScenario: true);
+        case ProfileCategory.syBased:
+          // Activate SY-based pre-fill. The SY generator picks its own
+          // island count, axes and topology; slug-level preferences are
+          // ignored.
+          return const _ResolvedTarget(syBasedScenario: true);
+        case ProfileCategory.minesweeper:
+        case ProfileCategory.nonogram:
+        case ProfileCategory.local:
+        case ProfileCategory.group:
+          // Unreachable: emergent profiles never appear in a ProfileTarget
+          // (kTargetProfile only contains the four pre-fill modes).
+          throw StateError(
+            'Unexpected emergent profile $profile in profile-target switch',
+          );
+      }
+    case CompositionTarget(:final families):
+      // Composition axis fixed. Restrict allowed slugs to the union of
+      // slugs in the target's real families (excluding `none` padding),
+      // and bias preferred slugs toward the dominant families.
+      final real = families.where((f) => f != kEmptyFamily).toList();
+      final allInFamilies = universe.allowedSlugs
+          .where((s) => real.contains(kConstraintFamily[s]))
+          .toSet();
+      if (allInFamilies.isEmpty) {
+        // Fallback: no slugs match — let the loop decide.
+        return const _ResolvedTarget();
+      }
+      // Biased preferred slugs: more drawn from the dominant family (1st),
+      // fewer from the 2nd, even fewer from the 3rd. Sort by slug deficit
+      // within each family so the secondary axis also advances.
+      final deficits = slugDeficits(stats, universe);
+      final preferred = <String>{};
+      final weights = [3, 2, 1];
+      for (int i = 0; i < real.length && i < weights.length; i++) {
+        final family = real[i];
+        final familySlugs =
+            universe.allowedSlugs
+                .where((s) => kConstraintFamily[s] == family)
+                .where((s) => !preferred.contains(s))
+                .toList()
+              ..sort(
+                (a, b) => (deficits[b] ?? 0.0).compareTo(deficits[a] ?? 0.0),
+              );
+        final n = weights[i] > familySlugs.length
+            ? familySlugs.length
+            : weights[i];
+        for (int j = 0; j < n; j++) {
+          preferred.add(familySlugs[j]);
+        }
+      }
+      return _ResolvedTarget(
+        allowedSlugs: allInFamilies,
+        preferredSlugs: preferred,
+      );
+
+    case DomainTarget():
+      // Domain axis fixed. The worker loop reads `target.size` directly to
+      // pin the attempt's domain; every other axis stays free (size via the
+      // weighted secondary draw, slugs via the loop's default pool).
+      return const _ResolvedTarget();
   }
+}
+
+// Effective pre-fill scenario for one attempt. Priority order matches
+// `PuzzleGenerator.generateOne` dispatch: pathBased / syBased short-circuit
+// the regular flow, and SH pre-fill activates whenever SH ∈ prioritySlugs
+// (= preferred ∪ required, cf. generator.dart). When none apply we're in
+// the classic grid-first flow.
+String _resolveScenario({
+  required bool pathBased,
+  required bool syBased,
+  required Set<String> preferredSlugs,
+  required Set<String> requiredSlugs,
+}) {
+  if (pathBased) return 'pathBased';
+  if (syBased) return 'syBased';
+  if (preferredSlugs.contains('SH') || requiredSlugs.contains('SH')) {
+    return 'sh';
+  }
+  if (preferredSlugs.contains('BB') || requiredSlugs.contains('BB')) {
+    return 'bb';
+  }
+  return 'classic';
 }

@@ -78,11 +78,10 @@ void main() {
       },
     );
 
-    test('current-collection plays still win over stale on-disk entries', () async {
-      // If a puzzle is currently played (in-memory) AND already has a
-      // stale entry on disk (e.g. an older play of the same puzzle),
-      // the in-session version must overwrite it — otherwise the new
-      // timings / failures would never make it to storage.
+    test('two plays of the same puzzle on distinct dates are both kept', () async {
+      // The full history must survive a replay: an older finished play on
+      // disk and a newer in-session play of the same puzzle have different
+      // completion stamps, so both rows are persisted (keyed on finished).
       const puzzleLine =
           'v2_12_3x3_000020020_FM:1.1;GS:0.1;PA:3.right;PA:8.left_1:122221122_8';
       const oldEntry =
@@ -101,9 +100,40 @@ void main() {
       await db.writeStats();
 
       final persisted = statsFile.readAsStringSync().trim();
-      // Exactly one entry remains for this canonical key, and its
-      // timings come from the current session (17s 0f), not the old
-      // stored row (99s 9f).
+      final lines = persisted
+          .split('\n')
+          .where((l) => l.contains(puzzleLine))
+          .toList();
+      // Both the stale 2025 play and the fresh 2026 play are present.
+      expect(lines, hasLength(2));
+      expect(lines.any((l) => l.contains('99s 9f')), isTrue);
+      expect(lines.any((l) => l.contains('17s 0f')), isTrue);
+    });
+
+    test('re-emitting the same play does not create a duplicate row', () async {
+      // The periodic 60s flush re-emits the in-progress play every tick.
+      // Because the dedup key includes the completion stamp, a play with the
+      // same `finished` as the on-disk row collapses to a single entry, and
+      // the in-session version (fresh timings) wins.
+      const puzzleLine =
+          'v2_12_3x3_000020020_FM:1.1;GS:0.1;PA:3.right;PA:8.left_1:122221122_8';
+      // Same completion second as the session play below, but stale timings.
+      const sameStampEntry =
+          '2026-05-11T17:55:49 99s 9f $puzzleLine - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg';
+      statsFile.writeAsStringSync(sameStampEntry);
+
+      final db = Database(playerLevel: 50);
+      db.collection = '1-easy';
+      final puz = PuzzleData(puzzleLine);
+      puz.played = true;
+      puz.finished = DateTime(2026, 5, 11, 17, 55, 49);
+      puz.duration = 17;
+      puz.failures = 0;
+      db.puzzles = [puz];
+
+      await db.writeStats();
+
+      final persisted = statsFile.readAsStringSync().trim();
       final lines = persisted
           .split('\n')
           .where((l) => l.contains(puzzleLine))
@@ -111,6 +141,92 @@ void main() {
       expect(lines, hasLength(1));
       expect(lines.single, contains('17s 0f'));
       expect(lines.single, isNot(contains('99s 9f')));
+    });
+
+    test(
+      'an unfinished row is dropped once the puzzle has a finished play',
+      () async {
+        // A skip / abandoned attempt (finished == null) leaves an `unfinished`
+        // row. Once the same puzzle is completed, the completion supersedes the
+        // attempt and the unfinished row is purged — keeping the file free of
+        // noise the analysis pipeline ignores anyway.
+        const puzzleLine =
+            'v2_12_3x3_000020020_FM:1.1;GS:0.1;PA:3.right;PA:8.left_1:122221122_8';
+        const unfinishedEntry =
+            'unfinished 0s 0f $puzzleLine - S__ - 2026-05-10T09:00:00 -  -  -  - 0h - 0e - 0fc - 0lg';
+        statsFile.writeAsStringSync(unfinishedEntry);
+
+        final db = Database(playerLevel: 50);
+        db.collection = '1-easy';
+        final puz = PuzzleData(puzzleLine);
+        puz.played = true;
+        puz.finished = DateTime(2026, 5, 11, 17, 55, 49);
+        puz.duration = 17;
+        puz.failures = 0;
+        db.puzzles = [puz];
+
+        await db.writeStats();
+
+        final persisted = statsFile.readAsStringSync().trim();
+        final lines = persisted
+            .split('\n')
+            .where((l) => l.contains(puzzleLine))
+            .toList();
+        expect(lines, hasLength(1));
+        expect(lines.single, isNot(contains('unfinished')));
+        expect(lines.single, contains('17s 0f'));
+      },
+    );
+
+    test(
+      'loadStats surfaces the most recent play, regardless of line order',
+      () async {
+        // With multiple finished plays of one puzzle in the file, the in-memory
+        // PuzzleData must reflect the latest one. The on-disk order is
+        // deliberately newest-first to prove the selection is by timestamp, not
+        // by parse order.
+        const puzzleLine =
+            'v2_12_3x3_000020020_FM:1.1;GS:0.1;PA:3.right;PA:8.left_1:122221122_8';
+        const recent =
+            '2026-05-11T17:55:49 17s 0f $puzzleLine - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg';
+        const older =
+            '2025-01-01T00:00:00 99s 9f $puzzleLine - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg';
+
+        final db = Database(playerLevel: 50);
+        db.collection = '1-easy';
+        final puz = PuzzleData(puzzleLine);
+        db.puzzles = [puz];
+        db.loadStats([recent, older]);
+
+        expect(puz.played, isTrue);
+        expect(puz.duration, 17);
+        expect(puz.failures, 0);
+        expect(puz.finished, DateTime(2026, 5, 11, 17, 55, 49));
+      },
+    );
+
+    test('getAllStats exposes the full history, not one row per puzzle', () async {
+      // The "all" scope of the stats page (view + share) must surface every
+      // play of a puzzle — that is the channel a mobile player uses to get
+      // their preserved history out for analysis. Two finished plays of the
+      // same puzzle on disk must both come back.
+      const puzzleLine =
+          'v2_12_3x3_000020020_FM:1.1;GS:0.1;PA:3.right;PA:8.left_1:122221122_8';
+      const play1 =
+          '2025-01-01T00:00:00 99s 9f $puzzleLine - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg';
+      const play2 =
+          '2026-05-11T17:55:49 17s 0f $puzzleLine - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg';
+      statsFile.writeAsStringSync('$play1\n$play2');
+
+      final db = Database(playerLevel: 50);
+      db.collection = '1-easy';
+      db.puzzles = []; // nothing in memory: pure on-disk history readback
+
+      final all = await db.getAllStats();
+      final lines = all.where((l) => l.contains(puzzleLine)).toList();
+      expect(lines, hasLength(2));
+      expect(lines.any((l) => l.contains('99s 9f')), isTrue);
+      expect(lines.any((l) => l.contains('17s 0f')), isTrue);
     });
   });
 }

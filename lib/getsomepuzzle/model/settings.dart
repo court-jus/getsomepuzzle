@@ -19,8 +19,8 @@ class ChangeableSettings {
   IdleTimeout? idleTimeout;
   int? playerLevel;
   bool? autoLevel;
-  bool? hintsEnabled;
   bool? grayoutEnabled;
+  String? statsDirectory;
 
   ChangeableSettings({
     this.validateType,
@@ -30,13 +30,13 @@ class ChangeableSettings {
     this.idleTimeout,
     this.playerLevel,
     this.autoLevel,
-    this.hintsEnabled,
     this.grayoutEnabled,
+    this.statsDirectory,
   });
 
   @override
   String toString() {
-    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}; HintsOn: $hintsEnabled; GrayoutOn: $grayoutEnabled";
+    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}; GrayoutOn: $grayoutEnabled";
   }
 }
 
@@ -48,6 +48,8 @@ class Settings {
   IdleTimeout idleTimeout;
   int playerLevel;
   bool autoLevel;
+  bool grayoutEnabled;
+  String? statsDirectory;
 
   /// When `false`, the hint button (and the underlying solver-on-demand
   /// it triggers) is disabled. Lets the player opt out of in-app solving
@@ -71,8 +73,8 @@ class Settings {
     this.idleTimeout = IdleTimeout.disabled,
     this.playerLevel = 0,
     this.autoLevel = true,
-    this.hintsEnabled = true,
     this.grayoutEnabled = true,
+    this.statsDirectory,
   });
 
   @override
@@ -145,8 +147,8 @@ class Settings {
     );
     playerLevel = prefs.getInt("settingsPlayerLevel") ?? 0;
     autoLevel = prefs.getBool("settingsAutoLevel") ?? true;
-    hintsEnabled = prefs.getBool("settingsHintsEnabled") ?? true;
     grayoutEnabled = prefs.getBool("settingsGrayoutEnabled") ?? true;
+    statsDirectory = prefs.getString("settingsStatsDirectory");
   }
 
   Future<void> save() async {
@@ -158,8 +160,12 @@ class Settings {
     prefs.setString("settingsIdleTimeout", idleTimeout.name);
     prefs.setInt("settingsPlayerLevel", playerLevel);
     prefs.setBool("settingsAutoLevel", autoLevel);
-    prefs.setBool("settingsHintsEnabled", hintsEnabled);
     prefs.setBool("settingsGrayoutEnabled", grayoutEnabled);
+    if (statsDirectory != null) {
+      prefs.setString("settingsStatsDirectory", statsDirectory!);
+    } else {
+      prefs.remove("settingsStatsDirectory");
+    }
   }
 
   void change(ChangeableSettings newValue) {
@@ -184,12 +190,26 @@ class Settings {
     if (newValue.autoLevel != null) {
       autoLevel = newValue.autoLevel!;
     }
-    if (newValue.hintsEnabled != null) {
-      hintsEnabled = newValue.hintsEnabled!;
-    }
     if (newValue.grayoutEnabled != null) {
       grayoutEnabled = newValue.grayoutEnabled!;
     }
+    if (newValue.statsDirectory != null) {
+      statsDirectory = newValue.statsDirectory;
+    }
     save();
+  }
+
+  /// Set or clear the stats sync directory and persist immediately.
+  /// Separate from [change] because [ChangeableSettings.statsDirectory]
+  /// is a tri-state (null = unset, non-null = set) that doesn't map
+  /// cleanly to the "null = unchanged" convention of [change].
+  Future<void> setStatsDirectory(String? path) async {
+    statsDirectory = path;
+    final prefs = await SharedPreferences.getInstance();
+    if (path != null) {
+      await prefs.setString('settingsStatsDirectory', path);
+    } else {
+      await prefs.remove('settingsStatsDirectory');
+    }
   }
 }

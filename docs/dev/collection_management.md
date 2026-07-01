@@ -16,8 +16,13 @@ records design decisions about the corpus as a whole.
 | `assets/4-strong.txt`         | Strong — complex complicities (tier ≥ 4), no force                |
 | `assets/5-expert.txt`         | Expert — exactly 1 force round, depth ≤ 5                         |
 | `assets/6-mad.txt`            | Mad — ≥ 2 force rounds or depth > 5                               |
-| `assets/overfilled-easy.txt`  | Beginner-by-trace puzzles whose prefill ratio > 30 %              |
-| `assets/overfilled.txt`       | Higher-tier puzzles whose prefill ratio > 30 %                    |
+| `assets/1-easy-overfilled.txt`     | Beginner-by-trace puzzles whose prefill ratio > 30 %         |
+| `assets/2-player-overfilled.txt`   | Player-by-trace, prefill > 30 %                              |
+| `assets/3-advanced-overfilled.txt` | Advanced-by-trace, prefill > 30 %                            |
+| `assets/4-strong-overfilled.txt`   | Strong-by-trace, prefill > 30 %                              |
+| `assets/5-expert-overfilled.txt`   | Expert-by-trace, prefill > 30 %                              |
+| `assets/6-mad-overfilled.txt`      | Mad-by-trace, prefill > 30 %                                 |
+| `assets/overfilled.txt`            | Legacy bucket (pre-split); redistributed by `--route`        |
 
 Routing is by `classifyTrace` (`lib/getsomepuzzle/level.dart`), not by
 declared slugs. See `levels.md` for the cascade.
@@ -27,16 +32,22 @@ declared slugs. See `levels.md` for the cascade.
 | Tool                                  | Purpose                                                      |
 |---------------------------------------|--------------------------------------------------------------|
 | `bin/generate.dart`                   | Generate new puzzles, validate / re-validate existing ones   |
-| `bin/recompute.dart`                  | Re-sort constraints, refresh stored cplx, re-route by level  |
+| `bin/maintain.dart`                   | Full periodic-maintenance pipeline (6 steps, apply mode)     |
+| `bin/recompute.dart`                  | Re-sort constraints, refresh stored cplx, re-route by level; writes `solve_traces.tsv` |
 | `bin/dedup_puzzles.dart`              | Drop puzzles that are exact duplicates (canonical key match) |
-| `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated puzzles                 |
-| `bin/vectorize_puzzles.dart`          | Produce per-puzzle feature vector CSV                        |
+| `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated / MJ-border-conflict / regular-pattern puzzles |
+| `bin/vectorize_puzzles.dart`          | Produce per-puzzle feature vector CSV (reads `solve_traces.tsv`) |
 | `bin/cluster_puzzles.dart`            | Find near-duplicate pairs/clusters (report or --apply mode)  |
 | `bin/extract_onboarding.dart`         | Build a diverse onboarding bank from 1-easy                  |
-| `bin/classify_difficulty.dart`        | Classify each puzzle into the level cascade                  |
+| `bin/classify_difficulty.dart`        | Classify each puzzle into the level cascade (reads `solve_traces.tsv`) |
 | `bin/aggregate_player_stats.dart`     | Merge per-player stats files, dedup, refresh cplx            |
 | `bin/analyze_stats.dart`              | OLS regression on log(duration), per-bucket stats            |
-| `bin/plot_vectors.py`                 | 2-D PCA projection of the vectors (matplotlib + numpy)       |
+| `bin/remark_scenarios.dart`           | Tag legacy v2 lines with `_scenario:<name>` (reads `solve_traces.tsv`) |
+| `bin/trace_score.dart`                | Score puzzles by trace quality (reads `solve_traces.tsv`)    |
+| `bin/query_corpus.dart`               | Ad-hoc filtered queries over `assets/*.txt` (read-only)      |
+| `bin/plot_vectors.py`                 | 2-D PCA projection + supervised separability of the vectors (matplotlib + numpy) |
+| `bin/detect_regular_solutions.dart`   | Diagnose globally-regular solutions (damier / colour bars) over-rated by the trace (read-only report + optional CSV) |
+| `bin/find_single_path_puzzles.dart`   | Filter puzzles that have a unique deduction path (exactly one move at every step) — no branching, no backtracking needed |
 
 ## Generation
 
@@ -86,18 +97,99 @@ the complexity formula, or the constraint sort changes:
 dart run bin/recompute.dart assets/1-easy.txt
 ```
 
-`--route` redistributes the six playable-level files between
-themselves and the two out-of-cascade buckets (`overfilled*`). Any
-puzzle whose `classifyTrace` changed lands in its new home; nothing
-is duplicated or lost.
+`--route` redistributes puzzles into `<dest>.tmp` files matching
+their post-sort classification. Two modes:
 
-```bash
-dart run bin/recompute.dart --route
-```
+* **No positional args** — sources are the six playable-level files
+  plus the two out-of-cascade buckets (`overfilled*`). Any puzzle
+  whose `classifyTrace` changed lands in its new home; nothing is
+  duplicated or lost.
+
+  ```bash
+  dart run bin/recompute.dart --route
+  ```
+
+* **With positional args** — those files are used as the feed
+  instead of the level files. Useful to ventilate an unsorted feed
+  (e.g. a fresh `/tmp/path6.txt` produced by an experimental
+  generator) into the existing cascade. The existing destination
+  content is **preserved**: each touched destination's current content
+  is seeded into its `.tmp` before the feed is appended, so the final
+  rename adds the feed to the corpus rather than replacing it. Feed
+  puzzles already present (by `canonicalPuzzleKey`) are deduped and
+  skipped, so re-running the same feed is a no-op. The feed's own
+  verbatim noise (blanks, comments, parse failures) is dropped
+  silently — the feed is an input, not a destination we mirror.
+
+  ```bash
+  dart run bin/recompute.dart --route /tmp/path6.txt
+  ```
+
+Both modes accumulate output into `<dest>.tmp` (append mode,
+idempotent via `canonicalPuzzleKey`) and rename each `.tmp` →
+original in-place at the very end, once all writes have succeeded.
+An interrupted `--route` leaves `.tmp` files on disk; simply
+re-launch to resume — already-processed puzzles are skipped.
 
 `--dry-run` reports the level transitions without writing any file —
 useful to see how a new complexity tweak would shift the cascade
 before committing to it.
+
+## Solve trace cache (`solve_traces.tsv`)
+
+Running `solveExplained()` is the most expensive operation in the maintenance
+pipeline — it is called once per puzzle per tool, adding up to 6× per full
+`bin/maintain.dart` run. `solve_traces.tsv` is a local sidecar file that
+caches the post-sort solving trace of every puzzle so that all consumer tools
+can skip the solver entirely.
+
+### Format
+
+Tab-separated, three columns, no header:
+
+```
+puzzle_hash<TAB>canonical_key<TAB>trace
+```
+
+* **`puzzle_hash`** — FNV-1a 32-bit hash (7 base-36 chars) of
+  `domain_dims_prefill_sortedConstraints`. Changes automatically when the
+  puzzle identity or constraint set changes, invalidating the cached trace.
+* **`canonical_key`** — human-readable label (the `canonicalPuzzleKey` of the
+  post-sort v2 line). Not used for lookup; kept for debugging.
+* **`trace`** — semicolon-separated steps. Each step:
+  `type|cellIdx|val|tier|cp|fd|constraint`  
+  where `type ∈ {S, R, s, r}` (uppercase = propagation, lowercase = force;
+  S/s = SetValue, R/r = RemoveOption).
+
+### Writer: `bin/recompute.dart`
+
+`recompute` is the **only** writer of `solve_traces.tsv`. After sorting a
+puzzle's constraints it computes the hash and either reads the cached trace
+(cache hit → second `solveExplained()` skipped) or runs the solver and stores
+the result. The file is saved atomically once per run.
+
+### Consumers (read-only)
+
+`bin/vectorize_puzzles.dart`, `bin/cleanup_collections.dart` (`--boring`),
+`bin/classify_difficulty.dart`, `bin/remark_scenarios.dart`,
+`bin/trace_score.dart`, and `bin/dedup_puzzles.dart` all read the cache at
+startup. On a cache hit, `solveExplained()` is skipped entirely. On a miss
+they fall back to solving (except `dedup_puzzles.dart`, which trusts that
+`recompute` ran first and keeps the line verbatim with a warning).
+
+### Lifecycle
+
+The file is gitignored. Delete it to force a full re-solve:
+
+```bash
+rm -f solve_traces.tsv
+dart run bin/recompute.dart assets/*.txt   # repopulate
+```
+
+After a code change that alters the solver or complexity formula, deleting
+the cache ensures fresh traces. The hash-based invalidation handles
+per-puzzle identity changes automatically, but does **not** detect global
+formula changes — those require a manual `rm`.
 
 ## Pruning the corpus
 
@@ -111,26 +203,46 @@ canonicalised). Catches reruns of the generator that hit the same
 identity.
 
 ```bash
+# In-place (default — overwrites the file directly)
+dart run bin/dedup_puzzles.dart assets/1-easy.txt
+
+# Explicit output path (preserves the original)
 dart run bin/dedup_puzzles.dart -o deduped.txt assets/1-easy.txt
 ```
 
-### 2. Drop disliked or trivial-FM-dominated puzzles
+### 2. Drop disliked, trivial-FM-dominated, MJ-border-conflict, or regular-pattern puzzles
 
-`bin/cleanup_collections.dart` runs two passes (both gated by
-their own flag, both run when neither is passed):
+`bin/cleanup_collections.dart` runs four passes (each gated by
+its own flag, all run when none is passed):
 
 * `--disliked` — cross-reference `stats_aggregated/*.txt` and flag
   puzzles that appear with a `__D` (disliked) marker.
 * `--boring` — solve each puzzle, flag those where ≥ 90 % of moves
   are deduced by 1×2 / 2×1 FM constraints (the trivial-saturation
-  variants, weight 0 in `complexity.md`). 1-easy and overfilled-easy
+  variants, weight 0 in `complexity.md`). 1-easy and 1-easy-overfilled
   are exempt — the trivial saturation is *the lesson* there.
+* `--mj-conflict` — flag puzzles with two Majority (MJ) zones whose
+  dashed borders would overlap visually (a shared flush edge with
+  overlapping perpendicular extent — see `MajorityConstraint.conflictsWith`
+  and `majority.md`). Cheap pre-filter (≥ 2 `MJ:` tokens) gates the parse.
+  The generator already refuses such pairs, so this only catches legacy
+  corpus puzzles.
+* `--regular-patterns` — flag puzzles whose solved grid is a globally-regular
+  geometry the local trace over-rates, using the designer-confirmed predicates
+  (working doc §6.1/§8.1): a perfect damier (`checker_block_k > 0`) or colour
+  bars (one axis fully constant, `period_x == 1 || period_y == 1`). These are
+  exact structural predicates — unlike an `auto_band` magnitude threshold they
+  never flag low-ink / sparse solutions. Reads `checker_block_k` / `period_x` /
+  `period_y` from `puzzle_vectors.csv` (`--vectors-file`); skips silently if the
+  file or those columns are absent. Of the flagged puzzles only a random
+  `--keep-ratio` (default 0.1) is kept — selection seeded by `--random-seed`
+  for reproducibility.
 
 ```bash
 # Dry-run report
 dart run bin/cleanup_collections.dart -v
 
-# Apply (writes <file>.cleanup files for the user to mv into place)
+# Apply — overwrites each modified collection in-place
 dart run bin/cleanup_collections.dart --apply
 ```
 
@@ -160,11 +272,24 @@ dart run bin/cluster_puzzles.dart \
 The vector includes 78 trace-share columns (`share_<slug>_t<tier>`
 for the 13 slugs × 6 complexity tiers) plus complexity, force_rounds,
 max_force_depth, avg_move_complexity, distinct_constraints_used,
-n_constraints, cells, and prefill_ratio. Z-scored across the pool,
-clipped at ±5.
+n_constraints, cells, and prefill_ratio. It also carries 13
+solution-geometry columns — the geometry of the solved grid, so
+globally-regular solutions (damier, colour bars) the trace shares cannot
+tell apart become separable. Eight are translation- and colour-swap-invariant
+transforms: five from the power spectrum |F(u,v)|² (`spec_peak_frac`,
+`spec_xbars_frac`, `spec_ybars_frac`, `spec_checker_frac`,
+`spec_concentration`) and three from its parity-robust autocorrelation dual
+(`auto_band`, `auto_checker`, `auto_tile`), which catch a 2×2 damier even
+on odd block counts (4×6, 6×6) where the fixed Nyquist spectral bin
+collapses. Five are interpretable scalars (the designer-confirmed predicates):
+`period_x` / `period_y` (smallest translation period per axis — period 1 = a
+fully constant axis ⇒ colour bars), `checker_block_k` (smallest k for a k×k
+alternating damier, 0 if none), `n_symmetries` (dihedral invariances), and
+`rle_ratio` (run density, a low-ink proxy). All thirteen are defined in
+`bin/_solution_geometry.dart`. Z-scored across the pool, clipped at ±5.
 
 The clustering empirically concentrates on `1-easy.txt` (~10 % at
-ε = 0.3) and `overfilled-easy.txt` (~5 %), with NC-only and
+ε = 0.3) and `1-easy-overfilled.txt` (~5 %), with NC-only and
 FM-only puzzles dominating the dropped clusters — see the
 "Why redundancy concentrates in the easy tier" section below.
 
@@ -187,6 +312,170 @@ eligible puzzles from 1-easy.txt and farthest-point-samples N of
 them so the player sees varied examples of each freshly-introduced
 constraint.
 
+## Querying the corpus
+
+`bin/query_corpus.dart` is a read-only ad-hoc query tool over the on-disk
+`assets/*.txt` files. It parses every v2 line, applies cumulative filters,
+and prints an aggregate table grouped by the axis of your choice. Useful
+when you want a quick answer like *« how many mono-slug puzzles are
+there, and which slugs dominate? »* without writing one-off `awk`.
+
+```bash
+# Mono-slug puzzles per slug across the six difficulty files.
+dart run bin/query_corpus.dart --ntypes 1
+
+# Distribution of ntypes among puzzles that contain CH but not SH.
+dart run bin/query_corpus.dart --include-slug CH --exclude-slug SH \
+    --group-by ntypes
+
+# Where does mono-FM thrive? Group by grid size, sort by key.
+dart run bin/query_corpus.dart --ntypes 1 --include-slug FM \
+    --group-by size --sort key
+```
+
+Filters compose with **AND** (e.g. `--include-slug FM --exclude-slug PA`
+keeps puzzles that have FM but no PA). `--include-slug` is repeatable
+(all must be present); `--exclude-slug` is repeatable (none may be
+present). `--width`, `--height`, `--min-area`, `--max-area` constrain
+the grid dimensions.
+
+`--in` selects the collections to scan. Three keywords are recognised:
+
+| Keyword       | Meaning                                                         |
+|---------------|-----------------------------------------------------------------|
+| `published`   | The six difficulty files (default).                             |
+| `rejects`     | `cancelled`, `noCandidates`, `notUnique`, `overfilled[-easy]`, `ratioTooHigh`. |
+| `all`         | Both groups concatenated.                                       |
+
+Explicit file paths also work and can be mixed with keywords:
+`--in published --in path/to/extra.txt`.
+
+`--group-by` accepts `slug` (default), `ntypes`, `size`, `scenario`,
+`collection`, `composition`. Note that `slug` grouping counts puzzle
+coverage — a multi-slug puzzle contributes once per slug — so the per-row
+share can sum to more than 100 % (the script prints a reminder when this
+happens). Other axes are exclusive: one puzzle, one row. The `size` axis is
+orientation-agnostic (`4x5` and `5x4` collapse to a single `4x5` bin),
+matching the generator's equilibrium size axis (`canonicalSize` in
+`equilibrium.dart`, see `equilibrium.md`). The `composition` axis groups
+by the ordered top-3 family triple (e.g. `path+line-centric+local`), using
+the same instance-count ranking as `compositionOf` in `families.dart` and
+the generator's equilibrium `CompositionTarget`. See `families.md`.
+
+```bash
+# Which composition triples are most/least populated?
+dart run bin/query_corpus.dart --group-by composition --sort count
+dart run bin/query_corpus.dart --group-by composition --reverse --top 20
+
+# Composition vs. difficulty level — where does each triple land?
+dart run bin/query_corpus.dart --cross composition,collection
+
+# Focused puzzles: how many span only one family?
+dart run bin/query_corpus.dart --group-by composition --ntypes 1
+
+# Composition in the buckets view: joint audit with slug-set and size
+dart run bin/query_corpus.dart --buckets size,slugs,composition
+```
+
+### Cross-tabulation (two axes)
+
+`--cross AXIS1,AXIS2` swaps the 1-D table for a two-entry matrix: `AXIS1`
+on rows, `AXIS2` on columns (same axis names as `--group-by`; the two may
+be equal). It is mutually exclusive with `--group-by`. Each cell shows the
+count and its share of the **row** total, with a `total` margin on the
+right (per row), a `total` row at the bottom (per column), and a grand
+total in the corner. `--sort count` (default) orders rows and columns by
+their marginal total; `--sort key` orders both alphanumerically. `--top N`
+keeps the N largest rows **and** N largest columns (a note flags the
+truncation; the margins then cover only the displayed cells). `--reverse`
+flips the order — combined with `--top` it surfaces the *bottom* of the
+ranking, e.g. the least-represented slug pairs.
+
+```bash
+# Which slugs dominate each difficulty file?
+dart run bin/query_corpus.dart --cross slug,collection
+
+# Slug co-occurrence among two-slug puzzles (symmetric matrix; the
+# diagonal is the per-slug coverage).
+dart run bin/query_corpus.dart --cross slug,slug --ntypes 2
+```
+
+When either axis is `slug`, the same coverage caveat applies — a
+multi-slug puzzle lands in several cells, so the grand total can exceed
+the filtered-puzzle count (the script prints a reminder).
+
+### Joint buckets (variety audit)
+
+`--buckets [DIMS]` lists every distinct **joint** category present in the
+filtered corpus, with its population — not the independent marginals that
+`equilibrium.dart` steers on (see `equilibrium.md`), but their full
+Cartesian product. `DIMS` is a comma list over `{size, ntypes, slugs,
+scenario}` (default `size,slugs,scenario`); `slugs` is the whole sorted
+constraint set as **one atomic key** (e.g. `slugs=CC,DF,EY,FM,GS`), so
+two puzzles share a bucket only when their size, full slug-set and
+scenario all match. It is mutually exclusive with `--group-by`/`--cross`.
+
+This is the lens for variety regressions the marginals hide. Because the
+equilibrium picker biases each axis independently, a freshly-added
+constraint can get over-targeted on its own axis and end up glued onto
+every large puzzle — so the slug *marginals* look balanced while the
+*joint* distribution collapses onto a handful of "everything-but-the-
+kitchen-sink" slug-sets repeated across sizes.
+
+```bash
+# Most over-populated (size, slug-set, scenario) tuples.
+dart run bin/query_corpus.dart --buckets --top 20
+
+# Rarest joint buckets — the long tail equilibrium under-produces.
+dart run bin/query_corpus.dart --buckets --reverse --top 20
+
+# How many distinct slug-sets exist among puzzles carrying every new
+# constraint? Narrow with filters, then inspect the bucket list.
+dart run bin/query_corpus.dart --buckets slugs \
+    --include-slug MJ --include-slug CH --include-slug RT --include-slug CT
+```
+
+Each puzzle lands in exactly one bucket, so shares sum to 100 %. The
+header line reports the number of distinct buckets.
+
+The script never writes to disk and emits nothing to `stdout` other than
+the table; warnings (missing files, parse errors) go to `stderr`.
+
+## Single-path puzzles
+
+`bin/find_single_path_puzzles.dart` filters a collection down to puzzles that
+have a **single deduction path**: at every step of the solving loop there is
+exactly one available move. These puzzles are uniquely determined by propagation
+alone — no player needs to consider alternative options, and no branching occurs
+in the solver.
+
+```bash
+# Default: reads assets/2-player.txt, writes single_path_puzzles.txt
+dart run bin/find_single_path_puzzles.dart
+
+# Custom source and destination
+dart run bin/find_single_path_puzzles.dart -i assets/3-advanced.txt -o single_path.txt
+
+# Verbose: print a KEPT / REJECTED line per puzzle with the rejection reason
+dart run bin/find_single_path_puzzles.dart -i assets/2-player.txt --verbose
+```
+
+The script uses `Puzzle.findAllMoves()` at each step and rejects any puzzle
+where more than one move is available, or where no move exists before completion
+(stuck), or where a contradiction is reached. After exhausting the path it
+verifies every constraint via `verify()` on the completed grid so constraints
+that only fire at completion (e.g. `QA`, `GC`) are not silently missed.
+
+Rejection reasons are collected and printed as a breakdown table at the end.
+Progress is emitted on `stderr`; results go to the output file.
+
+**Typical uses:**
+
+- Build a curated study set where the logic is purely linear — no "what-if"
+  enumeration required from the player.
+- Audit whether a newly introduced constraint type tends to produce
+  single-path or branching puzzles.
+
 ## Visual diagnostics
 
 ```bash
@@ -198,12 +487,34 @@ python3 bin/plot_vectors.py --color-by dominant_slug -o puzzle_pca_slugs.png
 
 # Continuous gradient on complexity.
 python3 bin/plot_vectors.py --color-by complexity -o puzzle_pca_cplx.png
+
+# Highlight a sub-population: by constraint (regex on canonical_key) …
+python3 bin/plot_vectors.py --color-by labeled \
+    --label-regex '(?=.*SH:11\.11)(?=.*SH:22\.22)' --even-only
+
+# … or by solution geometry (numeric column ≥ threshold).
+python3 bin/plot_vectors.py --color-by labeled \
+    --label-col auto_checker --label-threshold 0.9
+
+# Supervised separability: is the highlighted group actually separable?
+python3 bin/plot_vectors.py --separation \
+    --label-regex '(?=.*SH:11\.11)(?=.*SH:22\.22)' --even-only
 ```
 
 Reads `puzzle_vectors.csv`. Linear PCA via numpy SVD — no sklearn
 dependency. Used to sanity-check that the level cascade carves the
 corpus into visually-distinct lobes (it does, modulo overlap in the
 middle tiers).
+
+`--color-by labeled` highlights a sub-population — chosen by `--label-regex`
+(matched against `canonical_key`) or by a numeric `--label-col ≥
+--label-threshold` (e.g. colour by the `auto_checker` geometry rather than the
+constraint that encodes it) — and prints a per-feature discrimination report
+(mean z-score gap + univariate AUC). Because PCA is unsupervised, a 0.1%
+minority never drives a top component, so a flat scatter is **not** evidence of
+inseparability. `--separation` answers that question directly: a shrinkage-
+regularized Fisher LDA, cross-validated (both needed since features ≫
+positives), reporting the out-of-fold ROC-AUC and a score-distribution figure.
 
 ## Player stats
 
@@ -216,6 +527,139 @@ dart run bin/aggregate_player_stats.dart stats_gle/ -o stats_aggregated/gle.txt
 # constants used by Database.computePlayerLevel.
 dart run bin/analyze_stats.dart stats_aggregated/gle.txt
 ```
+
+## Tagging legacy puzzles with their scenario
+
+Since the `scenario:<name>` v2 suffix became authoritative (see
+`docs/dev/prefill_sy.md` and the `detectPuzzleProfile` entry in
+`equilibrium.dart`), every puzzle generated by the regular flow is
+stamped at emission time — but the historical corpus (~26 k puzzles
+shipped in `assets/`) predates this and carries no marker. Unmarked
+lines are read as `classic` at runtime, which is correct for the vast
+majority but mis-attributes the `sh` / `pathBased` / `syBased`
+puzzles that the equilibrium loop did produce, leaving the profile
+histogram skewed toward `classic`.
+
+`bin/remark_scenarios.dart` infers the scenario from each unmarked
+line and appends `_scenario:<name>` only for non-classic conclusions.
+`classic` puzzles are left untouched — the absence of the suffix is
+the canonical encoding for that case, and re-runs are idempotent
+(lines that already carry `_scenario:` are pass-through).
+
+The detection is the **same trace-based algorithm** used by
+`bin/extract_path_like.dart` (and extended symmetrically to SY), so a
+puzzle is only tagged `pathBased` / `syBased` when the solver's
+deduction trace actually behaves that way — not just because the
+constraint list happens to contain a few `LT:` / `SY:` entries.
+
+| Priority | Trigger                                                                                                                                       | Tag         |
+|----------|-----------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| 1        | any `SH:` constraint                                                                                                                          | `sh`        |
+| 2/3      | trace's `LT:` propagation share ≥ `--min-lt-share` **and** ≥ `--min-lt-interesting` LT steps at complexity ≥ 2 (after the LT topo pre-filter) | `pathBased` |
+| 2/3      | same for `SY:` (after the SY topo pre-filter)                                                                                                 | `syBased`   |
+| 4        | otherwise                                                                                                                                     | *(none)*    |
+
+Step by step:
+
+1. `SH:` is unambiguous (only `preFillSh` emits it), so any line
+   carrying one is tagged `sh` without ever running the solver.
+2. Otherwise the script applies two cheap **topological pre-filters**
+   to gate the expensive trace step:
+   - PATH_TOPO: ≥ `--min-letters` distinct LT letters, each with its
+     own anchors at Manhattan distance ≥ `--min-anchor-distance`.
+   - SY_TOPO:   ≥ `--min-sy-seeds` distinct SY anchors.
+   If neither passes, the line is left as classic.
+3. If either passes, the solver runs once via `solveExplained` and the
+   script aggregates, on the propagation steps only:
+   - `lt-share` / `sy-share` — fraction of steps issued by an LT / SY
+     constraint;
+   - `lt-interesting` / `sy-interesting` — number of those steps with
+     `complexity ≥ 2`.
+4. A scenario "qualifies" iff its topo pre-filter passed **and** its
+   share ≥ threshold **and** its interesting count ≥ threshold. If
+   both LT and SY qualify (rare — the two generators exclude each
+   other's dominant slug), the larger share wins (LT on exact ties).
+   Puzzles whose `solve()` requires backtracking are recorded as
+   `trace_failed` and left as classic (same gate as
+   `bin/extract_path_like.dart:_traceMetrics`). The shipped corpora
+   are filtered by `--check` against backtracking puzzles, so a hit
+   here is anomalous — `-v` prints the full v2 line for inspection.
+
+Defaults match `extract_path_like.dart`: `--min-letters 2`,
+`--min-anchor-distance 2`, `--min-sy-seeds 2`, `--min-lt-share 0.5`,
+`--min-lt-interesting 1`, `--min-sy-share 0.5`,
+`--min-sy-interesting 1`, `--timeout-ms 15000`.
+
+Usage:
+
+```bash
+# No argument → processes the eight standard collections in `assets/`.
+# Dry-run reports counts without writing anything; expensive but safe.
+dart run bin/remark_scenarios.dart --dry-run -v
+
+# Single file, custom output path.
+dart run bin/remark_scenarios.dart assets/1-easy.txt -o /tmp/out.txt -v
+
+# Apply — writes `<file>.remarked.txt` per input. Migrate manually:
+dart run bin/remark_scenarios.dart -v
+for f in assets/*.remarked.txt; do mv "$f" "${f%.remarked.txt}"; done
+```
+
+The trace step is expensive (a solver run per qualifying puzzle, up
+to `--timeout-ms`); the topological pre-filter eliminates the bulk of
+the corpus before that. Still, plan for ~10–20 min on the standard
+collections — run a `--dry-run` first to estimate.
+
+Run once across the standard collections after merging the
+`scenario:` marker work into the main branch. Subsequent corpora
+produced by `bin/generate.dart` already carry the tag, so the script
+is a one-shot migration tool — not a step in the periodic maintenance
+pipeline.
+
+## Periodic maintenance
+
+`bin/maintain.dart` chains the six routine maintenance tools into a
+single fail-fast pipeline that applies as it goes. Run it from the
+project root whenever the corpus needs a refresh — typically after a
+formula tweak, a new constraint, or just on a periodic cadence:
+
+```bash
+dart run bin/maintain.dart
+```
+
+Pipeline (each step applies directly; the next step sees the updated
+`assets/`):
+
+1. **`recompute --route`** — refresh stored cplx + cached solutions,
+   re-sort constraints, redistribute each puzzle to its classified level.
+2. **`vectorize_puzzles`** — build `puzzle_vectors.csv` from the freshly
+   recomputed corpus (trace shares + solution geometry). Runs early so the
+   later passes that consume the CSV — `cleanup` (regular patterns) and
+   `cluster` — see geometry computed from the current solutions.
+3. **`dedup_puzzles`** — drop exact duplicates per file
+   (defence-in-depth: `--route` already enforces canonical-key
+   uniqueness, but this catches anything that slipped through).
+4. **`cleanup_collections --apply`** — drop disliked, boring
+   (≥ 90 % trivial-FM), overlapping-MJ-border, and regular-pattern
+   (damier / colour-bar) puzzles. The regular-patterns pass reads the
+   geometry columns from `puzzle_vectors.csv`.
+5. **`cluster_puzzles --apply`** — drop near-duplicates
+   (`--max-distance 0.15`, `--keep-per-cluster 1`), protecting the
+   current onboarding bank. Because the vector predates steps 3-4, it
+   first drops CSV rows whose puzzle is no longer in any collection, so a
+   stale row can never be picked as the representative that survives.
+6. **`extract_onboarding`** — refresh `assets/1-easy_onboarding.txt`
+   (300 per phase) from the post-cleanup corpus.
+
+The pipeline never commits — every change lands in `assets/*.txt`
+directly, so `git diff` is the canonical "what just happened?" view.
+At the end the orchestrator prints a per-step status, the per-file
+line-count delta, and total wall time. The first failing step aborts
+the rest; subsequent steps can be resumed by re-running the script
+after fixing the issue (each step independently snapshots and applies).
+
+Wall time on a 26 k-puzzle corpus is dominated by step 4
+(vectorize, ~20-30 min) and step 5 (cluster, a few minutes).
 
 ## Typical workflows
 
@@ -232,20 +676,18 @@ mv new.txt.new new.txt
 
 # 3. Merge into the existing files via classification routing
 cat new.txt >> assets/undetermined.txt
-dart run bin/recompute.dart --route
+dart run bin/recompute.dart --route   # renames in-place at the end
 
 # 4. Drop the inevitable near-duplicates
 dart run bin/vectorize_puzzles.dart
 dart run bin/cluster_puzzles.dart --apply --max-distance 0.15 \
   --protect-from assets/1-easy_onboarding.txt -v
-for f in assets/*.cleanup; do mv "$f" "${f%.cleanup}"; done
 ```
 
 ### "The complexity formula changed, refresh the corpus"
 
 ```bash
 dart run bin/recompute.dart --route -v
-for f in assets/*.txt.new; do mv "$f" "${f%.new}"; done
 ```
 
 `--route` re-classifies every puzzle through `classifyTrace`, so a
@@ -269,7 +711,7 @@ dart run bin/cluster_puzzles.dart --top-k 1000 --output similar_pairs.txt
 ## Why redundancy concentrates in the easy tier
 
 Empirically, `--apply --max-distance 0.3` removes about 9 % of
-1-easy and 5 % of overfilled-easy, while every other collection
+1-easy and 5 % of 1-easy-overfilled, while every other collection
 loses well under 1 %. 4-strong has *zero* removals.
 
 The cause is structural, not a generator bug. The slug-axis target
@@ -279,7 +721,7 @@ GS (52 %) and NC (49 %) — NC is fourth, not the worst. But:
 
 * NC produces only tier-0 moves (counting neighbours is local), so
   every NC-heavy puzzle has an "easy" trace and is routed to
-  1-easy / overfilled-easy.
+  1-easy / 1-easy-overfilled.
 * A puzzle with one slug and tier-0 moves has a sparse vector — 1
   non-zero share out of 78. With many similar puzzles, the few
   non-zero dimensions can't keep them apart.
