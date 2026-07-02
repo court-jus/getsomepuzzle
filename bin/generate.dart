@@ -817,6 +817,7 @@ void _renderDashboard({
     GenerationStrategy.phaseGate => 'phase-gate',
     GenerationStrategy.phase1Oneshot => 'phase-1-oneshot',
     GenerationStrategy.propOnly => 'prop-only',
+    GenerationStrategy.pdcg => 'pdcg',
   };
   // `auto(2/3)` = no --domain flag: the domain axis is active and the
   // worker draws each attempt's domain gap-based toward the 60/40 profile.
@@ -1752,6 +1753,11 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     // kTargetDomainProfile). An explicit 2 or 3 freezes the domain and
     // disables the axis.
     'domain': null,
+    // `pdcg` is deliberately NOT in the default rotation: workers are
+    // assigned strategies round-robin, so listing it here would dedicate
+    // ~1/4 of the pool to PDCG while kTargetProfile caps its corpus share
+    // at 2 %. The equilibrium routes pdcg attempts itself via
+    // `ProfileTarget(pdcg)`; pass `--strategy pdcg` for an explicit run.
     'strategy': <GenerationStrategy>[
       GenerationStrategy.phaseGate,
       GenerationStrategy.phase1Oneshot,
@@ -1886,11 +1892,13 @@ Map<String, dynamic> _parseArgs(List<String> args) {
               return GenerationStrategy.phase1Oneshot;
             case 'prop-only':
               return GenerationStrategy.propOnly;
+            case 'pdcg':
+              return GenerationStrategy.pdcg;
             default:
               stderr.writeln(
                 "--strategy values must be from "
                 "'single-tier', 'phase-gate', 'phase-1-oneshot', "
-                "'prop-only' (got '$p')",
+                "'prop-only', 'pdcg' (got '$p')",
               );
               exit(1);
           }
@@ -2005,6 +2013,11 @@ Generation options:
                                              phase 2. Rejects puzzles that
                                              need force; produces only
                                              pure-propagation puzzles.
+                            pdcg             Constructive seed-first flow
+                                             (docs/dev/boss/boss.md). Not
+                                             in the default rotation; the
+                                             equilibrium routes attempts
+                                             to it via the profile axis.
       --max-stall S       No-progress watchdog: abandon an attempt that
                           has spent S seconds without accepting a
                           candidate. Avoids pathological cases where

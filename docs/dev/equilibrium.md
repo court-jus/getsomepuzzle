@@ -46,8 +46,8 @@ except as noted on axis 3):
    non-square bin, the worker picks one of the two orientations at random
    (`_orientSize` in `worker_io.dart`, constrained to the width/height
    bounds), so both orientations keep being emitted while counting as one.
-5. **Profile** — pre-fill scenario category (`classic`, `sh`, `bb`,
-   `pathBased`, `syBased`). Identification reads the authoritative
+5. **Profile** — pre-fill scenario category (`classic`, `pdcg`, `sh`,
+   `bb`, `pathBased`, `syBased`). Identification reads the authoritative
    `scenario:<name>` suffix written by the generator at emission time (see
    `detectPuzzleProfile` in `equilibrium.dart`); unmarked lines fall
    back to a heuristic: lines containing the `SH` constraint slug are
@@ -161,12 +161,14 @@ exact per-n weights.
 
 ### Profile axis distribution
 
-The bulk of puzzles come from the regular flow; the remaining ~20 % is
-split between the four themed pre-fills.
+The bulk of puzzles come from the regular flow; the remaining ~22 % is
+split between the constructive PDCG strategy and the four themed
+pre-fills.
 
 | Profile     | Target share | Pre-fill source                                       |
 | ----------- | ------------ | ----------------------------------------------------- |
-| `classic`   | 80 %         | `preFillRegular` (random grid + greedy cherry-pick)   |
+| `classic`   | 78 %         | `preFillRegular` (random grid + greedy cherry-pick)   |
+| `pdcg`      | 2 %          | `_generateOnePdcg` (constructive seed-first strategy, cf. [`boss/boss.md`](boss/boss.md)) |
 | `sh`        | 5 %          | `preFillSh` (seeded Shape motif)                      |
 | `bb`        | 5 %          | `preFillBB` (bounding-box islands, cf. [`prefill_bb.md`](prefill_bb.md)) |
 | `pathBased` | 5 %          | `preFillPath` (constructive LT topology, cf. [`path_based.md`](path_based.md)) |
@@ -417,11 +419,13 @@ combination.
 
 Some constraint families need a custom seed grid because a random fill
 almost never produces a valid puzzle for them. The generator dispatches
-to one of five pre-fill functions inside `generateOne`:
+to one of five pre-fill functions inside `generateOne` — plus the PDCG
+strategy, which is not a pre-fill but a whole alternate flow:
 
 | Pre-fill           | Trigger                                                           | Stamped `scenario:` suffix |
 | ------------------ | ----------------------------------------------------------------- | -------------------------- |
 | `preFillRegular`   | default — random grid                                             | *(none, read as `classic`)* |
+| `_generateOnePdcg` | `strategy == GenerationStrategy.pdcg` (per attempt via `ProfileTarget(pdcg)`, or `--strategy pdcg`) | `pdcg` |
 | `preFillSh`        | `prioritySlugs` contains `"SH"` (via `requiredRules` or `preferredSlugs`, SH allowed by `allowedSlugs`) | `sh`           |
 | `preFillBB`        | `prioritySlugs` contains `"BB"` (via `preferredSlugs`, BB allowed by `allowedSlugs`) | `bb`           |
 | `preFillPath`      | `pathBasedScenario == true`                                       | `pathBased`                |
@@ -440,9 +444,13 @@ Sources of each trigger:
   CLI flag `--scenario path-based` / `--scenario sy-based` also forces 100 %.
   See [`path_based.md`](path_based.md) and [`prefill_sy.md`](prefill_sy.md)
   for the algorithms.
+- **PDCG**: equilibrium sets a per-attempt `GenerationStrategy.pdcg`
+  override via `ProfileCategory.pdcg` (`_ResolvedTarget.strategy` in
+  `worker_io.dart`); the CLI flag `--strategy pdcg` also forces 100 %.
+  See [`boss/boss.md`](boss/boss.md) for the algorithm.
 
 The dispatch is the only puzzle-flow-level branching in `generateOne`;
-each pre-fill function is otherwise self-contained.
+each pre-fill function (and the PDCG flow) is otherwise self-contained.
 
 ## Implementation details
 
@@ -494,7 +502,8 @@ The `ntypes` field distinguishes hard from soft constraints:
 
 `slugs={…}` always lists the sorted preferred slugs. `scenario` is resolved by
 `_resolveScenario` in `worker_io.dart` following the priority order
-`pathBased > syBased > sh > bb > classic`; `sh` activates whenever
+`pdcg > pathBased > syBased > sh > bb > classic`; `pdcg` activates when
+the attempt carries a `GenerationStrategy.pdcg` override, `sh` whenever
 `SH ∈ preferredSlugs` and `bb` activates whenever `BB ∈ preferredSlugs`.
 
 ### Warmup threshold
@@ -528,8 +537,8 @@ algorithm:
   tail through n=14). Any `n` absent from the map has an implicit target
   of 0 and is never pushed. Refer to `equilibrium.dart` for the exact
   per-key percentages — the constant is the source of truth.
-- `kTargetProfile` — map for the profile axis (`{classic: 0.80, sh: 0.05,
-  bb: 0.05, pathBased: 0.05, syBased: 0.05}`).
+- `kTargetProfile` — map for the profile axis (`{classic: 0.78,
+  pdcg: 0.02, sh: 0.05, bb: 0.05, pathBased: 0.05, syBased: 0.05}`).
 - `kTargetDomainProfile` — map for the domain axis (`{2: 0.60, 3: 0.40}`).
   Drives both the `DomainTarget` gaps in `_scoreAll` and the per-attempt
   off-target draw in `pickWeightedDomain`.

@@ -23,6 +23,8 @@ read the relevant page before touching the corresponding subsystem.
   growth for `SY` puzzles.
 - [`prefill_bb.md`](prefill_bb.md) — Pre-fill by bounding-box islands
   for `BB` puzzles.
+- [`boss/boss.md`](boss/boss.md) — PDCG constructive strategy
+  (seed-first, constraint-later; inverts the grid-first pipeline).
 
 ## Solving & reasoning
 

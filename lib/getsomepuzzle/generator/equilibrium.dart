@@ -26,7 +26,8 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 /// [detectPuzzleProfile]. Lines without that suffix are treated as
 /// `classic` (legacy corpus included).
 const Map<ProfileCategory, double> kTargetProfile = {
-  ProfileCategory.classic: 0.80,
+  ProfileCategory.classic: 0.78,
+  ProfileCategory.pdcg: 0.02,
   ProfileCategory.sh: 0.05,
   ProfileCategory.bb: 0.05,
   ProfileCategory.pathBased: 0.05,
@@ -199,6 +200,11 @@ enum ProfileCategory {
   /// self-avoiding walk and DPLL completion (see `docs/dev/path_based.md`).
   pathBased,
 
+  /// PDCG-constructive: seed-only + constraint round-robin via
+  /// `_generateOnePdcg`. Produces puzzles with a different structural
+  /// character than the classic greedy loop.
+  pdcg,
+
   /// SY-themed: `preFillSy` grows symmetric islands and ambiguates via a
   /// bipartite cascade dominated by SY constraints. See
   /// `docs/dev/prefill_sy.md`.
@@ -335,10 +341,11 @@ class DomainTarget extends Target {
 /// Detection algorithm:
 ///
 /// 1. **Authoritative marqueur** — if the `scenario:` value is
-///    `pathBased`, `syBased` or `sh`, return it immediately (court-circuit).
-///    If `classic` or an unknown name → do **not** court-circuit, fall
-///    through to emergent detection so a classic-generated puzzle that is
-///    100 % NC-dominant can reveal itself as `minesweeper`.
+///    `pathBased`, `syBased`, `sh`, `bb` or `pdcg`, return it immediately
+///    (court-circuit). If `classic` or an unknown name → do **not**
+///    court-circuit, fall through to emergent detection so a classic-
+///    generated puzzle that is 100 % NC-dominant can reveal itself as
+///    `minesweeper`.
 ///
 /// 2. **Emergent** — from the multiset of constraint slugs (field [4],
 ///    repeats counted). If `SH` is present → `sh`. Otherwise, for each
@@ -365,7 +372,8 @@ ProfileCategory detectPuzzleProfile(String v2Line) {
         if (p == ProfileCategory.pathBased ||
             p == ProfileCategory.sh ||
             p == ProfileCategory.bb ||
-            p == ProfileCategory.syBased) {
+            p == ProfileCategory.syBased ||
+            p == ProfileCategory.pdcg) {
           return p;
         }
         // classic or unknown → do not court-circuit, fall through.
@@ -437,6 +445,7 @@ ProfileCategory generationBucket(ProfileCategory cat) {
     case ProfileCategory.local:
     case ProfileCategory.group:
       return ProfileCategory.classic;
+    case ProfileCategory.pdcg:
     default:
       return cat;
   }

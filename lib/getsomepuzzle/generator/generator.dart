@@ -108,6 +108,17 @@ class GeneratorConfig {
   /// legitimately slow successes.
   final Duration maxStall;
 
+  /// Number of readonly seed cells for the PDCG constructive strategy.
+  /// Only used when [strategy] is `GenerationStrategy.pdcg`.
+  final int pdcgSeedSize;
+
+  /// Gentle-force switch for PDCG (binary, despite the name). When > 0
+  /// and no constraint candidate is accepted for the current target, the
+  /// generator tries each domain value on the target cell and checks
+  /// propagation. If exactly one value survives, it is forced as a
+  /// readonly cell. 0 = disabled (default 1).
+  final int pdcgForceDepth;
+
   const GeneratorConfig({
     required this.width,
     required this.height,
@@ -131,6 +142,8 @@ class GeneratorConfig {
     this.domain = defaultDomain,
     this.strategy = GenerationStrategy.phaseGate,
     this.maxStall = const Duration(seconds: 15),
+    this.pdcgSeedSize = 5,
+    this.pdcgForceDepth = 1,
   });
 }
 
@@ -218,6 +231,11 @@ enum GenerationRejectReason {
   /// equilibrium targets where one attempt would otherwise eat
   /// minutes of CPU at a plateau ratio. See `GeneratorConfig.maxStall`.
   attemptStalled,
+
+  /// PDCG constructive loop failed to close the puzzle: iterations
+  /// exhausted with residual free cells (ratio ≤ 0.25), no candidate was
+  /// ever accepted, or a propagation probe hit a contradiction.
+  pdcgStalled,
 }
 
 /// Map a failed `preFillPath` attempt to its dominant reject
@@ -288,6 +306,12 @@ enum GenerationStrategy {
   ///     solvable by pure propagation, no force needed → "pure
   ///     beginner" tier.
   propOnly,
+
+  /// Propagation-Driven Constructive Generator (PDCG): places a seed
+  /// of readonly cells, then iteratively adds constraints that
+  /// propagate to determine the rest. Inverse of the classic "random
+  /// grid → constraints" approach. See `docs/dev/boss/refinement.md`.
+  pdcg,
 }
 
 /// Per-stage wall-time accumulator paired with an invocation counter.
@@ -480,6 +504,16 @@ class PuzzleGenerator {
       pu.cachedSolution = result.solution;
       pu.generationScenario = 'syBased';
       return _finalize(pu, config, onReject: onReject, shouldStop: shouldStop);
+    }
+
+    if (config.strategy == GenerationStrategy.pdcg) {
+      return _generateOnePdcg(
+        config,
+        onProgress: onProgress,
+        onReject: onReject,
+        shouldStop: shouldStop,
+        onStallStats: onStallStats,
+      );
     }
 
     final size = width * height;
@@ -1293,6 +1327,627 @@ class PuzzleGenerator {
       // reflect the wrong domain.
       pu.cachedComplexity = null;
     }
+  }
+
+  /// Orthogonal neighbours of [idx] within grid bounds.
+  static List<int> _neighbours(int idx, int w, int h) {
+    final col = idx % w;
+    final row = idx ~/ w;
+    final result = <int>[];
+    if (col > 0) result.add(idx - 1);
+    if (col < w - 1) result.add(idx + 1);
+    if (row > 0) result.add(idx - w);
+    if (row < h - 1) result.add(idx + w);
+    return result;
+  }
+
+  /// Cells on [side] of [anchor] (exclusive).
+  static List<int> _sideCells(int anchor, String side, int w, int h) {
+    final col = anchor % w;
+    final row = anchor ~/ w;
+    final result = <int>[];
+    switch (side) {
+      case 'left':
+        for (int c = 0; c < col; c++) {
+          result.add(row * w + c);
+        }
+      case 'right':
+        for (int c = col + 1; c < w; c++) {
+          result.add(row * w + c);
+        }
+      case 'top':
+        for (int r = 0; r < row; r++) {
+          result.add(r * w + col);
+        }
+      case 'bottom':
+        for (int r = row + 1; r < h; r++) {
+          result.add(r * w + col);
+        }
+    }
+    return result;
+  }
+
+  /// Total cells of [color] that [eye] can see in the solved grid.
+  static int _eyeSeen(
+    int eye,
+    CellValue color,
+    List<CellValue> sol,
+    int w,
+    int h,
+  ) {
+    final col = eye % w;
+    final row = eye ~/ w;
+    int total = 0;
+    for (int c = col - 1; c >= 0 && sol[row * w + c] == color; c--) {
+      total++;
+    }
+    for (int c = col + 1; c < w && sol[row * w + c] == color; c++) {
+      total++;
+    }
+    for (int r = row - 1; r >= 0 && sol[r * w + col] == color; r--) {
+      total++;
+    }
+    for (int r = row + 1; r < h && sol[r * w + col] == color; r++) {
+      total++;
+    }
+    return total;
+  }
+
+  /// Build a throwaway Puzzle from [solution] for group queries.
+  static Puzzle _puzzleFromSolution(
+    List<CellValue> sol,
+    int w,
+    int h,
+    List<CellValue> domain,
+  ) {
+    final p = Puzzle.empty(w, h, domain);
+    for (int i = 0; i < sol.length; i++) {
+      p.cells[i].setForSolver(sol[i]);
+    }
+    return p;
+  }
+
+  /// Enumerate candidate constraints for [cellIdx], grouped by slug (the
+  /// caller decides the slug order — deficit-weighted or round-robin).
+  ///
+  /// Most slugs anchor on [cellIdx] or one of its neighbours; FM and BB
+  /// are grid-global (their `generateAllParameters` spans the whole grid).
+  /// Parameters are derived from [referenceSolution], which is a *partial*
+  /// projection (`solve()` output, not a full backing grid): counts (NC,
+  /// RC, CC, EY, QA, GC) only reflect the determined cells, and SY/PA are
+  /// emitted without any reference check at all. Candidates are therefore
+  /// speculative — the caller's clone-and-propagate acceptance test is
+  /// what keeps the constraint set consistent.
+  static List<Constraint> _enumerateConstraintsForCellPdcg(
+    int cellIdx,
+    List<CellValue> referenceSolution,
+    int w,
+    int h,
+    List<CellValue> domain,
+    Set<String> allowed,
+  ) {
+    final result = <Constraint>[];
+    final col = cellIdx % w;
+    final row = cellIdx ~/ w;
+    // Shared read-only projection of [referenceSolution]; built once and
+    // reused by every slug that needs group queries or a `verify` probe.
+    final refPuzzle = _puzzleFromSolution(referenceSolution, w, h, domain);
+
+    // -- DF (pairs differing in referenceSolution) --
+    if (allowed.contains('DF')) {
+      // anchor = target, direction = right
+      if (col < w - 1 &&
+          referenceSolution[cellIdx] != referenceSolution[cellIdx + 1]) {
+        final c = createConstraint('DF', '$cellIdx.right');
+        if (c != null) result.add(c);
+      }
+      // anchor = target, direction = down
+      if (row < h - 1 &&
+          referenceSolution[cellIdx] != referenceSolution[cellIdx + w]) {
+        final c = createConstraint('DF', '$cellIdx.down');
+        if (c != null) result.add(c);
+      }
+      // target is right neighbour of anchor
+      if (col > 0 &&
+          referenceSolution[cellIdx - 1] != referenceSolution[cellIdx]) {
+        final c = createConstraint('DF', '${cellIdx - 1}.right');
+        if (c != null) result.add(c);
+      }
+      // target is down neighbour of anchor
+      if (row > 0 &&
+          referenceSolution[cellIdx - w] != referenceSolution[cellIdx]) {
+        final c = createConstraint('DF', '${cellIdx - w}.down');
+        if (c != null) result.add(c);
+      }
+    }
+
+    // -- FM (forbidden motif) —
+    if (allowed.contains('FM')) {
+      final allParams = generateAllParameters('FM', w, h, domain, null);
+      if (allParams != null) {
+        for (final param in allParams) {
+          final c = createConstraint('FM', param);
+          if (c != null && c.verify(refPuzzle)) {
+            result.add(c);
+          }
+        }
+      }
+    }
+
+    // -- NC (neighbour-count anchored at a neighbour of target) --
+    if (allowed.contains('NC')) {
+      for (final anchor in _neighbours(cellIdx, w, h)) {
+        final ncs = _neighbours(anchor, w, h);
+        for (final cv in domain) {
+          final cnt = ncs.where((i) => referenceSolution[i] == cv).length;
+          final c = createConstraint(
+            'NC',
+            '$anchor.${cellValueToString(cv)}.$cnt',
+          );
+          if (c != null) result.add(c);
+        }
+      }
+    }
+
+    // -- RC (row-count for target's row) --
+    if (allowed.contains('RC')) {
+      for (final cv in domain) {
+        var cnt = 0;
+        for (int ci = 0; ci < w; ci++) {
+          if (referenceSolution[row * w + ci] == cv) cnt++;
+        }
+        if (cnt > 0 && cnt < w) {
+          final c = createConstraint(
+            'RC',
+            '$row.${cellValueToString(cv)}.$cnt',
+          );
+          if (c != null) result.add(c);
+        }
+      }
+    }
+
+    // -- CC (column-count for target's column) --
+    if (allowed.contains('CC')) {
+      for (final cv in domain) {
+        var cnt = 0;
+        for (int ri = 0; ri < h; ri++) {
+          if (referenceSolution[ri * w + col] == cv) cnt++;
+        }
+        if (cnt > 0 && cnt < h) {
+          final c = createConstraint(
+            'CC',
+            '$col.${cellValueToString(cv)}.$cnt',
+          );
+          if (c != null) result.add(c);
+        }
+      }
+    }
+
+    // -- PA (balanced partition on a side of target) --
+    if (allowed.contains('PA')) {
+      for (final side in ['left', 'right', 'top', 'bottom']) {
+        final cells = _sideCells(cellIdx, side, w, h);
+        if (cells.length >= 2 && cells.length % domain.length == 0) {
+          final c = createConstraint('PA', '$cellIdx.$side');
+          if (c != null) result.add(c);
+        }
+      }
+    }
+
+    // -- GS (group size anchored at target) --
+    if (allowed.contains('GS')) {
+      final groups = utils_groups.getGroups(refPuzzle);
+      for (final g in groups) {
+        if (g.contains(cellIdx) && g.length > 1) {
+          final c = createConstraint('GS', '$cellIdx.${g.length}');
+          if (c != null) result.add(c);
+          break;
+        }
+      }
+    }
+
+    // -- SY (symmetry anchored at target) --
+    if (allowed.contains('SY')) {
+      for (int axis = 1; axis <= 5; axis++) {
+        final c = createConstraint('SY', '$cellIdx.$axis');
+        if (c != null) result.add(c);
+      }
+    }
+
+    // -- LT (letter group anchored at target) --
+    if (allowed.contains('LT')) {
+      for (final nb in _neighbours(cellIdx, w, h)) {
+        if (referenceSolution[cellIdx] != CellValue.free &&
+            referenceSolution[cellIdx] == referenceSolution[nb]) {
+          // Deliberately always letter 'A': `Puzzle.addConstraint`
+          // aggregates same-letter LT instances, so every accepted pair
+          // merges into one growing connected group instead of littering
+          // the grid with trivial 2-cell groups.
+          final c = createConstraint('LT', 'A.$cellIdx.$nb');
+          if (c != null && c.verify(refPuzzle)) {
+            result.add(c);
+          }
+        }
+      }
+    }
+
+    // -- EY (eye count anchored at target or a neighbour) --
+    if (allowed.contains('EY')) {
+      final eyes = {cellIdx, ..._neighbours(cellIdx, w, h)};
+      for (final e in eyes) {
+        for (final cv in domain) {
+          final seen = _eyeSeen(e, cv, referenceSolution, w, h);
+          if (seen > 0) {
+            final c = createConstraint(
+              'EY',
+              '$e.${cellValueToString(cv)}.$seen',
+            );
+            if (c != null) result.add(c);
+          }
+        }
+      }
+    }
+
+    // -- QA (global quantity) --
+    if (allowed.contains('QA')) {
+      for (final cv in domain) {
+        final cnt = referenceSolution.where((v) => v == cv).length;
+        if (cnt > 0 && cnt < referenceSolution.length) {
+          final c = createConstraint('QA', '${cellValueToString(cv)}.$cnt');
+          if (c != null) result.add(c);
+        }
+      }
+    }
+
+    // -- GC (global group count) --
+    if (allowed.contains('GC')) {
+      for (final cv in domain) {
+        final groups = utils_groups.getColorGroups(refPuzzle, cv);
+        if (groups.isNotEmpty) {
+          final c = createConstraint(
+            'GC',
+            '${cellValueToString(cv)}.${groups.length}',
+          );
+          if (c != null) result.add(c);
+        }
+      }
+    }
+
+    // -- BB (bounding box) —
+    if (allowed.contains('BB')) {
+      final allParams = generateAllParameters('BB', w, h, domain, null);
+      if (allParams != null) {
+        for (final param in allParams) {
+          final c = createConstraint('BB', param);
+          if (c != null && c.verify(refPuzzle)) {
+            result.add(c);
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /// Try gentle force on [cellIdx]: test each domain value on a clone,
+  /// propagate, and return the single surviving value (if exactly one
+  /// survives). Returns `null` when no forced value can be deduced.
+  static CellValue? _forceCellPdcg(
+    Puzzle pu,
+    int cellIdx,
+    List<CellValue> domain,
+  ) {
+    if (pu.cells[cellIdx].value != CellValue.free) return null;
+    CellValue? forced;
+    int possible = 0;
+    for (final cv in domain) {
+      final clone = pu.clone();
+      clone.setValue(cellIdx, cv);
+      if (clone.propagateToFixpoint() != null) {
+        possible++;
+        forced = cv;
+      }
+    }
+    return possible == 1 ? forced : null;
+  }
+
+  /// PDCG (Propagation-Driven Constructive Generator) — seed-first,
+  /// constraint-later approach.
+  static ({String line, PuzzleLevel level})? _generateOnePdcg(
+    GeneratorConfig config, {
+    void Function(GeneratorProgress)? onProgress,
+    void Function(GenerationRejectReason, Puzzle)? onReject,
+    bool Function()? shouldStop,
+    void Function(int maxAcceptGapMs)? onStallStats,
+  }) {
+    final w = config.width;
+    final h = config.height;
+    final domain = config.domain;
+    final size = w * h;
+
+    // 1. Empty puzzle + centre-biased seed with random values
+    final pu = Puzzle.empty(w, h, domain);
+
+    final seedSize = config.pdcgSeedSize.clamp(3, size);
+    final centreRow = (h - 1) / 2.0;
+    final centreCol = (w - 1) / 2.0;
+    final indices = List.generate(size, (i) => i);
+    indices.sort((a, b) {
+      final da = ((a ~/ w - centreRow).abs() + (a % w - centreCol).abs());
+      final db = ((b ~/ w - centreRow).abs() + (b % w - centreCol).abs());
+      return da.compareTo(db);
+    });
+    final seedIndices = indices.take(seedSize).toList();
+    for (final idx in seedIndices) {
+      pu.cells[idx].setForSolver(domain[_rng.nextInt(domain.length)]);
+      pu.cells[idx].readonly = true;
+    }
+
+    // 2. Initial reference solution from the seeded state (partial: with
+    // no constraints yet, solve() leaves every non-seed cell free)
+    final initialClone = pu.clone();
+    initialClone.solve();
+    pu.cachedSolution = initialClone.cellValues;
+
+    // Propagate from seed (no-op without constraints, but consistent)
+    if (pu.propagateToFixpoint() == null) {
+      onReject?.call(GenerationRejectReason.pdcgStalled, pu);
+      return null;
+    }
+
+    // 3. Main loop
+    // IMPORTANT: we never propagate on `pu` itself — only on clones.
+    // `pu` accumulates constraints but its cells stay free (CellValue.free)
+    // so the line export correctly leaves them as player targets.
+    final allowedSlugs =
+        config.allowedSlugs ??
+        {
+          'DF',
+          'FM',
+          'NC',
+          'RC',
+          'CC',
+          'PA',
+          'GS',
+          'SY',
+          'LT',
+          'EY',
+          'QA',
+          'GC',
+          'BB',
+        };
+    final maxIter = size * 2;
+    final blocked = <int>{};
+    int acceptedCount = 0;
+
+    // No-progress watchdog + accept-gap telemetry, same idiom as the
+    // classic loop (see `_generateOneTimed`): an attempt that spends
+    // `maxStall` without accepting anything is abandoned.
+    final attemptSw = Stopwatch()..start();
+    int lastAcceptMs = 0;
+    int maxAcceptGapMs = 0;
+    final maxStallMs = config.maxStall.inMilliseconds;
+    final watchdogEnabled = maxStallMs > 0;
+
+    for (int iter = 0; iter < maxIter; iter++) {
+      if (shouldStop?.call() == true) {
+        onReject?.call(GenerationRejectReason.cancelled, pu);
+        return null;
+      }
+      if (watchdogEnabled &&
+          attemptSw.elapsedMilliseconds - lastAcceptMs > maxStallMs) {
+        onReject?.call(GenerationRejectReason.attemptStalled, pu);
+        return null;
+      }
+
+      // Project forward to see where constraint propagation would get us.
+      final probe = pu.clone();
+      final probeResult = probe.propagateToFixpoint();
+      if (probeResult == null) {
+        // Contradiction — the constraint set is already inconsistent.
+        onReject?.call(GenerationRejectReason.pdcgStalled, pu);
+        return null;
+      }
+      if (probe.complete) break;
+
+      onProgress?.call(
+        GeneratorProgress(
+          puzzlesGenerated: 0,
+          totalRequested: config.count,
+          constraintsTried: iter,
+          constraintsTotal: maxIter,
+          currentRatio: probe.computeRatio(),
+        ),
+      );
+
+      final freeInProbe = probe
+          .freeCells()
+          .map((e) => e.$2)
+          .where((idx) => !blocked.contains(idx))
+          .toList();
+      if (freeInProbe.isEmpty) break;
+
+      // Pick the best target from the probe's free cells.
+      final centreRow = (h - 1) / 2.0;
+      final centreCol = (w - 1) / 2.0;
+      freeInProbe.sort((a, b) {
+        final aDet = _neighbours(
+          a,
+          w,
+          h,
+        ).where((i) => probe.cellValues[i] != CellValue.free).length;
+        final bDet = _neighbours(
+          b,
+          w,
+          h,
+        ).where((i) => probe.cellValues[i] != CellValue.free).length;
+        if (aDet != bDet) return bDet.compareTo(aDet);
+        final aDist = ((a ~/ w - centreRow).abs() + (a % w - centreCol).abs());
+        final bDist = ((b ~/ w - centreRow).abs() + (b % w - centreCol).abs());
+        return aDist.compareTo(bDist);
+      });
+      final target = freeInProbe.first;
+
+      final candidates = _enumerateConstraintsForCellPdcg(
+        target,
+        pu.cachedSolution!,
+        w,
+        h,
+        domain,
+        allowedSlugs,
+      );
+      if (candidates.isEmpty) {
+        blocked.add(target);
+        continue;
+      }
+
+      // Order slugs by corpus deficit when available; fall back to
+      // round-robin so non-equilibrium runs keep the existing cycle.
+      final deficits = config.slugDeficitScores;
+      final List<String> orderedSlugs;
+      if (deficits != null && deficits.isNotEmpty) {
+        // Deficit-weighted: most under-represented slugs first. Tie-
+        // break by static priority so equally-deficient slugs stay in
+        // the same order as the round-robin priority list.
+        const slugPriority = [
+          'DF',
+          'FM',
+          'NC',
+          'RC',
+          'CC',
+          'PA',
+          'GS',
+          'SY',
+          'LT',
+          'EY',
+          'QA',
+          'GC',
+          'BB',
+        ];
+        final priorityIndex = <String, int>{
+          for (int i = 0; i < slugPriority.length; i++) slugPriority[i]: i,
+        };
+        orderedSlugs =
+            allowedSlugs.where((s) => priorityIndex.containsKey(s)).toList()
+              ..sort((a, b) {
+                final da = deficits[a] ?? 0.0;
+                final db = deficits[b] ?? 0.0;
+                if (da != db) return db.compareTo(da);
+                return (priorityIndex[a] ?? 0).compareTo(priorityIndex[b] ?? 0);
+              });
+      } else {
+        // Round-robin: cycle the priority list per iteration for variety.
+        const slugPriority = [
+          'DF',
+          'FM',
+          'NC',
+          'RC',
+          'CC',
+          'PA',
+          'GS',
+          'SY',
+          'LT',
+          'EY',
+          'QA',
+          'GC',
+          'BB',
+        ];
+        final rrStart = iter % slugPriority.length;
+        orderedSlugs = <String>[
+          ...slugPriority.sublist(rrStart),
+          ...slugPriority.sublist(0, rrStart),
+        ].where((s) => allowedSlugs.contains(s)).toList();
+      }
+
+      final bySlug = <String, List<Constraint>>{};
+      for (final c in candidates) {
+        bySlug.putIfAbsent(c.slug, () => []).add(c);
+      }
+
+      final freeBefore = probe.freeCells().length;
+      bool accepted = false;
+      for (final slug in orderedSlugs) {
+        final slugCandidates = bySlug[slug];
+        if (slugCandidates == null || slugCandidates.isEmpty) continue;
+        for (final c in slugCandidates) {
+          final clone = pu.clone();
+          clone.addConstraint(c);
+          final propResult = clone.propagateToFixpoint();
+          if (propResult != null && clone.freeCells().length < freeBefore) {
+            pu.addConstraint(c);
+            pu.cachedSolution = clone.complete
+                ? clone.cellValues
+                : (clone..solve()).cellValues;
+            accepted = true;
+            acceptedCount++;
+            break;
+          }
+        }
+        if (accepted) break;
+      }
+
+      if (!accepted) {
+        // Gentle force (Tier 2): try each domain value on the target.
+        if (config.pdcgForceDepth > 0) {
+          final forced = _forceCellPdcg(pu, target, domain);
+          if (forced != null) {
+            pu.cells[target].setForSolver(forced);
+            pu.cells[target].readonly = true;
+            final solver = pu.clone();
+            solver.solve();
+            pu.cachedSolution = solver.cellValues;
+            acceptedCount++;
+            accepted = true;
+          }
+        }
+        if (!accepted) {
+          blocked.add(target);
+        }
+      }
+
+      if (accepted) {
+        // Reset the watchdog: an accept (constraint or forced cell)
+        // counts as forward progress.
+        final gap = attemptSw.elapsedMilliseconds - lastAcceptMs;
+        if (gap > maxAcceptGapMs) {
+          maxAcceptGapMs = gap;
+          onStallStats?.call(maxAcceptGapMs);
+        }
+        lastAcceptMs = attemptSw.elapsedMilliseconds;
+      }
+    }
+
+    // 4. Post-processing
+    if (acceptedCount == 0) {
+      onReject?.call(GenerationRejectReason.pdcgStalled, pu);
+      return null;
+    }
+
+    // Check whether the constraints (+ seed and forced readonly cells)
+    // close the puzzle. Any residual free cell is a hard reject: unlike
+    // the classic path there is no full backing solution to fill hints
+    // from — `cachedSolution` comes from the same deterministic `solve()`
+    // as this probe, so every cell free here is also free (unknown)
+    // there. Rejecting now avoids paying `_finalize`'s `solveExplained`
+    // for a puzzle that would die as `notUnique` anyway.
+    final test = pu.clone();
+    test.solve();
+    final ratio = test.computeRatio();
+    if (ratio > 0.25) {
+      onReject?.call(GenerationRejectReason.ratioTooHigh, pu);
+      return null;
+    }
+    if (ratio > 0) {
+      onReject?.call(GenerationRejectReason.pdcgStalled, pu);
+      return null;
+    }
+
+    // Authoritative profile marqueur: without it `detectPuzzleProfile`
+    // falls through to emergent detection and the equilibrium's pdcg
+    // bucket never fills (the corpus share would read as `classic`).
+    pu.generationScenario = 'pdcg';
+
+    return _finalize(pu, config, onReject: onReject, shouldStop: shouldStop);
   }
 
   /// Serialised-key set of constraint candidates that, when added,

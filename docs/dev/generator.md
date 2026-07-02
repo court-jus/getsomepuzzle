@@ -18,6 +18,11 @@ work together:
 The generator is "grid → constraints": it starts from a concrete solved
 grid, then collects the constraints that characterise it best.
 
+One strategy bypasses this pipeline entirely: `GenerationStrategy.pdcg`
+inverts it into a constructive "seed → constraints → grid" flow — see
+[`boss/boss.md`](boss/boss.md). Everything below describes the regular
+grid-first flow.
+
 ### 1.1. Pipeline
 
 1. **Build a random solution grid.** Each cell is filled with a random domain
@@ -169,6 +174,7 @@ When a `generateOne` attempt returns `null`, the generator now reports
 | `pathRoutingTimeout`  | `preFillPath`'s DPLL background completion hit the `completionTimeoutMs` wall-clock budget. |
 | `pathRoutingInfeasible` | `preFillPath`'s DPLL background completion proved the current backbone infeasible (search exhausted). |
 | `syPrefillFailed`     | `preFillSy` exhausted its retry budget without producing a deductively-unique puzzle.  |
+| `pdcgStalled`         | The PDCG constructive loop failed to close the puzzle: iterations exhausted with residual free cells (ratio ≤ 0.25), no candidate ever accepted, or a propagation probe contradicted. See [`boss/boss.md`](boss/boss.md). |
 
 The worker (`worker_io.dart`) persists every rejected puzzle to
 `assets/<reason>.txt` for post-run analysis. The path is currently

@@ -446,6 +446,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
     Set<String> preferredSlugs = const {};
     bool attemptPathBased = false;
     bool attemptSyBased = false;
+    GenerationStrategy? attemptStrategy;
 
     // Estimate the global corpus size: this worker only sees its own output,
     // so we approximate other workers' contributions by `generated × jobsCount`.
@@ -508,6 +509,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
         preferredSlugs = resolved.preferredSlugs;
         attemptPathBased = resolved.pathBasedScenario;
         attemptSyBased = resolved.syBasedScenario;
+        attemptStrategy = resolved.strategy;
         if (resolved.width != null && resolved.height != null) {
           // Size targets are canonical bins (width ≤ height); pick a concrete
           // orientation so both portrait and landscape grids keep appearing.
@@ -573,6 +575,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       syBased: params.syBasedScenario || attemptSyBased,
       preferredSlugs: preferredSlugs,
       requiredSlugs: requiredSet,
+      strategyOverride: attemptStrategy,
     );
     final resolvedTarget = target;
     // `ntypesIntended` is the explicit target.n when chasing NTypesTarget,
@@ -667,7 +670,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       domain: attemptDomainSize == 3 ? fullDomain : defaultDomain,
       pathMaxRetries: params.pathMaxRetries,
       pathWindingProb: params.pathWindingProb,
-      strategy: params.strategy,
+      strategy: attemptStrategy ?? params.strategy,
       maxStall: Duration(milliseconds: params.maxStallMs),
     );
 
@@ -945,6 +948,11 @@ class _ResolvedTarget {
   /// CLI flag via OR.
   final bool syBasedScenario;
 
+  /// When non-null, overrides the worker's default `GenerationStrategy`
+  /// for this attempt. Used by `ProfileTarget(pdcg)` to route the
+  /// attempt through `_generateOnePdcg`.
+  final GenerationStrategy? strategy;
+
   const _ResolvedTarget({
     this.width,
     this.height,
@@ -952,6 +960,7 @@ class _ResolvedTarget {
     this.preferredSlugs = const {},
     this.pathBasedScenario = false,
     this.syBasedScenario = false,
+    this.strategy,
   });
 }
 
@@ -1125,12 +1134,17 @@ _ResolvedTarget _resolveTarget(
           // island count, axes and topology; slug-level preferences are
           // ignored.
           return const _ResolvedTarget(syBasedScenario: true);
+        case ProfileCategory.pdcg:
+          // Route through `_generateOnePdcg`. No special slug preference:
+          // the PDCG path uses deficit-weighted ordering when equilibrium
+          // is active.
+          return const _ResolvedTarget(strategy: GenerationStrategy.pdcg);
         case ProfileCategory.minesweeper:
         case ProfileCategory.nonogram:
         case ProfileCategory.local:
         case ProfileCategory.group:
           // Unreachable: emergent profiles never appear in a ProfileTarget
-          // (kTargetProfile only contains the four pre-fill modes).
+          // (kTargetProfile only contains the five pre-fill modes).
           throw StateError(
             'Unexpected emergent profile $profile in profile-target switch',
           );
@@ -1184,16 +1198,18 @@ _ResolvedTarget _resolveTarget(
 }
 
 // Effective pre-fill scenario for one attempt. Priority order matches
-// `PuzzleGenerator.generateOne` dispatch: pathBased / syBased short-circuit
-// the regular flow, and SH pre-fill activates whenever SH ∈ prioritySlugs
-// (= preferred ∪ required, cf. generator.dart). When none apply we're in
-// the classic grid-first flow.
+// `PuzzleGenerator.generateOne` dispatch: pdcg / pathBased / syBased
+// short-circuit the regular flow, and SH pre-fill activates whenever
+// SH ∈ prioritySlugs (= preferred ∪ required, cf. generator.dart).
+// When none apply we're in the classic grid-first flow.
 String _resolveScenario({
   required bool pathBased,
   required bool syBased,
   required Set<String> preferredSlugs,
   required Set<String> requiredSlugs,
+  GenerationStrategy? strategyOverride,
 }) {
+  if (strategyOverride == GenerationStrategy.pdcg) return 'pdcg';
   if (pathBased) return 'pathBased';
   if (syBased) return 'syBased';
   if (preferredSlugs.contains('SH') || requiredSlugs.contains('SH')) {
