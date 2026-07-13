@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -436,14 +438,58 @@ class _StatsDirectoryRow extends StatelessWidget {
     required this.onChange,
   });
 
-  Future<void> _pickDirectory() async {
+  Future<void> _pickDirectory(BuildContext context) async {
     String? selected;
     if (defaultTargetPlatform == TargetPlatform.android) {
       selected = await SafAccess.pickDirectory();
     } else {
-      selected = await FilePicker.getDirectoryPath(
-        dialogTitle: 'Select stats sync directory',
-      );
+      try {
+        selected = await FilePicker.getDirectoryPath(
+          dialogTitle: 'Select stats sync directory',
+        );
+      } catch (e) {
+        if (context.mounted) {
+          final controller = TextEditingController();
+          selected = await showDialog<String>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Select stats sync directory'),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    hintText: '/path/to/stats/directory',
+                  ),
+                  autofocus: true,
+                  onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      Navigator.pop(ctx, controller.text.trim()),
+                  child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+                ),
+              ],
+            ),
+          );
+          if (selected != null && !await Directory(selected).exists()) {
+            selected = null;
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Directory does not exist'),
+                ),
+              );
+            }
+          }
+        }
+      }
     }
     if (selected != null) {
       onChange(selected);
@@ -509,7 +555,7 @@ class _StatsDirectoryRow extends StatelessWidget {
                         ? l10n.statsSyncDirectoryChange
                         : l10n.statsSyncDirectoryChoose,
                   ),
-                  onPressed: _pickDirectory,
+                  onPressed: () => _pickDirectory(context),
                 ),
                 if (path != null) ...[
                   const SizedBox(width: 8),
