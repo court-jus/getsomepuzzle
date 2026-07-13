@@ -80,7 +80,7 @@ class GameModel extends ChangeNotifier {
 
   // --- Visual feedback ---
   String topMessage = "";
-  Color topMessageColor = Colors.black;
+  Color? topMessageColor;
 
   // --- Hint constraint state ---
   HintWorker? _hintWorker;
@@ -185,7 +185,7 @@ class GameModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setTopMessage({String text = "", Color color = Colors.black}) {
+  void setTopMessage({String text = "", Color? color}) {
     topMessage = text;
     topMessageColor = color;
   }

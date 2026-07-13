@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class OnboardingCompleteDialog extends StatelessWidget {
@@ -15,10 +16,11 @@ class OnboardingCompleteDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.celebration, color: Colors.amber),
+          Icon(Icons.celebration, color: pc.dialogAccent),
           const SizedBox(width: 8),
           Expanded(child: Text(l.onboardingCompleteTitle)),
         ],

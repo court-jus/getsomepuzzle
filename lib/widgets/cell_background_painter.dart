@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
-import 'package:getsomepuzzle/widgets/cell.dart' show bgColors;
 
 class CellBackgroundPainter extends CustomPainter {
   final Puzzle puzzle;
   final double cellSize;
+  final PuzzleColors puzzleColors;
 
-  CellBackgroundPainter({required this.puzzle, required this.cellSize});
+  CellBackgroundPainter({
+    required this.puzzle,
+    required this.cellSize,
+    required this.puzzleColors,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -14,7 +20,18 @@ class CellBackgroundPainter extends CustomPainter {
     for (int idx = 0; idx < puzzle.cells.length; idx++) {
       final col = idx % w;
       final row = idx ~/ w;
-      final color = bgColors[puzzle.cellValues[idx]] ?? Colors.transparent;
+      final value = puzzle.cellValues[idx];
+      final Color color;
+      switch (value) {
+        case CellValue.free:
+          color = puzzleColors.cellBgUndecided;
+        case CellValue.black:
+          color = puzzleColors.cellBgBlack;
+        case CellValue.white:
+          color = puzzleColors.cellBgWhite;
+        case CellValue.purple:
+          color = puzzleColors.cellBgWhite;
+      }
       final rect = Rect.fromLTWH(
         col * cellSize,
         row * cellSize,

@@ -459,5 +459,21 @@
     "statsSyncDirectoryAutoCleared": "La carpeta de sincronización se ha borrado porque ya no es accesible. Puedes configurar una nueva en los ajustes.",
     "@statsSyncDirectoryAutoCleared": {
         "description": "Snackbar shown at boot when the stats directory has been auto-cleared due to inaccessibility"
+    },
+    "settingTheme": "Tema",
+    "@settingTheme": {
+        "description": "Setting label for the app theme (light/dark/system)"
+    },
+    "settingThemeSystem": "Sistema",
+    "@settingThemeSystem": {
+        "description": "Theme option: follow the system setting"
+    },
+    "settingThemeLight": "Claro",
+    "@settingThemeLight": {
+        "description": "Theme option: always use light theme"
+    },
+    "settingThemeDark": "Oscuro",
+    "@settingThemeDark": {
+        "description": "Theme option: always use dark theme"
     }
 }

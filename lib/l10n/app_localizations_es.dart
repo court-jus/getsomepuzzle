@@ -981,4 +981,16 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get statsSyncDirectoryAutoCleared =>
       'La carpeta de sincronización se ha borrado porque ya no es accesible. Puedes configurar una nueva en los ajustes.';
+
+  @override
+  String get settingTheme => 'Tema';
+
+  @override
+  String get settingThemeSystem => 'Sistema';
+
+  @override
+  String get settingThemeLight => 'Claro';
+
+  @override
+  String get settingThemeDark => 'Oscuro';
 }

@@ -1827,6 +1827,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The stats sync folder was cleared because it is no longer accessible. You can set a new one in the settings.'**
   String get statsSyncDirectoryAutoCleared;
+
+  /// Setting label for the app theme (light/dark/system)
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingTheme;
+
+  /// Theme option: follow the system setting
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingThemeSystem;
+
+  /// Theme option: always use light theme
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingThemeLight;
+
+  /// Theme option: always use light theme
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get settingThemeDark;
 }
 
 class _AppLocalizationsDelegate

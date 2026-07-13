@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/widgets/cell_background_painter.dart';
 import 'package:getsomepuzzle/widgets/constraints/majority.dart';
@@ -25,7 +25,7 @@ class PuzzleGridStack extends StatelessWidget {
     required this.cellSize,
     required this.cellBuilder,
     this.dfDefaultColor = Colors.black87,
-    this.dfHighlightColor = highlightColor,
+    this.dfHighlightColor,
     this.overlays = const [],
   });
 
@@ -37,10 +37,11 @@ class PuzzleGridStack extends StatelessWidget {
   /// Builds the cell widget for a flat cell index `row * width + col`.
   final Widget Function(int index) cellBuilder;
 
-  /// DF arrow colours: game uses black87 / [highlightColor], editor uses
-  /// blueGrey / green.
+  /// DF arrow colours: game uses black87 / theme highlight, editor uses
+  /// blueGrey / green. When [dfHighlightColor] is null the theme's
+  /// `PuzzleColors.highlight` is used.
   final Color dfDefaultColor;
-  final Color dfHighlightColor;
+  final Color? dfHighlightColor;
 
   /// Extra stack children drawn above the constraint painters (e.g. the game's
   /// option dots overlay).
@@ -48,6 +49,7 @@ class PuzzleGridStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     final width = puzzle.width;
     final height = puzzle.height;
     final imConstraints = puzzle.constraints
@@ -68,6 +70,7 @@ class PuzzleGridStack extends StatelessWidget {
               painter: CellBackgroundPainter(
                 puzzle: puzzle,
                 cellSize: cellSize,
+                puzzleColors: pc,
               ),
             ),
           ),
@@ -80,6 +83,7 @@ class PuzzleGridStack extends StatelessWidget {
                   constraints: imConstraints,
                   cellSize: cellSize,
                   gridWidth: width,
+                  highlightColor: pc.highlight,
                 ),
               ),
             ),
@@ -106,7 +110,8 @@ class PuzzleGridStack extends StatelessWidget {
                   cellSize: cellSize,
                   gridWidth: width,
                   defaultColor: dfDefaultColor,
-                  highlightColor: dfHighlightColor,
+                  highlightColor: dfHighlightColor ?? pc.highlight,
+                  fillColor: pc.mandatory,
                 ),
               ),
             ),
@@ -119,6 +124,7 @@ class PuzzleGridStack extends StatelessWidget {
                   constraints: mjConstraints,
                   cellSize: cellSize,
                   gridWidth: width,
+                  highlightColor: pc.highlight,
                 ),
               ),
             ),

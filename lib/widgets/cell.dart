@@ -3,25 +3,42 @@ import 'dart:math';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/to_flutter.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
 
-final bgColors = {
-  CellValue.free: Color.fromARGB(255, 192, 235, 241),
-  CellValue.black: Colors.black,
-  CellValue.white: Colors.white,
-  CellValue.purple: Colors.purple[100],
-};
-const fgColors = {
-  CellValue.free: Colors.black,
-  CellValue.black: Colors.white,
-  CellValue.white: Colors.black,
-  CellValue.purple: Colors.green,
-};
+/// Returns the cell background color for a given value using the theme.
+Color cellBgColor(BuildContext context, CellValue value) {
+  final pc = Theme.of(context).extension<PuzzleColors>()!;
+  switch (value) {
+    case CellValue.free:
+      return pc.cellBgUndecided;
+    case CellValue.black:
+      return pc.cellBgBlack;
+    case CellValue.white:
+      return pc.cellBgWhite;
+    case CellValue.purple:
+      return pc.cellBgPurple;
+  }
+}
+
+/// Returns the cell foreground (text/icon) color for a given value using the theme.
+Color cellFgColor(BuildContext context, CellValue value) {
+  final pc = Theme.of(context).extension<PuzzleColors>()!;
+  switch (value) {
+    case CellValue.free:
+      return pc.cellFgUndecided;
+    case CellValue.black:
+      return pc.cellFgBlack;
+    case CellValue.white:
+      return pc.cellFgWhite;
+    case CellValue.purple:
+      return pc.cellFgPurple;
+  }
+}
 
 class CellWidget extends StatelessWidget {
   // Constructor
@@ -88,6 +105,7 @@ class CellWidget extends StatelessWidget {
   // Build UI
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     int widgetScale = 1;
     if (constraints != null) {
       // DF and IM are rendered by background painters, not inside the cell.
@@ -109,10 +127,9 @@ class CellWidget extends StatelessWidget {
                     constraint is! ImplicationConstraint)
                   constraintToFlutter(
                     constraint,
-                    constraint.isHighlighted
-                        ? highlightColor
-                        : (fgColors[value] ?? Colors.black),
+                    cellFgColor(context, value),
                     cellSize,
+                    highlightColor: pc.highlight,
                     count: widgetScale,
                     actualGroupSize: getCellGroupSize?.call(idx) ?? 0,
                   ),
@@ -171,8 +188,7 @@ class CellWidget extends StatelessWidget {
             border: BoxBorder.all(
               width: borderWidth ?? ((readonly || isHighlighted) ? 6 : 1),
               color:
-                  borderColor ??
-                  (isHighlighted ? highlightColor : Colors.blueAccent),
+                  borderColor ?? (isHighlighted ? pc.highlight : pc.gridBorder),
             ),
           ),
           child: SizedBox(
@@ -195,9 +211,9 @@ class CellWidget extends StatelessWidget {
                       size: Size(cellSize * 0.4, cellSize * 0.4),
                       painter: _CornerTrianglePainter(
                         color: cornerIndicatorValue == CellValue.black
-                            ? Colors.black
-                            : Colors.white,
-                        borderColor: Colors.grey,
+                            ? pc.cellBgBlack
+                            : pc.cellBgWhite,
+                        borderColor: pc.constraintGrayed,
                       ),
                     ),
                   ),
@@ -237,7 +253,7 @@ class OptionDots extends StatelessWidget {
             height: dotSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: bgColors[options[i]],
+              color: cellBgColor(context, options[i]),
               border: Border.all(color: Colors.black54, width: 0.5),
             ),
           ),

@@ -983,4 +983,16 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get statsSyncDirectoryAutoCleared =>
       'Le dossier de synchronisation a été effacé car il n\'est plus accessible. Vous pouvez en définir un nouveau dans les paramètres.';
+
+  @override
+  String get settingTheme => 'Thème';
+
+  @override
+  String get settingThemeSystem => 'Système';
+
+  @override
+  String get settingThemeLight => 'Clair';
+
+  @override
+  String get settingThemeDark => 'Sombre';
 }

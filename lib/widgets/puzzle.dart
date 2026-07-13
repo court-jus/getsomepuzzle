@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
@@ -175,6 +176,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     double maxConstraintsInTopBarSize = widget.cellSize;
     int numberOfTopBarConstraints = widget.currentPuzzle.constraints
         .where(
@@ -282,7 +284,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                       style: TextStyle(
                         color: widget.hintIsError
                             ? Colors.deepOrange
-                            : highlightColor,
+                            : pc.highlight,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -494,6 +496,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               groups,
                               mjZoneHighlightIndices,
                               constraintHomeCells,
+                              pc.highlight,
                             ),
                             overlays: [
                               _buildOptionDotsOverlay(adjustedCellSize),
@@ -515,7 +518,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                       painter: _ArrowPainter(
                         start: start,
                         end: _arrowEnd!,
-                        color: highlightColor,
+                        color: pc.highlight,
                       ),
                     ),
                   ),
@@ -560,6 +563,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
     List<List<int>> groups,
     Set<int>? mjZoneHighlightIndices,
     Set<int> constraintHomeCells,
+    Color highlightColor,
   ) {
     final idx = rowidx * widget.currentPuzzle.width + cellidx;
 

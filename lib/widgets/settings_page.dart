@@ -87,6 +87,21 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                         ],
                       ),
+                      _EnumSettingRow<ThemeModeType>(
+                        label: l10n.settingTheme,
+                        value: widget.settings.themeMode,
+                        options: ThemeModeType.values,
+                        labels: {
+                          ThemeModeType.system: l10n.settingThemeSystem,
+                          ThemeModeType.light: l10n.settingThemeLight,
+                          ThemeModeType.dark: l10n.settingThemeDark,
+                        },
+                        onChanged: (v) => setState(() {
+                          widget.onSettingsChange(
+                            ChangeableSettings(themeMode: v),
+                          );
+                        }),
+                      ),
                       _EnumSettingRow<ValidateType>(
                         label: l10n.settingValidateType,
                         value: widget.settings.validateType,

@@ -975,4 +975,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get statsSyncDirectoryAutoCleared =>
       'The stats sync folder was cleared because it is no longer accessible. You can set a new one in the settings.';
+
+  @override
+  String get settingTheme => 'Theme';
+
+  @override
+  String get settingThemeSystem => 'System';
+
+  @override
+  String get settingThemeLight => 'Light';
+
+  @override
+  String get settingThemeDark => 'Dark';
 }

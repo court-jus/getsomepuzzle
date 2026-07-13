@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
@@ -44,12 +45,13 @@ class _TimerBottomBarState extends State<TimerBottomBar> {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     if (widget.currentPuzzle == null) {
-      return BottomAppBar(height: 40, color: Colors.amber, child: SizedBox());
+      return BottomAppBar(height: 40, color: pc.bottomBarBg, child: SizedBox());
     }
     return BottomAppBar(
       height: 40,
-      color: Colors.amber,
+      color: pc.bottomBarBg,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [

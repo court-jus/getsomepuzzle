@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 /// Generic 3x3 motif editor — shared by Forbidden Motif and Shape.
@@ -131,20 +131,22 @@ Future<String?> _showMotifDialog(
 
 Future<ForbiddenMotif?> showForbiddenMotifDialog(BuildContext context) async {
   final loc = AppLocalizations.of(context)!;
+  final pc = Theme.of(context).extension<PuzzleColors>()!;
   final motifStr = await _showMotifDialog(
     context,
     titleText: loc.constraintForbiddenPattern,
-    backgroundColor: forbiddenColor,
+    backgroundColor: pc.forbidden,
   );
   return motifStr == null ? null : ForbiddenMotif(motifStr);
 }
 
 Future<ShapeConstraint?> showShapeDialog(BuildContext context) async {
   final loc = AppLocalizations.of(context)!;
+  final pc = Theme.of(context).extension<PuzzleColors>()!;
   final motifStr = await _showMotifDialog(
     context,
     titleText: loc.constraintShape,
-    backgroundColor: mandatoryColor,
+    backgroundColor: pc.mandatory,
   );
   return motifStr == null ? null : ShapeConstraint(motifStr);
 }

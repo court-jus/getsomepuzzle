@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
-
-const _textColors = {
-  CellValue.free: Colors.transparent,
-  CellValue.black: Colors.black,
-  CellValue.white: Colors.white,
-  CellValue.purple: Color(0xFF8E44AD),
-};
 
 /// Fixed 6×6 path cells for vertical (top→bottom) chain.
 const _chainPathCells = {1, 7, 8, 14, 15, 21, 22, 28, 34};
@@ -30,19 +23,25 @@ class ChainWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     final bool shouldGrayOut = constraint.isComplete && constraint.isValid;
     final borderColor = constraint.isHighlighted
-        ? highlightColor
-        : (constraint.isValid ? Colors.green : Colors.deepOrange);
+        ? pc.highlight
+        : (constraint.isValid ? pc.constraintValid : pc.constraintInvalid);
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
-        : mandatoryColor;
+        : pc.mandatory;
 
     final pathColor = shouldGrayOut
-        ? Colors.grey
+        ? pc.constraintGrayed
         : (constraint.isHighlighted
-              ? highlightColor
-              : (fgcolor ?? _textColors[constraint.color]!));
+              ? pc.highlight
+              : (fgcolor ??
+                    (constraint.color == CellValue.black
+                        ? pc.cellBgBlack
+                        : constraint.color == CellValue.white
+                        ? pc.cellBgWhite
+                        : Colors.transparent)));
 
     return DecoratedBox(
       decoration: BoxDecoration(

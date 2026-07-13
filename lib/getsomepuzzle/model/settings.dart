@@ -11,6 +11,8 @@ enum HintType { deducibleCell, addConstraint }
 
 enum IdleTimeout { disabled, s5, s10, s30, m1, m2 }
 
+enum ThemeModeType { system, light, dark }
+
 class ChangeableSettings {
   ValidateType? validateType;
   ShowRating? showRating;
@@ -21,6 +23,7 @@ class ChangeableSettings {
   bool? autoLevel;
   bool? grayoutEnabled;
   String? statsDirectory;
+  ThemeModeType? themeMode;
 
   ChangeableSettings({
     this.validateType,
@@ -32,6 +35,7 @@ class ChangeableSettings {
     this.autoLevel,
     this.grayoutEnabled,
     this.statsDirectory,
+    this.themeMode,
   });
 
   @override
@@ -50,6 +54,7 @@ class Settings {
   bool autoLevel;
   bool grayoutEnabled;
   String? statsDirectory;
+  ThemeModeType themeMode;
 
   final log = Logger("Settings");
 
@@ -63,6 +68,7 @@ class Settings {
     this.autoLevel = true,
     this.grayoutEnabled = true,
     this.statsDirectory,
+    this.themeMode = ThemeModeType.system,
   });
 
   @override
@@ -137,6 +143,12 @@ class Settings {
     autoLevel = prefs.getBool("settingsAutoLevel") ?? true;
     grayoutEnabled = prefs.getBool("settingsGrayoutEnabled") ?? true;
     statsDirectory = prefs.getString("settingsStatsDirectory");
+    final String settingsThemeMode =
+        prefs.getString("settingsThemeMode") ?? "system";
+    themeMode = ThemeModeType.values.firstWhere(
+      (e) => e.name == settingsThemeMode,
+      orElse: () => ThemeModeType.system,
+    );
   }
 
   Future<void> save() async {
@@ -154,6 +166,7 @@ class Settings {
     } else {
       prefs.remove("settingsStatsDirectory");
     }
+    prefs.setString("settingsThemeMode", themeMode.name);
   }
 
   void change(ChangeableSettings newValue) {
@@ -183,6 +196,9 @@ class Settings {
     }
     if (newValue.statsDirectory != null) {
       statsDirectory = newValue.statsDirectory;
+    }
+    if (newValue.themeMode != null) {
+      themeMode = newValue.themeMode!;
     }
     save();
   }

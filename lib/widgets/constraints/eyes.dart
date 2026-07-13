@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
-import 'package:getsomepuzzle/widgets/cell.dart';
 
 class EyesWidget extends StatelessWidget {
   const EyesWidget({
@@ -20,7 +20,11 @@ class EyesWidget extends StatelessWidget {
       width: cellSize,
       height: cellSize,
       child: CustomPaint(
-        painter: _EyesPainter(constraint: constraint, cellSize: cellSize),
+        painter: _EyesPainter(
+          constraint: constraint,
+          cellSize: cellSize,
+          pc: Theme.of(context).extension<PuzzleColors>()!,
+        ),
       ),
     );
     // Complete-and-valid fades the whole widget via opacity rather than
@@ -37,6 +41,7 @@ class EyesWidget extends StatelessWidget {
 class _EyesPainter extends CustomPainter {
   final EyesConstraint constraint;
   final double cellSize;
+  final PuzzleColors pc;
   // Snapshots at construction time. The `constraint` reference is stable
   // across builds (it is mutated in place), so comparing flags through
   // `constraint.*` in `shouldRepaint` would always be a no-op.
@@ -45,11 +50,14 @@ class _EyesPainter extends CustomPainter {
   final CellValue color;
   final int count;
 
-  _EyesPainter({required this.constraint, required this.cellSize})
-    : isValid = constraint.isValid,
-      isHighlighted = constraint.isHighlighted,
-      color = constraint.color,
-      count = constraint.count;
+  _EyesPainter({
+    required this.constraint,
+    required this.cellSize,
+    required this.pc,
+  }) : isValid = constraint.isValid,
+       isHighlighted = constraint.isHighlighted,
+       color = constraint.color,
+       count = constraint.count;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -69,19 +77,27 @@ class _EyesPainter extends CustomPainter {
       ..arcTo(rect, -3.14159, -3.14159, true)
       ..arcTo(rect, 3.14159, 3.14159, true);
 
-    final fillColor = bgColors[color] ?? Colors.grey;
-    final oppositeColor =
-        bgColors[color == CellValue.black
-            ? CellValue.white
-            : CellValue.black] ??
-        Colors.white;
-    final textColor = fgColors[color] ?? Colors.black;
+    final fillColor = color == CellValue.black
+        ? pc.cellBgBlack
+        : color == CellValue.white
+        ? pc.cellBgWhite
+        : pc.constraintGrayed;
+    final oppositeColor = color == CellValue.black
+        ? pc.cellBgWhite
+        : color == CellValue.white
+        ? pc.cellBgBlack
+        : pc.constraintGrayed;
+    final textColor = color == CellValue.black
+        ? pc.cellFgBlack
+        : color == CellValue.white
+        ? pc.cellFgWhite
+        : pc.constraintGrayed;
 
     final Color strokeColor;
     if (!isValid) {
-      strokeColor = Colors.deepOrange;
+      strokeColor = pc.constraintInvalid;
     } else if (isHighlighted) {
-      strokeColor = highlightColor;
+      strokeColor = pc.highlight;
     } else {
       strokeColor = oppositeColor;
     }

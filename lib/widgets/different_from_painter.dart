@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 
 class DifferentFromPainter extends CustomPainter {
   final List<DifferentFromConstraint> constraints;
@@ -8,6 +7,7 @@ class DifferentFromPainter extends CustomPainter {
   final int gridWidth;
   final Color defaultColor;
   final Color highlightColor;
+  final Color fillColor;
 
   DifferentFromPainter({
     required this.constraints,
@@ -15,6 +15,7 @@ class DifferentFromPainter extends CustomPainter {
     required this.gridWidth,
     required this.defaultColor,
     required this.highlightColor,
+    required this.fillColor,
   });
 
   @override
@@ -50,9 +51,7 @@ class DifferentFromPainter extends CustomPainter {
       }
 
       final fillPaint = Paint()
-        ..color = shouldGrayOut
-            ? Colors.grey.withValues(alpha: 0.3)
-            : mandatoryColor
+        ..color = shouldGrayOut ? Colors.grey.withValues(alpha: 0.3) : fillColor
         ..style = PaintingStyle.fill;
 
       final strokePaint = Paint()

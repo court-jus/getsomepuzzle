@@ -1,19 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
-
-final textColors = {
-  CellValue.free: Colors.transparent,
-  CellValue.black: Colors.black,
-  CellValue.white: Colors.white,
-  CellValue.purple: Colors.purple[100],
-};
-const oppositeColors = {
-  CellValue.free: Colors.transparent,
-  CellValue.black: Colors.white,
-  CellValue.white: Colors.black,
-};
 
 class QuantityWidget extends StatelessWidget {
   const QuantityWidget({
@@ -35,13 +24,14 @@ class QuantityWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     final bool shouldGrayOut = constraint.isComplete;
     final borderColor = constraint.isHighlighted
-        ? highlightColor
-        : (constraint.isValid ? Colors.green : Colors.deepOrange);
+        ? pc.highlight
+        : (constraint.isValid ? pc.constraintValid : pc.constraintInvalid);
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
-        : mandatoryColor;
+        : pc.mandatory;
     final smallText = "$actualCount/";
     final largeText = constraint.count.toString();
     final oppositeText = "$oppositeActual/$oppositeTotal";
@@ -66,7 +56,11 @@ class QuantityWidget extends StatelessWidget {
                   oppositeText,
                   style: TextStyle(
                     fontSize: smallFontSize,
-                    color: oppositeColors[constraint.color],
+                    color: constraint.color == CellValue.black
+                        ? pc.cellBgWhite
+                        : constraint.color == CellValue.white
+                        ? pc.cellBgBlack
+                        : Colors.transparent,
                   ),
                 ),
               ),
@@ -78,7 +72,11 @@ class QuantityWidget extends StatelessWidget {
                   smallText,
                   style: TextStyle(
                     fontSize: smallFontSize,
-                    color: textColors[constraint.color],
+                    color: constraint.color == CellValue.black
+                        ? pc.cellBgBlack
+                        : constraint.color == CellValue.white
+                        ? pc.cellBgWhite
+                        : Colors.transparent,
                   ),
                 ),
               ),
@@ -87,7 +85,11 @@ class QuantityWidget extends StatelessWidget {
                 largeText,
                 style: TextStyle(
                   fontSize: largeFontSize,
-                  color: textColors[constraint.color],
+                  color: constraint.color == CellValue.black
+                      ? pc.cellBgBlack
+                      : constraint.color == CellValue.white
+                      ? pc.cellBgWhite
+                      : Colors.transparent,
                 ),
               ),
             ),

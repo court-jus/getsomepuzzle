@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 
 /// Full-screen overlay shown when the game is paused.
 ///
@@ -37,10 +38,12 @@ class PauseOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     if (onRestart == null) {
       // Resume-only: a single full-size button (the historical pause overlay).
       return _button(
-        color: Colors.teal,
+        context: context,
+        color: pc.pauseOverlayBg,
         icon: Icons.pause,
         iconSize: iconSize,
         onPressed: onResume,
@@ -61,7 +64,8 @@ class PauseOverlay extends StatelessWidget {
     final double splitIconSize = iconSize * 0.6;
 
     final resume = _button(
-      color: Colors.teal,
+      context: context,
+      color: pc.pauseOverlayBg,
       icon: Icons.pause,
       iconSize: splitIconSize,
       onPressed: onResume,
@@ -71,6 +75,7 @@ class PauseOverlay extends StatelessWidget {
       compact: true,
     );
     final restart = _button(
+      context: context,
       color: Colors.redAccent.shade100,
       icon: Icons.restart_alt_outlined,
       iconSize: splitIconSize,
@@ -97,6 +102,7 @@ class PauseOverlay extends StatelessWidget {
   /// One overlay button: a coloured rounded box of [width] x [height] with a
   /// centred [icon] and optional [label]/[subtitle], wrapped in a [TextButton].
   Widget _button({
+    required BuildContext context,
     required Color color,
     required IconData icon,
     required double iconSize,
@@ -149,10 +155,10 @@ class PauseOverlay extends StatelessWidget {
                     child: Text(
                       subtitle,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),

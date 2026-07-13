@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 
@@ -18,9 +19,10 @@ class GroupSizeWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     final borderColor = constraint.isHighlighted
-        ? highlightColor
-        : (constraint.isValid ? Colors.transparent : Colors.deepOrange);
+        ? pc.highlight
+        : (constraint.isValid ? Colors.transparent : pc.constraintInvalid);
     final smallText = "$actualGroupSize/";
     final largeText = constraint.size.toString();
     final smallFontSize = cellSize * cellSizeToFontSize / 3.5;

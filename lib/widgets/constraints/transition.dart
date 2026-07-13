@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
 
 class TransitionWidget extends StatelessWidget {
@@ -19,16 +19,17 @@ class TransitionWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     final bool shouldGrayOut = constraint.isComplete;
     final borderColor = shouldGrayOut
         ? Colors.grey
         : (constraint.isHighlighted
-              ? highlightColor
+              ? pc.highlight
               : (constraint.isValid ? Colors.grey : Colors.redAccent));
-    const waveColor = Colors.black;
+    final waveColor = pc.cellBgBlack;
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
-        : mandatoryColor;
+        : pc.mandatory;
     final squareSize = cellSize * 0.7;
 
     return SizedBox(
@@ -48,6 +49,7 @@ class TransitionWidget extends StatelessWidget {
               count: constraint.count,
               axis: axis,
               color: waveColor,
+              haloColor: pc.cellBgWhite,
             ),
           ),
         ),
@@ -76,15 +78,13 @@ class _SquareWavePainter extends CustomPainter {
   final int count;
   final Axis axis;
   final Color color;
-
-  // Contrast halo drawn under both the wave and the digit so they read against
-  // the grey square and against each other.
-  static const Color _halo = Colors.white;
+  final Color haloColor;
 
   _SquareWavePainter({
     required this.count,
     required this.axis,
     required this.color,
+    required this.haloColor,
   });
 
   @override
@@ -100,7 +100,7 @@ class _SquareWavePainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = _halo
+        ..color = haloColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = haloW
         ..strokeCap = StrokeCap.round
@@ -130,7 +130,7 @@ class _SquareWavePainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = outlineWidth
             ..strokeJoin = StrokeJoin.round
-            ..color = _halo,
+            ..color = haloColor,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -210,5 +210,8 @@ class _SquareWavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SquareWavePainter old) =>
-      old.count != count || old.axis != axis || old.color != color;
+      old.count != count ||
+      old.axis != axis ||
+      old.color != color ||
+      old.haloColor != haloColor;
 }

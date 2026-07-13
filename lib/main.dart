@@ -16,6 +16,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/between_puzzles.dart';
 import 'package:getsomepuzzle/widgets/end_of_playlist.dart';
@@ -108,11 +109,34 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   Locale selectedLocale = Locale("en");
+  ThemeModeType _themeMode = ThemeModeType.system;
 
   void setAppLocale(String newLocale) {
     setState(() {
       selectedLocale = Locale(newLocale);
     });
+  }
+
+  void setAppTheme(ThemeModeType newThemeMode) {
+    setState(() {
+      _themeMode = newThemeMode;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThemeMode();
+  }
+
+  Future<void> _loadThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString("settingsThemeMode") ?? "system";
+    final mode = ThemeModeType.values.firstWhere(
+      (e) => e.name == saved,
+      orElse: () => ThemeModeType.system,
+    );
+    if (mounted) setState(() => _themeMode = mode);
   }
 
   // This widget is the root of your application.
@@ -124,12 +148,13 @@ class _MyAppState extends State<MyApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: selectedLocale, // controlled by state
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: resolveThemeMode(_themeMode),
       home: MyHomePage(
         title: 'Get Some Puzzle',
         setAppLocale: setAppLocale,
+        setAppTheme: setAppTheme,
         initialSharedLine: widget.initialSharedLine,
       ),
     );
@@ -141,11 +166,13 @@ class MyHomePage extends StatefulWidget {
     super.key,
     required this.title,
     required this.setAppLocale,
+    required this.setAppTheme,
     this.initialSharedLine,
   });
 
   final String title;
   final ValueChanged<String> setAppLocale;
+  final ValueChanged<ThemeModeType> setAppTheme;
 
   /// Puzzle line forwarded from main(args)/Uri.base. Consumed once on first
   /// database init; subsequent loads fall back to the playlist.
@@ -1053,7 +1080,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 child: TextButton.icon(
                   style: TextButton.styleFrom(
                     foregroundColor: Theme.of(context).colorScheme.primary,
-                    backgroundColor: Colors.lightGreen,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).extension<PuzzleColors>()!.validateButtonBg,
                     disabledBackgroundColor: Theme.of(
                       context,
                     ).colorScheme.surfaceDim,
@@ -1244,6 +1273,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       _applyGrayoutSetting();
                       setState(() {});
                     }
+                    if (newValue.themeMode != null) {
+                      widget.setAppTheme(settings.themeMode);
+                    }
                     // Recompute immediately when auto is toggled on, so
                     // the player doesn't have to finish a puzzle first.
                     if (autoLevelTurnedOn && database != null) {
@@ -1355,7 +1387,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           game.topMessage,
                           style: TextStyle(
                             fontSize: 16,
-                            color: game.topMessageColor,
+                            color:
+                                game.topMessageColor ??
+                                Theme.of(context).colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

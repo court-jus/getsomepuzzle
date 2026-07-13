@@ -29,6 +29,7 @@ Widget constraintToFlutter(
   Constraint constraint,
   Color defaultColor,
   double cellSize, {
+  required Color highlightColor,
   int count = 1,
   int actualGroupSize = 0,
 }) {

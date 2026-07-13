@@ -2,17 +2,18 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 
 class ImplicationPainter extends CustomPainter {
   final List<ImplicationConstraint> constraints;
   final double cellSize;
   final int gridWidth;
+  final Color highlightColor;
 
   ImplicationPainter({
     required this.constraints,
     required this.cellSize,
     required this.gridWidth,
+    required this.highlightColor,
   });
 
   @override
@@ -150,6 +151,7 @@ class ImplicationPainter extends CustomPainter {
   bool shouldRepaint(covariant ImplicationPainter oldDelegate) {
     return constraints != oldDelegate.constraints ||
         cellSize != oldDelegate.cellSize ||
-        gridWidth != oldDelegate.gridWidth;
+        gridWidth != oldDelegate.gridWidth ||
+        highlightColor != oldDelegate.highlightColor;
   }
 }

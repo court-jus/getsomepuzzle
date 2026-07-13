@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
-import 'package:getsomepuzzle/widgets/cell.dart';
 
 class NeighborCountWidget extends StatelessWidget {
   const NeighborCountWidget({
@@ -20,7 +19,11 @@ class NeighborCountWidget extends StatelessWidget {
       width: cellSize,
       height: cellSize,
       child: CustomPaint(
-        painter: _CrossPainter(constraint: constraint, cellSize: cellSize),
+        painter: _CrossPainter(
+          constraint: constraint,
+          cellSize: cellSize,
+          pc: Theme.of(context).extension<PuzzleColors>()!,
+        ),
       ),
     );
     // Complete-and-valid fades the whole widget via opacity rather than
@@ -37,6 +40,7 @@ class NeighborCountWidget extends StatelessWidget {
 class _CrossPainter extends CustomPainter {
   final NeighborCountConstraint constraint;
   final double cellSize;
+  final PuzzleColors pc;
   // Snapshots at construction time. The `constraint` reference is stable
   // across builds (it is mutated in place), so comparing flags through
   // `constraint.*` in `shouldRepaint` would always be a no-op.
@@ -45,11 +49,14 @@ class _CrossPainter extends CustomPainter {
   final CellValue color;
   final int count;
 
-  _CrossPainter({required this.constraint, required this.cellSize})
-    : isValid = constraint.isValid,
-      isHighlighted = constraint.isHighlighted,
-      color = constraint.color,
-      count = constraint.count;
+  _CrossPainter({
+    required this.constraint,
+    required this.cellSize,
+    required this.pc,
+  }) : isValid = constraint.isValid,
+       isHighlighted = constraint.isHighlighted,
+       color = constraint.color,
+       count = constraint.count;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -77,19 +84,27 @@ class _CrossPainter extends CustomPainter {
       ..lineTo(inset + h, inset + h)
       ..close();
 
-    final fillColor = bgColors[color] ?? Colors.grey;
-    final oppositeColor =
-        bgColors[color == CellValue.black
-            ? CellValue.white
-            : CellValue.black] ??
-        Colors.white;
-    final textColor = fgColors[color] ?? Colors.black;
+    final fillColor = color == CellValue.black
+        ? pc.cellBgBlack
+        : color == CellValue.white
+        ? pc.cellBgWhite
+        : pc.constraintGrayed;
+    final oppositeColor = color == CellValue.black
+        ? pc.cellBgWhite
+        : color == CellValue.white
+        ? pc.cellBgBlack
+        : pc.constraintGrayed;
+    final textColor = color == CellValue.black
+        ? pc.cellFgBlack
+        : color == CellValue.white
+        ? pc.cellFgWhite
+        : pc.constraintGrayed;
 
     final Color strokeColor;
     if (!isValid) {
-      strokeColor = Colors.deepOrange;
+      strokeColor = pc.constraintInvalid;
     } else if (isHighlighted) {
-      strokeColor = highlightColor;
+      strokeColor = pc.highlight;
     } else {
       strokeColor = oppositeColor;
     }

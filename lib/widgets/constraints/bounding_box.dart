@@ -2,15 +2,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
-
-/// Translucent background tint per constraint colour.
-final _tintColors = {
-  CellValue.black: Colors.black.withValues(alpha: 0.3),
-  CellValue.white: Colors.white.withValues(alpha: 0.6),
-  CellValue.purple: Colors.purple.withValues(alpha: 0.3),
-};
 
 /// Renders the BB target as an empty `width × height` grid (transparent cells
 /// with borders) on a background tinted with the constraint's colour. Border:
@@ -28,12 +22,23 @@ class BoundingBoxWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     final shouldGrayOut = constraint.isComplete && constraint.isValid;
-    final tint = _tintColors[constraint.color] ?? Colors.transparent;
+    final Color tint;
+    switch (constraint.color) {
+      case CellValue.black:
+        tint = pc.cellBgBlack.withValues(alpha: 0.3);
+      case CellValue.white:
+        tint = pc.cellBgWhite.withValues(alpha: 0.6);
+      case CellValue.purple:
+        tint = Colors.purple.withValues(alpha: 0.3);
+      case CellValue.free:
+        tint = Colors.transparent;
+    }
     final bgColor = shouldGrayOut ? Colors.grey.withValues(alpha: 0.3) : tint;
     final borderColor = constraint.isHighlighted
-        ? highlightColor
-        : (constraint.isValid ? Colors.green : Colors.deepOrange);
+        ? pc.highlight
+        : (constraint.isValid ? pc.constraintValid : pc.constraintInvalid);
 
     final maxDim = max(constraint.width, constraint.height);
     final boxCellSize =

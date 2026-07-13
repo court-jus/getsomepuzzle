@@ -4,15 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
-
-final _bgColors = {
-  CellValue.free: Colors.transparent,
-  CellValue.black: Colors.black,
-  CellValue.white: Colors.white,
-  CellValue.purple: Colors.purple[100],
-};
 
 class MotifWidget extends StatelessWidget {
   const MotifWidget({
@@ -26,14 +20,15 @@ class MotifWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     final bool shouldGrayOut = constraint.isComplete;
     final isShapeConstraint = constraint is ShapeConstraint;
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
-        : (constraint is ForbiddenMotif ? forbiddenColor : mandatoryColor);
+        : (constraint is ForbiddenMotif ? pc.forbidden : pc.mandatory);
     final borderColor = constraint.isHighlighted
-        ? highlightColor
-        : (constraint.isValid ? Colors.green : Colors.deepOrange);
+        ? pc.highlight
+        : (constraint.isValid ? pc.constraintValid : pc.constraintInvalid);
     final rows = constraint.motif.length;
     final cols = constraint.motif.isNotEmpty ? constraint.motif[0].length : 0;
     final maxDim = rows > cols ? rows : cols;
@@ -49,7 +44,11 @@ class MotifWidget extends StatelessWidget {
               for (var (_, cell) in row.indexed)
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    color: _bgColors[cell],
+                    color: cell == CellValue.free
+                        ? Colors.transparent
+                        : cell == CellValue.black
+                        ? pc.cellBgBlack
+                        : pc.cellBgWhite,
                     border: BoxBorder.all(color: Colors.blueGrey),
                   ),
                   child: SizedBox(width: motifCellSize, height: motifCellSize),

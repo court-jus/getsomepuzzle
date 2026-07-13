@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
-
-final textColors = {
-  CellValue.free: Colors.transparent,
-  CellValue.black: Colors.black,
-  CellValue.white: Colors.white,
-  CellValue.purple: Colors.purple[100],
-};
 
 class GroupCountWidget extends StatelessWidget {
   const GroupCountWidget({
@@ -24,16 +18,21 @@ class GroupCountWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     final borderColor = constraint.isHighlighted
-        ? highlightColor
-        : (constraint.isValid ? Colors.green : Colors.deepOrange);
+        ? pc.highlight
+        : (constraint.isValid ? pc.constraintValid : pc.constraintInvalid);
     final bool shouldGrayOut = constraint.isComplete;
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
-        : mandatoryColor;
+        : pc.mandatory;
     final largeText = constraint.count.toString();
     final largeFontSize = cellSize * cellSizeToFontSize;
-    final color = textColors[constraint.color];
+    final color = constraint.color == CellValue.black
+        ? pc.cellBgBlack
+        : constraint.color == CellValue.white
+        ? pc.cellBgWhite
+        : Colors.transparent;
     final compact = cellSize < 28;
 
     if (compact) {

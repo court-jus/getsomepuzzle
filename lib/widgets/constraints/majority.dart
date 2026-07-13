@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/widgets/dashed_painter.dart';
 
 const Color _mjBorderBlackTarget = Color(0xFF3A4A6B);
@@ -20,11 +19,13 @@ class MajorityZonePainter extends CustomPainter {
   final List<MajorityConstraint> constraints;
   final double cellSize;
   final int gridWidth;
+  final Color highlightColor;
 
   MajorityZonePainter({
     required this.constraints,
     required this.cellSize,
     required this.gridWidth,
+    required this.highlightColor,
   });
 
   @override
@@ -101,6 +102,7 @@ class MajorityZonePainter extends CustomPainter {
   bool shouldRepaint(covariant MajorityZonePainter oldDelegate) {
     return !listEquals(constraints, oldDelegate.constraints) ||
         cellSize != oldDelegate.cellSize ||
-        gridWidth != oldDelegate.gridWidth;
+        gridWidth != oldDelegate.gridWidth ||
+        highlightColor != oldDelegate.highlightColor;
   }
 }

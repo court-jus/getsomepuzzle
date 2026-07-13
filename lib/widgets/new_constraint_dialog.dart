@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 
@@ -56,10 +57,11 @@ class NewConstraintDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.new_releases, color: Colors.amber),
+          Icon(Icons.new_releases, color: pc.dialogAccent),
           const SizedBox(width: 8),
           Expanded(child: Text(l.newConstraintModalTitle)),
         ],

@@ -2,13 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
-
-final _textColors = {
-  CellValue.free: Colors.transparent,
-  CellValue.black: Colors.black,
-  CellValue.white: Colors.white,
-  CellValue.purple: Colors.purple[100],
-};
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 
 class ColumnCountWidget extends StatelessWidget {
   const ColumnCountWidget({
@@ -22,16 +16,21 @@ class ColumnCountWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
     final bool shouldGrayOut = constraint.isComplete;
     final borderColor = shouldGrayOut
         ? Colors.grey
         : (constraint.isHighlighted
-              ? highlightColor
+              ? pc.highlight
               : (constraint.isValid ? Colors.grey : Colors.redAccent));
-    final textColor = _textColors[constraint.color] ?? Colors.black;
+    final textColor = constraint.color == CellValue.black
+        ? pc.cellBgBlack
+        : constraint.color == CellValue.white
+        ? pc.cellBgWhite
+        : Colors.transparent;
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
-        : mandatoryColor;
+        : pc.mandatory;
     final fontSize = cellSize * cellSizeToFontSize * 0.6;
     final circleSize = cellSize * 0.7;
 
