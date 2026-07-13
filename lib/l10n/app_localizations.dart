@@ -1846,11 +1846,95 @@ abstract class AppLocalizations {
   /// **'Light'**
   String get settingThemeLight;
 
-  /// Theme option: always use light theme
+  /// Setting label for the app theme (always use dark theme)
   ///
   /// In en, this message translates to:
   /// **'Dark'**
   String get settingThemeDark;
+
+  /// Section header on the stats dashboard: stats grouped by puzzle complexity range.
+  ///
+  /// In en, this message translates to:
+  /// **'By complexity'**
+  String get statsSectionDifficulty;
+
+  /// Section header on the stats dashboard: stats grouped by constraint type (top 5).
+  ///
+  /// In en, this message translates to:
+  /// **'By rule'**
+  String get statsSectionConstraint;
+
+  /// Section header on the stats dashboard: stats grouped by the built-in collection the puzzle belongs to.
+  ///
+  /// In en, this message translates to:
+  /// **'By collection'**
+  String get statsSectionCollection;
+
+  /// Section header on the stats dashboard: puzzle likes/dislikes summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get statsSectionRating;
+
+  /// Section header on the stats dashboard: list of the most recent finished puzzles.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent plays'**
+  String get statsSectionRecent;
+
+  /// Summary card label: total number of puzzles played.
+  ///
+  /// In en, this message translates to:
+  /// **'Played'**
+  String get statsDashboardPlayed;
+
+  /// Summary card label: number of puzzles completed.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get statsDashboardFinished;
+
+  /// Summary card label: average completion time per puzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg time'**
+  String get statsDashboardAvgDuration;
+
+  /// Summary card label: total number of hints used.
+  ///
+  /// In en, this message translates to:
+  /// **'Hints'**
+  String get statsDashboardTotalHints;
+
+  /// Summary card label: average number of hints per puzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hints/pz'**
+  String get statsDashboardHintsPerPuzzle;
+
+  /// Summary card label: ratio of liked puzzles over all rated puzzles.
+  ///
+  /// In en, this message translates to:
+  /// **'Approval'**
+  String get statsDashboardApproval;
+
+  /// Rating section label for the count of liked puzzles.
+  ///
+  /// In en, this message translates to:
+  /// **'Liked'**
+  String get statsDashboardLiked;
+
+  /// Rating section label for the count of disliked puzzles.
+  ///
+  /// In en, this message translates to:
+  /// **'Disliked'**
+  String get statsDashboardDisliked;
+
+  /// Rating section label for the average pleasure score across all rated puzzles.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg score'**
+  String get statsDashboardAvgScore;
 }
 
 class _AppLocalizationsDelegate

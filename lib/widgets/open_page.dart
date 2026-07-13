@@ -478,32 +478,8 @@ class _OpenPageState extends State<OpenPage> {
                                 items: [
                                   for (final item
                                       in widget.database.getCollections(
-                                        CollectionLabels(
-                                          easy: AppLocalizations.of(
-                                            context,
-                                          )!.collectionEasy,
-                                          player: AppLocalizations.of(
-                                            context,
-                                          )!.collectionPlayer,
-                                          advanced: AppLocalizations.of(
-                                            context,
-                                          )!.collectionAdvanced,
-                                          strong: AppLocalizations.of(
-                                            context,
-                                          )!.collectionStrong,
-                                          expert: AppLocalizations.of(
-                                            context,
-                                          )!.collectionExpert,
-                                          mad: AppLocalizations.of(
-                                            context,
-                                          )!.collectionMad,
-                                          myPuzzles: AppLocalizations.of(
-                                            context,
-                                          )!.collectionMyPuzzles,
-                                          recommendedTooltip:
-                                              AppLocalizations.of(
-                                                context,
-                                              )!.tooltipRecommendedCollection,
+                                        CollectionLabels.fromLocalizations(
+                                          AppLocalizations.of(context)!,
                                         ),
                                         recommendedKey: widget
                                             .database

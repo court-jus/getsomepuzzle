@@ -1447,18 +1447,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                               final l = AppLocalizations.of(
                                                 context,
                                               )!;
-                                              final labels = CollectionLabels(
-                                                easy: l.collectionEasy,
-                                                player: l.collectionPlayer,
-                                                advanced: l.collectionAdvanced,
-                                                strong: l.collectionStrong,
-                                                expert: l.collectionExpert,
-                                                mad: l.collectionMad,
-                                                myPuzzles:
-                                                    l.collectionMyPuzzles,
-                                                recommendedTooltip: l
-                                                    .tooltipRecommendedCollection,
-                                              );
+                                              final labels =
+                                                  CollectionLabels.fromLocalizations(l);
                                               final recommendedKey = database
                                                   ?.recommendedCollectionKey;
                                               return EndOfPlaylist(

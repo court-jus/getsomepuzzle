@@ -995,4 +995,46 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingThemeDark => 'Sombre';
+
+  @override
+  String get statsSectionDifficulty => 'Par complexité';
+
+  @override
+  String get statsSectionConstraint => 'Par contrainte';
+
+  @override
+  String get statsSectionCollection => 'Par collection';
+
+  @override
+  String get statsSectionRating => 'Appréciation';
+
+  @override
+  String get statsSectionRecent => 'Dernières parties';
+
+  @override
+  String get statsDashboardPlayed => 'Joués';
+
+  @override
+  String get statsDashboardFinished => 'Finis';
+
+  @override
+  String get statsDashboardAvgDuration => 'Durée moy.';
+
+  @override
+  String get statsDashboardTotalHints => 'Hints';
+
+  @override
+  String get statsDashboardHintsPerPuzzle => 'Hints/pz';
+
+  @override
+  String get statsDashboardApproval => 'Appréciation';
+
+  @override
+  String get statsDashboardLiked => 'Aimés';
+
+  @override
+  String get statsDashboardDisliked => 'Pas aimés';
+
+  @override
+  String get statsDashboardAvgScore => 'Score moyen';
 }

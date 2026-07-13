@@ -1,3 +1,5 @@
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+
 /// A parsed stat line from the stats files.
 /// Format: finishedTimestamp durationS failuresF puzzleLine - SLD - extras
 /// The extras block contains in order:
@@ -80,11 +82,13 @@ class PuzzleAggregatedStats {
   int total = 0;
   int duration = 0;
   int failures = 0;
+  int hints = 0;
 
   void add(StatEntry entry) {
     total++;
     duration += entry.duration;
     failures += entry.failures;
+    hints += entry.hints;
   }
 
   /// Difficulty level: avg duration + 30 * avg failures.
@@ -112,4 +116,243 @@ List<String> sortPuzzlesByDifficulty(Map<String, PuzzleAggregatedStats> stats) {
   final entries = stats.entries.toList()
     ..sort((a, b) => a.value.level.compareTo(b.value.level));
   return entries.map((e) => e.key).toList();
+}
+
+/// A difficulty bucket grouping puzzles by cplx range.
+class DifficultyBucket {
+  final String label;
+  final int count;
+  final double avgDuration;
+  final double avgHints;
+
+  const DifficultyBucket({
+    required this.label,
+    required this.count,
+    required this.avgDuration,
+    required this.avgHints,
+  });
+}
+
+/// A constraint bucket grouping puzzles by constraint slug.
+class ConstraintBucket {
+  final String slug;
+  final int puzzleCount;
+  final int instanceCount;
+  final double avgDuration;
+  final double avgHints;
+
+  const ConstraintBucket({
+    required this.slug,
+    required this.puzzleCount,
+    required this.instanceCount,
+    required this.avgDuration,
+    required this.avgHints,
+  });
+}
+
+/// A collection bucket grouping puzzles by collection.
+class CollectionBucket {
+  final String label;
+  final int count;
+  final double avgDuration;
+  final double avgHints;
+
+  const CollectionBucket({
+    required this.label,
+    required this.count,
+    required this.avgDuration,
+    required this.avgHints,
+  });
+}
+
+int _extractCplx(String puzzleLine) {
+  final parts = puzzleLine.split('_');
+  return parts.length > 6 ? (int.tryParse(parts[6]) ?? 0) : 0;
+}
+
+List<String> _extractSlugs(String puzzleLine) {
+  final parts = puzzleLine.split('_');
+  if (parts.length < 5) return [];
+  return parts[4].split(';').map((c) => c.split(':')[0]).toList();
+}
+
+/// Aggregated stats dashboard computed from raw [StatEntry] list.
+class StatsDashboard {
+  /// [collectionLookup] maps a [canonicalPuzzleKey] to a collection label.
+  StatsDashboard(List<StatEntry> raw, {Map<String, String>? collectionLookup}) {
+    for (final entry in raw) {
+      _totalPlays++;
+      if (entry.finished != null) {
+        _finishedPlays++;
+      }
+      _sumDuration += entry.duration;
+      _sumFailures += entry.failures;
+      _sumHints += entry.hints;
+
+      // By difficulty
+      final cplx = _extractCplx(entry.puzzleLine);
+      final bucket = _bucketLabel(cplx);
+      _difficultyBuckets.putIfAbsent(bucket, () => _BucketAccumulator());
+      _difficultyBuckets[bucket]!.add(entry);
+
+      // By constraint
+      final allSlugs = _extractSlugs(entry.puzzleLine);
+      final uniqueSlugs = allSlugs.toSet();
+      for (final slug in uniqueSlugs) {
+        _constraintBuckets.putIfAbsent(slug, () => _ConstraintAccumulator());
+        _constraintBuckets[slug]!.puzzleCount++;
+        _constraintBuckets[slug]!.sumDuration += entry.duration;
+        _constraintBuckets[slug]!.sumHints += entry.hints;
+      }
+      for (final slug in allSlugs) {
+        _constraintBuckets[slug]!.instanceCount++;
+      }
+
+      // By collection
+      if (collectionLookup != null) {
+        final key = canonicalPuzzleKey(entry.puzzleLine);
+        final col = collectionLookup[key] ?? 'other';
+        _collectionBuckets.putIfAbsent(col, () => _BucketAccumulator());
+        _collectionBuckets[col]!.add(entry);
+      }
+
+      // Rating
+      if (entry.pleasure != null) {
+        if (entry.pleasure! > 0) _likes++;
+        if (entry.pleasure! < 0) _dislikes++;
+        _sumPleasure += entry.pleasure!;
+        _pleasureCount++;
+      }
+
+      // Recent plays (keep track, sort later)
+      if (entry.finished != null) {
+        _allPlays.add(entry);
+      }
+    }
+
+    // Build difficulty buckets
+    for (final label in _allBuckets) {
+      final bucket = _difficultyBuckets[label];
+      if (bucket == null) {
+        byDifficulty.add(
+          DifficultyBucket(label: label, count: 0, avgDuration: 0, avgHints: 0),
+        );
+      } else {
+        byDifficulty.add(
+          DifficultyBucket(
+            label: label,
+            count: bucket.count,
+            avgDuration: bucket.count > 0
+                ? bucket.sumDuration / bucket.count
+                : 0,
+            avgHints: bucket.count > 0 ? bucket.sumHints / bucket.count : 0,
+          ),
+        );
+      }
+    }
+
+    // Build constraint buckets (top 5 by instanceCount)
+    final sortedSlugs = _constraintBuckets.entries.toList()
+      ..sort((a, b) => b.value.instanceCount.compareTo(a.value.instanceCount));
+    for (final entry in sortedSlugs.take(5)) {
+      byConstraint.add(
+        ConstraintBucket(
+          slug: entry.key,
+          puzzleCount: entry.value.puzzleCount,
+          instanceCount: entry.value.instanceCount,
+          avgDuration: entry.value.puzzleCount > 0
+              ? entry.value.sumDuration / entry.value.puzzleCount
+              : 0,
+          avgHints: entry.value.puzzleCount > 0
+              ? entry.value.sumHints / entry.value.puzzleCount
+              : 0,
+        ),
+      );
+    }
+
+    // Build collection buckets
+    final sortedCollections = _collectionBuckets.entries.toList()
+      ..sort((a, b) => b.value.count.compareTo(a.value.count));
+    for (final entry in sortedCollections) {
+      byCollection.add(
+        CollectionBucket(
+          label: entry.key,
+          count: entry.value.count,
+          avgDuration: entry.value.count > 0
+              ? entry.value.sumDuration / entry.value.count
+              : 0,
+          avgHints: entry.value.count > 0
+              ? entry.value.sumHints / entry.value.count
+              : 0,
+        ),
+      );
+    }
+
+    // Sort recent plays by finished timestamp descending, take 10
+    _allPlays.sort((a, b) => b.finished!.compareTo(a.finished!));
+    recentPlays = _allPlays.take(10).toList();
+  }
+
+  // Raw accumulated data
+  int _totalPlays = 0;
+  int _finishedPlays = 0;
+  int _sumDuration = 0;
+  int _sumFailures = 0;
+  int _sumHints = 0;
+  int _likes = 0;
+  int _dislikes = 0;
+  int _sumPleasure = 0;
+  int _pleasureCount = 0;
+  final List<StatEntry> _allPlays = [];
+  final Map<String, _BucketAccumulator> _difficultyBuckets = {};
+  final Map<String, _ConstraintAccumulator> _constraintBuckets = {};
+  final Map<String, _BucketAccumulator> _collectionBuckets = {};
+
+  // Computed results
+  final List<DifficultyBucket> byDifficulty = [];
+  final List<ConstraintBucket> byConstraint = [];
+  final List<CollectionBucket> byCollection = [];
+  late final List<StatEntry> recentPlays;
+
+  // Computed getters
+  int get totalPlays => _totalPlays;
+  int get finishedPlays => _finishedPlays;
+  int get skippedPlays => _totalPlays - _finishedPlays;
+  double get avgDuration => _totalPlays > 0 ? _sumDuration / _totalPlays : 0;
+  double get avgFailures => _totalPlays > 0 ? _sumFailures / _totalPlays : 0;
+  int get totalHints => _sumHints;
+  double get avgHintsPerPuzzle => _totalPlays > 0 ? _sumHints / _totalPlays : 0;
+  int get likes => _likes;
+  int get dislikes => _dislikes;
+  double? get avgPleasure =>
+      _pleasureCount > 0 ? _sumPleasure / _pleasureCount : null;
+
+  static String _bucketLabel(int cplx) {
+    if (cplx <= 20) return '0-20';
+    if (cplx <= 40) return '21-40';
+    if (cplx <= 60) return '41-60';
+    if (cplx <= 80) return '61-80';
+    return '81-100';
+  }
+
+  static const _allBuckets = ['0-20', '21-40', '41-60', '61-80', '81-100'];
+}
+
+class _BucketAccumulator {
+  int count = 0;
+  int sumDuration = 0;
+  int sumHints = 0;
+
+  void add(StatEntry entry) {
+    count++;
+    sumDuration += entry.duration;
+    sumHints += entry.hints;
+  }
+}
+
+class _ConstraintAccumulator {
+  int puzzleCount = 0;
+  int instanceCount = 0;
+  int sumDuration = 0;
+  int sumHints = 0;
 }

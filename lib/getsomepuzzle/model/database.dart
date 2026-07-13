@@ -11,6 +11,7 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart'
     as equilibrium;
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -325,6 +326,18 @@ class CollectionLabels {
     required this.recommendedTooltip,
   });
 
+  factory CollectionLabels.fromLocalizations(AppLocalizations loc) =>
+      CollectionLabels(
+        easy: loc.collectionEasy,
+        player: loc.collectionPlayer,
+        advanced: loc.collectionAdvanced,
+        strong: loc.collectionStrong,
+        expert: loc.collectionExpert,
+        mad: loc.collectionMad,
+        myPuzzles: loc.collectionMyPuzzles,
+        recommendedTooltip: loc.tooltipRecommendedCollection,
+      );
+
   /// Localised label for a built-in playable level collection key.
   /// Returns null for non-playable keys (custom, user_*).
   String? labelFor(String collectionKey) {
@@ -388,6 +401,32 @@ class Database {
   /// like "tutorial" / "default" / "collection2" / "collection3" that no
   /// longer exist post-merge.
   static const entryCollectionKey = '1-easy';
+
+  /// Lazy-loaded cache: canonical puzzle key → collection key for built-in
+  /// collections. Built by [getCollectionLookup] and reused across calls.
+  Map<String, String>? _puzzleCollectionCache;
+
+  /// Load every built-in collection file and build a map from
+  /// [canonicalPuzzleKey] to the collection key (e.g. `'1-easy'`).
+  /// Used by the stats dashboard to group plays by collection.
+  /// Calling this from the UI thread is safe because
+  /// [rootBundle.loadString] is non-blocking.
+  Future<Map<String, String>> getCollectionLookup() async {
+    if (_puzzleCollectionCache != null) return _puzzleCollectionCache!;
+    _puzzleCollectionCache = {};
+    for (final key in _builtInCollectionKeys) {
+      if (key == 'custom') continue;
+      try {
+        final content = await rootBundle.loadString('assets/$key.txt');
+        for (final line in content.split('\n')) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) continue;
+          _puzzleCollectionCache![canonicalPuzzleKey(trimmed)] = key;
+        }
+      } catch (_) {}
+    }
+    return _puzzleCollectionCache!;
+  }
 
   /// Per-constraint mastery tracker. Populated by [loadStats] from the
   /// player's history (so reinstalls or device transfers reconstruct

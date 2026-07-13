@@ -474,6 +474,63 @@
     },
     "settingThemeDark": "Sombre",
     "@settingThemeDark": {
-        "description": "Theme option: always use dark theme"
+        "description": "Setting label for the app theme (always use dark theme)"
+    },
+
+    "statsSectionDifficulty": "Par complexité",
+    "@statsSectionDifficulty": {
+        "description": "Section header on the stats dashboard: stats grouped by puzzle complexity range."
+    },
+    "statsSectionConstraint": "Par contrainte",
+    "@statsSectionConstraint": {
+        "description": "Section header on the stats dashboard: stats grouped by constraint type (top 5)."
+    },
+    "statsSectionCollection": "Par collection",
+    "@statsSectionCollection": {
+        "description": "Section header on the stats dashboard: stats grouped by the built-in collection the puzzle belongs to."
+    },
+    "statsSectionRating": "Appréciation",
+    "@statsSectionRating": {
+        "description": "Section header on the stats dashboard: puzzle likes/dislikes summary."
+    },
+    "statsSectionRecent": "Dernières parties",
+    "@statsSectionRecent": {
+        "description": "Section header on the stats dashboard: list of the most recent finished puzzles."
+    },
+    "statsDashboardPlayed": "Joués",
+    "@statsDashboardPlayed": {
+        "description": "Summary card label: total number of puzzles played."
+    },
+    "statsDashboardFinished": "Finis",
+    "@statsDashboardFinished": {
+        "description": "Summary card label: number of puzzles completed."
+    },
+    "statsDashboardAvgDuration": "Durée moy.",
+    "@statsDashboardAvgDuration": {
+        "description": "Summary card label: average completion time per puzzle."
+    },
+    "statsDashboardTotalHints": "Hints",
+    "@statsDashboardTotalHints": {
+        "description": "Summary card label: total number of hints used."
+    },
+    "statsDashboardHintsPerPuzzle": "Hints/pz",
+    "@statsDashboardHintsPerPuzzle": {
+        "description": "Summary card label: average number of hints per puzzle."
+    },
+    "statsDashboardApproval": "Appréciation",
+    "@statsDashboardApproval": {
+        "description": "Summary card label: ratio of liked puzzles over all rated puzzles."
+    },
+    "statsDashboardLiked": "Aimés",
+    "@statsDashboardLiked": {
+        "description": "Rating section label for the count of liked puzzles."
+    },
+    "statsDashboardDisliked": "Pas aimés",
+    "@statsDashboardDisliked": {
+        "description": "Rating section label for the count of disliked puzzles."
+    },
+    "statsDashboardAvgScore": "Score moyen",
+    "@statsDashboardAvgScore": {
+        "description": "Rating section label for the average pleasure score across all rated puzzles."
     }
 }
