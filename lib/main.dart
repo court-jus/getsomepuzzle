@@ -1286,19 +1286,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     if (!valid) {
                       await database!.clearStatsDirectory();
                       await settings.setStatsDirectory(null);
-                      if (mounted) {
-                        setState(() {});
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              AppLocalizations.of(
-                                context,
-                              )!.statsSyncDirectoryInvalid,
-                            ),
-                            duration: const Duration(seconds: 6),
+                      if (!context.mounted) return;
+                      setState(() {});
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            AppLocalizations.of(
+                              context,
+                            )!.statsSyncDirectoryInvalid,
                           ),
-                        );
-                      }
+                          duration: const Duration(seconds: 6),
+                        ),
+                      );
                     }
                   },
                   onChangeLanguage: () {

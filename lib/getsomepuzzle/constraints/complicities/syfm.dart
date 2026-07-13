@@ -141,9 +141,7 @@ class SYFMComplicity extends Complicity {
       for (int step = 0; step < _maxHypothesisSteps; step++) {
         final m = hyp.findAMove(checkErrors: false, tryForce: false);
         if (m == null) break;
-        if (m.givenBy is CanApply) {
-          participatingConstraints.add(m.givenBy as CanApply);
-        }
+        participatingConstraints.add(m.givenBy);
         switch (m) {
           case Impossible():
             failed = true;

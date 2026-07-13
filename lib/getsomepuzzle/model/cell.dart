@@ -237,8 +237,8 @@ final class SetValue extends Move {
     this.value,
     super.givenBy, {
     this.complexity = 0,
-    List<CanApply> contributors = const [],
-  }) : super._(contributors: contributors);
+    super.contributors = const [],
+  }) : super._();
 }
 
 /// Prune colour [option] from the still-free cell [idx]. Issued either by
@@ -264,13 +264,12 @@ final class RemoveOption extends Move {
     this.complexity = 0,
     this.isForce = false,
     this.forceDepth = 0,
-    List<CanApply> contributors = const [],
-  }) : super._(contributors: contributors);
+    super.contributors = const [],
+  }) : super._();
 }
 
 /// The current state contradicts [givenBy] — either directly broken or with
 /// future satisfaction now unreachable. Carries no cell target.
 final class Impossible extends Move {
-  const Impossible(super.givenBy, {List<CanApply> contributors = const []})
-    : super._(contributors: contributors);
+  const Impossible(super.givenBy, {super.contributors = const []}) : super._();
 }

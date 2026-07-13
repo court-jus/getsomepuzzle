@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/fmfm.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsall.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/gsgs.dart';

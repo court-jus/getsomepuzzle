@@ -526,7 +526,7 @@ _Args _parseArgs(List<String> args) {
       case '--playlist':
         playlist = int.parse(need(i));
         i++;
-        if (playlist! < 1) {
+        if (playlist < 1) {
           throw ArgumentError('--playlist must be >= 1.');
         }
         break;
