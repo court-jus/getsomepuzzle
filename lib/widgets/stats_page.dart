@@ -95,17 +95,11 @@ class _StatsPageState extends State<StatsPage> {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['txt'],
-      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     final picked = result.files.first;
-    String? content;
-    if (picked.bytes != null) {
-      content = utf8.decode(picked.bytes!, allowMalformed: true);
-    } else if (picked.path != null) {
-      content = await File(picked.path!).readAsString();
-    }
-    if (content == null) return;
+    final bytes = await picked.readAsBytes();
+    final content = utf8.decode(bytes, allowMalformed: true);
     final added = await widget.database.importStats(content);
     if (!mounted) return;
     final loc = AppLocalizations.of(context)!;

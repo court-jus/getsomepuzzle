@@ -471,8 +471,7 @@ class _StatsDirectoryRow extends StatelessWidget {
                   child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
                 ),
                 TextButton(
-                  onPressed: () =>
-                      Navigator.pop(ctx, controller.text.trim()),
+                  onPressed: () => Navigator.pop(ctx, controller.text.trim()),
                   child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
                 ),
               ],
@@ -482,9 +481,7 @@ class _StatsDirectoryRow extends StatelessWidget {
             selected = null;
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Directory does not exist'),
-                ),
+                SnackBar(content: const Text('Directory does not exist')),
               );
             }
           }

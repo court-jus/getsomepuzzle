@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'dart:developer';
-import 'dart:io' as java_io;
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -284,22 +282,14 @@ class _OpenPageState extends State<OpenPage> {
 
   Future<void> _importPlaylistFromFile() async {
     final loc = AppLocalizations.of(context)!;
-    // withData=true so the same code path works on every platform: on web
-    // file_picker only populates `bytes`, on native it populates both.
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['txt'],
-      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
-    String? content;
-    if (file.bytes != null) {
-      content = utf8.decode(file.bytes!, allowMalformed: true);
-    } else if (file.path != null) {
-      content = await java_io.File(file.path!).readAsString();
-    }
-    if (content == null) return;
+    final bytes = await file.readAsBytes();
+    final content = utf8.decode(bytes, allowMalformed: true);
     final lines = content
         .split('\n')
         .where((l) => l.trim().isNotEmpty && !l.startsWith('#'))

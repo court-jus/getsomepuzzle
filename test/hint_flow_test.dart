@@ -9,12 +9,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 
 /// Minimal puzzle whose first deducible move is a **setValue** (not a
 /// `removeOption`). `LT:A.0.4` with cell 0 already coloured black forces
-/// cell 4 to the same colour through a `Move(value: black)`. This shape
-/// matters because `GameModel._applyHelpMove` currently only handles the
-/// `value` branch — applying a `removeOption` hint is a TODO tracked in
-/// `docs/dev/third_color.md`. Any fixture whose first hint were a
-/// `removeOption` (typically FM/PA/CC) would make tap 4 a no-op and the
-/// stage-3-then-apply cycle untestable.
+/// cell 4 to the same colour through a `Move(value: black)`.
 PuzzleData _deducibleFixture() =>
     PuzzleData('v2_12_3x3_100000000_LT:A.0.4_0:0_0');
 

@@ -1448,7 +1448,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                                 context,
                                               )!;
                                               final labels =
-                                                  CollectionLabels.fromLocalizations(l);
+                                                  CollectionLabels.fromLocalizations(
+                                                    l,
+                                                  );
                                               final recommendedKey = database
                                                   ?.recommendedCollectionKey;
                                               return EndOfPlaylist(
