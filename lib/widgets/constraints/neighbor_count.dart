@@ -90,9 +90,9 @@ class _CrossPainter extends CustomPainter {
         ? pc.cellBgWhite
         : pc.cellBgPurple;
     final oppositeColor = color == CellValue.black
-        ? pc.cellBgWhite
+        ? pc.cellFgBlack
         : color == CellValue.white
-        ? pc.cellBgBlack
+        ? pc.cellFgWhite
         : pc.cellFgPurple;
     final textColor = color == CellValue.black
         ? pc.cellFgBlack

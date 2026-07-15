@@ -148,49 +148,49 @@ class PuzzleColors extends ThemeExtension<PuzzleColors> {
 }
 
 const puzzleColorsLight = PuzzleColors(
-  cellBgUndecided: Color(0xFFC0EBF1),
-  cellBgBlack: Colors.black,
-  cellBgWhite: Colors.white,
-  cellFgUndecided: Colors.black,
-  cellFgBlack: Colors.white,
-  cellFgWhite: Colors.black,
-  cellBgPurple: Color(0xFFE1BEE7),
-  cellFgPurple: Color(0xFF4A148C),
-  highlight: Color(0xFF8B7D3C),
-  forbidden: Color(0xFFB956CA),
-  mandatory: Colors.lightBlue,
-  gridBorder: Colors.blueAccent,
-  drawerHeaderBg: Colors.blue,
-  bottomBarBg: Colors.amber,
-  validateButtonBg: Colors.lightGreen,
-  pauseOverlayBg: Colors.teal,
-  dialogAccent: Colors.amber,
-  constraintValid: Colors.green,
-  constraintInvalid: Colors.deepOrange,
-  constraintGrayed: Colors.grey,
+  cellBgUndecided: Color(0xFFEEE8D5), // base2
+  cellBgBlack: Color(0xFFB58900), // jaune (valeur 1)
+  cellBgWhite: Color(0xFFD33682), // magenta (valeur 2)
+  cellBgPurple: Color(0xFF2AA198), // cyan (valeur 3)
+  cellFgUndecided: Color(0xFF657B83), // base00
+  cellFgBlack: Color(0xFF002B36), // base03 (contraste sur jaune)
+  cellFgWhite: Color(0xFFFDF6E3), // base3 (contraste sur magenta)
+  cellFgPurple: Color(0xFF002B36), // base03 (contraste sur cyan)
+  highlight: Color(0xFF859900), // vert
+  mandatory: Color(0xFF93A1A1), // base1
+  forbidden: Color(0xFF586E75), // base01
+  gridBorder: Color(0xFF586E75), // base01
+  drawerHeaderBg: Color(0xFF073642), // base02
+  bottomBarBg: Color(0xFFEEE8D5), // base2
+  validateButtonBg: Color(0xFF859900), // vert
+  pauseOverlayBg: Color(0x99073642), // base02 à 60%
+  dialogAccent: Color(0xFFCB4B16), // orange
+  constraintValid: Color(0xFF859900), // vert
+  constraintInvalid: Color(0xFFDC322F), // rouge
+  constraintGrayed: Color(0xFF93A1A1), // base1
 );
 
 const puzzleColorsDark = PuzzleColors(
-  cellBgUndecided: Color(0xFF3A6070),
-  cellBgBlack: Color(0xFF2A2A2A),
-  cellBgWhite: Color(0xFFB0B0B0),
-  cellFgUndecided: Color(0xFFE0E0E0),
-  cellFgBlack: Color(0xFFE0E0E0),
-  cellFgWhite: Color(0xFF2A2A2A),
-  cellBgPurple: Color(0xFF6A4C93),
-  cellFgPurple: Color(0xFFE0E0E0),
-  highlight: Color(0xFFD4B84A),
-  forbidden: Color(0xFFCE80E0),
-  mandatory: Color(0xFF4FC3F7),
-  gridBorder: Color(0xFF64B5F6),
-  drawerHeaderBg: Color(0xFF1A237E),
-  bottomBarBg: Color(0xFF5D4037),
-  validateButtonBg: Color(0xFF66BB6A),
-  pauseOverlayBg: Color(0xFF004D40),
-  dialogAccent: Color(0xFFFFB74D),
-  constraintValid: Color(0xFF81C784),
-  constraintInvalid: Color(0xFFE57373),
-  constraintGrayed: Color(0xFF757575),
+  cellBgUndecided: Color(0xFF073642), // base02
+  cellBgBlack: Color(0xFFB58900), // jaune (valeur 1)
+  cellBgWhite: Color(0xFFD33682), // magenta (valeur 2)
+  cellBgPurple: Color(0xFF2AA198), // cyan (valeur 3)
+  cellFgUndecided: Color(0xFF839496), // base0
+  cellFgBlack: Color(0xFF002B36), // base03 (contraste sur jaune)
+  cellFgWhite: Color(0xFFFDF6E3), // base3 (contraste sur magenta)
+  cellFgPurple: Color(0xFF002B36), // base03 (contraste sur cyan)
+  highlight: Color(0xFF859900), // vert
+  mandatory: Color(0xFF93A1A1), // base1
+  forbidden: Color(0xFF586E75), // base01
+  gridBorder: Color(0xFF93A1A1), // base1
+  drawerHeaderBg: Color(0xFF073642), // base02
+  bottomBarBg: Color(0xFF073642), // base02
+  validateButtonBg: Color(0xFF859900), // vert
+  pauseOverlayBg: Color(0xCC002B36), // base03 à 80%
+  dialogAccent: Color(0xFFCB4B16), // orange
+  constraintValid: Color(0xFF859900), // vert
+  constraintInvalid: Color(0xFFDC322F), // rouge
+  constraintGrayed: Color(0xFF586E75), // base01
 );
 
 /// Maps our [ThemeModeType] to Flutter's [ThemeMode].
@@ -208,7 +208,7 @@ ThemeMode resolveThemeMode(ThemeModeType type) {
 /// Light theme.
 final lightTheme = ThemeData(
   colorScheme: ColorScheme.fromSeed(
-    seedColor: Colors.deepPurple,
+    seedColor: const Color(0xFFB58900), // solarized yellow
     brightness: Brightness.light,
   ),
   useMaterial3: true,
@@ -218,7 +218,7 @@ final lightTheme = ThemeData(
 /// Dark theme.
 final darkTheme = ThemeData(
   colorScheme: ColorScheme.fromSeed(
-    seedColor: Colors.deepPurple,
+    seedColor: const Color(0xFFB58900), // solarized yellow
     brightness: Brightness.dark,
   ),
   useMaterial3: true,

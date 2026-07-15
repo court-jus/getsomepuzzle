@@ -42,7 +42,7 @@ class ImplicationPainter extends CustomPainter {
       final Color arrowColor;
       double strokeWidth;
       if (!constraint.isValid) {
-        arrowColor = Colors.red;
+        arrowColor = const Color(0xFFDC322F); // solarized red
         strokeWidth = 4.0;
       } else if (isHighlighted) {
         arrowColor = highlightColor;
@@ -54,9 +54,9 @@ class ImplicationPainter extends CustomPainter {
         // Arrow colour reflects the constraint's colour for quick
         // visual identification.
         arrowColor = switch (constraint.color) {
-          CellValue.black => const Color(0xFF333333),
-          CellValue.purple => const Color(0xFF9C27B0),
-          _ => const Color(0xFFDDDDDD),
+          CellValue.black => const Color(0xFFB58900), // jaune
+          CellValue.purple => const Color(0xFF2AA198), // cyan
+          _ => const Color(0xFFD33682), // magenta
         };
         strokeWidth = 4.0;
       }

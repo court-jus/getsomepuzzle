@@ -24,7 +24,7 @@ class PuzzleGridStack extends StatelessWidget {
     required this.puzzle,
     required this.cellSize,
     required this.cellBuilder,
-    this.dfDefaultColor = Colors.black87,
+    this.dfDefaultColor = const Color(0xFF657B83), // base00
     this.dfHighlightColor,
     this.overlays = const [],
   });

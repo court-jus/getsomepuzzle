@@ -38,14 +38,14 @@ Future<CellAction?> showCellActionsDialog(
             if (isFixed)
               _ActionTile(
                 icon: Icons.circle,
-                iconColor: Colors.black,
+                iconColor: const Color(0xFFB58900),
                 label: loc.createFixBlack,
                 onTap: () => Navigator.pop(ctx, CellAction.fixBlack),
               ),
             if (isFixed)
               _ActionTile(
                 icon: Icons.circle,
-                iconColor: Colors.white,
+                iconColor: const Color(0xFFD33682),
                 label: loc.createFixWhite,
                 onTap: () => Navigator.pop(ctx, CellAction.fixWhite),
               ),

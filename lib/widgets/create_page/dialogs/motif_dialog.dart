@@ -14,7 +14,7 @@ Future<String?> _showMotifDialog(
   int motifWidth = 2;
   int motifHeight = 2;
   final grid = List.generate(3, (_) => List.filled(3, 0));
-  final bgColors = {0: backgroundColor, 1: Colors.black, 2: Colors.white};
+  final bgColors = {0: backgroundColor, 1: const Color(0xFFB58900), 2: const Color(0xFFD33682)};
 
   return showDialog<String>(
     context: context,

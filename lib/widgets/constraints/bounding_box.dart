@@ -32,7 +32,7 @@ class BoundingBoxWidget extends StatelessWidget {
       case CellValue.white:
         tint = pc.cellBgWhite.withValues(alpha: 0.6);
       case CellValue.purple:
-        tint = Colors.purple.withValues(alpha: 0.3);
+        tint = pc.cellBgPurple.withValues(alpha: 0.3);
       case CellValue.free:
         tint = Colors.transparent;
     }

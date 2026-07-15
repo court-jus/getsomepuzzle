@@ -4,9 +4,9 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/widgets/dashed_painter.dart';
 
-const Color _mjBorderBlackTarget = Color(0xFF3A4A6B);
-const Color _mjBorderWhiteTarget = Color(0xFFC8D4E8);
-const Color _mjBorderPurpleTarget = Color(0xFF8E44AD);
+const Color _mjBorderBlackTarget = Color(0xFFB58900); // jaune
+const Color _mjBorderWhiteTarget = Color(0xFFD33682); // magenta
+const Color _mjBorderPurpleTarget = Color(0xFF2AA198); // cyan
 
 Color _mjBorderColor(CellValue targetColor) {
   if (targetColor == CellValue.black) return _mjBorderBlackTarget;

@@ -37,7 +37,7 @@ class ThirdColorSuggestionDialog extends StatelessWidget {
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.palette, color: Colors.purple),
+          const Icon(Icons.palette, color: Color(0xFF2AA198)),
           const SizedBox(width: 8),
           Expanded(child: Text(l.thirdColorSuggestionTitle)),
         ],

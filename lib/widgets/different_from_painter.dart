@@ -34,7 +34,7 @@ class DifferentFromPainter extends CustomPainter {
 
       final Color circleColor;
       if (!constraint.isValid) {
-        circleColor = Colors.red;
+        circleColor = const Color(0xFFDC322F); // solarized red
       } else if (isHighlighted) {
         circleColor = highlightColor;
       } else {
