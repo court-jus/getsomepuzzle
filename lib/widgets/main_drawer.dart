@@ -30,6 +30,7 @@ class MainDrawer extends StatelessWidget {
     required this.onCreate,
     required this.onStats,
     required this.onLearning,
+    required this.onColorReview,
     required this.onSettings,
     required this.onHelp,
   });
@@ -54,6 +55,7 @@ class MainDrawer extends StatelessWidget {
   /// "Progress" section. Shown only when [database] is loaded.
   final VoidCallback onStats;
   final VoidCallback onLearning;
+  final VoidCallback onColorReview;
 
   /// Always visible.
   final VoidCallback onSettings;
@@ -191,6 +193,12 @@ class MainDrawer extends StatelessWidget {
                   icon: Icons.school,
                   label: l10n.learning,
                   onTap: onLearning,
+                ),
+                _entry(
+                  context,
+                  icon: Icons.palette,
+                  label: 'Couleurs',
+                  onTap: onColorReview,
                 ),
               ],
             ),

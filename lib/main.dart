@@ -36,6 +36,7 @@ import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/save_progress_dialog.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
+import 'package:getsomepuzzle/widgets/color_review_page.dart';
 import 'package:getsomepuzzle/widgets/welcome_dialog.dart';
 import 'package:getsomepuzzle/widgets/timer_bottom_bar.dart';
 import 'package:getsomepuzzle/utils/platform_utils.dart';
@@ -1350,6 +1351,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               loadPuzzle();
             }
           },
+          onColorReview: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (context) => const ColorReviewPage(),
+            ),
+          ),
           onHelp: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => HelpPage(locale: locale)),
