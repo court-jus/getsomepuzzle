@@ -24,7 +24,7 @@ class PuzzleGridStack extends StatelessWidget {
     required this.puzzle,
     required this.cellSize,
     required this.cellBuilder,
-    this.dfDefaultColor = Colors.black87,
+    this.dfDefaultColor = const Color(0xFF657B83), // base00
     this.dfHighlightColor,
     this.overlays = const [],
   });
@@ -84,6 +84,9 @@ class PuzzleGridStack extends StatelessWidget {
                   cellSize: cellSize,
                   gridWidth: width,
                   highlightColor: pc.highlight,
+                  constraintColors: pc.constrastedColors,
+                  invalidColor: pc.constraintInvalid,
+                  grayoutColor: Colors.grey.withValues(alpha: 0.25),
                 ),
               ),
             ),
@@ -125,6 +128,9 @@ class PuzzleGridStack extends StatelessWidget {
                   cellSize: cellSize,
                   gridWidth: width,
                   highlightColor: pc.highlight,
+                  constraintColors: pc.constrastedColors,
+                  invalidColor: pc.constraintInvalid,
+                  grayoutColor: Colors.grey.withValues(alpha: 0.25),
                 ),
               ),
             ),

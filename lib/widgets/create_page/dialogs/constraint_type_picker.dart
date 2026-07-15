@@ -57,14 +57,14 @@ Future<String?> showConstraintTypePicker(BuildContext context) {
                   Expanded(
                     child: TextButton.icon(
                       onPressed: () => Navigator.pop(ctx, 'fixBlack'),
-                      icon: const Icon(Icons.circle, color: Colors.black),
+                      icon: const Icon(Icons.circle, color: Color(0xFFB58900)),
                       label: Text(loc.createFixBlack),
                     ),
                   ),
                   Expanded(
                     child: TextButton.icon(
                       onPressed: () => Navigator.pop(ctx, 'fixWhite'),
-                      icon: const Icon(Icons.circle, color: Colors.white),
+                      icon: const Icon(Icons.circle, color: Color(0xFFD33682)),
                       label: Text(loc.createFixWhite),
                     ),
                   ),

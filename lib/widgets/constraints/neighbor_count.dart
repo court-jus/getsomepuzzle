@@ -84,21 +84,8 @@ class _CrossPainter extends CustomPainter {
       ..lineTo(inset + h, inset + h)
       ..close();
 
-    final fillColor = color == CellValue.black
-        ? pc.cellBgBlack
-        : color == CellValue.white
-        ? pc.cellBgWhite
-        : pc.constraintGrayed;
-    final oppositeColor = color == CellValue.black
-        ? pc.cellBgWhite
-        : color == CellValue.white
-        ? pc.cellBgBlack
-        : pc.constraintGrayed;
-    final textColor = color == CellValue.black
-        ? pc.cellFgBlack
-        : color == CellValue.white
-        ? pc.cellFgWhite
-        : pc.constraintGrayed;
+    final fillColor = pc.constraintColors[color] ?? pc.constraintInvalid;
+    final oppositeColor = pc.oppositeColors[color] ?? pc.constraintInvalid;
 
     final Color strokeColor;
     if (!isValid) {
@@ -109,12 +96,15 @@ class _CrossPainter extends CustomPainter {
       strokeColor = oppositeColor;
     }
 
+    final bool flagged = !isValid || isHighlighted;
     final fillPaint = Paint()
       ..color = fillColor
       ..style = PaintingStyle.fill;
     final strokePaint = Paint()
       ..color = strokeColor
-      ..strokeWidth = (s * 0.05).clamp(1.0, 3.0)
+      ..strokeWidth = flagged
+          ? (s * 0.09).clamp(2.0, 5.0)
+          : (s * 0.05).clamp(1.0, 3.0)
       ..style = PaintingStyle.stroke;
 
     canvas.drawPath(path, fillPaint);
@@ -125,7 +115,7 @@ class _CrossPainter extends CustomPainter {
         text: count.toString(),
         style: TextStyle(
           fontSize: w * 0.7,
-          color: textColor,
+          color: oppositeColor,
           fontWeight: FontWeight.bold,
         ),
       ),

@@ -16,12 +16,8 @@ Color cellBgColor(BuildContext context, CellValue value) {
   switch (value) {
     case CellValue.free:
       return pc.cellBgUndecided;
-    case CellValue.black:
-      return pc.cellBgBlack;
-    case CellValue.white:
-      return pc.cellBgWhite;
-    case CellValue.purple:
-      return pc.cellBgPurple;
+    default:
+      return pc.constraintColors[value] ?? pc.constraintInvalid;
   }
 }
 
@@ -31,12 +27,8 @@ Color cellFgColor(BuildContext context, CellValue value) {
   switch (value) {
     case CellValue.free:
       return pc.cellFgUndecided;
-    case CellValue.black:
-      return pc.cellFgBlack;
-    case CellValue.white:
-      return pc.cellFgWhite;
-    case CellValue.purple:
-      return pc.cellFgPurple;
+    default:
+      return pc.oppositeColors[value] ?? pc.constraintInvalid;
   }
 }
 
@@ -188,7 +180,12 @@ class CellWidget extends StatelessWidget {
             border: BoxBorder.all(
               width: borderWidth ?? ((readonly || isHighlighted) ? 6 : 1),
               color:
-                  borderColor ?? (isHighlighted ? pc.highlight : pc.gridBorder),
+                  borderColor ??
+                  (isHighlighted
+                      ? pc.highlight
+                      : readonly
+                      ? pc.cellFgReadonly
+                      : pc.gridBorder),
             ),
           ),
           child: SizedBox(
@@ -210,9 +207,9 @@ class CellWidget extends StatelessWidget {
                     child: CustomPaint(
                       size: Size(cellSize * 0.4, cellSize * 0.4),
                       painter: _CornerTrianglePainter(
-                        color: cornerIndicatorValue == CellValue.black
-                            ? pc.cellBgBlack
-                            : pc.cellBgWhite,
+                        color:
+                            pc.constraintColors[cornerIndicatorValue] ??
+                            pc.constraintInvalid,
                         borderColor: pc.constraintGrayed,
                       ),
                     ),

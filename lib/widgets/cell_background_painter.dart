@@ -25,12 +25,10 @@ class CellBackgroundPainter extends CustomPainter {
       switch (value) {
         case CellValue.free:
           color = puzzleColors.cellBgUndecided;
-        case CellValue.black:
-          color = puzzleColors.cellBgBlack;
-        case CellValue.white:
-          color = puzzleColors.cellBgWhite;
-        case CellValue.purple:
-          color = puzzleColors.cellBgWhite;
+        default:
+          color =
+              puzzleColors.constraintColors[value] ??
+              puzzleColors.constraintInvalid;
       }
       final rect = Rect.fromLTWH(
         col * cellSize,

@@ -8,12 +8,18 @@ class ImplicationPainter extends CustomPainter {
   final double cellSize;
   final int gridWidth;
   final Color highlightColor;
+  final Map<CellValue, Color> constraintColors;
+  final Color grayoutColor;
+  final Color invalidColor;
 
   ImplicationPainter({
     required this.constraints,
     required this.cellSize,
     required this.gridWidth,
     required this.highlightColor,
+    required this.constraintColors,
+    required this.grayoutColor,
+    required this.invalidColor,
   });
 
   @override
@@ -41,20 +47,19 @@ class ImplicationPainter extends CustomPainter {
 
       final Color arrowColor;
       double strokeWidth;
-      if (isHighlighted) {
+      if (!constraint.isValid) {
+        arrowColor = invalidColor; // solarized red
+        strokeWidth = 4.0;
+      } else if (isHighlighted) {
         arrowColor = highlightColor;
         strokeWidth = 5.0;
       } else if (shouldGrayOut) {
-        arrowColor = Colors.grey.withValues(alpha: 0.25);
+        arrowColor = grayoutColor;
         strokeWidth = 2.0;
       } else {
         // Arrow colour reflects the constraint's colour for quick
         // visual identification.
-        arrowColor = switch (constraint.color) {
-          CellValue.black => const Color(0xFF333333),
-          CellValue.purple => const Color(0xFF9C27B0),
-          _ => const Color(0xFFDDDDDD),
-        };
+        arrowColor = constraintColors[constraint.color] ?? invalidColor;
         strokeWidth = 4.0;
       }
 

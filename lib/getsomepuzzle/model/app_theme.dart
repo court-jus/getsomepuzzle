@@ -1,5 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
+
+const Map<CellValue, Color> defaultConstraintColors = {
+  CellValue.black: Color(0xFF000000),
+  CellValue.white: Color(0xFFFFFFFF),
+  CellValue.purple: Color(0xFFD33682),
+};
+
+const Map<CellValue, Color> defaultOppositeColors = {
+  CellValue.white: Color(0xFF000000),
+  CellValue.black: Color(0xFFFFFFFF),
+  CellValue.purple: Color(0xFFFFFFFF),
+};
+
+// Those are used when we need to display white on a light background or black on a dark background
+// (IM and MJ constraints)
+const Color contrastWhite = Color(0xFF93A1A1);
+const Color constrastBlack = Color(0xFF586E75);
+
+const Color defaultInvalidColor = Color(0xFFDC322F);
 
 /// Theme extension carrying all puzzle-specific colors.
 ///
@@ -7,15 +27,17 @@ import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
 /// (or `puzzleColorsDark`) and consume in widgets with
 /// `Theme.of(context).extension<PuzzleColors>()!`.
 class PuzzleColors extends ThemeExtension<PuzzleColors> {
+  // --- Main colors ---
+  final Map<CellValue, Color> constraintColors;
+  final Map<CellValue, Color> oppositeColors;
+  final Map<CellValue, Color> constrastedColors;
+  final Color rawBlack;
+  final Color rawWhite;
+
   // --- Cell colors ---
   final Color cellBgUndecided;
-  final Color cellBgBlack;
-  final Color cellBgWhite;
   final Color cellFgUndecided;
-  final Color cellFgBlack;
-  final Color cellFgWhite;
-  final Color cellBgPurple;
-  final Color cellFgPurple;
+  final Color cellFgReadonly;
 
   // --- Semantic colors ---
   final Color highlight;
@@ -38,14 +60,14 @@ class PuzzleColors extends ThemeExtension<PuzzleColors> {
   final Color constraintGrayed;
 
   const PuzzleColors({
+    required this.constraintColors,
+    required this.oppositeColors,
+    required this.constrastedColors,
     required this.cellBgUndecided,
-    required this.cellBgBlack,
-    required this.cellBgWhite,
+    required this.rawBlack,
+    required this.rawWhite,
     required this.cellFgUndecided,
-    required this.cellFgBlack,
-    required this.cellFgWhite,
-    required this.cellBgPurple,
-    required this.cellFgPurple,
+    required this.cellFgReadonly,
     required this.highlight,
     required this.forbidden,
     required this.mandatory,
@@ -62,14 +84,14 @@ class PuzzleColors extends ThemeExtension<PuzzleColors> {
 
   @override
   PuzzleColors copyWith({
+    Map<CellValue, Color>? constraintColors,
+    Map<CellValue, Color>? oppositeColors,
+    Map<CellValue, Color>? constrastedColors,
     Color? cellBgUndecided,
-    Color? cellBgBlack,
-    Color? cellBgWhite,
+    Color? rawBlack,
+    Color? rawWhite,
     Color? cellFgUndecided,
-    Color? cellFgBlack,
-    Color? cellFgWhite,
-    Color? cellBgPurple,
-    Color? cellFgPurple,
+    Color? cellFgReadonly,
     Color? highlight,
     Color? forbidden,
     Color? mandatory,
@@ -84,14 +106,14 @@ class PuzzleColors extends ThemeExtension<PuzzleColors> {
     Color? constraintGrayed,
   }) {
     return PuzzleColors(
+      constraintColors: constraintColors ?? this.constraintColors,
+      oppositeColors: oppositeColors ?? this.oppositeColors,
+      constrastedColors: constrastedColors ?? this.constrastedColors,
       cellBgUndecided: cellBgUndecided ?? this.cellBgUndecided,
-      cellBgBlack: cellBgBlack ?? this.cellBgBlack,
-      cellBgWhite: cellBgWhite ?? this.cellBgWhite,
+      rawBlack: rawBlack ?? this.rawBlack,
+      rawWhite: rawWhite ?? this.rawWhite,
       cellFgUndecided: cellFgUndecided ?? this.cellFgUndecided,
-      cellFgBlack: cellFgBlack ?? this.cellFgBlack,
-      cellFgWhite: cellFgWhite ?? this.cellFgWhite,
-      cellBgPurple: cellBgPurple ?? this.cellBgPurple,
-      cellFgPurple: cellFgPurple ?? this.cellFgPurple,
+      cellFgReadonly: cellFgReadonly ?? this.cellFgReadonly,
       highlight: highlight ?? this.highlight,
       forbidden: forbidden ?? this.forbidden,
       mandatory: mandatory ?? this.mandatory,
@@ -111,14 +133,14 @@ class PuzzleColors extends ThemeExtension<PuzzleColors> {
   PuzzleColors lerp(PuzzleColors? other, double t) {
     if (other is! PuzzleColors) return this;
     return PuzzleColors(
+      constraintColors: constraintColors,
+      oppositeColors: oppositeColors,
+      constrastedColors: constrastedColors,
       cellBgUndecided: Color.lerp(cellBgUndecided, other.cellBgUndecided, t)!,
-      cellBgBlack: Color.lerp(cellBgBlack, other.cellBgBlack, t)!,
-      cellBgWhite: Color.lerp(cellBgWhite, other.cellBgWhite, t)!,
+      rawBlack: Color.lerp(rawBlack, other.rawBlack, t)!,
+      rawWhite: Color.lerp(rawWhite, other.rawWhite, t)!,
       cellFgUndecided: Color.lerp(cellFgUndecided, other.cellFgUndecided, t)!,
-      cellFgBlack: Color.lerp(cellFgBlack, other.cellFgBlack, t)!,
-      cellFgWhite: Color.lerp(cellFgWhite, other.cellFgWhite, t)!,
-      cellBgPurple: Color.lerp(cellBgPurple, other.cellBgPurple, t)!,
-      cellFgPurple: Color.lerp(cellFgPurple, other.cellFgPurple, t)!,
+      cellFgReadonly: Color.lerp(cellFgReadonly, other.cellFgReadonly, t)!,
       highlight: Color.lerp(highlight, other.highlight, t)!,
       forbidden: Color.lerp(forbidden, other.forbidden, t)!,
       mandatory: Color.lerp(mandatory, other.mandatory, t)!,
@@ -148,49 +170,57 @@ class PuzzleColors extends ThemeExtension<PuzzleColors> {
 }
 
 const puzzleColorsLight = PuzzleColors(
-  cellBgUndecided: Color(0xFFC0EBF1),
-  cellBgBlack: Colors.black,
-  cellBgWhite: Colors.white,
-  cellFgUndecided: Colors.black,
-  cellFgBlack: Colors.white,
-  cellFgWhite: Colors.black,
-  cellBgPurple: Color(0xFFE1BEE7),
-  cellFgPurple: Color(0xFF4A148C),
-  highlight: Color(0xFF8B7D3C),
-  forbidden: Color(0xFFB956CA),
-  mandatory: Colors.lightBlue,
-  gridBorder: Colors.blueAccent,
-  drawerHeaderBg: Colors.blue,
-  bottomBarBg: Colors.amber,
-  validateButtonBg: Colors.lightGreen,
-  pauseOverlayBg: Colors.teal,
-  dialogAccent: Colors.amber,
-  constraintValid: Colors.green,
-  constraintInvalid: Colors.deepOrange,
-  constraintGrayed: Colors.grey,
+  constraintColors: defaultConstraintColors,
+  oppositeColors: defaultOppositeColors,
+  cellBgUndecided: Color(0xFFEEE8D5),
+  rawBlack: Color(0xFF000000),
+  rawWhite: Color(0xFFFFFFFF), // Color(0xFFD33682), // magenta (valeur 2)
+  constrastedColors: {
+    CellValue.black: Color(0xFF000000),
+    CellValue.white: contrastWhite,
+    CellValue.purple: Color(0xFFD33682),
+  },
+  cellFgUndecided: Color(0xFF002B36),
+  cellFgReadonly: Color(0xFF2AA198),
+  highlight: Color(0xFF859900), // vert
+  mandatory: Color(0xFF93A1A1), // base1
+  forbidden: Color(0xFF586E75), // base01
+  gridBorder: Color(0xFF586E75), // base01
+  drawerHeaderBg: Color(0xFF073642), // base02
+  bottomBarBg: Color(0xFFEEE8D5), // base2
+  validateButtonBg: Color(0xFF859900), // vert
+  pauseOverlayBg: Color(0x99073642), // base02 à 60%
+  dialogAccent: Color(0xFFCB4B16), // orange
+  constraintValid: Color(0xFF859900), // vert
+  constraintInvalid: defaultInvalidColor, // rouge
+  constraintGrayed: Color(0xFF93A1A1), // base1
 );
 
 const puzzleColorsDark = PuzzleColors(
-  cellBgUndecided: Color(0xFF3A6070),
-  cellBgBlack: Color(0xFF2A2A2A),
-  cellBgWhite: Color(0xFFB0B0B0),
-  cellFgUndecided: Color(0xFFE0E0E0),
-  cellFgBlack: Color(0xFFE0E0E0),
-  cellFgWhite: Color(0xFF2A2A2A),
-  cellBgPurple: Color(0xFF6A4C93),
-  cellFgPurple: Color(0xFFE0E0E0),
-  highlight: Color(0xFFD4B84A),
-  forbidden: Color(0xFFCE80E0),
-  mandatory: Color(0xFF4FC3F7),
-  gridBorder: Color(0xFF64B5F6),
-  drawerHeaderBg: Color(0xFF1A237E),
-  bottomBarBg: Color(0xFF5D4037),
-  validateButtonBg: Color(0xFF66BB6A),
-  pauseOverlayBg: Color(0xFF004D40),
-  dialogAccent: Color(0xFFFFB74D),
-  constraintValid: Color(0xFF81C784),
-  constraintInvalid: Color(0xFFE57373),
-  constraintGrayed: Color(0xFF757575),
+  constraintColors: defaultConstraintColors,
+  oppositeColors: defaultOppositeColors,
+  cellBgUndecided: Color(0xFF073642), // base02
+  rawBlack: Color(0xFF000000), // Color(0xFFB58900), // jaune (valeur 1)
+  rawWhite: Color(0xFFFFFFFF), // Color(0xFFD33682), // magenta (valeur 2)
+  constrastedColors: {
+    CellValue.black: constrastBlack,
+    CellValue.white: Color(0xFFFFFFFF),
+    CellValue.purple: Color(0xFFD33682),
+  },
+  cellFgUndecided: Color(0xFFFDF6E3),
+  cellFgReadonly: Color(0xFF2AA198),
+  highlight: Color(0xFF859900), // vert
+  mandatory: Color(0xFF93A1A1), // base1
+  forbidden: Color(0xFF586E75), // base01
+  gridBorder: Color(0xFF93A1A1), // base1
+  drawerHeaderBg: Color(0xFF073642), // base02
+  bottomBarBg: Color(0xFF073642), // base02
+  validateButtonBg: Color(0xFF859900), // vert
+  pauseOverlayBg: Color(0xCC002B36), // base03 à 80%
+  dialogAccent: Color(0xFFCB4B16), // orange
+  constraintValid: Color(0xFF859900), // vert
+  constraintInvalid: defaultInvalidColor, // rouge
+  constraintGrayed: Color(0xFF586E75), // base01
 );
 
 /// Maps our [ThemeModeType] to Flutter's [ThemeMode].
@@ -208,7 +238,7 @@ ThemeMode resolveThemeMode(ThemeModeType type) {
 /// Light theme.
 final lightTheme = ThemeData(
   colorScheme: ColorScheme.fromSeed(
-    seedColor: Colors.deepPurple,
+    seedColor: const Color(0xFFB58900), // solarized yellow
     brightness: Brightness.light,
   ),
   useMaterial3: true,
@@ -218,7 +248,7 @@ final lightTheme = ThemeData(
 /// Dark theme.
 final darkTheme = ThemeData(
   colorScheme: ColorScheme.fromSeed(
-    seedColor: Colors.deepPurple,
+    seedColor: const Color(0xFFB58900), // solarized yellow
     brightness: Brightness.dark,
   ),
   useMaterial3: true,

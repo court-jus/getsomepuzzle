@@ -4,28 +4,23 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/widgets/dashed_painter.dart';
 
-const Color _mjBorderBlackTarget = Color(0xFF3A4A6B);
-const Color _mjBorderWhiteTarget = Color(0xFFC8D4E8);
-const Color _mjBorderPurpleTarget = Color(0xFF8E44AD);
-
-Color _mjBorderColor(CellValue targetColor) {
-  if (targetColor == CellValue.black) return _mjBorderBlackTarget;
-  if (targetColor == CellValue.white) return _mjBorderWhiteTarget;
-  if (targetColor == CellValue.purple) return _mjBorderPurpleTarget;
-  return Colors.grey;
-}
-
 class MajorityZonePainter extends CustomPainter {
   final List<MajorityConstraint> constraints;
   final double cellSize;
   final int gridWidth;
   final Color highlightColor;
+  final Map<CellValue, Color> constraintColors;
+  final Color grayoutColor;
+  final Color invalidColor;
 
   MajorityZonePainter({
     required this.constraints,
     required this.cellSize,
     required this.gridWidth,
     required this.highlightColor,
+    required this.constraintColors,
+    required this.grayoutColor,
+    required this.invalidColor,
   });
 
   @override
@@ -76,7 +71,7 @@ class MajorityZonePainter extends CustomPainter {
       } else if (isHighlighted) {
         borderColor = highlightColor;
       } else {
-        borderColor = _mjBorderColor(constraint.targetColor);
+        borderColor = constraintColors[constraint.targetColor] ?? invalidColor;
       }
 
       if (isHighlighted) {

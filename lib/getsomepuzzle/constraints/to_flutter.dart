@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
+import 'package:getsomepuzzle/widgets/constraints/base.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
@@ -33,12 +34,12 @@ Widget constraintToFlutter(
   int count = 1,
   int actualGroupSize = 0,
 }) {
-  final bool shouldGrayOut = constraint.isComplete && constraint.isValid;
+  final bool shouldGrayOut = constraint.isGrayedOut;
   final fgcolor = shouldGrayOut
       ? Colors.grey
-      : (constraint.isHighlighted
-            ? highlightColor
-            : (constraint.isValid ? defaultColor : Colors.redAccent));
+      : (!constraint.isValid
+            ? Colors.redAccent
+            : (constraint.isHighlighted ? highlightColor : defaultColor));
 
   if (constraint is SymmetryConstraint) {
     return _symmetryWidget(constraint, fgcolor, cellSize, count);

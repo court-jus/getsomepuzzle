@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 /// Generic 3x3 motif editor — shared by Forbidden Motif and Shape.
@@ -14,12 +15,12 @@ Future<String?> _showMotifDialog(
   int motifWidth = 2;
   int motifHeight = 2;
   final grid = List.generate(3, (_) => List.filled(3, 0));
-  final bgColors = {0: backgroundColor, 1: Colors.black, 2: Colors.white};
 
   return showDialog<String>(
     context: context,
     builder: (ctx) {
       final loc = AppLocalizations.of(context)!;
+      final pc = Theme.of(context).extension<PuzzleColors>()!;
       return StatefulBuilder(
         builder: (ctx, setDialogState) {
           return AlertDialog(
@@ -78,8 +79,12 @@ Future<String?> _showMotifDialog(
                                   width: 50,
                                   height: 50,
                                   decoration: BoxDecoration(
-                                    color: bgColors[grid[row][col]],
-                                    border: Border.all(color: Colors.blueGrey),
+                                    color:
+                                        pc.constraintColors[cellRepresentationToValue(
+                                          grid[row][col].toString(),
+                                        )] ??
+                                        pc.constraintInvalid,
+                                    border: Border.all(color: pc.gridBorder),
                                   ),
                                 ),
                               ),

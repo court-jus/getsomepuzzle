@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/widgets/constraints/base.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
@@ -23,22 +24,15 @@ class BoundingBoxWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pc = Theme.of(context).extension<PuzzleColors>()!;
-    final shouldGrayOut = constraint.isComplete && constraint.isValid;
+    final shouldGrayOut = constraint.isGrayedOut;
     final Color tint;
-    switch (constraint.color) {
-      case CellValue.black:
-        tint = pc.cellBgBlack.withValues(alpha: 0.3);
-      case CellValue.white:
-        tint = pc.cellBgWhite.withValues(alpha: 0.6);
-      case CellValue.purple:
-        tint = Colors.purple.withValues(alpha: 0.3);
-      case CellValue.free:
-        tint = Colors.transparent;
+    if (constraint.color == CellValue.free) {
+      tint = Colors.transparent;
+    } else {
+      tint = (pc.constraintColors[constraint.color] ?? pc.constraintInvalid);
     }
     final bgColor = shouldGrayOut ? Colors.grey.withValues(alpha: 0.3) : tint;
-    final borderColor = constraint.isHighlighted
-        ? pc.highlight
-        : (constraint.isValid ? pc.constraintValid : pc.constraintInvalid);
+    final borderColor = constraint.borderColor(pc);
 
     final maxDim = max(constraint.width, constraint.height);
     final boxCellSize =
@@ -54,7 +48,11 @@ class BoundingBoxWidget extends StatelessWidget {
               for (int c = 0; c < constraint.width; c++)
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    border: BoxBorder.all(color: Colors.blueGrey),
+                    border: BoxBorder.all(
+                      color:
+                          pc.oppositeColors[constraint.color] ??
+                          pc.constraintInvalid,
+                    ),
                   ),
                   child: SizedBox(width: boxCellSize, height: boxCellSize),
                 ),
@@ -68,7 +66,7 @@ class BoundingBoxWidget extends StatelessWidget {
         color: bgColor,
         border: BoxBorder.all(
           color: borderColor,
-          width: constraint.isHighlighted ? 8 : 4,
+          width: constraint.borderWidth,
         ),
       ),
       child: SizedBox(

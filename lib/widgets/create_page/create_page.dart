@@ -546,17 +546,17 @@ class _CreatePageState extends State<CreatePage> {
               children: [
                 TextButton.icon(
                   onPressed: () => Navigator.pop(ctx, CellValue.black),
-                  icon: const Icon(Icons.circle, color: Colors.black),
+                  icon: const Icon(Icons.circle, color: Color(0xFFB58900)),
                   label: Text(loc2.colorBlack),
                 ),
                 TextButton.icon(
                   onPressed: () => Navigator.pop(ctx, CellValue.white),
-                  icon: const Icon(Icons.circle, color: Colors.white),
+                  icon: const Icon(Icons.circle, color: Color(0xFFD33682)),
                   label: Text(loc2.colorWhite),
                 ),
                 TextButton.icon(
                   onPressed: () => Navigator.pop(ctx, CellValue.purple),
-                  icon: const Icon(Icons.circle, color: Colors.purple),
+                  icon: const Icon(Icons.circle, color: Color(0xFF2AA198)),
                   label: Text(loc2.colorPurple),
                 ),
               ],
@@ -629,12 +629,12 @@ class _CreatePageState extends State<CreatePage> {
           children: [
             TextButton.icon(
               onPressed: () => Navigator.pop(ctx, 1),
-              icon: const Icon(Icons.circle, color: Colors.black),
+              icon: const Icon(Icons.circle, color: Color(0xFFB58900)),
               label: Text(loc.createFixBlack),
             ),
             TextButton.icon(
               onPressed: () => Navigator.pop(ctx, 2),
-              icon: const Icon(Icons.circle, color: Colors.white),
+              icon: const Icon(Icons.circle, color: Color(0xFFD33682)),
               label: Text(loc.createFixWhite),
             ),
           ],

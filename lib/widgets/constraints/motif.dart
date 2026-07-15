@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/widgets/constraints/base.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
@@ -21,14 +22,12 @@ class MotifWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pc = Theme.of(context).extension<PuzzleColors>()!;
-    final bool shouldGrayOut = constraint.isComplete;
+    final shouldGrayOut = constraint.isGrayedOut;
     final isShapeConstraint = constraint is ShapeConstraint;
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
         : (constraint is ForbiddenMotif ? pc.forbidden : pc.mandatory);
-    final borderColor = constraint.isHighlighted
-        ? pc.highlight
-        : (constraint.isValid ? pc.constraintValid : pc.constraintInvalid);
+    final borderColor = constraint.borderColor(pc);
     final rows = constraint.motif.length;
     final cols = constraint.motif.isNotEmpty ? constraint.motif[0].length : 0;
     final maxDim = rows > cols ? rows : cols;
@@ -46,10 +45,12 @@ class MotifWidget extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: cell == CellValue.free
                         ? Colors.transparent
-                        : cell == CellValue.black
-                        ? pc.cellBgBlack
-                        : pc.cellBgWhite,
-                    border: BoxBorder.all(color: Colors.blueGrey),
+                        : pc.constraintColors[cell] ?? pc.constraintInvalid,
+                    border: BoxBorder.all(
+                      color: cell == CellValue.free
+                          ? Colors.transparent
+                          : pc.gridBorder,
+                    ),
                   ),
                   child: SizedBox(width: motifCellSize, height: motifCellSize),
                 ),
@@ -62,7 +63,7 @@ class MotifWidget extends StatelessWidget {
         color: bgColor,
         border: BoxBorder.all(
           color: borderColor,
-          width: constraint.isHighlighted ? 8 : 4,
+          width: constraint.borderWidth,
         ),
       ),
       child: SizedBox(

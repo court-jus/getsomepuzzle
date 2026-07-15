@@ -77,21 +77,8 @@ class _EyesPainter extends CustomPainter {
       ..arcTo(rect, -3.14159, -3.14159, true)
       ..arcTo(rect, 3.14159, 3.14159, true);
 
-    final fillColor = color == CellValue.black
-        ? pc.cellBgBlack
-        : color == CellValue.white
-        ? pc.cellBgWhite
-        : pc.constraintGrayed;
-    final oppositeColor = color == CellValue.black
-        ? pc.cellBgWhite
-        : color == CellValue.white
-        ? pc.cellBgBlack
-        : pc.constraintGrayed;
-    final textColor = color == CellValue.black
-        ? pc.cellFgBlack
-        : color == CellValue.white
-        ? pc.cellFgWhite
-        : pc.constraintGrayed;
+    final fillColor = pc.constraintColors[color] ?? pc.constraintInvalid;
+    final oppositeColor = pc.oppositeColors[color] ?? pc.constraintInvalid;
 
     final Color strokeColor;
     if (!isValid) {
@@ -102,12 +89,15 @@ class _EyesPainter extends CustomPainter {
       strokeColor = oppositeColor;
     }
 
+    final bool flagged = !isValid || isHighlighted;
     final fillPaint = Paint()
-      ..color = fillColor
+      ..color = isValid ? fillColor : pc.constraintInvalid
       ..style = PaintingStyle.fill;
     final strokePaint = Paint()
       ..color = strokeColor
-      ..strokeWidth = (s * 0.05).clamp(1.0, 3.0)
+      ..strokeWidth = flagged
+          ? (s * 0.09).clamp(2.0, 5.0)
+          : (s * 0.05).clamp(1.0, 3.0)
       ..style = PaintingStyle.stroke;
 
     canvas.drawPath(path, fillPaint);
@@ -130,7 +120,7 @@ class _EyesPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = outlineWidth
             ..strokeJoin = StrokeJoin.round
-            ..color = textColor,
+            ..color = oppositeColor,
         ),
       ),
       textDirection: TextDirection.ltr,

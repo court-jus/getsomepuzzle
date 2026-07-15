@@ -29,18 +29,12 @@ Consume it in a widget with:
 final pc = Theme.of(context).extension<PuzzleColors>()!;
 ```
 
-Cell colors are resolved through the helpers `cellBgColor(context, value)` and
-`cellFgColor(context, value)` in `lib/widgets/cell.dart`, which switch on
-`CellValue` and return the matching `PuzzleColors` field. `CellValue.purple`
-(the "both options" third color) has its own `cellBgPurple` / `cellFgPurple`
-fields (a light purple in light mode, a muted purple in dark) so it stays
-visually distinct from white cells. A literal purple is also drawn directly in
-`lib/widgets/implication_painter.dart` for implication arrows.
+Cell colors are resolved through the helpers `constraintColors` and
+`oppositeColors` declared in `app_theme.dart`.
 
 ### Field groups
 
-- **Cell colors:** `cellBgUndecided/Black/White`, `cellFgUndecided/Black/White`,
-  `cellBgPurple`, `cellFgPurple`.
+- **Cell colors:** `constraintColors`, `oppositeColors`.
 - **Semantic:** `highlight`, `forbidden`, `mandatory`.
 - **Grid:** `gridBorder`.
 - **UI chrome:** `drawerHeaderBg`, `bottomBarBg`, `validateButtonBg`,
