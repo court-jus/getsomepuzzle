@@ -81,17 +81,17 @@ class _EyesPainter extends CustomPainter {
         ? pc.cellBgBlack
         : color == CellValue.white
         ? pc.cellBgWhite
-        : pc.constraintGrayed;
+        : pc.cellBgPurple;
     final oppositeColor = color == CellValue.black
         ? pc.cellBgWhite
         : color == CellValue.white
         ? pc.cellBgBlack
-        : pc.constraintGrayed;
+        : pc.cellFgPurple;
     final textColor = color == CellValue.black
         ? pc.cellFgBlack
         : color == CellValue.white
         ? pc.cellFgWhite
-        : pc.constraintGrayed;
+        : pc.cellFgPurple;
 
     final Color strokeColor;
     if (!isValid) {
@@ -102,12 +102,13 @@ class _EyesPainter extends CustomPainter {
       strokeColor = oppositeColor;
     }
 
+    final bool flagged = !isValid || isHighlighted;
     final fillPaint = Paint()
       ..color = fillColor
       ..style = PaintingStyle.fill;
     final strokePaint = Paint()
       ..color = strokeColor
-      ..strokeWidth = (s * 0.05).clamp(1.0, 3.0)
+      ..strokeWidth = flagged ? (s * 0.09).clamp(2.0, 5.0) : (s * 0.05).clamp(1.0, 3.0)
       ..style = PaintingStyle.stroke;
 
     canvas.drawPath(path, fillPaint);

@@ -41,7 +41,10 @@ class ImplicationPainter extends CustomPainter {
 
       final Color arrowColor;
       double strokeWidth;
-      if (isHighlighted) {
+      if (!constraint.isValid) {
+        arrowColor = Colors.red;
+        strokeWidth = 4.0;
+      } else if (isHighlighted) {
         arrowColor = highlightColor;
         strokeWidth = 5.0;
       } else if (shouldGrayOut) {

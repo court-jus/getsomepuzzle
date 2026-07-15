@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/widgets/constraints/base.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
 
@@ -20,12 +21,8 @@ class TransitionWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pc = Theme.of(context).extension<PuzzleColors>()!;
-    final bool shouldGrayOut = constraint.isComplete;
-    final borderColor = shouldGrayOut
-        ? Colors.grey
-        : (constraint.isHighlighted
-              ? pc.highlight
-              : (constraint.isValid ? Colors.grey : Colors.redAccent));
+    final shouldGrayOut = constraint.isGrayedOut;
+    final borderColor = constraint.borderColor(pc);
     final waveColor = pc.cellBgBlack;
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
@@ -42,7 +39,7 @@ class TransitionWidget extends StatelessWidget {
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: borderColor, width: 2),
+            border: Border.all(color: borderColor, width: constraint.borderWidth),
           ),
           child: CustomPaint(
             painter: _SquareWavePainter(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/widgets/constraints/base.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
@@ -25,10 +26,8 @@ class QuantityWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pc = Theme.of(context).extension<PuzzleColors>()!;
-    final bool shouldGrayOut = constraint.isComplete;
-    final borderColor = constraint.isHighlighted
-        ? pc.highlight
-        : (constraint.isValid ? pc.constraintValid : pc.constraintInvalid);
+    final shouldGrayOut = constraint.isGrayedOut;
+    final borderColor = constraint.borderColor(pc);
     final bgColor = shouldGrayOut
         ? Colors.grey.withValues(alpha: 0.3)
         : pc.mandatory;
@@ -40,7 +39,7 @@ class QuantityWidget extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: bgColor,
-        border: BoxBorder.all(color: borderColor, width: 4),
+        border: BoxBorder.all(color: borderColor, width: constraint.borderWidth),
       ),
       child: SizedBox(
         width: cellSize,
@@ -60,7 +59,7 @@ class QuantityWidget extends StatelessWidget {
                         ? pc.cellBgWhite
                         : constraint.color == CellValue.white
                         ? pc.cellBgBlack
-                        : Colors.transparent,
+                        : pc.cellFgPurple,
                   ),
                 ),
               ),
@@ -76,7 +75,7 @@ class QuantityWidget extends StatelessWidget {
                         ? pc.cellBgBlack
                         : constraint.color == CellValue.white
                         ? pc.cellBgWhite
-                        : Colors.transparent,
+                        : pc.cellBgPurple,
                   ),
                 ),
               ),
@@ -89,7 +88,7 @@ class QuantityWidget extends StatelessWidget {
                       ? pc.cellBgBlack
                       : constraint.color == CellValue.white
                       ? pc.cellBgWhite
-                      : Colors.transparent,
+                      : pc.cellBgPurple,
                 ),
               ),
             ),

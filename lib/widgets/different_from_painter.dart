@@ -33,10 +33,12 @@ class DifferentFromPainter extends CustomPainter {
       final shouldGrayOut = constraint.isComplete;
 
       final Color circleColor;
-      if (isHighlighted) {
+      if (!constraint.isValid) {
+        circleColor = Colors.red;
+      } else if (isHighlighted) {
         circleColor = highlightColor;
       } else {
-        circleColor = constraint.isValid ? defaultColor : Colors.red;
+        circleColor = defaultColor;
       }
 
       double centerX;

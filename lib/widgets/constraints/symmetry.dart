@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 
 class SymmetryWidget extends StatelessWidget {
@@ -16,25 +15,13 @@ class SymmetryWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pc = Theme.of(context).extension<PuzzleColors>()!;
-    final borderColor = constraint.isHighlighted
-        ? pc.highlight
-        : (constraint.isValid ? Colors.transparent : pc.constraintInvalid);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: BoxBorder.all(
-          color: borderColor,
-          width: constraint.isHighlighted ? 8 : 4,
-        ),
-      ),
-      child: SizedBox(
-        width: cellSize,
-        height: cellSize,
-        child: Center(
-          child: CustomPaint(
-            size: Size(cellSize * 0.6, cellSize * 0.6),
-            painter: SymmetryPainter(axis: constraint.axis, color: fgcolor),
-          ),
+    return SizedBox(
+      width: cellSize,
+      height: cellSize,
+      child: Center(
+        child: CustomPaint(
+          size: Size(cellSize * 0.6, cellSize * 0.6),
+          painter: SymmetryPainter(axis: constraint.axis, color: fgcolor),
         ),
       ),
     );
