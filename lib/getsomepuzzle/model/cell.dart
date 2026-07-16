@@ -67,6 +67,7 @@ class Cell {
   }
 
   void reset() {
+    if (readonly) return;
     value = CellValue.free;
     options = domain.toList();
     onMutate?.call();

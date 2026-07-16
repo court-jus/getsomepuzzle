@@ -432,6 +432,7 @@ class GameModel extends ChangeNotifier {
   void handleDrag(int idx) {
     if (currentPuzzle == null) return;
     if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
+    if (currentPuzzle!.cells[idx].readonly) return;
     if (lastDragIdx != null && idx == lastDragIdx) return;
     _beforeMutation();
     lastDragIdx = idx;
@@ -467,7 +468,9 @@ class GameModel extends ChangeNotifier {
       // player did on that cell — and an already-coloured start cell has
       // empty options, so the unguarded setValue would throw RangeError.
       // Mirrors the right-drag path (`_commitRightPaint` / `decrValue`).
-      currentPuzzle!.setValue(idx, firstDragValue!, ignoreOptions: true);
+      if (!currentPuzzle!.setValue(idx, firstDragValue!, ignoreOptions: true)) {
+        return;
+      }
     }
     currentMeta?.stats?.recordCellEdit();
     if (history.isEmpty || history.last != idx) history.add(idx);
@@ -488,6 +491,7 @@ class GameModel extends ChangeNotifier {
   void handleRightDrag(int idx) {
     if (currentPuzzle == null) return;
     if (idx < 0 || idx >= currentPuzzle!.cells.length) return;
+    if (currentPuzzle!.cells[idx].readonly) return;
     if (lastRightDragIdx != null && idx == lastRightDragIdx) return;
     final currentValue = currentPuzzle!.cellValues[idx];
 
