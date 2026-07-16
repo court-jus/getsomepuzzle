@@ -278,11 +278,11 @@ void main() {
       },
     );
 
-    test('graduated player sets the flag without touching filters', () async {
+    test('graduated player does not set the flag (reco is null)', () async {
       // recommendedOnboardingFilters is null once every slug has been
-      // seen. We still set the flag so subsequent boots stop probing —
-      // otherwise every launch would re-evaluate the recommendation
-      // for nothing.
+      // seen. The flag remains absent so a future state regression
+      // (e.g. corrupted onboardingCompletions) can still apply fresh
+      // filters on next launch.
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       final progress = ConstraintProgress();
@@ -297,7 +297,7 @@ void main() {
       await db.maybeApplyOnboardingFilterDefaults(prefs);
       expect(db.currentFilters.wantedRules, {'SY'});
       expect(db.currentFilters.bannedRules, {'FM'});
-      expect(prefs.getBool('onboardingFiltersApplied'), isTrue);
+      expect(prefs.getBool('onboardingFiltersApplied'), isNull);
     });
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
@@ -12,6 +13,10 @@ const _threeColourLine = 'v2_123_3x3_000000000_NC:4.3.4_0:0_0';
 // puzzle is what a player in that phase is actually served — and thus
 // what graduates them when they finish it.
 const _qaLine = 'v2_12_3x3_000000000_QA:1.4_0:0_0';
+
+// Puzzle line with two QA constraints — used to verify that duplicate
+// slugs do not inflate onboardingCompletions.
+const _qaDupLine = 'v2_12_3x3_000000000_QA:1.4;QA:2.7_0:0_0';
 
 Map<String, int> _allPhasesDone() => {
   for (final p in OnboardingPhase.phases)
@@ -203,6 +208,20 @@ void main() {
       expect(db.postOnboardingCompletions, 1);
       db.notePuzzleCompleted(PuzzleData(_twoColourLine));
       expect(db.postOnboardingCompletions, 2);
+    });
+
+    test('duplicate slugs in a puzzle do not inflate onboardingCompletions', () {
+      // Regression: the onboardingCompletions loop used puz.rules (a List)
+      // instead of puz.rules.toSet(). A puzzle with two QA constraints
+      // counted as 2 completions instead of 1, accelerating phase
+      // progression.
+      final db = Database(playerLevel: 0, progress: ConstraintProgress());
+      db.onboardingCompletions = _allPhasesDoneMinusOne();
+      final before = db.onboardingCompletions['QA'] ?? 0;
+
+      db.notePuzzleCompleted(PuzzleData(_qaDupLine));
+
+      expect(db.onboardingCompletions['QA'] ?? 0, before + 1);
     });
 
     test('replaying a puzzle does not inflate postOnboardingCompletions', () {

@@ -726,10 +726,9 @@ class Database {
     }
     final wasOnboarding = oldPhase != null;
     if (wasOnboarding) {
-      for (var slug in puz.rules) {
-        onboardingCompletions[slug] = onboardingCompletions[slug] == null
-            ? 1
-            : onboardingCompletions[slug]! + 1;
+      for (final slug in puz.rules.toSet()) {
+        if (slug.isEmpty || slug == 'TX') continue;
+        onboardingCompletions[slug] = (onboardingCompletions[slug] ?? 0) + 1;
       }
       _persistOnboardingCompletions();
       if (currentPhase == null) {
@@ -1391,10 +1390,10 @@ class Database {
   /// first time we see this player post-refactor (flag absent in prefs).
   /// Subsequent calls are no-ops so the player's manual overrides stick.
   ///
-  /// We always set the flag — even when the player has already
-  /// graduated and there is no recommendation to apply — so the
-  /// migration probe terminates and we don't pay the recheck cost on
-  /// every boot.
+  /// Only sets the flag when a recommendation was actually applied, so a
+  /// graduated player (recommendation == null) can still receive fresh
+  /// filters if their state later regresses (e.g. corrupted
+  /// onboardingCompletions on a subsequent launch).
   @visibleForTesting
   Future<void> maybeApplyOnboardingFilterDefaults(
     SharedPreferences prefs,
@@ -1405,8 +1404,8 @@ class Database {
       currentFilters.wantedRules = reco.wantedRules;
       currentFilters.bannedRules = reco.bannedRules;
       await currentFilters.save();
+      await prefs.setBool(_onboardingFiltersAppliedKey, true);
     }
-    await prefs.setBool(_onboardingFiltersAppliedKey, true);
   }
 
   /// Read every persisted raw stat line from disk (or `SharedPreferences`
