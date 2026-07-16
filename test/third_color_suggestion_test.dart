@@ -210,19 +210,22 @@ void main() {
       expect(db.postOnboardingCompletions, 2);
     });
 
-    test('duplicate slugs in a puzzle do not inflate onboardingCompletions', () {
-      // Regression: the onboardingCompletions loop used puz.rules (a List)
-      // instead of puz.rules.toSet(). A puzzle with two QA constraints
-      // counted as 2 completions instead of 1, accelerating phase
-      // progression.
-      final db = Database(playerLevel: 0, progress: ConstraintProgress());
-      db.onboardingCompletions = _allPhasesDoneMinusOne();
-      final before = db.onboardingCompletions['QA'] ?? 0;
+    test(
+      'duplicate slugs in a puzzle do not inflate onboardingCompletions',
+      () {
+        // Regression: the onboardingCompletions loop used puz.rules (a List)
+        // instead of puz.rules.toSet(). A puzzle with two QA constraints
+        // counted as 2 completions instead of 1, accelerating phase
+        // progression.
+        final db = Database(playerLevel: 0, progress: ConstraintProgress());
+        db.onboardingCompletions = _allPhasesDoneMinusOne();
+        final before = db.onboardingCompletions['QA'] ?? 0;
 
-      db.notePuzzleCompleted(PuzzleData(_qaDupLine));
+        db.notePuzzleCompleted(PuzzleData(_qaDupLine));
 
-      expect(db.onboardingCompletions['QA'] ?? 0, before + 1);
-    });
+        expect(db.onboardingCompletions['QA'] ?? 0, before + 1);
+      },
+    );
 
     test('replaying a puzzle does not inflate postOnboardingCompletions', () {
       // The stats file now keeps every play (keep-history), but the
