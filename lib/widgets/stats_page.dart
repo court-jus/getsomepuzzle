@@ -57,18 +57,12 @@ class _StatsPageState extends State<StatsPage> {
 
   Future<void> _loadStats() async {
     setState(() => loading = true);
-    final lines = await widget.database.getAllStats();
-    final entries = <StatEntry>[];
-    for (final line in lines) {
-      final entry = StatEntry.parse(line);
-      if (entry != null) entries.add(entry);
-    }
+    final entries = widget.database.getAllStatEntries();
     entries.sort((a, b) {
       final aFin = a.finished ?? '';
       final bFin = b.finished ?? '';
       return bFin.compareTo(aFin);
     });
-
     final lookup = await widget.database.getCollectionLookup();
     if (!mounted) return;
     setState(() {

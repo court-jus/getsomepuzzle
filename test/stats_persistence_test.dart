@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -63,7 +64,9 @@ void main() {
         final db = Database(playerLevel: 50);
         db.collection = '2-player';
         db.puzzles = [PuzzleData('v2_12_4x4_0000000000000000_FM:1_0:0_0')];
-        db.loadStats([easyEntry]); // mirrors what loadPuzzlesFile does
+        db.loadStats([
+          StatEntry.parse(easyEntry)!,
+        ]); // mirrors what loadPuzzlesFile does
 
         // None of the 2-player puzzles are played, so getStats() is empty.
         expect(db.getStats(), isEmpty);
@@ -90,6 +93,9 @@ void main() {
 
       final db = Database(playerLevel: 50);
       db.collection = '1-easy';
+      // Populate the in-memory cache from the file on disk, as
+      // loadPuzzlesFile does at startup.
+      db.loadStats([StatEntry.parse(oldEntry)!]);
       final puz = PuzzleData(puzzleLine);
       puz.played = true;
       puz.finished = DateTime(2026, 5, 11, 17, 55, 49);
@@ -196,7 +202,7 @@ void main() {
         db.collection = '1-easy';
         final puz = PuzzleData(puzzleLine);
         db.puzzles = [puz];
-        db.loadStats([recent, older]);
+        db.loadStats([StatEntry.parse(recent)!, StatEntry.parse(older)!]);
 
         expect(puz.played, isTrue);
         expect(puz.duration, 17);
@@ -220,7 +226,10 @@ void main() {
 
       final db = Database(playerLevel: 50);
       db.collection = '1-easy';
-      db.puzzles = []; // nothing in memory: pure on-disk history readback
+      db.puzzles = []; // nothing in memory: pure history readback
+      // Populate the in-memory cache from the file on disk, as
+      // loadPuzzlesFile does at startup.
+      db.loadStats([StatEntry.parse(play1)!, StatEntry.parse(play2)!]);
 
       final all = await db.getAllStats();
       final lines = all.where((l) => l.contains(puzzleLine)).toList();

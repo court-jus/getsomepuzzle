@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
 /// Smallest line representations that [PuzzleData] accepts: the
 /// constructor needs at least 7 underscore-separated segments to read
@@ -163,8 +164,10 @@ void main() {
         final db = Database(playerLevel: 0);
         db.hasPlayedThirdColor = true; // pretend a stale prefs value
         // Reload with stats that contain no 3-colour line.
-        db.loadStats(<String>[
-          '2026-05-13T18:00:00 30s 0f $_twoColourLine - ___ -  -  -  - 0 - 0h',
+        db.loadStats([
+          StatEntry.parse(
+            '2026-05-13T18:00:00 30s 0f $_twoColourLine - ___ -  -  -  - 0 - 0h',
+          )!,
         ]);
         expect(db.hasPlayedThirdColor, isFalse);
       },
@@ -178,8 +181,10 @@ void main() {
         // pick up the 3-colour line and flip the flag on.
         final db = Database(playerLevel: 0);
         expect(db.hasPlayedThirdColor, isFalse);
-        db.loadStats(<String>[
-          '2026-05-13T18:00:00 30s 0f $_threeColourLine - ___ -  -  -  - 0 - 0h',
+        db.loadStats([
+          StatEntry.parse(
+            '2026-05-13T18:00:00 30s 0f $_threeColourLine - ___ -  -  -  - 0 - 0h',
+          )!,
         ]);
         expect(db.hasPlayedThirdColor, isTrue);
       },
@@ -214,7 +219,7 @@ void main() {
           '2026-02-0${i + 1}T12:00:00 30s 0f $_twoColourLine'
               ' - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg',
       ];
-      db.loadStats(replays);
+      db.loadStats(replays.map((l) => StatEntry.parse(l)!).toList());
       expect(db.postOnboardingCompletions, 1);
     });
   });

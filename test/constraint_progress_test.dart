@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -132,10 +133,12 @@ void main() {
       final progress = ConstraintProgress();
       final db = Database(playerLevel: 50, progress: progress);
       db.loadStats([
-        stat(
-          'v2_12_3x3_000020000_FM:11;GS:4.1_1:212121212_6',
-          '2026-03-15T10:00:00',
-        ),
+        StatEntry.parse(
+          stat(
+            'v2_12_3x3_000020000_FM:11;GS:4.1_1:212121212_6',
+            '2026-03-15T10:00:00',
+          ),
+        )!,
       ]);
       expect(progress.firstSeen.keys, unorderedEquals(['FM', 'GS']));
       expect(progress.firstSeen['FM'], DateTime.parse('2026-03-15T10:00:00'));
@@ -149,11 +152,18 @@ void main() {
       final progress = ConstraintProgress();
       final db = Database(playerLevel: 50, progress: progress);
       db.loadStats([
-        stat(
-          'v2_12_3x3_000020000_FM:11;GS:4.1_1:212121212_6',
-          '2026-03-15T10:00:00',
-        ),
-        stat('v2_12_3x3_000020000_FM:11_1:212121212_6', '2026-01-02T08:00:00'),
+        StatEntry.parse(
+          stat(
+            'v2_12_3x3_000020000_FM:11;GS:4.1_1:212121212_6',
+            '2026-03-15T10:00:00',
+          ),
+        )!,
+        StatEntry.parse(
+          stat(
+            'v2_12_3x3_000020000_FM:11_1:212121212_6',
+            '2026-01-02T08:00:00',
+          ),
+        )!,
       ]);
       expect(progress.firstSeen['FM'], DateTime.parse('2026-01-02T08:00:00'));
       expect(progress.firstSeen['GS'], DateTime.parse('2026-03-15T10:00:00'));
@@ -169,7 +179,7 @@ void main() {
       // also carry the skipped timestamp.
       const skippedLine =
           '2026-03-15T10:00:00 0s 0f v2_12_3x3_000020000_FM:11_1:212121212_6 - S__ - 2026-03-15T10:01:00 -  -  -  - 0h - 0e - 0fc - 0lg';
-      db.loadStats([skippedLine]);
+      db.loadStats([StatEntry.parse(skippedLine)!]);
       expect(progress.firstSeen, isEmpty);
     });
 
@@ -178,7 +188,12 @@ void main() {
       // can omit `progress` entirely. loadStats must not throw.
       final db = Database(playerLevel: 50);
       db.loadStats([
-        stat('v2_12_3x3_000020000_FM:11_1:212121212_6', '2026-03-15T10:00:00'),
+        StatEntry.parse(
+          stat(
+            'v2_12_3x3_000020000_FM:11_1:212121212_6',
+            '2026-03-15T10:00:00',
+          ),
+        )!,
       ]);
       // Nothing to assert — the test is that we didn't crash.
     });

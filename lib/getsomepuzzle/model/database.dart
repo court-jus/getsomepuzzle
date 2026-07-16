@@ -406,6 +406,12 @@ class Database {
   /// collections. Built by [getCollectionLookup] and reused across calls.
   Map<String, String>? _puzzleCollectionCache;
 
+  /// Full play history across all collections, parsed once at startup
+  /// (or after import/clear) and reused by [getAllStats], [writeStats],
+  /// and the stats page. Avoids re-reading and re-parsing stats files
+  /// from disk on every puzzle transition or stats-page open.
+  List<StatEntry> _allStats = [];
+
   /// Load every built-in collection file and build a map from
   /// [canonicalPuzzleKey] to the collection key (e.g. `'1-easy'`).
   /// Used by the stats dashboard to group plays by collection.
@@ -1101,8 +1107,9 @@ class Database {
     return candSkipped != null && incSkipped == null;
   }
 
-  void loadStats(List<String> rawStats) {
+  void loadStats(List<StatEntry> allEntries) {
     log.finest("loadStats");
+    _allStats = allEntries;
     // Index by canonical key (identity-only): old stats lines that embed
     // a stale complexity score or constraint order still match the current
     // puzzle line. See lib/getsomepuzzle/model/canonical.dart.
@@ -1113,9 +1120,7 @@ class Database {
     // counter behaves exactly as it did when the file held a single row per
     // puzzle: we surface the latest play, not an inflated replay count.
     final Map<String, StatEntry> solvedPuzzles = {};
-    for (final line in rawStats) {
-      final entry = StatEntry.parse(line);
-      if (entry == null) continue;
+    for (final entry in allEntries) {
       final key = canonicalPuzzleKey(entry.puzzleLine);
       final existing = solvedPuzzles[key];
       if (existing == null || _isMoreRecentPlay(entry, existing)) {
@@ -1351,8 +1356,12 @@ class Database {
     await _augmentWithOverfilledIfOnboarding();
     await _loadOverfilledFallback();
     await currentFilters.load();
-    final stats = await _readRawStatsFromStorage();
-    loadStats(stats);
+    final rawStats = await _readRawStatsFromStorage();
+    _allStats = rawStats
+        .map((line) => StatEntry.parse(line))
+        .whereType<StatEntry>()
+        .toList();
+    loadStats(_allStats);
     // After `loadStats` because it populates `progress.firstSeen` from
     // the play history, which the soft-filter recommendation reads.
     await maybeApplyOnboardingFilterDefaults(prefs);
@@ -1367,6 +1376,9 @@ class Database {
     }
     await _refreshSoftDiscoveryPool();
     preparePlaylist();
+    // Pre-warm the collection-lookup cache in the background so the
+    // stats page doesn't block on loading 6 asset files.
+    getCollectionLookup();
   }
 
   /// SharedPreferences key gating the one-shot application of
@@ -1488,12 +1500,9 @@ class Database {
       return '${entry.finished ?? "unfinished"}|$canonical';
     }
 
-    final raw = await _readRawStatsFromStorage();
     final Map<String, String> byKey = {};
-    for (final line in raw) {
-      final entry = StatEntry.parse(line);
-      if (entry == null) continue;
-      byKey[historyKey(entry)] = line;
+    for (final entry in _allStats) {
+      byKey[historyKey(entry)] = entry.toString();
     }
     final fromSession = getStats();
     for (final line in fromSession) {
@@ -1523,6 +1532,10 @@ class Database {
 
   Future<void> writeStats() async {
     final merged = await _mergedStatHistory();
+    _allStats = merged
+        .map((line) => StatEntry.parse(line))
+        .whereType<StatEntry>()
+        .toList();
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList("stats", merged);
@@ -1836,6 +1849,7 @@ class Database {
   /// [Settings] is intentionally left alone (it's outside the scope of
   /// "stats").
   Future<void> clearAllStats() async {
+    _allStats = [];
     for (final puz in puzzles) {
       puz.played = false;
       puz.finished = null;
@@ -2406,8 +2420,10 @@ class Database {
         if (statsDirectory != null) statsDirectoryError = '$e';
       }
     }
-    final allStats = await _readRawStatsFromStorage();
-    loadStats(allStats);
+    _allStats.addAll(
+      validLines.map((line) => StatEntry.parse(line)).whereType<StatEntry>(),
+    );
+    loadStats(_allStats);
     preparePlaylist();
     return validLines.length;
   }
@@ -2425,6 +2441,11 @@ class Database {
   /// surface its previous entry (or nothing) instead of the just-recorded
   /// timings.
   Future<List<String>> getAllStats() => _mergedStatHistory();
+
+  /// All stat entries across every collection, in-memory cached form.
+  /// Avoids the serialize-parse round-trip that [getAllStats] performs.
+  /// Use this from the stats page; use [getAllStats] for export/share.
+  List<StatEntry> getAllStatEntries() => _allStats;
 
   String _playlistFileName(String slug) =>
       slug == 'custom' ? 'custom.txt' : 'playlist_$slug.txt';

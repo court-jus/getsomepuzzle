@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
 import 'helpers/onboarding_completions.dart';
 
@@ -510,11 +511,13 @@ void main() {
     // vary the grid height instead — a structural field that survives
     // canonicalization and can't alias another via rotation (rotation
     // preserves the {w, h} set).
-    List<String> nFinishedStatLines(int n) => List.generate(n, (i) {
+    List<StatEntry> nFinishedStatLines(int n) => List.generate(n, (i) {
       final height = i + 4;
       final prefill = '0' * (4 * height);
-      return '2026-01-0${(i % 9) + 1}T12:00:00 30s 0f '
-          'v2_12_4x${height}_${prefill}_FM:1_0:0_$i';
+      return StatEntry.parse(
+        '2026-01-0${(i % 9) + 1}T12:00:00 30s 0f '
+        'v2_12_4x${height}_${prefill}_FM:1_0:0_$i',
+      )!;
     });
 
     const enough = 40;
