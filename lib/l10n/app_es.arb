@@ -130,6 +130,8 @@
     "constraintGroupSize": "tamaño de grupo",
     "constraintLetterGroup": "grupo de letras",
     "constraintMajority": "color mayoritario",
+    "constraintColumnMajority": "mayoría columna",
+    "constraintRowMajority": "mayoría fila",
     "constraintParity": "paridad",
     "constraintQuantity": "cantidad",
     "constraintGroupCount": "número de grupos",
@@ -180,6 +182,10 @@
     "constraintExplainLineCount": "Un número dentro de un círculo al lado de una fila o columna indica cuántas celdas de ese color deben aparecer en esa línea.",
     "@constraintExplainLineCount": {
         "description": "Body of the new-constraint explanation modal for the merged line count constraint (CC/RC)"
+    },
+    "constraintExplainLineMajority": "Círculos concéntricos de colores al lado de una fila o columna imponen un orden estricto de colores por cantidad: el color exterior debe tener más celdas que el siguiente, y así sucesivamente.",
+    "@constraintExplainLineMajority": {
+        "description": "Body of the new-constraint explanation modal for the line majority constraint (JC/JR)"
     },
     "constraintExplainTransition": "Una onda cuadrada con un número al lado de una fila o columna indica cuántos cambios de color deben aparecer en esa línea. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la línea es de un solo color.",
     "@constraintExplainTransition": {

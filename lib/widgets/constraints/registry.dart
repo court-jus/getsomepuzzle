@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
@@ -17,6 +19,7 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/column_majority.dart';
 import 'package:getsomepuzzle/widgets/constraints/implication.dart';
 import 'package:getsomepuzzle/widgets/constraints/eyes.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
@@ -129,6 +132,14 @@ final constraintUIRegistry =
         ),
       ),
       (
+        slug: 'JC',
+        label: 'Column majority',
+        buildPreview: (fg, size) => MajorityIndicatorWidget(
+          constraint: ColumnMajorityConstraint('0.21'),
+          cellSize: size,
+        ),
+      ),
+      (
         slug: 'CH',
         label: 'Chain',
         buildPreview: (fg, size) => ChainWidget(
@@ -188,6 +199,14 @@ final constraintUIRegistry =
             ImplicationWidget(fgcolor: fg, cellSize: size),
       ),
       (
+        slug: 'JR',
+        label: 'Row majority',
+        buildPreview: (fg, size) => MajorityIndicatorWidget(
+          constraint: RowMajorityConstraint('0.21'),
+          cellSize: size,
+        ),
+      ),
+      (
         slug: 'BB',
         label: 'Bounding box',
         buildPreview: (fg, size) => BoundingBoxWidget(
@@ -219,6 +238,10 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintLetterGroup;
     case 'MJ':
       return l.constraintMajority;
+    case 'JC':
+      return l.constraintColumnMajority;
+    case 'JR':
+      return l.constraintRowMajority;
     case 'QA':
       return l.constraintQuantity;
     case 'SY':

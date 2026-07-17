@@ -700,6 +700,18 @@ abstract class AppLocalizations {
   /// **'majority color'**
   String get constraintMajority;
 
+  /// Name of the column majority constraint
+  ///
+  /// In en, this message translates to:
+  /// **'column majority'**
+  String get constraintColumnMajority;
+
+  /// Name of the row majority constraint
+  ///
+  /// In en, this message translates to:
+  /// **'row majority'**
+  String get constraintRowMajority;
+
   /// Name of the parity constraint
   ///
   /// In en, this message translates to:
@@ -1389,6 +1401,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A circled number beside a row or column tells how many cells of that color must appear in that line.'**
   String get constraintExplainLineCount;
+
+  /// Body of the new-constraint explanation modal for the line majority constraint (JC/JR)
+  ///
+  /// In en, this message translates to:
+  /// **'Colored concentric circles beside a row or column enforce a strict ordering of colors by count: the outermost color must have more cells than the next, and so on.'**
+  String get constraintExplainLineMajority;
 
   /// Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)
   ///

@@ -458,6 +458,14 @@
     "@constraintMajority": {
         "description": "Name of the majority zone constraint"
     },
+    "constraintColumnMajority": "column majority",
+    "@constraintColumnMajority": {
+        "description": "Name of the column majority constraint"
+    },
+    "constraintRowMajority": "row majority",
+    "@constraintRowMajority": {
+        "description": "Name of the row majority constraint"
+    },
     "constraintParity": "parity",
     "@constraintParity": {
         "description": "Name of the parity constraint"
@@ -797,6 +805,10 @@
     "constraintExplainLineCount": "A circled number beside a row or column tells how many cells of that color must appear in that line.",
     "@constraintExplainLineCount": {
         "description": "Body of the new-constraint explanation modal for the merged line count constraint (CC/RC)"
+    },
+    "constraintExplainLineMajority": "Colored concentric circles beside a row or column enforce a strict ordering of colors by count: the outermost color must have more cells than the next, and so on.",
+    "@constraintExplainLineMajority": {
+        "description": "Body of the new-constraint explanation modal for the line majority constraint (JC/JR)"
     },
     "constraintExplainTransition": "A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.",
     "@constraintExplainTransition": {

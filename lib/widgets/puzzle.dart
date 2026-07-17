@@ -8,8 +8,10 @@ import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
@@ -21,6 +23,7 @@ import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/column_majority.dart';
 import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/puzzle_grid_stack.dart';
@@ -237,6 +240,22 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       }
     }
 
+    // Build a map of column index → ColumnMajorityConstraint for JC in column header
+    final jcByColumn = <int, ColumnMajorityConstraint>{};
+    for (final c in widget.currentPuzzle.constraints) {
+      if (c is ColumnMajorityConstraint) {
+        jcByColumn[c.columnIdx] = c;
+      }
+    }
+
+    // Build a map of row index → RowMajorityConstraint for JR in left-side bar
+    final jrByRow = <int, RowMajorityConstraint>{};
+    for (final c in widget.currentPuzzle.constraints) {
+      if (c is RowMajorityConstraint) {
+        jrByRow[c.rowIdx] = c;
+      }
+    }
+
     // Collect all highlighted constraints for multi-arrow rendering
     final highlightedConstraints = widget.currentPuzzle.constraints
         .where((c) => c.isHighlighted)
@@ -385,8 +404,10 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Left side: RC and RT indicators
-                    if (rcByRow.isNotEmpty || rtByRow.isNotEmpty)
+                    // Left side: RC, RT and JR indicators
+                    if (rcByRow.isNotEmpty ||
+                        rtByRow.isNotEmpty ||
+                        jrByRow.isNotEmpty)
                       Column(
                         children: [
                           for (
@@ -395,7 +416,8 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                             row++
                           )
                             if (rcByRow.containsKey(row) ||
-                                rtByRow.containsKey(row))
+                                rtByRow.containsKey(row) ||
+                                jrByRow.containsKey(row))
                               Column(
                                 children: [
                                   if (rcByRow.containsKey(row))
@@ -421,6 +443,17 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                       cellSize: adjustedCellSize,
                                       axis: Axis.horizontal,
                                     ),
+                                  if (jrByRow.containsKey(row))
+                                    MajorityIndicatorWidget(
+                                      key: jrByRow[row]!.isHighlighted
+                                          ? _arrowKeys.putIfAbsent(
+                                              jrByRow[row]!,
+                                              () => GlobalKey(),
+                                            )
+                                          : null,
+                                      constraint: jrByRow[row]!,
+                                      cellSize: adjustedCellSize,
+                                    ),
                                 ],
                               )
                             else
@@ -430,10 +463,12 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                               ),
                         ],
                       ),
-                    // Right side: CC row + Grid
+                    // Right side: CC, CT, JC row + Grid
                     Column(
                       children: [
-                        if (ccByColumn.isNotEmpty || ctByCol.isNotEmpty)
+                        if (ccByColumn.isNotEmpty ||
+                            ctByCol.isNotEmpty ||
+                            jcByColumn.isNotEmpty)
                           SizedBox(
                             width: gridWidth,
                             child: Row(
@@ -444,7 +479,8 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                   col++
                                 )
                                   if (ccByColumn.containsKey(col) ||
-                                      ctByCol.containsKey(col))
+                                      ctByCol.containsKey(col) ||
+                                      jcByColumn.containsKey(col))
                                     SizedBox(
                                       width: adjustedCellSize,
                                       child: Column(
@@ -471,6 +507,18 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                                     )
                                                   : null,
                                               constraint: ccByColumn[col]!,
+                                              cellSize: adjustedCellSize,
+                                            ),
+                                          if (jcByColumn.containsKey(col))
+                                            MajorityIndicatorWidget(
+                                              key:
+                                                  jcByColumn[col]!.isHighlighted
+                                                  ? _arrowKeys.putIfAbsent(
+                                                      jcByColumn[col]!,
+                                                      () => GlobalKey(),
+                                                    )
+                                                  : null,
+                                              constraint: jcByColumn[col]!,
                                               cellSize: adjustedCellSize,
                                             ),
                                         ],

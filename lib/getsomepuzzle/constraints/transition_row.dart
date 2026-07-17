@@ -1,6 +1,7 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_utils.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
@@ -38,6 +39,7 @@ final class RowTransitionConstraint extends LineCentricConstraint {
   @override
   bool conflictsWith(Constraint other) {
     if (other is RowCountConstraint && other.rowIdx == rowIdx) return true;
+    if (other is RowMajorityConstraint && other.rowIdx == rowIdx) return true;
     return false;
   }
 

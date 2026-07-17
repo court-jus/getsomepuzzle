@@ -34,6 +34,7 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/bounding_box_dialog.da
 import 'package:getsomepuzzle/widgets/create_page/dialogs/cell_actions_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/chain_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/column_count_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/column_majority_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/confirm_delete_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/constraint_type_picker.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/different_from_dialog.dart';
@@ -46,6 +47,7 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/parity_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/playlist_name_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/quantity_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/row_count_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/row_majority_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/symmetry_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/transition_dialog.dart';
 import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
@@ -483,12 +485,28 @@ class _CreatePageState extends State<CreatePage> {
           width: _width,
           height: _height,
         );
+      case 'JC':
+        added = await showColumnMajorityDialog(
+          context,
+          cellIdx: cellIdx,
+          width: _width,
+          height: _height,
+          domain: defaultDomain,
+        );
       case 'RC':
         added = await showRowCountDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+        );
+      case 'JR':
+        added = await showRowMajorityDialog(
+          context,
+          cellIdx: cellIdx,
+          width: _width,
+          height: _height,
+          domain: defaultDomain,
         );
       case 'RT':
         added = await showRowTransitionDialog(

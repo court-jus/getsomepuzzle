@@ -86,11 +86,13 @@ void main() {
         'RT',
         'SY',
         'SH',
+        'JC',
         'CH',
         'CT',
         'GC',
         'MJ',
         'IM',
+        'JR',
         'BB',
       ]);
     });

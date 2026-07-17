@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_utils.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_majority.dart';
 
 final class ColumnTransitionConstraint extends LineCentricConstraint {
   @override
@@ -38,6 +39,9 @@ final class ColumnTransitionConstraint extends LineCentricConstraint {
   @override
   bool conflictsWith(Constraint other) {
     if (other is ColumnCountConstraint && other.columnIdx == columnIdx) {
+      return true;
+    }
+    if (other is ColumnMajorityConstraint && other.columnIdx == columnIdx) {
       return true;
     }
     return false;

@@ -115,6 +115,9 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainLT;
     case 'MJ':
       return l.constraintExplainMJ;
+    case 'JC':
+    case 'JR':
+      return l.constraintExplainLineMajority;
     case 'QA':
       return l.constraintExplainQA;
     case 'SY':

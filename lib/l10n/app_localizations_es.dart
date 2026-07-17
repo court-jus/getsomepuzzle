@@ -346,6 +346,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintMajority => 'color mayoritario';
 
   @override
+  String get constraintColumnMajority => 'mayoría columna';
+
+  @override
+  String get constraintRowMajority => 'mayoría fila';
+
+  @override
   String get constraintParity => 'paridad';
 
   @override
@@ -726,6 +732,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get constraintExplainLineCount =>
       'Un número dentro de un círculo al lado de una fila o columna indica cuántas celdas de ese color deben aparecer en esa línea.';
+
+  @override
+  String get constraintExplainLineMajority =>
+      'Círculos concéntricos de colores al lado de una fila o columna imponen un orden estricto de colores por cantidad: el color exterior debe tener más celdas que el siguiente, y así sucesivamente.';
 
   @override
   String get constraintExplainTransition =>

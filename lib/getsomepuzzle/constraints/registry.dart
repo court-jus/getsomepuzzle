@@ -3,8 +3,10 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/column_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
@@ -104,6 +106,12 @@ final constraintRegistry =
         generateAllParameters: ColumnCountConstraint.generateAllParameters,
       ),
       (
+        slug: 'JC',
+        label: 'Column majority',
+        fromParams: ColumnMajorityConstraint.new,
+        generateAllParameters: ColumnMajorityConstraint.generateAllParameters,
+      ),
+      (
         slug: 'CH',
         label: 'Chain',
         fromParams: ChainConstraint.new,
@@ -144,6 +152,12 @@ final constraintRegistry =
         label: 'Implication',
         fromParams: ImplicationConstraint.new,
         generateAllParameters: ImplicationConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'JR',
+        label: 'Row majority',
+        fromParams: RowMajorityConstraint.new,
+        generateAllParameters: RowMajorityConstraint.generateAllParameters,
       ),
       (
         slug: 'BB',

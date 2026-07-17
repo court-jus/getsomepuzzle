@@ -73,3 +73,6 @@ tmp
 puzzle_vectors.csv
 solve_traces.tsv
 assets/attemptStalled.txt
+assets/noCandidates.txt
+assets/requiredMissing.txt
+assets/syPrefillFailed.txt

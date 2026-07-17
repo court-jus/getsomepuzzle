@@ -20,6 +20,8 @@ const Map<String, String> kConstraintFamily = {
   'CC': 'line-centric',
   'CT': 'line-centric',
   'PA': 'line-centric',
+  'JC': 'line-centric',
+  'JR': 'line-centric',
   // local: forbidden motifs / adjacency / immediate-neighbourhood counting.
   'FM': 'local',
   'DF': 'local',

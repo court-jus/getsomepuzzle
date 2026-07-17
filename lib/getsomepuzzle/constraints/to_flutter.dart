@@ -16,6 +16,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
+import 'package:getsomepuzzle/widgets/constraints/column_majority.dart';
 import 'package:getsomepuzzle/widgets/constraints/eyes.dart';
 import 'package:getsomepuzzle/widgets/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
@@ -73,6 +74,17 @@ Widget constraintToFlutter(
   }
   if (constraint is ChainConstraint) {
     return _chainWidget(constraint, fgcolor, cellSize, count);
+  }
+  if (constraint is JRCConstraint) {
+    final double widgetSize = cellSize / count;
+    return SizedBox(
+      width: widgetSize,
+      height: widgetSize,
+      child: MajorityIndicatorWidget(
+        constraint: constraint,
+        cellSize: widgetSize,
+      ),
+    );
   }
   if (constraint is RowTransitionConstraint) {
     return _transitionWidget(constraint, cellSize, count, Axis.horizontal);

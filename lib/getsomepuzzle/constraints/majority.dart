@@ -1,5 +1,6 @@
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/majority_util.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 class MajorityConstraint extends Constraint {
@@ -44,9 +45,8 @@ class MajorityConstraint extends Constraint {
 
   int get zoneSize => (r1 - r0 + 1) * (c1 - c0 + 1);
 
-  /// Minimum target-color cells needed for strict majority:
-  /// floor(N/2) + 1 = (N ~/ 2) + 1
-  int get target => (zoneSize ~/ 2) + 1;
+  /// Minimum target-color cells needed for strict majority.
+  int get target => majorityTarget(zoneSize);
 
   @override
   String toString() => 'MJ';
