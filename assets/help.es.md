@@ -86,6 +86,10 @@ Un número en un círculo a la izquierda de una fila indica cuántas celdas de e
 
 Una onda cuadrada con un número dentro de un cuadrado a la izquierda de una fila indica cuántos cambios de color deben aparecer en esa fila. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la fila es de un solo color.
 
+### Mayoría columna / Mayoría fila
+
+Círculos concéntricos de colores al lado de una fila o columna imponen un orden estricto de colores por cantidad: el color exterior debe tener más celdas que el siguiente, y así sucesivamente.
+
 ### Número de grupos
 
 Un número en un cuadro con un icono de enlace indica cuántos grupos (componentes conectados) de ese color deben estar en la solución.
@@ -171,6 +175,8 @@ En el escritorio, estas teclas controlan un puzle mientras juegas:
 La página de ajustes configura cómo el juego comprueba tu trabajo y te ayuda.
 
 **Idioma**: elige el idioma de visualización de la aplicación (inglés, francés o español).
+
+**Tema**: elegir entre Claro, Oscuro, o seguir la configuración del sistema (predeterminado).
 
 **Validación**: elige si la cuadrícula se comprueba manualmente (tocas un botón) o automáticamente (en cuanto se rellena por completo).
 

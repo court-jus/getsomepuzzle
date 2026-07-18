@@ -86,6 +86,10 @@ A number in a circle to the left of a row indicates how many cells of that color
 
 A square wave with a number in a square beside a row tells how many color changes (transitions) must appear in that row. Each step of the wave is one change; a flat wave with 0 means the whole row is a single color.
 
+### Column majority / Row majority
+
+Colored concentric circles beside a row or column enforce a strict ordering of colors by count: the outermost color must have more cells than the next, and so on.
+
 ### Group count
 
 A number in a box with a link icon indicates how many groups (connected components) of that color must be in the solution.
@@ -171,6 +175,8 @@ On desktop, these keys control a puzzle while you play:
 The settings page tunes how the game checks your work and asks for help.
 
 **Language**: choose the app's display language (English, French or Spanish).
+
+**Theme**: choose between Light, Dark, or follow the system setting (default).
 
 **Validation**: choose whether the grid is checked manually (you tap a button) or automatically (as soon as it is fully filled).
 

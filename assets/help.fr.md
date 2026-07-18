@@ -86,6 +86,10 @@ Un nombre dans un cercle à gauche d'une ligne indique combien de cellules de ce
 
 Une onde carrée avec un nombre dans un carré à gauche d'une ligne indique combien de changements de couleur doivent apparaître dans cette ligne. Chaque marche de l'onde est un changement ; une onde plate avec 0 signifie que toute la ligne est d'une seule couleur.
 
+### Majorité colonne / Majorité ligne
+
+Des cercles concentriques colorés à côté d'une ligne ou d'une colonne imposent un ordre strict des couleurs par nombre : la couleur la plus extérieure doit avoir plus de cellules que la suivante, et ainsi de suite.
+
 ### Nombre de groupes
 
 Un nombre dans un cadre avec une icône de lien indique combien de groupes (composantes connectées) de cette couleur doivent être dans la solution.
@@ -171,6 +175,8 @@ Sur ordinateur, ces touches pilotent un puzzle pendant que vous jouez :
 La page Paramètres règle la façon dont le jeu vérifie votre travail et vous aide.
 
 **Langue** : choisissez la langue d'affichage (Anglais, Français ou Espagnol).
+
+**Thème** : choisir entre Clair, Sombre, ou suivre le réglage système (par défaut).
 
 **Validation** : choisissez si la grille est vérifiée manuellement (vous appuyez sur un bouton) ou automatiquement (dès qu'elle est entièrement remplie).
 
