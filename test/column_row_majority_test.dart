@@ -74,6 +74,13 @@ void main() {
     });
 
     group('verify — domain 3', () {
+      test('middle colour not pruned by max bound → true', () {
+        // 9×1 row: [1,1,0,0,0,2,2,2,2], JR:0.123 (black > white > purple)
+        // black=2, white=4, purple=0, 3 free → white=4 ≤ maxs[white]=4
+        final p = makePuzzle3('110002222');
+        expect(RowMajorityConstraint('0.123').verify(p), isTrue);
+      });
+
       test('complete with correct ordering → true', () {
         // col 0: [1,1,1,2,2] → black=3, white=2, purple=0 → 3>2>0 ✓
         final p = makePuzzle3('123\n123\n123\n223\n223');
