@@ -1375,13 +1375,15 @@ enum _DetailedCategory {
   unsolvable,
   nonUnique,
   needsBacktrack,
-  cachedMismatch;
+  cachedMismatch,
+  conflict;
 
   String get label => switch (this) {
     _DetailedCategory.unsolvable => 'UNSOLVABLE',
     _DetailedCategory.nonUnique => 'NON-UNIQUE',
     _DetailedCategory.needsBacktrack => 'NEEDS-BACKTRACK',
     _DetailedCategory.cachedMismatch => 'CACHED MISMATCH',
+    _DetailedCategory.conflict => 'CONFLICT',
   };
 }
 
@@ -1457,6 +1459,37 @@ Future<void> _runCheck(
       // still snapshot the value here to make the dependency explicit and
       // protect against future changes to the solver.
       final lineCachedSolution = p.cachedSolution;
+
+      bool hasConflict = false;
+      String? conflictDesc;
+      for (int ai = 0; ai < p.constraints.length && !hasConflict; ai++) {
+        for (int bi = ai + 1; bi < p.constraints.length && !hasConflict; bi++) {
+          if (p.constraints[ai].conflictsWith(p.constraints[bi]) ||
+              p.constraints[bi].conflictsWith(p.constraints[ai])) {
+            hasConflict = true;
+            conflictDesc = '${p.constraints[ai]} <-> ${p.constraints[bi]}';
+          }
+        }
+      }
+      if (hasConflict) {
+        invalid++;
+        if (detailed) {
+          categoryCounts[_DetailedCategory.conflict] =
+              categoryCounts[_DetailedCategory.conflict]! + 1;
+          badSink.writeln(
+            '# INVALID (${_DetailedCategory.conflict.label} — $conflictDesc)',
+          );
+        } else {
+          badSink.writeln('# INVALID (conflicting constraints)');
+        }
+        badSink.writeln(line);
+        if ((i + 1) % 10 == 0 || i + 1 == lines.length) {
+          stats = _CollectionStats.fromLines(goodLines);
+          render();
+        }
+        continue;
+      }
+
       if (p.isDeductivelyUnique()) {
         if (detailed && lineCachedSolution != null) {
           // Re-solve on a fresh clone to obtain the deduced completion,
@@ -1515,6 +1548,7 @@ Future<void> _runCheck(
             _DetailedCategory.needsBacktrack =>
               '1 solution found but solver can\'t deduce it',
             _DetailedCategory.cachedMismatch => '',
+            _DetailedCategory.conflict => '',
           };
           badSink.writeln('# INVALID (${cat.label} — $detail)');
         } else {
