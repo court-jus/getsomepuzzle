@@ -31,8 +31,9 @@ class ColorDot extends StatelessWidget {
     final pc = Theme.of(context).extension<PuzzleColors>()!;
     final loc = AppLocalizations.of(context)!;
     final color = pc.constraintColors[value] ?? pc.constraintInvalid;
-    final borderColor =
-        selected ? Theme.of(context).colorScheme.primary : Colors.black54;
+    final borderColor = selected
+        ? Theme.of(context).colorScheme.primary
+        : Colors.black54;
 
     return Tooltip(
       message: _colorName(loc, value),
@@ -44,10 +45,7 @@ class ColorDot extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: color,
-            border: Border.all(
-              color: borderColor,
-              width: selected ? 2.5 : 0.5,
-            ),
+            border: Border.all(color: borderColor, width: selected ? 2.5 : 0.5),
           ),
         ),
       ),

@@ -90,8 +90,10 @@ Future<BoundingBoxConstraint?> showBoundingBoxDialog(
             child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
           ),
           TextButton(
-            onPressed: () =>
-                Navigator.pop(ctx, BoundingBoxConstraint('${cellValueToString(color)}.$w.$h')),
+            onPressed: () => Navigator.pop(
+              ctx,
+              BoundingBoxConstraint('${cellValueToString(color)}.$w.$h'),
+            ),
             child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
           ),
         ],

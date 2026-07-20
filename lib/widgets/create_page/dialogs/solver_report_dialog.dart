@@ -39,13 +39,16 @@ class _SolverReportDialogBodyState extends State<_SolverReportDialogBody> {
   @override
   void initState() {
     super.initState();
-    widget.solverFuture.then((report) {
-      if (mounted) setState(() => _report = report);
-    }, onError: (Object error, StackTrace stackTrace) {
-      // Without this the dialog would sit on the spinner forever.
-      debugPrint('[editor] solver report failed: $error');
-      if (mounted) Navigator.pop(context);
-    });
+    widget.solverFuture.then(
+      (report) {
+        if (mounted) setState(() => _report = report);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        // Without this the dialog would sit on the spinner forever.
+        debugPrint('[editor] solver report failed: $error');
+        if (mounted) Navigator.pop(context);
+      },
+    );
   }
 
   @override
@@ -134,10 +137,12 @@ class _SolverReportDialogBodyState extends State<_SolverReportDialogBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(loc.createSolverDeducible(
-          report.deducedCount.toString(),
-          report.totalFreeCells.toString(),
-        )),
+        Text(
+          loc.createSolverDeducible(
+            report.deducedCount.toString(),
+            report.totalFreeCells.toString(),
+          ),
+        ),
         if (report.bruteForceCount > 0)
           Padding(
             padding: const EdgeInsets.only(left: 16),
@@ -159,8 +164,9 @@ class _SolverReportDialogBodyState extends State<_SolverReportDialogBody> {
     );
     final collectionKey = levelToPlayableCollectionKey[level];
     final labels = CollectionLabels.fromLocalizations(loc);
-    final collectionLabel =
-        collectionKey != null ? labels.labelFor(collectionKey) : null;
+    final collectionLabel = collectionKey != null
+        ? labels.labelFor(collectionKey)
+        : null;
     return loc.createSolverValid(collectionLabel ?? '?');
   }
 }

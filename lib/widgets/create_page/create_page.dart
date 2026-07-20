@@ -460,10 +460,7 @@ class _CreatePageState extends State<CreatePage> {
     Constraint? added;
     switch (slug) {
       case 'FM':
-        added = await showForbiddenMotifDialog(
-          context,
-          domain: _domain,
-        );
+        added = await showForbiddenMotifDialog(context, domain: _domain);
       case 'PA':
         added = await showParityDialog(
           context,
@@ -555,10 +552,7 @@ class _CreatePageState extends State<CreatePage> {
           domain: _domain,
         );
       case 'SH':
-        added = await showShapeDialog(
-          context,
-          domain: _domain,
-        );
+        added = await showShapeDialog(context, domain: _domain);
       case 'SY':
         added = await showSymmetryDialog(context, cellIdx: cellIdx);
       case 'DF':
@@ -620,10 +614,7 @@ class _CreatePageState extends State<CreatePage> {
         });
         return;
       case 'CH':
-        added = await showChainDialog(
-          context,
-          domain: _domain,
-        );
+        added = await showChainDialog(context, domain: _domain);
       case 'BB':
         added = await showBoundingBoxDialog(
           context,
@@ -734,7 +725,9 @@ class _CreatePageState extends State<CreatePage> {
       return;
     }
     _addConstraint(
-      MajorityConstraint('$rMin.$cMin.$rMax.$cMax.${cellValueToString(_majorityZoneColor)}'),
+      MajorityConstraint(
+        '$rMin.$cMin.$rMax.$cMax.${cellValueToString(_majorityZoneColor)}',
+      ),
     );
     setState(() {
       _majorityZoneMode = false;
@@ -876,7 +869,11 @@ class _CreatePageState extends State<CreatePage> {
                   ),
                   TextButton.icon(
                     onPressed: _validatePuzzle,
-                    icon: const Icon(Icons.check, color: Colors.white, size: 16),
+                    icon: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                     label: Text(
                       loc.createValidate,
                       style: const TextStyle(color: Colors.white),

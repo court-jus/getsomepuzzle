@@ -73,7 +73,8 @@ Future<String?> _showMotifDialog(
                               GestureDetector(
                                 onTap: () {
                                   setDialogState(() {
-                                    grid[row][col] = (grid[row][col] + 1) %
+                                    grid[row][col] =
+                                        (grid[row][col] + 1) %
                                         (domain.length + 1);
                                   });
                                 },

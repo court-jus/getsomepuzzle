@@ -24,5 +24,7 @@ Future<ColumnCountConstraint?> showColumnCountDialog(
     domain: domain,
   );
   if (result == null) return null;
-  return ColumnCountConstraint('$cidx.${cellValueToString(result.$1)}.${result.$2}');
+  return ColumnCountConstraint(
+    '$cidx.${cellValueToString(result.$1)}.${result.$2}',
+  );
 }

@@ -24,5 +24,7 @@ Future<EyesConstraint?> showEyesDialog(
     domain: domain,
   );
   if (result == null) return null;
-  return EyesConstraint('$cellIdx.${cellValueToString(result.$1)}.${result.$2}');
+  return EyesConstraint(
+    '$cellIdx.${cellValueToString(result.$1)}.${result.$2}',
+  );
 }

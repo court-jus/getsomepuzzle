@@ -24,5 +24,7 @@ Future<RowCountConstraint?> showRowCountDialog(
     domain: domain,
   );
   if (result == null) return null;
-  return RowCountConstraint('$ridx.${cellValueToString(result.$1)}.${result.$2}');
+  return RowCountConstraint(
+    '$ridx.${cellValueToString(result.$1)}.${result.$2}',
+  );
 }

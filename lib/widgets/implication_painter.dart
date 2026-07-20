@@ -120,10 +120,13 @@ class ImplicationPainter extends CustomPainter {
           tgtCenter.dy,
         );
       if (needsBorder) {
-        canvas.drawPath(path, Paint()
-          ..color = grayoutColor
-          ..strokeWidth = strokeWidth + 2.0
-          ..style = PaintingStyle.stroke);
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = grayoutColor
+            ..strokeWidth = strokeWidth + 2.0
+            ..style = PaintingStyle.stroke,
+        );
       }
       canvas.drawPath(path, paint);
 

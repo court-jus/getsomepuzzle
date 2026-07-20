@@ -30,5 +30,7 @@ Future<NeighborCountConstraint?> showNeighborCountDialog(
     domain: domain,
   );
   if (result == null) return null;
-  return NeighborCountConstraint('$cellIdx.${cellValueToString(result.$1)}.${result.$2}');
+  return NeighborCountConstraint(
+    '$cellIdx.${cellValueToString(result.$1)}.${result.$2}',
+  );
 }

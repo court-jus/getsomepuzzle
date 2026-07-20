@@ -30,7 +30,9 @@ Future<ChainConstraint?> showChainDialog(
                 child: TextButton.icon(
                   onPressed: () => Navigator.pop(
                     ctx,
-                    ChainConstraint('${cellValueToString(opt.$1)}.${opt.$2}.${opt.$3}'),
+                    ChainConstraint(
+                      '${cellValueToString(opt.$1)}.${opt.$2}.${opt.$3}',
+                    ),
                   ),
                   icon: SizedBox(
                     width: 40,
