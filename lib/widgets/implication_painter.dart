@@ -47,6 +47,7 @@ class ImplicationPainter extends CustomPainter {
 
       final Color arrowColor;
       double strokeWidth;
+      bool needsBorder = false;
       if (!constraint.isValid) {
         arrowColor = invalidColor; // solarized red
         strokeWidth = 4.0;
@@ -61,6 +62,7 @@ class ImplicationPainter extends CustomPainter {
         // visual identification.
         arrowColor = constraintColors[constraint.color] ?? invalidColor;
         strokeWidth = 4.0;
+        needsBorder = true;
       }
 
       final paint = Paint()
@@ -117,6 +119,12 @@ class ImplicationPainter extends CustomPainter {
           tgtCenter.dx,
           tgtCenter.dy,
         );
+      if (needsBorder) {
+        canvas.drawPath(path, Paint()
+          ..color = grayoutColor
+          ..strokeWidth = strokeWidth + 2.0
+          ..style = PaintingStyle.stroke);
+      }
       canvas.drawPath(path, paint);
 
       // Arrowhead: tangent at the endpoint (roughly direction from ctrl2 to tgt)
@@ -136,6 +144,21 @@ class ImplicationPainter extends CustomPainter {
         ..lineTo(p1.dx, p1.dy)
         ..lineTo(p2.dx, p2.dy)
         ..close();
+      if (needsBorder) {
+        canvas.drawPath(
+          headPath,
+          Paint()
+            ..color = grayoutColor
+            ..style = PaintingStyle.fill,
+        );
+        canvas.drawPath(
+          headPath,
+          Paint()
+            ..color = grayoutColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5,
+        );
+      }
       canvas.drawPath(
         headPath,
         Paint()
