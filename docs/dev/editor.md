@@ -2,8 +2,8 @@
 
 The editor (`CreatePage`, `lib/widgets/create_page/create_page.dart`) lets a
 player author a puzzle by hand: choose a grid size, fix cells black/white, attach
-constraints, watch the solver react live, then **test** the puzzle (play it
-immediately) or **save** it into a writable playlist.
+constraints, validate it with the solver on demand, then **test** the puzzle
+(play it immediately) or **save** it into a writable playlist.
 
 It is the manual counterpart to the generator (`docs/dev/generator.md`): same
 `Puzzle` model and solver, driven by taps instead of search.
@@ -30,9 +30,9 @@ All editing state lives in `_CreatePageState`:
 - **Two-tap authoring modes** — `_letterGroupMode` (+ `_letterGroupLetter`,
   `_letterGroupIndices`) and `_majorityZoneMode` (+ `_majorityZoneColor`,
   `_majorityZoneFirstIdx`). See *Adding constraints*.
-- **Live-solve output** — `_propagationCells`, `_forceCells` (cell-border
-  colouring), `_solvedValues` (corner hints), `_autoComplexity`,
-  `_autoImpossibleBy`, `_autoSolving`, debounced by `_solveDebounce`.
+- **Solver feedback** — `_propagationCells`, `_forceCells` (cell-border
+  colouring) and `_solvedValues` (corner hints), populated by the last
+  validation run and cleared on the next edit.
 - **Save target** — `_targetPlaylist`.
 
 ### Surviving navigation
@@ -56,9 +56,9 @@ for (final entry in _fixedCells.entries) {
 p.replaceConstraints(_constraints);
 ```
 
-It is cheap and side-effect-free, so it is called freely — once per live solve,
-once per grid build (for the background painter), and on test/save. The domain is
-always `defaultDomain` (two colours).
+It is cheap and side-effect-free, so it is called freely — once per validation
+run, once per grid build (for the background painter), and on test/save. The
+domain is always `defaultDomain` (two colours).
 
 ## Rendering
 
@@ -89,8 +89,8 @@ painters render identically to the game.
   background painter; `readonly: isFixed`).
 - **border** — amber for the active LT/MJ selection, else green for a
   `_propagationCells` cell, else orange for a `_forceCells` cell.
-- **corner indicator** — `cornerIndicatorValue` shows the solved colour
-  (`_solvedValues`) on non-fixed cells, previewing the unique solution.
+- **corner indicator** — `cornerIndicatorValue` shows the deduced colour
+  (`_solvedValues`) on non-fixed cells, previewing the solution.
 - **tap** — `_onCellTap`. The drag/secondary callbacks are no-ops (the editor
   never colours by dragging).
 
@@ -141,35 +141,105 @@ multiple cells:
   dialog → `showDeleteConstraintPicker`.
 - **MJ zones** — tapping a cell inside them → `_showMjDeletePicker`.
 
-All removals go through `_removeConstraint`, which re-triggers a live solve.
+All removals go through `_removeConstraint`, which also clears the solver
+feedback.
 
-## Live solve
+## Solver validation
 
-Every mutation (`_addConstraint`, `_removeConstraint`, `_setFixedCell`,
-load) calls `_scheduleAutoSolve`:
+A **Validate** button (`createValidate` l10n key) in the `BottomAppBar`
+runs the solver on demand and opens a modal report dialog. Every edit
+(`_addConstraint`, `_removeConstraint`, `_setFixedCell`, puzzle load)
+calls `_clearSolveFeedback()` inside its `setState`, which empties the
+feedback sets and resets every constraint's `isValid` to `true` — the
+grid only ever displays the outcome of the latest validation run on the
+current puzzle.
 
-1. Mark `_autoSolving`, reset every constraint's `isValid` to `true` (clears the
-   previous orange culprit highlight), and `debugPrint` the current line export.
-2. After a **500 ms debounce**, `_autoSolve` builds the puzzle and runs
-   `_solvePuzzle` in a `compute()` isolate.
+### Dialog
 
-`_solvePuzzle` mirrors `Puzzle.solveExplained`'s loop (capped at 1000 steps /
-10 s) but also returns the `serialize()` of whatever raised an `Impossible`
-(`impossibleBy`). Each step is classified:
+`showSolverReportDialog` (`dialogs/solver_report_dialog.dart`) is a
+stateful `AlertDialog` with two phases:
 
-- `SetValue` and non-force `RemoveOption` → **propagation** (green border).
-- force `RemoveOption` (`isForce`) → **force** (orange border).
+1. **Progress** — a `CircularProgressIndicator` plus the
+   `createSolverChecking` label, while the solver runs in a `compute()`
+   isolate (`_solvePuzzle`). The dialog cannot be dismissed
+   (`barrierDismissible: false`, no close button); a solver failure pops
+   it with `null`.
+2. **Report** — once the solver finishes, the dialog swaps its content
+   for the deduction counts and the verdict, with a single *OK* button
+   that pops the dialog and returns the `SolverReport`.
 
-Back on the UI thread `_autoSolve` stores the per-cell sets, the solved values,
-`computeComplexity()` and `impossibleBy`. When a contradiction is raised by a
-real constraint present in `_constraints`, that instance's `isValid` is set
-`false` so its widget shows the orange border (the same convention as
-`_revealErrors` in `game_model.dart`); complicities have no widget, so the bottom
-bar instead shows the `serialize()` label next to the complexity.
+### Report content
 
-The bottom bar (`BottomAppBar`) shows size, constraint count and a brain icon
-with the complexity (`...` while solving, red `<cplx> (<culprit>)` when
-impossible-by-complicity).
+**Deduction counts** — over the free (non-fixed) cells, via
+`createSolverDeducible` (deduced X / total Y), plus a
+`createSolverBruteForce` sub-line giving the brute-force share when at
+least one cell required it.
+
+**Verdicts** (mutually exclusive, priority order):
+
+1. **Contradiction** — `impossibleBy != null`. Error icon and the
+   `createSolverContradiction` message naming the culprit.
+2. **Incomplete** — no contradiction, but the solver stalled. Warning
+   icon and the `createSolverIncomplete` message suggesting more
+   constraints.
+3. **Solved** — the solver completed the grid. Success icon and the
+   `createSolverValid` message, which embeds the **localised
+   playable-collection name** matching the solver trace (via
+   `classifyTrace` → `levelToPlayableCollectionKey` →
+   `CollectionLabels.labelFor`). `maxPrefill: 1.0` disables the
+   prefill-ratio rerouting, since fixed cells are author-chosen clues
+   rather than generator prefill.
+
+### Grid feedback
+
+When the dialog closes with a report, `_validatePuzzle` applies it to
+the editor state:
+
+- **green border** on `propagationCells` (cells deduced by pure
+  propagation);
+- **orange border** on `forceCells` (cells whose first deduction occurs
+  at or after the first `SolveMethod.force` step);
+- **corner triangle** on every deduced cell, showing the value the cell
+  first took in the trace (a `RemoveOption` on the 2-colour domain
+  resolves to the surviving colour).
+
+The per-cell sets are populated even when the solve is incomplete or
+contradictory, so the author still sees what the solver managed to
+deduce. When the contradiction was raised by a regular `Constraint`
+present in `_constraints`, that instance's `isValid` is set to `false`
+so its widget shows the orange border (same convention as
+`_revealErrors` in `game_model.dart`); complicities have no widget, so
+the dialog message is their only highlight. The feedback persists until
+the next edit clears it, and amber LT/MJ/IM selection borders keep
+precedence over solver borders.
+
+### Definitions
+
+- **Deduced cell** — a non-fixed cell whose value becomes known while
+  replaying the trace: target of a `SetValueStep`, or of a
+  `RemoveOptionStep` whose surviving option (2-colour domain) becomes
+  the value.
+- **Brute-force cell** — a deduced cell whose *first* deduction step
+  occurs at or after the first `SolveMethod.force` step in the trace.
+- **Corner value** — the value a deduced cell first takes during the
+  replay.
+
+### SolverReport & `_solvePuzzle`
+
+`_solvePuzzle` (`create_page.dart`, run in the isolate) builds the
+`SolverReport` (`dialogs/solver_report.dart`) on top of the shared
+`Puzzle.solveTrace` loop (the same deduction loop backing
+`Puzzle.solveExplained`, capped at 1000 steps; the editor passes a 10 s
+timeout). `solveTrace` returns the recorded `steps`, the `serialize()`
+of the constraint/complicity that raised the contradiction
+(`impossibleBy`) and an `aborted` flag for the timeout; the per-cell
+sets (`propagationCells`, `forceCells`, `cornerValues`) and the
+`solved` flag are derived by replaying the trace on a clone inside the
+isolate. The report also carries `deducedCount`, `bruteForceCount` and
+`totalFreeCells` for the dialog.
+
+Steps record `isComplicity: givenBy is Complicity` so `classifyTrace`
+can distinguish complicities from single-constraint deductions.
 
 ## Test & save
 
@@ -189,6 +259,8 @@ impossible-by-complicity).
   (re-exported from `create_page.dart`).
 - `dialogs/` — one dialog per constraint slug plus the shared pickers
   (`constraint_type_picker.dart`, `cell_actions_dialog.dart`,
-  `confirm_delete_dialog.dart`, `playlist_name_dialog.dart`).
+  `confirm_delete_dialog.dart`, `playlist_name_dialog.dart`) plus
+  the solver report dialog (`solver_report_dialog.dart`) and its
+  `SolverReport` data class (`solver_report.dart`).
 - `shared/color_count_dialog.dart` — reusable colour-count input used by several
   constraint dialogs.

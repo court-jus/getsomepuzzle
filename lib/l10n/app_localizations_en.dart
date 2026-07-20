@@ -428,6 +428,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createTest => 'Test';
 
   @override
+  String get createSolverChecking => 'Checking…';
+
+  @override
+  String createSolverDeducible(String deduced, String total) {
+    return 'Deducible cells: $deduced / $total';
+  }
+
+  @override
+  String createSolverBruteForce(String count) {
+    return 'including $count by brute force';
+  }
+
+  @override
+  String get createSolverIncomplete =>
+      'Your puzzle cannot be fully solved, add more constraints';
+
+  @override
+  String createSolverValid(String collection) {
+    return 'Congratulations, your puzzle is valid, its estimated complexity is $collection';
+  }
+
+  @override
+  String createSolverContradiction(String culprit) {
+    return 'Contradiction detected ($culprit): the puzzle has no solution';
+  }
+
+  @override
   String get createValidate => 'Validate';
 
   @override

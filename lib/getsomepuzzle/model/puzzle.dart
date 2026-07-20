@@ -1283,13 +1283,20 @@ class Puzzle {
     return trace.solved == null ? (1 << 30) : trace.effort;
   }
 
-  /// Step-by-step solving trace, returning each deduction made.
+  /// Core trace loop shared by [solveExplained] and callers that also
+  /// need the contradiction culprit (e.g. the in-game editor's solver
+  /// report).
+  ///
   /// Does not modify the puzzle — works on a clone.
   /// If [timeoutMs] is provided, stops after that many milliseconds.
   /// If [shouldStop] is provided, it is invoked between iterations;
-  /// returning `true` aborts the trace (callers receive the empty list,
-  /// same convention as a timeout).
-  List<SolveStep> solveExplained({
+  /// returning `true` aborts the trace.
+  ///
+  /// Returns the recorded deduction `steps` (partial when the loop is
+  /// interrupted), `impossibleBy` — the `serialize()` of the constraint
+  /// or complicity that raised an [Impossible], when any — and `aborted`
+  /// when the timeout / [shouldStop] deadline cut the loop short.
+  ({List<SolveStep> steps, String? impossibleBy, bool aborted}) solveTrace({
     int? timeoutMs,
     bool Function()? shouldStop,
   }) {
@@ -1299,13 +1306,19 @@ class Puzzle {
     bool timedOut() =>
         stopwatch != null && stopwatch.elapsedMilliseconds > timeoutMs!;
 
+    String? impossibleBy;
+    bool aborted = false;
     solveLoop:
     for (int step = 0; step < 1000; step++) {
-      if (timedOut() || shouldStop?.call() == true) return [];
+      if (timedOut() || shouldStop?.call() == true) {
+        aborted = true;
+        break;
+      }
       final m = test.findAMove(checkErrors: false);
       if (m == null) break;
       switch (m) {
-        case Impossible():
+        case Impossible(:final givenBy):
+          impossibleBy = givenBy.serialize();
           break solveLoop;
         case SetValue(:final idx, :final value, :final complexity):
           // See `_propagateCount`: bail out on an excluded-option setValue.
@@ -1344,10 +1357,24 @@ class Puzzle {
             ),
           );
       }
-      if (test.complete) return steps;
+      if (test.complete) break;
     }
 
-    return steps;
+    return (steps: steps, impossibleBy: impossibleBy, aborted: aborted);
+  }
+
+  /// Step-by-step solving trace, returning each deduction made.
+  /// Does not modify the puzzle — works on a clone.
+  /// If [timeoutMs] is provided, stops after that many milliseconds.
+  /// If [shouldStop] is provided, it is invoked between iterations;
+  /// returning `true` aborts the trace (callers receive the empty list,
+  /// same convention as a timeout).
+  List<SolveStep> solveExplained({
+    int? timeoutMs,
+    bool Function()? shouldStop,
+  }) {
+    final trace = solveTrace(timeoutMs: timeoutMs, shouldStop: shouldStop);
+    return trace.aborted ? [] : trace.steps;
   }
 
   /// Unified solving: loop `findAMove` until stuck, contradiction, or complete.
