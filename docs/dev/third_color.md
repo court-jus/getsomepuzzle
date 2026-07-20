@@ -507,7 +507,120 @@ Possible next steps (not done): derive the `currentRatio > 0.25`
 acceptance threshold from `domain.length`; smarter pre-fill choosing
 colours that maximise constraint satisfiability.
 
-## Frozen decisions
+## In game editor
+
+The editor (`CreatePage`) supports authoring 3-colour puzzles alongside
+the original 2-colour mode (see `docs/dev/editor.md` for the editor's
+base architecture). The domain is chosen once when creating a puzzle and
+flows through every dialog, constraint serialisation and the *Test* /
+*Save* path.
+
+### Domain selection
+
+* The puzzle's domain is chosen **once, in the dimensions form**
+  (`_buildDimensionsForm`), next to the width/height sliders: a
+  `ColorDotPicker` whose dots represent the available colours (two dots
+  for domain 2, three for domain 3). Default: 2 colours.
+* Loading a pasted `v2_…` line is authoritative: `_loadFromRepresentation`
+  sets the domain from `Puzzle(line).domain`, overriding the selector.
+* The domain is **not modifiable while editing** (no in-editor toggle);
+  `_newPuzzle` (AppBar `+`) resets it to 2 colours along with everything
+  else. This sidesteps the "what happens to purple references when
+  switching 3→2" question entirely.
+* The domain survives navigation: `EditorState` carries it, so pressing
+  *Test* and coming back re-opens the same 3-colour puzzle.
+* `_buildPuzzle()` passes the editor domain to `Puzzle.empty` (instead of
+  the hardcoded `defaultDomain`), so live rendering, validation, *Test*
+  and *Save* all operate on the right domain, and `lineExport`
+  automatically emits `v2_123_…` for a 3-colour puzzle.
+* The `BottomAppBar` dimensions label shows a domain marker
+  (`4x4 (16) · d3`) so the author always sees which mode they are in.
+
+### Colour-dot picker widget
+
+All colour choices in editor dialogs go through a shared widget
+(`shared/color_dot_picker.dart`) — no more `DropdownButton<int>` showing
+the text "1"/"2", no more hardcoded hex colours.
+
+* `ColorDot` — a single non-interactive pastille: circle filled with
+  `PuzzleColors.constraintColors[value]` (theme colours, i.e. real
+  black / real white / purple `D33682`), thin outline using
+  `Theme.colorScheme.primary` for the selected state and `Colors.black54`
+  otherwise, tooltip carrying the localized colour name (l10n keys
+  `colorBlack` / `colorWhite` / `colorPurple`).
+* `ColorDotPicker` — a `Wrap` of `ColorDot`s built from a
+  `List<CellValue> domain`, radio-style: the selected dot gets a
+  highlight ring, tapping another dot fires `onChanged`. No text labels
+  (tooltips only). In a 2-colour editor session it renders two dots, in
+  a 3-colour session three — purple is never offered outside domain 3.
+* This unification **fixes the legacy hardcoded colours** that were
+  present in the editor: yellow `B58900` for "black" and magenta
+  `D33682` for "white" in the fix rows / cell-actions / MJ dialogs, and
+  the wrong teal `2AA198` used for purple in the IM dialog. Everything
+  now uses the theme palette the game actually renders with.
+
+### Per-dialog changes
+
+Purple is offered **iff the editor domain is 3**; every dialog below
+receives the editor domain from `CreatePage`.
+
+* **Fix row (constraint type picker)** — the pinned bottom row has a
+  third entry *Fix to purple* (pseudo-slug `fixPurple`, l10n key
+  `createFixPurple`) shown only on domain 3. The three entries use
+  `ColorDot` icons instead of the legacy-coloured `Icons.circle`.
+* **Cell actions dialog** — `CellAction.fixPurple` sits next to
+  `fixBlack` / `fixWhite`, same `isFixed` gating, shown only on domain
+  3; icons are `ColorDot`s.
+* **`showColorCountDialog`** (shared by QA, CC, RC, GC, NC, EY) — uses
+  a `ColorDotPicker` driven by the editor domain instead of the old
+  `DropdownButton<int>`. The dialog returns a `(CellValue, int)` record;
+  call sites serialise the colour with `cellValueToString`.
+* **`showBoundingBoxDialog`** (BB) — same `ColorDotPicker` replacement;
+  gains a `domain` parameter.
+* **`showChainDialog`** (CH) — option list built from the domain
+  (nested loops: colour × side pair, so 6 options on domain 3).
+  Serialised with `cellValueToString`; the redundant numeric suffix
+  `(1)`/`(2)` in the text label was dropped.
+* **Majority zone start dialog** (MJ, inline in `create_page.dart`) —
+  uses a `ColorDotPicker`; `_majorityZoneColor` is a `CellValue`
+  serialised with `cellValueToString` in `_finishMajorityZone`.
+* **Implication colour dialog** (IM, inline in `create_page.dart`) —
+  uses a `ColorDotPicker` driven by the domain (fixes the teal-purple
+  colour that was there before). `_implicationColor` already was a
+  `CellValue`.
+* **Motif editor** (`_showMotifDialog`, shared by FM and SH) — on
+  domain 3 a cell tap cycles `0→1→2→3` (purple included); on domain 2
+  the cycle stays `0→1→2`. The "has at least one coloured cell" guard
+  accepts `3` (`RegExp('[123]')`). Motif rendering maps cells through
+  `cellRepresentationToValue` + `constraintColors`, so purple cells
+  paint correctly with no extra work.
+* **Parity dialog** (PA) — side validity uses `% domain.length`
+  (matching the balanced-colour-partition semantics: see § PA above); on
+  domain 3 only sides whose length is divisible by 3 are offered. When
+  no side is valid, a localised SnackBar (`createNoValidParitySide`) is
+  shown.
+* **Row/column majority dialogs** (RM/CM) — already domain-driven
+  (colour chips from `PuzzleColors.constraintColors`); they now receive
+  the editor domain instead of `defaultDomain`.
+* **No change** — SY (axis only), DF (direction only), RT/CT (count
+  only), LT (letter only), GS (size only), the solver report dialog and
+  the whole validation path (`_solvePuzzle` is domain-agnostic), the
+  top-bar / CC / RC rendering (theme-driven), corner indicators and
+  fixed-cell painting (already `CellValue`-based).
+
+### Consequences and edge notes
+
+* **Saved 3-colour puzzles and domain filters.** Saving a d3 puzzle into
+  a user playlist works, but the collection picker applies the player's
+  domain filters (`bannedDomains` defaults to `{"d3"}`) to every
+  collection, user playlists included. An author who hasn't opted in to
+  d3 won't see their own saved puzzle in rotation — the *Test* button is
+  unaffected since it loads the line directly. Same opt-in policy as the
+  shipped corpus; no special-casing for user playlists in this
+  iteration.
+* **Docs.** `docs/dev/editor.md` was updated alongside the
+  implementation (domain in state/`EditorState`, `fixPurple`, the
+  colour-dot widget replacing the dropdowns, MJ colour as `CellValue`).
 
 ### Player play-state: options not serialised on reload
 
@@ -594,11 +707,3 @@ Checklist:
    N-colour lines — the soundness invariants above are domain-sensitive
    and a wider domain can resurface "too-lenient on pruned options"
    bugs.
-
-## Branch state (2026-06-05)
-
-The third-colour work lives on `third-color` = `master` (`bb2def1`) plus
-two commits (`767fb4b` Third color, `8052c87` Generator fixes, more docs
-and puzzles), pushed to `origin/third-color`. Release gates pass
-(`flutter analyze` clean, `flutter test` green). Remaining: merge into
-`master`.

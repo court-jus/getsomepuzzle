@@ -1222,11 +1222,29 @@ abstract class AppLocalizations {
   /// **'Fix to white'**
   String get createFixWhite;
 
+  /// No description provided for @createFixPurple.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix to purple'**
+  String get createFixPurple;
+
+  /// No description provided for @createDomainLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Colours'**
+  String get createDomainLabel;
+
   /// No description provided for @createRemoveFixed.
   ///
   /// In en, this message translates to:
   /// **'Remove fixed color'**
   String get createRemoveFixed;
+
+  /// No description provided for @createNoValidParitySide.
+  ///
+  /// In en, this message translates to:
+  /// **'No valid parity side for this cell'**
+  String get createNoValidParitySide;
 
   /// No description provided for @createPasteHint.
   ///

@@ -2,7 +2,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/create_page/shared/color_dot_picker.dart';
 
 /// Color + width + height picker for the global Bounding Box (BB) constraint.
 /// Mirrors the layout of [showColorCountDialog] but exposes two dimension
@@ -11,9 +13,10 @@ Future<BoundingBoxConstraint?> showBoundingBoxDialog(
   BuildContext context, {
   required int width,
   required int height,
+  required List<CellValue> domain,
 }) {
   final loc = AppLocalizations.of(context)!;
-  int color = 1;
+  CellValue color = domain.first;
   int w = min(3, width);
   int h = min(3, height);
 
@@ -56,14 +59,12 @@ Future<BoundingBoxConstraint?> showBoundingBoxDialog(
               Row(
                 children: [
                   Text('${loc.createChooseValue}: '),
-                  DropdownButton<int>(
-                    value: color,
-                    items: [1, 2]
-                        .map(
-                          (v) => DropdownMenuItem(value: v, child: Text('$v')),
-                        )
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => color = v!),
+                  const SizedBox(width: 8),
+                  ColorDotPicker(
+                    domain: domain,
+                    selected: color,
+                    onChanged: (v) => setDialogState(() => color = v),
+                    dotSize: 28,
                   ),
                 ],
               ),
@@ -90,7 +91,7 @@ Future<BoundingBoxConstraint?> showBoundingBoxDialog(
           ),
           TextButton(
             onPressed: () =>
-                Navigator.pop(ctx, BoundingBoxConstraint('$color.$w.$h')),
+                Navigator.pop(ctx, BoundingBoxConstraint('${cellValueToString(color)}.$w.$h')),
             child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
           ),
         ],

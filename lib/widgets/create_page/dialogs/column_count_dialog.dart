@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/create_page/shared/color_count_dialog.dart';
 
@@ -8,6 +9,7 @@ Future<ColumnCountConstraint?> showColumnCountDialog(
   required int cellIdx,
   required int width,
   required int height,
+  required List<CellValue> domain,
 }) async {
   final loc = AppLocalizations.of(context)!;
   final cidx = cellIdx % width;
@@ -19,7 +21,8 @@ Future<ColumnCountConstraint?> showColumnCountDialog(
     maxCount: height,
     colorLabel: loc.createChooseValue,
     countLabel: loc.createChooseCount,
+    domain: domain,
   );
   if (result == null) return null;
-  return ColumnCountConstraint('$cidx.${result.$1}.${result.$2}');
+  return ColumnCountConstraint('$cidx.${cellValueToString(result.$1)}.${result.$2}');
 }

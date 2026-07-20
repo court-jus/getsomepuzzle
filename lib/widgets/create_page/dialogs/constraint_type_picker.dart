@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/registry.dart';
+import 'package:getsomepuzzle/widgets/create_page/shared/color_dot_picker.dart';
 
 // Preview widgets inside the picker render at the same size as a small grid
 // cell so players see the actual constraint glyph they will encounter on the
 // board, rather than a generic Material icon that doesn't visually match.
 const _previewSize = 44.0;
 
-Future<String?> showConstraintTypePicker(BuildContext context) {
+Future<String?> showConstraintTypePicker(
+  BuildContext context, {
+  List<CellValue> domain = defaultDomain,
+}) {
   final loc = AppLocalizations.of(context)!;
   return showDialog<String>(
     context: context,
@@ -57,17 +62,25 @@ Future<String?> showConstraintTypePicker(BuildContext context) {
                   Expanded(
                     child: TextButton.icon(
                       onPressed: () => Navigator.pop(ctx, 'fixBlack'),
-                      icon: const Icon(Icons.circle, color: Color(0xFFB58900)),
+                      icon: ColorDot(value: CellValue.black, size: 20),
                       label: Text(loc.createFixBlack),
                     ),
                   ),
                   Expanded(
                     child: TextButton.icon(
                       onPressed: () => Navigator.pop(ctx, 'fixWhite'),
-                      icon: const Icon(Icons.circle, color: Color(0xFFD33682)),
+                      icon: ColorDot(value: CellValue.white, size: 20),
                       label: Text(loc.createFixWhite),
                     ),
                   ),
+                  if (domain.length > 2)
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.pop(ctx, 'fixPurple'),
+                        icon: ColorDot(value: CellValue.purple, size: 20),
+                        label: Text(loc.createFixPurple),
+                      ),
+                    ),
                 ],
               ),
             ],

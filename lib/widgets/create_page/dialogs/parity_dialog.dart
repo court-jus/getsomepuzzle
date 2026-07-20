@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 Future<ParityConstraint?> showParityDialog(
@@ -7,6 +8,7 @@ Future<ParityConstraint?> showParityDialog(
   required int cellIdx,
   required int width,
   required int height,
+  required List<CellValue> domain,
 }) async {
   final loc = AppLocalizations.of(context)!;
   final ridx = cellIdx ~/ width;
@@ -15,20 +17,21 @@ Future<ParityConstraint?> showParityDialog(
   final rightSize = width - 1 - cidx;
   final topSize = ridx;
   final bottomSize = height - 1 - ridx;
+  final domainLen = domain.length;
 
   final validSides = <String>[];
-  if (leftSize % 2 == 0 && leftSize > 0) validSides.add('left');
-  if (rightSize % 2 == 0 && rightSize > 0) validSides.add('right');
-  if (leftSize % 2 == 0 &&
-      rightSize % 2 == 0 &&
+  if (leftSize % domainLen == 0 && leftSize > 0) validSides.add('left');
+  if (rightSize % domainLen == 0 && rightSize > 0) validSides.add('right');
+  if (leftSize % domainLen == 0 &&
+      rightSize % domainLen == 0 &&
       rightSize > 0 &&
       leftSize > 0) {
     validSides.add('horizontal');
   }
-  if (topSize % 2 == 0 && topSize > 0) validSides.add('top');
-  if (bottomSize % 2 == 0 && bottomSize > 0) validSides.add('bottom');
-  if (topSize % 2 == 0 &&
-      bottomSize % 2 == 0 &&
+  if (topSize % domainLen == 0 && topSize > 0) validSides.add('top');
+  if (bottomSize % domainLen == 0 && bottomSize > 0) validSides.add('bottom');
+  if (topSize % domainLen == 0 &&
+      bottomSize % domainLen == 0 &&
       bottomSize > 0 &&
       topSize > 0) {
     validSides.add('vertical');
@@ -36,7 +39,7 @@ Future<ParityConstraint?> showParityDialog(
 
   if (validSides.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('No valid parity side for this cell')),
+      SnackBar(content: Text(loc.createNoValidParitySide)),
     );
     return null;
   }

@@ -628,7 +628,17 @@ class AppLocalizationsFr extends AppLocalizations {
   String get createFixWhite => 'Fixer en blanc';
 
   @override
+  String get createFixPurple => 'Fixer en violet';
+
+  @override
+  String get createDomainLabel => 'Couleurs';
+
+  @override
   String get createRemoveFixed => 'Retirer la couleur fixée';
+
+  @override
+  String get createNoValidParitySide =>
+      'Pas de côté de parité valide pour cette cellule';
 
   @override
   String get createPasteHint =>

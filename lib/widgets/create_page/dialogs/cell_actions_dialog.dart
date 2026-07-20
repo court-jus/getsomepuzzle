@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/create_page/shared/color_dot_picker.dart';
 
-enum CellAction { addNew, deleteConstraint, removeFixed, fixBlack, fixWhite }
+enum CellAction {
+  addNew,
+  deleteConstraint,
+  removeFixed,
+  fixBlack,
+  fixWhite,
+  fixPurple,
+}
 
 Future<CellAction?> showCellActionsDialog(
   BuildContext context, {
   required bool hasConstraints,
   required bool isFixed,
+  List<CellValue> domain = defaultDomain,
 }) {
   final loc = AppLocalizations.of(context)!;
   return showDialog<CellAction>(
@@ -38,16 +48,23 @@ Future<CellAction?> showCellActionsDialog(
             if (isFixed)
               _ActionTile(
                 icon: Icons.circle,
-                iconColor: const Color(0xFFB58900),
+                iconWidget: ColorDot(value: CellValue.black, size: 20),
                 label: loc.createFixBlack,
                 onTap: () => Navigator.pop(ctx, CellAction.fixBlack),
               ),
             if (isFixed)
               _ActionTile(
                 icon: Icons.circle,
-                iconColor: const Color(0xFFD33682),
+                iconWidget: ColorDot(value: CellValue.white, size: 20),
                 label: loc.createFixWhite,
                 onTap: () => Navigator.pop(ctx, CellAction.fixWhite),
+              ),
+            if (isFixed && domain.length > 2)
+              _ActionTile(
+                icon: Icons.circle,
+                iconWidget: ColorDot(value: CellValue.purple, size: 20),
+                label: loc.createFixPurple,
+                onTap: () => Navigator.pop(ctx, CellAction.fixPurple),
               ),
           ],
         ),
@@ -97,6 +114,7 @@ Future<Constraint?> showDeleteConstraintPicker(
 class _ActionTile extends StatelessWidget {
   final IconData icon;
   final Color? iconColor;
+  final Widget? iconWidget;
   final String label;
   final VoidCallback onTap;
   const _ActionTile({
@@ -104,6 +122,7 @@ class _ActionTile extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.iconColor,
+    this.iconWidget,
   });
 
   @override
@@ -112,7 +131,7 @@ class _ActionTile extends StatelessWidget {
       width: double.maxFinite,
       child: TextButton.icon(
         onPressed: onTap,
-        icon: Icon(icon, color: iconColor),
+        icon: iconWidget ?? Icon(icon, color: iconColor),
         label: Align(alignment: Alignment.centerLeft, child: Text(label)),
       ),
     );

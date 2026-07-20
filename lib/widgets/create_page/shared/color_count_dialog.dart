@@ -1,11 +1,13 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/widgets/create_page/shared/color_dot_picker.dart';
 
 /// Shared `AlertDialog` body used by QuantityConstraint, ColumnCountConstraint,
-/// GroupCountConstraint and GroupSize. A color dropdown (optional) + a count
+/// GroupCountConstraint and GroupSize. A `ColorDotPicker` (optional) + a count
 /// slider, returning the chosen `(color, count)`.
-Future<(int color, int count)?> showColorCountDialog(
+Future<(CellValue color, int count)?> showColorCountDialog(
   BuildContext context, {
   required String title,
   required int initialCount,
@@ -13,12 +15,13 @@ Future<(int color, int count)?> showColorCountDialog(
   required int maxCount,
   required String countLabel,
   String colorLabel = '',
-  int initialColor = 1,
+  CellValue initialColor = CellValue.black,
   bool showColor = true,
+  required List<CellValue> domain,
 }) {
-  int color = initialColor;
+  CellValue color = initialColor;
   int count = initialCount;
-  return showDialog<(int, int)>(
+  return showDialog<(CellValue, int)>(
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setDialogState) => AlertDialog(
@@ -32,15 +35,12 @@ Future<(int color, int count)?> showColorCountDialog(
                 Row(
                   children: [
                     Text('$colorLabel: '),
-                    DropdownButton<int>(
-                      value: color,
-                      items: [1, 2]
-                          .map(
-                            (v) =>
-                                DropdownMenuItem(value: v, child: Text('$v')),
-                          )
-                          .toList(),
-                      onChanged: (v) => setDialogState(() => color = v!),
+                    const SizedBox(width: 8),
+                    ColorDotPicker(
+                      domain: domain,
+                      selected: color,
+                      onChanged: (v) => setDialogState(() => color = v),
+                      dotSize: 28,
                     ),
                   ],
                 ),

@@ -53,6 +53,7 @@ import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/transition.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/solver_report.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/solver_report_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/shared/color_dot_picker.dart';
 
 export 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
 
@@ -78,6 +79,7 @@ class CreatePage extends StatefulWidget {
 class _CreatePageState extends State<CreatePage> {
   int _width = 4;
   int _height = 4;
+  List<CellValue> _domain = defaultDomain;
   bool _editing = false;
 
   final List<Constraint> _constraints = [];
@@ -91,7 +93,7 @@ class _CreatePageState extends State<CreatePage> {
   List<int> _letterGroupIndices = [];
 
   bool _majorityZoneMode = false;
-  int _majorityZoneColor = 1;
+  CellValue _majorityZoneColor = CellValue.black;
   int? _majorityZoneFirstIdx;
 
   Set<int> _propagationCells = {};
@@ -116,6 +118,7 @@ class _CreatePageState extends State<CreatePage> {
       _height = saved.height;
       _constraints.addAll(saved.constraints);
       _fixedCells.addAll(saved.fixedCells);
+      _domain = saved.domain;
       _editing = true;
       CreatePage.savedState = null;
     }
@@ -127,6 +130,7 @@ class _CreatePageState extends State<CreatePage> {
       _height,
       List.from(_constraints),
       Map.from(_fixedCells),
+      List.from(_domain),
     );
   }
 
@@ -234,7 +238,7 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Puzzle _buildPuzzle() {
-    final p = Puzzle.empty(_width, _height, defaultDomain);
+    final p = Puzzle.empty(_width, _height, _domain);
     for (final entry in _fixedCells.entries) {
       p.cells[entry.key].setForSolver(entry.value);
       p.cells[entry.key].readonly = true;
@@ -263,6 +267,7 @@ class _CreatePageState extends State<CreatePage> {
             _fixedCells[i] = puzzle.cells[i].value;
           }
         }
+        _domain = puzzle.domain;
         _editing = true;
         _clearSolveFeedback();
       });
@@ -382,6 +387,7 @@ class _CreatePageState extends State<CreatePage> {
       context,
       hasConstraints: cellConstraints.isNotEmpty,
       isFixed: isFixed,
+      domain: _domain,
     );
     if (!mounted || action == null) return;
     switch (action) {
@@ -402,6 +408,8 @@ class _CreatePageState extends State<CreatePage> {
         _setFixedCell(cellIdx, CellValue.black);
       case CellAction.fixWhite:
         _setFixedCell(cellIdx, CellValue.white);
+      case CellAction.fixPurple:
+        _setFixedCell(cellIdx, CellValue.purple);
     }
   }
 
@@ -414,18 +422,25 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Future<void> _pickAndAddConstraint(int cellIdx) async {
-    final slug = await showConstraintTypePicker(context);
+    final slug = await showConstraintTypePicker(
+      context,
+      domain: _domain,
+    );
     if (!mounted || slug == null) return;
     Constraint? added;
     switch (slug) {
       case 'FM':
-        added = await showForbiddenMotifDialog(context);
+        added = await showForbiddenMotifDialog(
+          context,
+          domain: _domain,
+        );
       case 'PA':
         added = await showParityDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'GS':
         added = await showGroupSizeDialog(
@@ -433,6 +448,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'LT':
         await _startLetterGroup(cellIdx);
@@ -445,6 +461,7 @@ class _CreatePageState extends State<CreatePage> {
           context,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'CC':
         added = await showColumnCountDialog(
@@ -452,6 +469,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'JC':
         added = await showColumnMajorityDialog(
@@ -459,7 +477,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
-          domain: defaultDomain,
+          domain: _domain,
         );
       case 'RC':
         added = await showRowCountDialog(
@@ -467,6 +485,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'JR':
         added = await showRowMajorityDialog(
@@ -474,7 +493,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
-          domain: defaultDomain,
+          domain: _domain,
         );
       case 'RT':
         added = await showRowTransitionDialog(
@@ -495,6 +514,7 @@ class _CreatePageState extends State<CreatePage> {
           context,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'NC':
         added = await showNeighborCountDialog(
@@ -502,9 +522,13 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'SH':
-        added = await showShapeDialog(context);
+        added = await showShapeDialog(
+          context,
+          domain: _domain,
+        );
       case 'SY':
         added = await showSymmetryDialog(context, cellIdx: cellIdx);
       case 'DF':
@@ -520,30 +544,38 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'IM':
         final loc2 = AppLocalizations.of(context)!;
+        CellValue imColor = _domain.first;
         final color = await showDialog<CellValue>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(loc2.constraintImplication),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton.icon(
-                  onPressed: () => Navigator.pop(ctx, CellValue.black),
-                  icon: const Icon(Icons.circle, color: Color(0xFFB58900)),
-                  label: Text(loc2.colorBlack),
+          builder: (ctx) => StatefulBuilder(
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: Text(loc2.constraintImplication),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${loc2.createChooseValue}:'),
+                  const SizedBox(height: 8),
+                  ColorDotPicker(
+                    domain: _domain,
+                    selected: imColor,
+                    onChanged: (v) => setDialogState(() => imColor = v),
+                    dotSize: 28,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
                 ),
-                TextButton.icon(
-                  onPressed: () => Navigator.pop(ctx, CellValue.white),
-                  icon: const Icon(Icons.circle, color: Color(0xFFD33682)),
-                  label: Text(loc2.colorWhite),
-                ),
-                TextButton.icon(
-                  onPressed: () => Navigator.pop(ctx, CellValue.purple),
-                  icon: const Icon(Icons.circle, color: Color(0xFF2AA198)),
-                  label: Text(loc2.colorPurple),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, imColor),
+                  child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
                 ),
               ],
             ),
@@ -558,18 +590,25 @@ class _CreatePageState extends State<CreatePage> {
         });
         return;
       case 'CH':
-        added = await showChainDialog(context);
+        added = await showChainDialog(
+          context,
+          domain: _domain,
+        );
       case 'BB':
         added = await showBoundingBoxDialog(
           context,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'fixBlack':
         _setFixedCell(cellIdx, CellValue.black);
         return;
       case 'fixWhite':
         _setFixedCell(cellIdx, CellValue.white);
+        return;
+      case 'fixPurple':
+        _setFixedCell(cellIdx, CellValue.purple);
         return;
     }
     if (added != null) _addConstraint(added);
@@ -606,22 +645,26 @@ class _CreatePageState extends State<CreatePage> {
 
   Future<void> _startMajorityZone(int cellIdx) async {
     final loc = AppLocalizations.of(context)!;
-    final color = await showDialog<int>(
+    CellValue selected = _domain.first;
+    final color = await showDialog<CellValue>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.createChooseType),
-        content: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            TextButton.icon(
-              onPressed: () => Navigator.pop(ctx, 1),
-              icon: const Icon(Icons.circle, color: Color(0xFFB58900)),
-              label: Text(loc.createFixBlack),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(loc.createChooseType),
+          content: ColorDotPicker(
+            domain: _domain,
+            selected: selected,
+            onChanged: (v) => setDialogState(() => selected = v),
+            dotSize: 36,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
             ),
-            TextButton.icon(
-              onPressed: () => Navigator.pop(ctx, 2),
-              icon: const Icon(Icons.circle, color: Color(0xFFD33682)),
-              label: Text(loc.createFixWhite),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, selected),
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
             ),
           ],
         ),
@@ -661,7 +704,7 @@ class _CreatePageState extends State<CreatePage> {
       return;
     }
     _addConstraint(
-      MajorityConstraint('$rMin.$cMin.$rMax.$cMax.$_majorityZoneColor'),
+      MajorityConstraint('$rMin.$cMin.$rMax.$cMax.${cellValueToString(_majorityZoneColor)}'),
     );
     setState(() {
       _majorityZoneMode = false;
@@ -686,6 +729,7 @@ class _CreatePageState extends State<CreatePage> {
     setState(() {
       _width = 4;
       _height = 4;
+      _domain = defaultDomain;
       _constraints.clear();
       _fixedCells.clear();
       _solvedValues.clear();
@@ -793,7 +837,7 @@ class _CreatePageState extends State<CreatePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   Text(
-                    '${_width}x$_height (${_width * _height})',
+                    '${_width}x$_height (${_width * _height}) · d${_domain.length}',
                     style: const TextStyle(color: Colors.white),
                   ),
                   Text(
@@ -828,6 +872,21 @@ class _CreatePageState extends State<CreatePage> {
           _buildSliderRow(loc.generateHeight, _height, 3, 10, (v) {
             setState(() => _height = v);
           }),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              SizedBox(width: 120, child: Text(loc.createDomainLabel)),
+              ColorDotPicker(
+                domain: fullDomain,
+                selected: _domain.last,
+                onChanged: (v) {
+                  final idx = fullDomain.indexOf(v);
+                  setState(() => _domain = fullDomain.sublist(0, idx + 1));
+                },
+                dotSize: 28,
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: _startEditing,
