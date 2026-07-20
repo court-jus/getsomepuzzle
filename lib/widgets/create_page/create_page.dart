@@ -895,11 +895,11 @@ class _CreatePageState extends State<CreatePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildSliderRow(loc.generateWidth, _width, 3, 10, (v) {
+          _buildSliderRow(loc.generateWidth, _width, 3, 20, (v) {
             setState(() => _width = v);
           }),
           const SizedBox(height: 8),
-          _buildSliderRow(loc.generateHeight, _height, 3, 10, (v) {
+          _buildSliderRow(loc.generateHeight, _height, 3, 15, (v) {
             setState(() => _height = v);
           }),
           const SizedBox(height: 16),
