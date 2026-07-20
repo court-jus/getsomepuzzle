@@ -235,7 +235,6 @@
     "createFixPurple": "Fixer en violet",
     "createDomainLabel": "Couleurs",
     "createRemoveFixed": "Retirer la couleur fixée",
-    "createNoValidParitySide": "Pas de côté de parité valide pour cette cellule",
     "createPasteHint": "Coller une représentation de puzzle pour l'éditer",
     "collectionMyPuzzles": "Mes puzzles",
     "collectionEasy": "Débutant",

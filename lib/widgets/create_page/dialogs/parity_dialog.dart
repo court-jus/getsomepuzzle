@@ -37,13 +37,6 @@ Future<ParityConstraint?> showParityDialog(
     validSides.add('vertical');
   }
 
-  if (validSides.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.createNoValidParitySide)),
-    );
-    return null;
-  }
-
   final side = await showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(

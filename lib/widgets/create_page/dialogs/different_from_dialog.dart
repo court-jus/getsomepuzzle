@@ -13,13 +13,6 @@ Future<DifferentFromConstraint?> showDifferentFromDialog(
   if (cidx < width - 1) validDirs.add('right');
   if (ridx < height - 1) validDirs.add('down');
 
-  if (validDirs.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('No valid direction for this cell')),
-    );
-    return null;
-  }
-
   if (validDirs.length == 1) {
     return DifferentFromConstraint('$cellIdx.${validDirs.first}');
   }

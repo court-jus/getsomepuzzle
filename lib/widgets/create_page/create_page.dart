@@ -421,10 +421,40 @@ class _CreatePageState extends State<CreatePage> {
     if (confirmed) _removeConstraint(constraint);
   }
 
+  Set<String> _disabledSlugsForCell(int cellIdx) {
+    final disabled = <String>{};
+    final ridx = cellIdx ~/ _width;
+    final cidx = cellIdx % _width;
+    final domainLen = _domain.length;
+
+    // PA: disabled when no side has a length that is a positive multiple of
+    // domainLen.  Four independent checks cover the two axes; the composite
+    // "horizontal" / "vertical" sides are only valid when both halves are.
+    bool hasValidSide(int size) => size > 0 && size % domainLen == 0;
+    final left = cidx;
+    final right = _width - 1 - cidx;
+    final top = ridx;
+    final bottom = _height - 1 - ridx;
+    if (!hasValidSide(left) &&
+        !hasValidSide(right) &&
+        !hasValidSide(top) &&
+        !hasValidSide(bottom)) {
+      disabled.add('PA');
+    }
+
+    // DF: disabled for the bottom-right corner (no right or down neighbour).
+    if (cidx == _width - 1 && ridx == _height - 1) {
+      disabled.add('DF');
+    }
+
+    return disabled;
+  }
+
   Future<void> _pickAndAddConstraint(int cellIdx) async {
     final slug = await showConstraintTypePicker(
       context,
       domain: _domain,
+      disabledSlugs: _disabledSlugsForCell(cellIdx),
     );
     if (!mounted || slug == null) return;
     Constraint? added;

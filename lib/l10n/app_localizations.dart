@@ -1240,12 +1240,6 @@ abstract class AppLocalizations {
   /// **'Remove fixed color'**
   String get createRemoveFixed;
 
-  /// No description provided for @createNoValidParitySide.
-  ///
-  /// In en, this message translates to:
-  /// **'No valid parity side for this cell'**
-  String get createNoValidParitySide;
-
   /// No description provided for @createPasteHint.
   ///
   /// In en, this message translates to:

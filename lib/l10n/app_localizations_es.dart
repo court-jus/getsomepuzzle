@@ -637,10 +637,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get createRemoveFixed => 'Quitar color fijo';
 
   @override
-  String get createNoValidParitySide =>
-      'No hay lado de paridad válido para esta celda';
-
-  @override
   String get createPasteHint =>
       'Pegar una representación de puzzle para editarlo';
 

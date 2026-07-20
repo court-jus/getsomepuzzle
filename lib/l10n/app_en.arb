@@ -698,7 +698,6 @@
     "createFixPurple": "Fix to purple",
     "createDomainLabel": "Colours",
     "createRemoveFixed": "Remove fixed color",
-    "createNoValidParitySide": "No valid parity side for this cell",
     "createPasteHint": "Paste a puzzle representation to edit it",
     "constraintGroupCount": "group count",
     "@constraintGroupCount": {
