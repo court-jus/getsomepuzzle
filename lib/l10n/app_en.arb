@@ -559,6 +559,43 @@
     "createNewPuzzle": "New puzzle",
     "createStart": "Start editing",
     "createTest": "Test",
+    "createSolverChecking": "Checking…",
+    "@createSolverChecking": {
+        "description": "Text shown in the solver report dialog while the solver runs"
+    },
+    "createSolverDeducible": "Deducible cells: {deduced} / {total}",
+    "@createSolverDeducible": {
+        "description": "Solver report: number of cells deduced out of total non-fixed cells",
+        "placeholders": {
+            "deduced": { "type": "String" },
+            "total": { "type": "String" }
+        }
+    },
+    "createSolverBruteForce": "including {count} by brute force",
+    "@createSolverBruteForce": {
+        "description": "Sub-line in solver report: how many deduced cells required brute force",
+        "placeholders": {
+            "count": { "type": "String" }
+        }
+    },
+    "createSolverIncomplete": "Your puzzle cannot be fully solved, add more constraints",
+    "@createSolverIncomplete": {
+        "description": "Solver report verdict when the puzzle is not contradictory but the solver stalled before completing it"
+    },
+    "createSolverValid": "Congratulations, your puzzle is valid, its estimated complexity is {collection}",
+    "@createSolverValid": {
+        "description": "Solver report verdict when the puzzle is solved, with the difficulty collection name interpolated",
+        "placeholders": {
+            "collection": { "type": "String" }
+        }
+    },
+    "createSolverContradiction": "Contradiction detected ({culprit}): the puzzle has no solution",
+    "@createSolverContradiction": {
+        "description": "Solver report verdict when a contradiction was found, naming the culprit",
+        "placeholders": {
+            "culprit": { "type": "String" }
+        }
+    },
     "createValidate": "Validate",
     "createSave": "Save",
     "createSaved": "Puzzle saved!",
@@ -658,6 +695,8 @@
     "createFixedCellMode": "Fix cell color",
     "createFixBlack": "Fix to black",
     "createFixWhite": "Fix to white",
+    "createFixPurple": "Fix to purple",
+    "createDomainLabel": "Colours",
     "createRemoveFixed": "Remove fixed color",
     "createPasteHint": "Paste a puzzle representation to edit it",
     "constraintGroupCount": "group count",

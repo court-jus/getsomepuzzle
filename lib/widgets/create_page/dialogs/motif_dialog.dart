@@ -11,6 +11,7 @@ Future<String?> _showMotifDialog(
   BuildContext context, {
   required String titleText,
   required Color backgroundColor,
+  required List<CellValue> domain,
 }) {
   int motifWidth = 2;
   int motifHeight = 2;
@@ -72,7 +73,8 @@ Future<String?> _showMotifDialog(
                               GestureDetector(
                                 onTap: () {
                                   setDialogState(() {
-                                    grid[row][col] = (grid[row][col] + 1) % 3;
+                                    grid[row][col] = (grid[row][col] + 1) %
+                                        (domain.length + 1);
                                   });
                                 },
                                 child: Container(
@@ -119,7 +121,7 @@ Future<String?> _showMotifDialog(
                         .map((v) => v.toString())
                         .join('');
                     motifRows.add(rowStr);
-                    if (rowStr.contains(RegExp('[12]'))) hasNonZero = true;
+                    if (rowStr.contains(RegExp('[123]'))) hasNonZero = true;
                   }
                   if (!hasNonZero) return;
                   Navigator.pop(ctx, motifRows.join('.'));
@@ -134,24 +136,32 @@ Future<String?> _showMotifDialog(
   );
 }
 
-Future<ForbiddenMotif?> showForbiddenMotifDialog(BuildContext context) async {
+Future<ForbiddenMotif?> showForbiddenMotifDialog(
+  BuildContext context, {
+  required List<CellValue> domain,
+}) async {
   final loc = AppLocalizations.of(context)!;
   final pc = Theme.of(context).extension<PuzzleColors>()!;
   final motifStr = await _showMotifDialog(
     context,
     titleText: loc.constraintForbiddenPattern,
     backgroundColor: pc.forbidden,
+    domain: domain,
   );
   return motifStr == null ? null : ForbiddenMotif(motifStr);
 }
 
-Future<ShapeConstraint?> showShapeDialog(BuildContext context) async {
+Future<ShapeConstraint?> showShapeDialog(
+  BuildContext context, {
+  required List<CellValue> domain,
+}) async {
   final loc = AppLocalizations.of(context)!;
   final pc = Theme.of(context).extension<PuzzleColors>()!;
   final motifStr = await _showMotifDialog(
     context,
     titleText: loc.constraintShape,
     backgroundColor: pc.mandatory,
+    domain: domain,
   );
   return motifStr == null ? null : ShapeConstraint(motifStr);
 }

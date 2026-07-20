@@ -431,6 +431,33 @@ class AppLocalizationsEs extends AppLocalizations {
   String get createTest => 'Probar';
 
   @override
+  String get createSolverChecking => 'Verificando…';
+
+  @override
+  String createSolverDeducible(String deduced, String total) {
+    return 'Celdas deducibles: $deduced / $total';
+  }
+
+  @override
+  String createSolverBruteForce(String count) {
+    return 'incluyendo $count por fuerza bruta';
+  }
+
+  @override
+  String get createSolverIncomplete =>
+      'Tu puzzle no se puede resolver completamente, añade más restricciones';
+
+  @override
+  String createSolverValid(String collection) {
+    return '¡Felicidades, tu puzzle es válido! Su complejidad estimada es $collection';
+  }
+
+  @override
+  String createSolverContradiction(String culprit) {
+    return 'Contradicción detectada ($culprit): el puzzle no tiene solución';
+  }
+
+  @override
   String get createValidate => 'Validar';
 
   @override
@@ -599,6 +626,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get createFixWhite => 'Fijar a blanco';
+
+  @override
+  String get createFixPurple => 'Fijar a morado';
+
+  @override
+  String get createDomainLabel => 'Colores';
 
   @override
   String get createRemoveFixed => 'Quitar color fijo';

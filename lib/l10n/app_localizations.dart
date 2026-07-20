@@ -862,6 +862,42 @@ abstract class AppLocalizations {
   /// **'Test'**
   String get createTest;
 
+  /// Text shown in the solver report dialog while the solver runs
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get createSolverChecking;
+
+  /// Solver report: number of cells deduced out of total non-fixed cells
+  ///
+  /// In en, this message translates to:
+  /// **'Deducible cells: {deduced} / {total}'**
+  String createSolverDeducible(String deduced, String total);
+
+  /// Sub-line in solver report: how many deduced cells required brute force
+  ///
+  /// In en, this message translates to:
+  /// **'including {count} by brute force'**
+  String createSolverBruteForce(String count);
+
+  /// Solver report verdict when the puzzle is not contradictory but the solver stalled before completing it
+  ///
+  /// In en, this message translates to:
+  /// **'Your puzzle cannot be fully solved, add more constraints'**
+  String get createSolverIncomplete;
+
+  /// Solver report verdict when the puzzle is solved, with the difficulty collection name interpolated
+  ///
+  /// In en, this message translates to:
+  /// **'Congratulations, your puzzle is valid, its estimated complexity is {collection}'**
+  String createSolverValid(String collection);
+
+  /// Solver report verdict when a contradiction was found, naming the culprit
+  ///
+  /// In en, this message translates to:
+  /// **'Contradiction detected ({culprit}): the puzzle has no solution'**
+  String createSolverContradiction(String culprit);
+
   /// No description provided for @createValidate.
   ///
   /// In en, this message translates to:
@@ -1185,6 +1221,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Fix to white'**
   String get createFixWhite;
+
+  /// No description provided for @createFixPurple.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix to purple'**
+  String get createFixPurple;
+
+  /// No description provided for @createDomainLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Colours'**
+  String get createDomainLabel;
 
   /// No description provided for @createRemoveFixed.
   ///

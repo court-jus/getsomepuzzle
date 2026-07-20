@@ -1,9 +1,10 @@
 # In-app puzzle editor
 
 The editor (`CreatePage`, `lib/widgets/create_page/create_page.dart`) lets a
-player author a puzzle by hand: choose a grid size, fix cells black/white, attach
-constraints, watch the solver react live, then **test** the puzzle (play it
-immediately) or **save** it into a writable playlist.
+player author a puzzle by hand: choose a grid size, choose 2 or 3 colours,
+fix cells black/white/purple, attach constraints, validate it with the solver
+on demand, then **test** the puzzle (play it immediately) or **save** it into a
+writable playlist.
 
 It is the manual counterpart to the generator (`docs/dev/generator.md`): same
 `Puzzle` model and solver, driven by taps instead of search.
@@ -13,8 +14,9 @@ It is the manual counterpart to the generator (`docs/dev/generator.md`): same
 `build` switches on `_editing`:
 
 1. **Dimensions form** (`_buildDimensionsForm`) — two sliders (width / height,
-   each `3..10`) and a *Start* button, plus a text field that loads a puzzle
-   from a pasted `v2_…` line (`_loadFromRepresentation`, via `Puzzle(line)`).
+   each `3..10`), a `ColorDotPicker` domain selector (2 or 3 colours, default 2)
+   and a *Start* button, plus a text field that loads a puzzle from a pasted
+   `v2_…` line (`_loadFromRepresentation`, via `Puzzle(line)`).
 2. **Editor** (`_buildEditor`) — the grid plus top/side constraint bars, the
    playlist dropdown and the *Test* / *Save* buttons.
 
@@ -24,22 +26,26 @@ It is the manual counterpart to the generator (`docs/dev/generator.md`): same
 
 All editing state lives in `_CreatePageState`:
 
+- **Domain** — `_domain` (`List<CellValue>`, defaults to `defaultDomain`).
+  Chosen in the dimensions form (2 or 3 colours) or set from a pasted puzzle
+  line; not modifiable while editing. Resets to 2 on `_newPuzzle`. Survives
+  navigation via `EditorState.domain`.
 - **Geometry / content** — `_width`, `_height`, `_fixedCells`
-  (`Map<int, CellValue>`, only black/white entries; absent ⇒ free) and
+  (`Map<int, CellValue>`, only entries within `_domain`; absent ⇒ free) and
   `_constraints` (`List<Constraint>`).
 - **Two-tap authoring modes** — `_letterGroupMode` (+ `_letterGroupLetter`,
-  `_letterGroupIndices`) and `_majorityZoneMode` (+ `_majorityZoneColor`,
-  `_majorityZoneFirstIdx`). See *Adding constraints*.
-- **Live-solve output** — `_propagationCells`, `_forceCells` (cell-border
-  colouring), `_solvedValues` (corner hints), `_autoComplexity`,
-  `_autoImpossibleBy`, `_autoSolving`, debounced by `_solveDebounce`.
+  `_letterGroupIndices`) and `_majorityZoneMode` (+ `_majorityZoneColor` as
+  `CellValue`, `_majorityZoneFirstIdx`). See *Adding constraints*.
+- **Solver feedback** — `_propagationCells`, `_forceCells` (cell-border
+  colouring) and `_solvedValues` (corner hints), populated by the last
+  validation run and cleared on the next edit.
 - **Save target** — `_targetPlaylist`.
 
 ### Surviving navigation
 
 Pressing *Test* navigates away from the editor, which would normally dispose its
-state. `_saveState` snapshots `(_width, _height, _constraints, _fixedCells)` into
-the static `CreatePage.savedState` (an `EditorState`,
+state. `_saveState` snapshots `(_width, _height, _constraints, _fixedCells,
+_domain)` into the static `CreatePage.savedState` (an `EditorState`,
 `lib/widgets/create_page/editor_state.dart`); `initState` restores and clears it.
 So returning from a test session re-opens the same in-progress puzzle.
 
@@ -48,7 +54,7 @@ So returning from a test session re-opens the same in-progress puzzle.
 `_buildPuzzle()` is the single bridge from editor state to the engine:
 
 ```dart
-final p = Puzzle.empty(_width, _height, defaultDomain);
+final p = Puzzle.empty(_width, _height, _domain);
 for (final entry in _fixedCells.entries) {
   p.cells[entry.key].setForSolver(entry.value);
   p.cells[entry.key].readonly = true;   // fixed = readonly clue
@@ -56,9 +62,11 @@ for (final entry in _fixedCells.entries) {
 p.replaceConstraints(_constraints);
 ```
 
-It is cheap and side-effect-free, so it is called freely — once per live solve,
-once per grid build (for the background painter), and on test/save. The domain is
-always `defaultDomain` (two colours).
+It is cheap and side-effect-free, so it is called freely — once per validation
+run, once per grid build (for the background painter), and on test/save. The
+domain comes from `_domain` (the editor's current domain), so `lineExport`
+automatically emits `v2_12_…` for 2-colour and `v2_123_…` for 3-colour
+puzzles.
 
 ## Rendering
 
@@ -89,8 +97,8 @@ painters render identically to the game.
   background painter; `readonly: isFixed`).
 - **border** — amber for the active LT/MJ selection, else green for a
   `_propagationCells` cell, else orange for a `_forceCells` cell.
-- **corner indicator** — `cornerIndicatorValue` shows the solved colour
-  (`_solvedValues`) on non-fixed cells, previewing the unique solution.
+- **corner indicator** — `cornerIndicatorValue` shows the deduced colour
+  (`_solvedValues`) on non-fixed cells, previewing the solution.
 - **tap** — `_onCellTap`. The drag/secondary callbacks are no-ops (the editor
   never colours by dragging).
 
@@ -107,7 +115,9 @@ painters render identically to the game.
 
 `_openCellActions` (`showCellActionsDialog`, enum `CellAction`) offers
 *add new* / *delete a constraint* (via `showDeleteConstraintPicker`) /
-*remove fixed* / *fix black* / *fix white*.
+*remove fixed* / *fix black* / *fix white* / *fix purple* (latter only
+when `domain.length > 2`). All fix colours use `ColorDot` icons instead
+of legacy-coloured `Icons.circle`.
 
 ## Adding constraints
 
@@ -115,7 +125,9 @@ painters render identically to the game.
 (`dialogs/constraint_type_picker.dart`), which renders one tile per entry of
 `constraintRegistry` using `previewForSlug` — so a newly registered slug appears
 automatically, no edit here. The picker also returns the pseudo-slugs `fixBlack`
-/ `fixWhite` for the pinned fix-colour row.
+/ `fixWhite` / `fixPurple` for the pinned fix-colour row (the purple entry is
+only shown when `domain.length > 2`). The fix colour buttons use `ColorDot`
+icons instead of the legacy-coloured `Icons.circle`.
 
 The returned slug drives a `switch` to the matching per-constraint dialog under
 `dialogs/` (e.g. `showParityDialog`, `showBoundingBoxDialog`, …); each returns a
@@ -129,9 +141,10 @@ multiple cells:
   selection mode; subsequent taps toggle cells; the AppBar *Done* button calls
   `_finishLetterGroup`, which emits `LetterGroup('<letter>.i.j.…')` when ≥ 2 cells
   are selected.
-- **`MJ` (majority zone)** — `_startMajorityZone` asks for a colour and records
-  the first corner; the next tap (`_finishMajorityZone`) defines the rectangle.
-  Zones smaller than 3 cells are rejected with a `createZoneTooSmall` SnackBar.
+- **`MJ` (majority zone)** — `_startMajorityZone` asks for a colour (via a
+  `ColorDotPicker` driven by `_domain`) and records the first corner; the next
+  tap (`_finishMajorityZone`) defines the rectangle. Zones smaller than 3 cells
+  are rejected with a `createZoneTooSmall` SnackBar.
 
 ## Deleting constraints
 
@@ -141,35 +154,106 @@ multiple cells:
   dialog → `showDeleteConstraintPicker`.
 - **MJ zones** — tapping a cell inside them → `_showMjDeletePicker`.
 
-All removals go through `_removeConstraint`, which re-triggers a live solve.
+All removals go through `_removeConstraint`, which also clears the solver
+feedback.
 
-## Live solve
+## Solver validation
 
-Every mutation (`_addConstraint`, `_removeConstraint`, `_setFixedCell`,
-load) calls `_scheduleAutoSolve`:
+The `BottomAppBar` shows the current puzzle size and domain (`4×4 (16) · d2`
+or `4×4 (16) · d3`) alongside a **Validate** button (`createValidate` l10n key).
+runs the solver on demand and opens a modal report dialog. Every edit
+(`_addConstraint`, `_removeConstraint`, `_setFixedCell`, puzzle load)
+calls `_clearSolveFeedback()` inside its `setState`, which empties the
+feedback sets and resets every constraint's `isValid` to `true` — the
+grid only ever displays the outcome of the latest validation run on the
+current puzzle.
 
-1. Mark `_autoSolving`, reset every constraint's `isValid` to `true` (clears the
-   previous orange culprit highlight), and `debugPrint` the current line export.
-2. After a **500 ms debounce**, `_autoSolve` builds the puzzle and runs
-   `_solvePuzzle` in a `compute()` isolate.
+### Dialog
 
-`_solvePuzzle` mirrors `Puzzle.solveExplained`'s loop (capped at 1000 steps /
-10 s) but also returns the `serialize()` of whatever raised an `Impossible`
-(`impossibleBy`). Each step is classified:
+`showSolverReportDialog` (`dialogs/solver_report_dialog.dart`) is a
+stateful `AlertDialog` with two phases:
 
-- `SetValue` and non-force `RemoveOption` → **propagation** (green border).
-- force `RemoveOption` (`isForce`) → **force** (orange border).
+1. **Progress** — a `CircularProgressIndicator` plus the
+   `createSolverChecking` label, while the solver runs in a `compute()`
+   isolate (`_solvePuzzle`). The dialog cannot be dismissed
+   (`barrierDismissible: false`, no close button); a solver failure pops
+   it with `null`.
+2. **Report** — once the solver finishes, the dialog swaps its content
+   for the deduction counts and the verdict, with a single *OK* button
+   that pops the dialog and returns the `SolverReport`.
 
-Back on the UI thread `_autoSolve` stores the per-cell sets, the solved values,
-`computeComplexity()` and `impossibleBy`. When a contradiction is raised by a
-real constraint present in `_constraints`, that instance's `isValid` is set
-`false` so its widget shows the orange border (the same convention as
-`_revealErrors` in `game_model.dart`); complicities have no widget, so the bottom
-bar instead shows the `serialize()` label next to the complexity.
+### Report content
 
-The bottom bar (`BottomAppBar`) shows size, constraint count and a brain icon
-with the complexity (`...` while solving, red `<cplx> (<culprit>)` when
-impossible-by-complicity).
+**Deduction counts** — over the free (non-fixed) cells, via
+`createSolverDeducible` (deduced X / total Y), plus a
+`createSolverBruteForce` sub-line giving the brute-force share when at
+least one cell required it.
+
+**Verdicts** (mutually exclusive, priority order):
+
+1. **Contradiction** — `impossibleBy != null`. Error icon and the
+   `createSolverContradiction` message naming the culprit.
+2. **Incomplete** — no contradiction, but the solver stalled. Warning
+   icon and the `createSolverIncomplete` message suggesting more
+   constraints.
+3. **Solved** — the solver completed the grid. Success icon and the
+   `createSolverValid` message, which embeds the **localised
+   playable-collection name** matching the solver trace (via
+   `classifyTrace` → `levelToPlayableCollectionKey` →
+   `CollectionLabels.labelFor`). `maxPrefill: 1.0` disables the
+   prefill-ratio rerouting, since fixed cells are author-chosen clues
+   rather than generator prefill.
+
+### Grid feedback
+
+When the dialog closes with a report, `_validatePuzzle` applies it to
+the editor state:
+
+- **green border** on `propagationCells` (cells deduced by pure
+  propagation);
+- **orange border** on `forceCells` (cells whose first deduction occurs
+  at or after the first `SolveMethod.force` step);
+- **corner triangle** on every deduced cell, showing the value the cell
+  first took in the trace (a `RemoveOption` on the 2-colour domain
+  resolves to the surviving colour).
+
+The per-cell sets are populated even when the solve is incomplete or
+contradictory, so the author still sees what the solver managed to
+deduce. When the contradiction was raised by a regular `Constraint`
+present in `_constraints`, that instance's `isValid` is set to `false`
+so its widget shows the orange border (same convention as
+`_revealErrors` in `game_model.dart`); complicities have no widget, so
+the dialog message is their only highlight. The feedback persists until
+the next edit clears it, and amber LT/MJ/IM selection borders keep
+precedence over solver borders.
+
+### Definitions
+
+- **Deduced cell** — a non-fixed cell whose value becomes known while
+  replaying the trace: target of a `SetValueStep`, or of a
+  `RemoveOptionStep` whose surviving option (2-colour domain) becomes
+  the value.
+- **Brute-force cell** — a deduced cell whose *first* deduction step
+  occurs at or after the first `SolveMethod.force` step in the trace.
+- **Corner value** — the value a deduced cell first takes during the
+  replay.
+
+### SolverReport & `_solvePuzzle`
+
+`_solvePuzzle` (`create_page.dart`, run in the isolate) builds the
+`SolverReport` (`dialogs/solver_report.dart`) on top of the shared
+`Puzzle.solveTrace` loop (the same deduction loop backing
+`Puzzle.solveExplained`, capped at 1000 steps; the editor passes a 10 s
+timeout). `solveTrace` returns the recorded `steps`, the `serialize()`
+of the constraint/complicity that raised the contradiction
+(`impossibleBy`) and an `aborted` flag for the timeout; the per-cell
+sets (`propagationCells`, `forceCells`, `cornerValues`) and the
+`solved` flag are derived by replaying the trace on a clone inside the
+isolate. The report also carries `deducedCount`, `bruteForceCount` and
+`totalFreeCells` for the dialog.
+
+Steps record `isComplicity: givenBy is Complicity` so `classifyTrace`
+can distinguish complicities from single-constraint deductions.
 
 ## Test & save
 
@@ -186,9 +270,15 @@ impossible-by-complicity).
 
 - `create_page.dart` — the page, all state and handlers above.
 - `editor_state.dart` — `EditorState` snapshot for navigation survival
-  (re-exported from `create_page.dart`).
+  (re-exported from `create_page.dart`), now carries the `domain` field.
 - `dialogs/` — one dialog per constraint slug plus the shared pickers
   (`constraint_type_picker.dart`, `cell_actions_dialog.dart`,
-  `confirm_delete_dialog.dart`, `playlist_name_dialog.dart`).
+  `confirm_delete_dialog.dart`, `playlist_name_dialog.dart`) plus
+  the solver report dialog (`solver_report_dialog.dart`) and its
+  `SolverReport` data class (`solver_report.dart`).
 - `shared/color_count_dialog.dart` — reusable colour-count input used by several
-  constraint dialogs.
+  constraint dialogs; uses `ColorDotPicker` instead of the legacy
+  `DropdownButton<int>`.
+- `shared/color_dot_picker.dart` — `ColorDot` (pastille + grey outline +
+  tooltip) and `ColorDotPicker` (radio-style row driven by a domain list).
+  Replaces every hardcoded hex-colour icon and numeric dropdown in the editor.

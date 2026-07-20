@@ -232,6 +232,8 @@
     "createFixedCellMode": "Fixer la couleur",
     "createFixBlack": "Fixer en noir",
     "createFixWhite": "Fixer en blanc",
+    "createFixPurple": "Fixer en violet",
+    "createDomainLabel": "Couleurs",
     "createRemoveFixed": "Retirer la couleur fixée",
     "createPasteHint": "Coller une représentation de puzzle pour l'éditer",
     "collectionMyPuzzles": "Mes puzzles",
@@ -296,6 +298,43 @@
     "createNewPuzzle": "Nouveau puzzle",
     "createStart": "Commencer l'édition",
     "createTest": "Tester",
+    "createSolverChecking": "Vérification en cours…",
+    "@createSolverChecking": {
+        "description": "Text shown in the solver report dialog while the solver runs"
+    },
+    "createSolverDeducible": "Cellules déductibles : {deduced} / {total}",
+    "@createSolverDeducible": {
+        "description": "Solver report: number of cells deduced out of total non-fixed cells",
+        "placeholders": {
+            "deduced": { "type": "String" },
+            "total": { "type": "String" }
+        }
+    },
+    "createSolverBruteForce": "dont {count} par force brute",
+    "@createSolverBruteForce": {
+        "description": "Sub-line in solver report: how many deduced cells required brute force",
+        "placeholders": {
+            "count": { "type": "String" }
+        }
+    },
+    "createSolverIncomplete": "Votre puzzle ne peut pas être entièrement résolu, ajoutez des contraintes supplémentaires",
+    "@createSolverIncomplete": {
+        "description": "Solver report verdict when the puzzle is not contradictory but the solver stalled before completing it"
+    },
+    "createSolverValid": "Bravo, votre puzzle est valable, sa complexité estimée est {collection}",
+    "@createSolverValid": {
+        "description": "Solver report verdict when the puzzle is solved, with the difficulty collection name interpolated",
+        "placeholders": {
+            "collection": { "type": "String" }
+        }
+    },
+    "createSolverContradiction": "Contradiction détectée ({culprit}) : le puzzle n'a pas de solution",
+    "@createSolverContradiction": {
+        "description": "Solver report verdict when a contradiction was found, naming the culprit",
+        "placeholders": {
+            "culprit": { "type": "String" }
+        }
+    },
     "createValidate": "Valider",
     "createSave": "Enregistrer",
     "createSaved": "Puzzle enregistré !",

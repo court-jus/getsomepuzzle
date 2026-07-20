@@ -6,5 +6,12 @@ class EditorState {
   final int height;
   final List<Constraint> constraints;
   final Map<int, CellValue> fixedCells;
-  EditorState(this.width, this.height, this.constraints, this.fixedCells);
+  final List<CellValue> domain;
+  EditorState(
+    this.width,
+    this.height,
+    this.constraints,
+    this.fixedCells,
+    this.domain,
+  );
 }

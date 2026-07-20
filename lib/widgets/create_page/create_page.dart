@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
@@ -52,6 +51,9 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/symmetry_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/transition_dialog.dart';
 import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/transition.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/solver_report.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/solver_report_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/shared/color_dot_picker.dart';
 
 export 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
 
@@ -77,6 +79,7 @@ class CreatePage extends StatefulWidget {
 class _CreatePageState extends State<CreatePage> {
   int _width = 4;
   int _height = 4;
+  List<CellValue> _domain = defaultDomain;
   bool _editing = false;
 
   final List<Constraint> _constraints = [];
@@ -90,16 +93,12 @@ class _CreatePageState extends State<CreatePage> {
   List<int> _letterGroupIndices = [];
 
   bool _majorityZoneMode = false;
-  int _majorityZoneColor = 1;
+  CellValue _majorityZoneColor = CellValue.black;
   int? _majorityZoneFirstIdx;
 
-  Timer? _solveDebounce;
   Set<int> _propagationCells = {};
   Set<int> _forceCells = {};
   Map<int, CellValue> _solvedValues = {};
-  int? _autoComplexity;
-  String? _autoImpossibleBy;
-  bool _autoSolving = false;
 
   final Map<int, CellValue> _fixedCells = {};
 
@@ -107,7 +106,6 @@ class _CreatePageState extends State<CreatePage> {
 
   @override
   void dispose() {
-    _solveDebounce?.cancel();
     super.dispose();
   }
 
@@ -120,6 +118,7 @@ class _CreatePageState extends State<CreatePage> {
       _height = saved.height;
       _constraints.addAll(saved.constraints);
       _fixedCells.addAll(saved.fixedCells);
+      _domain = saved.domain;
       _editing = true;
       CreatePage.savedState = null;
     }
@@ -131,59 +130,36 @@ class _CreatePageState extends State<CreatePage> {
       _height,
       List.from(_constraints),
       Map.from(_fixedCells),
+      List.from(_domain),
     );
   }
 
-  void _scheduleAutoSolve() {
-    _solveDebounce?.cancel();
-    setState(() {
-      _autoSolving = true;
-      // Clear any leftover orange-border highlight from the previous solve so
-      // the UI doesn't keep marking a constraint that may no longer be the
-      // culprit (or may have just been removed).
-      for (final c in _constraints) {
-        c.isValid = true;
-      }
-    });
-    debugPrint('[editor] ${_buildPuzzle().lineExport(compute: false)}');
-    _solveDebounce = Timer(const Duration(milliseconds: 500), () {
-      _autoSolve();
-    });
+  /// Clears the solver feedback (coloured borders, corner hints and the
+  /// orange culprit highlight). Must be called inside a `setState`.
+  void _clearSolveFeedback() {
+    _propagationCells.clear();
+    _forceCells.clear();
+    _solvedValues.clear();
+    for (final c in _constraints) {
+      c.isValid = true;
+    }
   }
 
-  Future<void> _autoSolve() async {
-    if (!mounted) return;
+  Future<void> _validatePuzzle() async {
     final puzzle = _buildPuzzle();
-    final result = await compute(_solvePuzzle, puzzle);
-    if (!mounted) return;
-    final propCells = <int>{};
-    final frcCells = <int>{};
-    final values = <int, CellValue>{};
-    for (final step in result.steps) {
-      if (step.value != null) {
-        values[step.cellIdx] = step.value!;
-      }
-      if (step.method == SolveMethod.propagation) {
-        propCells.add(step.cellIdx);
-      } else {
-        frcCells.add(step.cellIdx);
-      }
-    }
+    debugPrint('[editor] ${puzzle.lineExport(compute: false)}');
+    final report = await showSolverReportDialog(
+      context,
+      solverFuture: compute(_solvePuzzle, puzzle),
+    );
+    if (!mounted || report == null) return;
     setState(() {
-      _propagationCells = propCells;
-      _forceCells = frcCells;
-      _solvedValues = values;
-      _autoComplexity = puzzle.computeComplexity();
-      _autoImpossibleBy = result.impossibleBy;
-      _autoSolving = false;
-      // Mirror the in-game "isValid = false → orange border" convention used
-      // by _revealErrors in game_model.dart: if the contradiction was raised
-      // by a regular Constraint, flag that exact instance in our state list.
-      // Complicities have no widget representation, so we fall back to the
-      // serialize() label in the bottom bar.
-      if (result.impossibleBy != null) {
+      _propagationCells = report.propagationCells;
+      _forceCells = report.forceCells;
+      _solvedValues = report.cornerValues;
+      if (report.impossibleBy != null) {
         for (final c in _constraints) {
-          if (c.serialize() == result.impossibleBy) {
+          if (c.serialize() == report.impossibleBy) {
             c.isValid = false;
             break;
           }
@@ -192,83 +168,77 @@ class _CreatePageState extends State<CreatePage> {
     });
   }
 
-  /// Runs the same step-by-step deduction loop as `Puzzle.solveExplained`
-  /// but reports the serialize() of the constraint/complicity that raised
-  /// the contradiction (if any), so the editor can distinguish "impossible"
-  /// from "merely incomplete" and surface the culprit.
-  static ({List<SolveStep> steps, String? impossibleBy}) _solvePuzzle(
-    Puzzle puzzle,
-  ) {
-    final steps = <SolveStep>[];
-    final test = puzzle.clone();
-    final stopwatch = Stopwatch()..start();
-    String? impossibleBy;
-    solveLoop:
-    for (int step = 0; step < 1000; step++) {
-      if (stopwatch.elapsedMilliseconds > 10000) break;
-      final m = test.findAMove(checkErrors: false);
-      if (m == null) break;
-      switch (m) {
-        case Impossible(:final givenBy):
-          impossibleBy = givenBy.serialize();
-          break solveLoop;
-        case SetValue(
-          :final idx,
-          :final value,
-          :final complexity,
-          :final givenBy,
-        ):
-          test.setValue(idx, value);
-          steps.add(
-            SetValueStep(
-              cellIdx: idx,
-              value: value,
-              constraint: givenBy.serialize(),
-              method: SolveMethod.propagation,
-              complexity: complexity,
-            ),
-          );
-        case RemoveOption(
-          :final idx,
-          :final option,
-          :final complexity,
-          :final isForce,
-          :final forceDepth,
-          :final givenBy,
-        ):
-          test.removeOption(idx, option);
-          steps.add(
-            RemoveOptionStep(
-              cellIdx: idx,
-              option: option,
-              constraint: isForce ? '' : givenBy.serialize(),
-              method: isForce ? SolveMethod.force : SolveMethod.propagation,
-              forceDepth: isForce ? forceDepth : 0,
-              complexity: isForce ? 0 : complexity,
-            ),
-          );
+  /// Builds a [SolverReport] for [puzzle] on top of the shared
+  /// [Puzzle.solveTrace] loop: per-cell results (borders, corner hints)
+  /// are derived by replaying the trace on a clone. The per-cell sets
+  /// are populated even when the solve is incomplete or contradictory,
+  /// so the author still sees what the solver managed to deduce.
+  static SolverReport _solvePuzzle(Puzzle puzzle) {
+    final trace = puzzle.solveTrace(timeoutMs: 10000);
+    final steps = trace.steps;
+
+    // Replay the trace on a clone to record, per cell, when its value
+    // first became known and which value it took (a RemoveOption on the
+    // 2-colour domain resolves to the surviving colour).
+    final replay = puzzle.clone();
+    final firstDeducedAt = <int, int>{};
+    final cornerValues = <int, CellValue>{};
+    for (int i = 0; i < steps.length; i++) {
+      final step = steps[i];
+      if (step.value != null) {
+        replay.setValue(step.cellIdx, step.value!);
+      } else if (step.removeOption != null) {
+        replay.removeOption(step.cellIdx, step.removeOption!);
       }
-      if (test.complete) break;
+
+      if (replay.cells[step.cellIdx].value != CellValue.free) {
+        firstDeducedAt.putIfAbsent(step.cellIdx, () => i);
+        cornerValues.putIfAbsent(
+          step.cellIdx,
+          () => replay.cells[step.cellIdx].value,
+        );
+      }
     }
-    return (steps: steps, impossibleBy: impossibleBy);
+
+    final firstForceIdx = steps.indexWhere(
+      (s) => s.method == SolveMethod.force,
+    );
+    final propCells = <int>{};
+    final frcCells = <int>{};
+    for (final MapEntry(:key, :value) in firstDeducedAt.entries) {
+      final isBruteForce = firstForceIdx != -1 && value >= firstForceIdx;
+      (isBruteForce ? frcCells : propCells).add(key);
+    }
+
+    return SolverReport(
+      steps: steps,
+      impossibleBy: trace.impossibleBy,
+      solved: trace.impossibleBy == null && !trace.aborted && replay.complete,
+      propagationCells: propCells,
+      forceCells: frcCells,
+      cornerValues: cornerValues,
+      deducedCount: firstDeducedAt.length,
+      bruteForceCount: frcCells.length,
+      totalFreeCells: puzzle.cells.where((c) => !c.readonly).length,
+    );
   }
 
   void _addConstraint(Constraint c) {
     setState(() {
       _constraints.add(c);
+      _clearSolveFeedback();
     });
-    _scheduleAutoSolve();
   }
 
   void _removeConstraint(Constraint c) {
     setState(() {
       _constraints.remove(c);
+      _clearSolveFeedback();
     });
-    _scheduleAutoSolve();
   }
 
   Puzzle _buildPuzzle() {
-    final p = Puzzle.empty(_width, _height, defaultDomain);
+    final p = Puzzle.empty(_width, _height, _domain);
     for (final entry in _fixedCells.entries) {
       p.cells[entry.key].setForSolver(entry.value);
       p.cells[entry.key].readonly = true;
@@ -297,9 +267,10 @@ class _CreatePageState extends State<CreatePage> {
             _fixedCells[i] = puzzle.cells[i].value;
           }
         }
+        _domain = puzzle.domain;
         _editing = true;
+        _clearSolveFeedback();
       });
-      _scheduleAutoSolve();
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -416,6 +387,7 @@ class _CreatePageState extends State<CreatePage> {
       context,
       hasConstraints: cellConstraints.isNotEmpty,
       isFixed: isFixed,
+      domain: _domain,
     );
     if (!mounted || action == null) return;
     switch (action) {
@@ -428,12 +400,16 @@ class _CreatePageState extends State<CreatePage> {
         );
         if (toRemove != null) _removeConstraint(toRemove);
       case CellAction.removeFixed:
-        setState(() => _fixedCells.remove(cellIdx));
-        _scheduleAutoSolve();
+        setState(() {
+          _fixedCells.remove(cellIdx);
+          _clearSolveFeedback();
+        });
       case CellAction.fixBlack:
         _setFixedCell(cellIdx, CellValue.black);
       case CellAction.fixWhite:
         _setFixedCell(cellIdx, CellValue.white);
+      case CellAction.fixPurple:
+        _setFixedCell(cellIdx, CellValue.purple);
     }
   }
 
@@ -445,19 +421,56 @@ class _CreatePageState extends State<CreatePage> {
     if (confirmed) _removeConstraint(constraint);
   }
 
+  Set<String> _disabledSlugsForCell(int cellIdx) {
+    final disabled = <String>{};
+    final ridx = cellIdx ~/ _width;
+    final cidx = cellIdx % _width;
+    final domainLen = _domain.length;
+
+    // PA: disabled when no side has a length that is a positive multiple of
+    // domainLen.  Four independent checks cover the two axes; the composite
+    // "horizontal" / "vertical" sides are only valid when both halves are.
+    bool hasValidSide(int size) => size > 0 && size % domainLen == 0;
+    final left = cidx;
+    final right = _width - 1 - cidx;
+    final top = ridx;
+    final bottom = _height - 1 - ridx;
+    if (!hasValidSide(left) &&
+        !hasValidSide(right) &&
+        !hasValidSide(top) &&
+        !hasValidSide(bottom)) {
+      disabled.add('PA');
+    }
+
+    // DF: disabled for the bottom-right corner (no right or down neighbour).
+    if (cidx == _width - 1 && ridx == _height - 1) {
+      disabled.add('DF');
+    }
+
+    return disabled;
+  }
+
   Future<void> _pickAndAddConstraint(int cellIdx) async {
-    final slug = await showConstraintTypePicker(context);
+    final slug = await showConstraintTypePicker(
+      context,
+      domain: _domain,
+      disabledSlugs: _disabledSlugsForCell(cellIdx),
+    );
     if (!mounted || slug == null) return;
     Constraint? added;
     switch (slug) {
       case 'FM':
-        added = await showForbiddenMotifDialog(context);
+        added = await showForbiddenMotifDialog(
+          context,
+          domain: _domain,
+        );
       case 'PA':
         added = await showParityDialog(
           context,
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'GS':
         added = await showGroupSizeDialog(
@@ -465,6 +478,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'LT':
         await _startLetterGroup(cellIdx);
@@ -477,6 +491,7 @@ class _CreatePageState extends State<CreatePage> {
           context,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'CC':
         added = await showColumnCountDialog(
@@ -484,6 +499,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'JC':
         added = await showColumnMajorityDialog(
@@ -491,7 +507,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
-          domain: defaultDomain,
+          domain: _domain,
         );
       case 'RC':
         added = await showRowCountDialog(
@@ -499,6 +515,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'JR':
         added = await showRowMajorityDialog(
@@ -506,7 +523,7 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
-          domain: defaultDomain,
+          domain: _domain,
         );
       case 'RT':
         added = await showRowTransitionDialog(
@@ -527,6 +544,7 @@ class _CreatePageState extends State<CreatePage> {
           context,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'NC':
         added = await showNeighborCountDialog(
@@ -534,9 +552,13 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'SH':
-        added = await showShapeDialog(context);
+        added = await showShapeDialog(
+          context,
+          domain: _domain,
+        );
       case 'SY':
         added = await showSymmetryDialog(context, cellIdx: cellIdx);
       case 'DF':
@@ -552,30 +574,38 @@ class _CreatePageState extends State<CreatePage> {
           cellIdx: cellIdx,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'IM':
         final loc2 = AppLocalizations.of(context)!;
+        CellValue imColor = _domain.first;
         final color = await showDialog<CellValue>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(loc2.constraintImplication),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton.icon(
-                  onPressed: () => Navigator.pop(ctx, CellValue.black),
-                  icon: const Icon(Icons.circle, color: Color(0xFFB58900)),
-                  label: Text(loc2.colorBlack),
+          builder: (ctx) => StatefulBuilder(
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: Text(loc2.constraintImplication),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${loc2.createChooseValue}:'),
+                  const SizedBox(height: 8),
+                  ColorDotPicker(
+                    domain: _domain,
+                    selected: imColor,
+                    onChanged: (v) => setDialogState(() => imColor = v),
+                    dotSize: 28,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
                 ),
-                TextButton.icon(
-                  onPressed: () => Navigator.pop(ctx, CellValue.white),
-                  icon: const Icon(Icons.circle, color: Color(0xFFD33682)),
-                  label: Text(loc2.colorWhite),
-                ),
-                TextButton.icon(
-                  onPressed: () => Navigator.pop(ctx, CellValue.purple),
-                  icon: const Icon(Icons.circle, color: Color(0xFF2AA198)),
-                  label: Text(loc2.colorPurple),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, imColor),
+                  child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
                 ),
               ],
             ),
@@ -590,18 +620,25 @@ class _CreatePageState extends State<CreatePage> {
         });
         return;
       case 'CH':
-        added = await showChainDialog(context);
+        added = await showChainDialog(
+          context,
+          domain: _domain,
+        );
       case 'BB':
         added = await showBoundingBoxDialog(
           context,
           width: _width,
           height: _height,
+          domain: _domain,
         );
       case 'fixBlack':
         _setFixedCell(cellIdx, CellValue.black);
         return;
       case 'fixWhite':
         _setFixedCell(cellIdx, CellValue.white);
+        return;
+      case 'fixPurple':
+        _setFixedCell(cellIdx, CellValue.purple);
         return;
     }
     if (added != null) _addConstraint(added);
@@ -638,22 +675,26 @@ class _CreatePageState extends State<CreatePage> {
 
   Future<void> _startMajorityZone(int cellIdx) async {
     final loc = AppLocalizations.of(context)!;
-    final color = await showDialog<int>(
+    CellValue selected = _domain.first;
+    final color = await showDialog<CellValue>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.createChooseType),
-        content: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            TextButton.icon(
-              onPressed: () => Navigator.pop(ctx, 1),
-              icon: const Icon(Icons.circle, color: Color(0xFFB58900)),
-              label: Text(loc.createFixBlack),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(loc.createChooseType),
+          content: ColorDotPicker(
+            domain: _domain,
+            selected: selected,
+            onChanged: (v) => setDialogState(() => selected = v),
+            dotSize: 36,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
             ),
-            TextButton.icon(
-              onPressed: () => Navigator.pop(ctx, 2),
-              icon: const Icon(Icons.circle, color: Color(0xFFD33682)),
-              label: Text(loc.createFixWhite),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, selected),
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
             ),
           ],
         ),
@@ -693,7 +734,7 @@ class _CreatePageState extends State<CreatePage> {
       return;
     }
     _addConstraint(
-      MajorityConstraint('$rMin.$cMin.$rMax.$cMax.$_majorityZoneColor'),
+      MajorityConstraint('$rMin.$cMin.$rMax.$cMax.${cellValueToString(_majorityZoneColor)}'),
     );
     setState(() {
       _majorityZoneMode = false;
@@ -708,17 +749,17 @@ class _CreatePageState extends State<CreatePage> {
       } else {
         _fixedCells[cellIdx] = value;
       }
+      _clearSolveFeedback();
     });
-    _scheduleAutoSolve();
   }
 
   // --- Action buttons ---
 
   void _newPuzzle() {
-    _solveDebounce?.cancel();
     setState(() {
       _width = 4;
       _height = 4;
+      _domain = defaultDomain;
       _constraints.clear();
       _fixedCells.clear();
       _solvedValues.clear();
@@ -727,9 +768,6 @@ class _CreatePageState extends State<CreatePage> {
       _implicationMode = false;
       _implicationSourceIdx = null;
       _editing = false;
-      _autoComplexity = null;
-      _autoImpossibleBy = null;
-      _autoSolving = false;
     });
   }
 
@@ -829,49 +867,21 @@ class _CreatePageState extends State<CreatePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   Text(
-                    '${_width}x$_height (${_width * _height})',
+                    '${_width}x$_height (${_width * _height}) · d${_domain.length}',
                     style: const TextStyle(color: Colors.white),
                   ),
                   Text(
                     '${_constraints.length} ${loc.generateConstraints.toLowerCase()}',
                     style: const TextStyle(color: Colors.white),
                   ),
-                  if (_autoSolving || _autoComplexity != null)
-                    Builder(
-                      builder: (_) {
-                        final impossible =
-                            !_autoSolving && _autoImpossibleBy != null;
-                        // The orange border on the constraint widget already
-                        // points at the culprit when it's a regular Constraint
-                        // (its serialize() appears in _constraints). Only fall
-                        // back to a textual label for complicities — they have
-                        // no on-screen widget to highlight.
-                        final hasWidgetHighlight =
-                            impossible &&
-                            _constraints.any(
-                              (c) => c.serialize() == _autoImpossibleBy,
-                            );
-                        final color = impossible
-                            ? Colors.red.shade900
-                            : Colors.white;
-                        final label = _autoSolving
-                            ? '...'
-                            : impossible && !hasWidgetHighlight
-                            ? '$_autoComplexity (${_autoImpossibleBy!})'
-                            : '$_autoComplexity';
-                        return Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FaIcon(
-                              FontAwesomeIcons.brain,
-                              size: 12,
-                              color: color,
-                            ),
-                            Text(' $label', style: TextStyle(color: color)),
-                          ],
-                        );
-                      },
+                  TextButton.icon(
+                    onPressed: _validatePuzzle,
+                    icon: const Icon(Icons.check, color: Colors.white, size: 16),
+                    label: Text(
+                      loc.createValidate,
+                      style: const TextStyle(color: Colors.white),
                     ),
+                  ),
                 ],
               ),
             )
@@ -885,13 +895,28 @@ class _CreatePageState extends State<CreatePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildSliderRow(loc.generateWidth, _width, 3, 10, (v) {
+          _buildSliderRow(loc.generateWidth, _width, 3, 20, (v) {
             setState(() => _width = v);
           }),
           const SizedBox(height: 8),
-          _buildSliderRow(loc.generateHeight, _height, 3, 10, (v) {
+          _buildSliderRow(loc.generateHeight, _height, 3, 15, (v) {
             setState(() => _height = v);
           }),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              SizedBox(width: 120, child: Text(loc.createDomainLabel)),
+              ColorDotPicker(
+                domain: fullDomain,
+                selected: _domain.last,
+                onChanged: (v) {
+                  final idx = fullDomain.indexOf(v);
+                  setState(() => _domain = fullDomain.sublist(0, idx + 1));
+                },
+                dotSize: 28,
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: _startEditing,

@@ -145,8 +145,9 @@ constraint introduces a novel `verify` contract pattern.
 ## Player & experience
 
 - [`editor.md`](editor.md) — In-app puzzle editor (`CreatePage`): fix
-  cells, attach constraints via per-slug dialogs, live solve feedback,
-  test/save. Renders its grid through the shared `PuzzleGridStack`.
+  cells, attach constraints via per-slug dialogs, on-demand solver
+  validation, test/save. Renders its grid through the shared
+  `PuzzleGridStack`.
 - [`adapt_to_player.md`](adapt_to_player.md) — Player-level inference
   and Gaussian sampling of puzzles around that level.
 - [`onboarding.md`](onboarding.md) — Gradual replacement of the

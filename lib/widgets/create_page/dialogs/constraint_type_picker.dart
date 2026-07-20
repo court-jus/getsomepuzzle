@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/registry.dart';
+import 'package:getsomepuzzle/widgets/create_page/shared/color_dot_picker.dart';
 
 // Preview widgets inside the picker render at the same size as a small grid
 // cell so players see the actual constraint glyph they will encounter on the
 // board, rather than a generic Material icon that doesn't visually match.
 const _previewSize = 44.0;
 
-Future<String?> showConstraintTypePicker(BuildContext context) {
+Future<String?> showConstraintTypePicker(
+  BuildContext context, {
+  List<CellValue> domain = defaultDomain,
+  Set<String> disabledSlugs = const {},
+}) {
   final loc = AppLocalizations.of(context)!;
   return showDialog<String>(
     context: context,
@@ -43,6 +49,7 @@ Future<String?> showConstraintTypePicker(BuildContext context) {
                               _previewSize,
                             ),
                             label: constraintNameForSlug(loc, entry.slug),
+                            enabled: !disabledSlugs.contains(entry.slug),
                             onTap: () => Navigator.pop(ctx, entry.slug),
                           ),
                         ),
@@ -57,17 +64,25 @@ Future<String?> showConstraintTypePicker(BuildContext context) {
                   Expanded(
                     child: TextButton.icon(
                       onPressed: () => Navigator.pop(ctx, 'fixBlack'),
-                      icon: const Icon(Icons.circle, color: Color(0xFFB58900)),
+                      icon: ColorDot(value: CellValue.black, size: 20),
                       label: Text(loc.createFixBlack),
                     ),
                   ),
                   Expanded(
                     child: TextButton.icon(
                       onPressed: () => Navigator.pop(ctx, 'fixWhite'),
-                      icon: const Icon(Icons.circle, color: Color(0xFFD33682)),
+                      icon: ColorDot(value: CellValue.white, size: 20),
                       label: Text(loc.createFixWhite),
                     ),
                   ),
+                  if (domain.length > 2)
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.pop(ctx, 'fixPurple'),
+                        icon: ColorDot(value: CellValue.purple, size: 20),
+                        label: Text(loc.createFixPurple),
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -88,38 +103,43 @@ class _TypeTile extends StatelessWidget {
   final Widget preview;
   final String label;
   final VoidCallback onTap;
+  final bool enabled;
   const _TypeTile({
     required this.preview,
     required this.label,
     required this.onTap,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.all(6),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              height: _previewSize + 4,
-              child: Center(child: preview),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.35,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          padding: const EdgeInsets.all(6),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: _previewSize + 4,
+                child: Center(child: preview),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );
