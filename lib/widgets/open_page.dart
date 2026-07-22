@@ -39,7 +39,10 @@ class _OpenPageState extends State<OpenPage> {
   static const _notPassed = Object();
 
   static List<String> get existingRules =>
-      constraintRegistry.map((r) => r.slug).toList();
+      constraintRegistry
+          .map((r) => r.slug)
+          .where((s) => !hiddenSlugs.contains(s))
+          .toList();
 
   Widget? _rulePreview(String slug) {
     for (final r in constraintUIRegistry) {

@@ -184,6 +184,29 @@ Constraint? createConstraint(String slug, String params) {
   return null;
 }
 
+/// Row/column pairs that are functionally equivalent for user-facing
+/// filtering and generation. The key is the "display" slug (always the
+/// column variant); the value is the full set of slugs in the pair.
+const mergedRuleGroups = {
+  'CC': {'CC', 'RC'},
+  'JC': {'JC', 'JR'},
+  'RT': {'RT', 'CT'},
+};
+
+/// Slugs hidden from the UI because they are covered by a merged group.
+/// The user only sees the column-variant slug (CC, JC, RT).
+final hiddenSlugs = {'RC', 'JR', 'CT'};
+
+/// Expand a set of user-facing slugs to the full set of real slugs
+/// they cover (handling merged pairs transparently).
+Set<String> expandMergedRules(Set<String> rules) {
+  final expanded = <String>{};
+  for (final r in rules) {
+    expanded.addAll(mergedRuleGroups[r] ?? {r});
+  }
+  return expanded;
+}
+
 List<String>? generateAllParameters(
   String slug,
   int width,

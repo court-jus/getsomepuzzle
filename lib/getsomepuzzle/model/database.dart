@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
 import 'package:flutter/services.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart'
     as equilibrium;
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
@@ -1265,13 +1266,17 @@ class Database {
       final fitsNormal = w >= minW && w <= maxW && h >= minH && h <= maxH;
       final fitsRotated = h >= minW && h <= maxW && w >= minH && w <= maxH;
       if (!fitsNormal && !fitsRotated) return false;
-      if (currentFilters.wantedRules.isNotEmpty &&
-          currentFilters.wantedRules.intersection(puz.rules.toSet()).length !=
-              currentFilters.wantedRules.length) {
+      // Expand merged rule pairs (CC/RC, JC/JR, RT/CT) so that
+      // selecting the column variant covers both axis variants.
+      final effectiveWanted = expandMergedRules(currentFilters.wantedRules);
+      final effectiveBanned = expandMergedRules(currentFilters.bannedRules);
+      if (effectiveWanted.isNotEmpty &&
+          effectiveWanted.intersection(puz.rules.toSet()).length !=
+              effectiveWanted.length) {
         return false;
       }
-      if (currentFilters.bannedRules.isNotEmpty &&
-          currentFilters.bannedRules
+      if (effectiveBanned.isNotEmpty &&
+          effectiveBanned
               .intersection(puz.rules.toSet())
               .isNotEmpty) {
         return false;

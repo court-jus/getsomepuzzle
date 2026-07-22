@@ -46,7 +46,10 @@ class _GeneratePageState extends State<GeneratePage> {
   Timer? _uiTimer;
 
   static List<(String, String)> get _ruleOptions =>
-      constraintUIRegistry.map((r) => (r.slug, r.slug)).toList();
+      constraintUIRegistry
+          .where((r) => !hiddenSlugs.contains(r.slug))
+          .map((r) => (r.slug, r.slug))
+          .toList();
 
   Widget? _rulePreview(String slug) {
     for (final r in constraintUIRegistry) {
@@ -66,13 +69,17 @@ class _GeneratePageState extends State<GeneratePage> {
   }
 
   void _startGeneration() {
-    final allowedSlugs = _excludedRules.isEmpty
+    // Expand merged rule pairs (CC/RC, JC/JR, RT/CT) so that
+    // selecting the column variant covers both axis variants.
+    final expandedRequired = expandMergedRules(_requiredRules);
+    final expandedExcluded = expandMergedRules(_excludedRules);
+    final allowedSlugs = expandedExcluded.isEmpty
         ? null
-        : constraintSlugs.toSet().difference(_excludedRules);
+        : constraintSlugs.toSet().difference(expandedExcluded);
     final config = GeneratorConfig(
       width: _width,
       height: _height,
-      requiredRules: _requiredRules,
+      requiredRules: expandedRequired,
       allowedSlugs: allowedSlugs,
       maxTime: Duration(seconds: _maxTimeSeconds),
       count: _count,
