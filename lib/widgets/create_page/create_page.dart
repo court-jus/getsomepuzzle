@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:math';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
@@ -56,6 +57,82 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/solver_report_dialog.d
 import 'package:getsomepuzzle/widgets/create_page/shared/color_dot_picker.dart';
 
 export 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
+
+// ---------------------------------------------------------------------------
+// Solver entry-point: runs in a background isolate on native platforms.
+// ---------------------------------------------------------------------------
+
+class _SolverMessage {
+  final Puzzle puzzle;
+  final SendPort replyPort;
+  const _SolverMessage(this.puzzle, this.replyPort);
+}
+
+/// Top-level entry point for the solver isolate.
+void _solvePuzzleEntry(_SolverMessage msg) {
+  msg.replyPort.send(_solvePuzzleSync(msg.puzzle));
+}
+
+/// Builds a [SolverReport] for [puzzle] synchronously.
+/// Runs inside a background isolate on native platforms.
+SolverReport _solvePuzzleSync(Puzzle puzzle) {
+  final trace = puzzle.solveTrace(timeoutMs: 60000);
+  return _buildReport(puzzle, trace);
+}
+
+/// Async variant that yields to the event loop periodically.
+/// Used on web where isolates are not available.
+Future<SolverReport> _solvePuzzleAsync(Puzzle puzzle) async {
+  final trace = await puzzle.solveTraceAsync(timeoutMs: 60000);
+  return _buildReport(puzzle, trace);
+}
+
+/// Shared report builder: replays the trace to derive per-cell info.
+SolverReport _buildReport(
+  Puzzle puzzle,
+  ({List<SolveStep> steps, String? impossibleBy, bool aborted}) trace,
+) {
+  final steps = trace.steps;
+  final replay = puzzle.clone();
+  final firstDeducedAt = <int, int>{};
+  final cornerValues = <int, CellValue>{};
+  for (int i = 0; i < steps.length; i++) {
+    final step = steps[i];
+    if (step.value != null) {
+      replay.setValue(step.cellIdx, step.value!);
+    } else if (step.removeOption != null) {
+      replay.removeOption(step.cellIdx, step.removeOption!);
+    }
+    if (replay.cells[step.cellIdx].value != CellValue.free) {
+      firstDeducedAt.putIfAbsent(step.cellIdx, () => i);
+      cornerValues.putIfAbsent(
+        step.cellIdx,
+        () => replay.cells[step.cellIdx].value,
+      );
+    }
+  }
+
+  final firstForceIdx = steps.indexWhere((s) => s.method == SolveMethod.force);
+  final propCells = <int>{};
+  final frcCells = <int>{};
+  for (final MapEntry(:key, :value) in firstDeducedAt.entries) {
+    final isBruteForce = firstForceIdx != -1 && value >= firstForceIdx;
+    (isBruteForce ? frcCells : propCells).add(key);
+  }
+
+  return SolverReport(
+    steps: steps,
+    impossibleBy: trace.impossibleBy,
+    solved: trace.impossibleBy == null && !trace.aborted && replay.complete,
+    aborted: trace.aborted,
+    propagationCells: propCells,
+    forceCells: frcCells,
+    cornerValues: cornerValues,
+    deducedCount: firstDeducedAt.length,
+    bruteForceCount: frcCells.length,
+    totalFreeCells: puzzle.cells.where((c) => !c.readonly).length,
+  );
+}
 
 class CreatePage extends StatefulWidget {
   final Database database;
@@ -148,11 +225,61 @@ class _CreatePageState extends State<CreatePage> {
   Future<void> _validatePuzzle() async {
     final puzzle = _buildPuzzle();
     debugPrint('[editor] ${puzzle.lineExport(compute: false)}');
-    final report = await showSolverReportDialog(
-      context,
-      solverFuture: compute(_solvePuzzle, puzzle),
-    );
-    if (!mounted || report == null) return;
+
+    if (kIsWeb) {
+      // Web: show dialog with a "Launch" button. The computation runs on
+      // the main thread (no isolates on web), so the user must explicitly
+      // start it and accept that the UI will freeze.
+      final report = await showSolverReportDialog(
+        context,
+        solverFuture: _solvePuzzleAsync(puzzle),
+        onCancel: () => Navigator.pop(context),
+        webMode: true,
+      );
+      if (!mounted || report == null) return;
+      _applyReport(report);
+    } else {
+      // Native: run in a background isolate so the UI stays responsive.
+      Isolate? solverIsolate;
+      final port = ReceivePort();
+      final completer = Completer<SolverReport>();
+
+      // Show dialog first — it awaits [completer.future].
+      final reportFuture = showSolverReportDialog(
+        context,
+        solverFuture: completer.future,
+        onCancel: () {
+          solverIsolate?.kill();
+          solverIsolate = null;
+          port.close();
+          if (!completer.isCompleted)
+            completer.completeError(StateError('cancelled'));
+          Navigator.pop(context);
+        },
+      );
+
+      // Spawn isolate after the dialog is queued so the UI can paint.
+      solverIsolate = await Isolate.spawn(
+        _solvePuzzleEntry,
+        _SolverMessage(puzzle, port.sendPort),
+      );
+      port.first.then(
+        (msg) {
+          port.close();
+          if (!completer.isCompleted) completer.complete(msg as SolverReport);
+        },
+        onError: (e) {
+          if (!completer.isCompleted) completer.completeError(e);
+        },
+      );
+
+      final report = await reportFuture;
+      if (!mounted || report == null) return;
+      _applyReport(report);
+    }
+  }
+
+  void _applyReport(SolverReport report) {
     setState(() {
       _propagationCells = report.propagationCells;
       _forceCells = report.forceCells;
@@ -166,61 +293,6 @@ class _CreatePageState extends State<CreatePage> {
         }
       }
     });
-  }
-
-  /// Builds a [SolverReport] for [puzzle] on top of the shared
-  /// [Puzzle.solveTrace] loop: per-cell results (borders, corner hints)
-  /// are derived by replaying the trace on a clone. The per-cell sets
-  /// are populated even when the solve is incomplete or contradictory,
-  /// so the author still sees what the solver managed to deduce.
-  static SolverReport _solvePuzzle(Puzzle puzzle) {
-    final trace = puzzle.solveTrace(timeoutMs: 10000);
-    final steps = trace.steps;
-
-    // Replay the trace on a clone to record, per cell, when its value
-    // first became known and which value it took (a RemoveOption on the
-    // 2-colour domain resolves to the surviving colour).
-    final replay = puzzle.clone();
-    final firstDeducedAt = <int, int>{};
-    final cornerValues = <int, CellValue>{};
-    for (int i = 0; i < steps.length; i++) {
-      final step = steps[i];
-      if (step.value != null) {
-        replay.setValue(step.cellIdx, step.value!);
-      } else if (step.removeOption != null) {
-        replay.removeOption(step.cellIdx, step.removeOption!);
-      }
-
-      if (replay.cells[step.cellIdx].value != CellValue.free) {
-        firstDeducedAt.putIfAbsent(step.cellIdx, () => i);
-        cornerValues.putIfAbsent(
-          step.cellIdx,
-          () => replay.cells[step.cellIdx].value,
-        );
-      }
-    }
-
-    final firstForceIdx = steps.indexWhere(
-      (s) => s.method == SolveMethod.force,
-    );
-    final propCells = <int>{};
-    final frcCells = <int>{};
-    for (final MapEntry(:key, :value) in firstDeducedAt.entries) {
-      final isBruteForce = firstForceIdx != -1 && value >= firstForceIdx;
-      (isBruteForce ? frcCells : propCells).add(key);
-    }
-
-    return SolverReport(
-      steps: steps,
-      impossibleBy: trace.impossibleBy,
-      solved: trace.impossibleBy == null && !trace.aborted && replay.complete,
-      propagationCells: propCells,
-      forceCells: frcCells,
-      cornerValues: cornerValues,
-      deducedCount: firstDeducedAt.length,
-      bruteForceCount: frcCells.length,
-      totalFreeCells: puzzle.cells.where((c) => !c.readonly).length,
-    );
   }
 
   void _addConstraint(Constraint c) {

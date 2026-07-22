@@ -886,6 +886,24 @@ abstract class AppLocalizations {
   /// **'Your puzzle cannot be fully solved, add more constraints'**
   String get createSolverIncomplete;
 
+  /// Solver report verdict when the solver was interrupted by the 2-minute timeout
+  ///
+  /// In en, this message translates to:
+  /// **'I stopped thinking after 1 minute and deduced {deduced} cell(s) out of {total}'**
+  String createSolverTimedOut(String deduced, String total);
+
+  /// Explanation shown in the solver dialog on web before the user starts the computation
+  ///
+  /// In en, this message translates to:
+  /// **'On the web, the computation freezes the interface while it runs. Tap \"Launch\" to start checking.'**
+  String get createSolverWebExplanation;
+
+  /// Button label to start the solver computation on web
+  ///
+  /// In en, this message translates to:
+  /// **'Launch'**
+  String get createSolverWebLaunch;
+
   /// Solver report verdict when the puzzle is solved, with the difficulty collection name interpolated
   ///
   /// In en, this message translates to:

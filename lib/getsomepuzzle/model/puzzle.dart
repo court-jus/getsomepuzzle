@@ -851,7 +851,13 @@ class Puzzle {
   /// Next deducible move, or null if stuck. Does not mutate `this`.
   /// [checkErrors] returns a corrective move for invalid constraints (UI-only).
   /// [tryForce] enables the force fallback when propagation is stuck.
-  Move? findAMove({bool checkErrors = true, bool tryForce = true}) {
+  /// When [shouldStop] is provided, it is checked between force-probe
+  /// iterations so expensive `_forceOneCell` calls can be interrupted.
+  Move? findAMove({
+    bool checkErrors = true,
+    bool tryForce = true,
+    bool Function()? shouldStop,
+  }) {
     if (checkErrors) {
       final hasErrors = check(saveResult: false);
       if (hasErrors.isNotEmpty) {
@@ -865,7 +871,7 @@ class Puzzle {
     final easyMove = apply();
     if (easyMove != null) return easyMove;
     if (!tryForce) return null;
-    return _forceOneCell();
+    return _forceOneCell(shouldStop: shouldStop);
   }
 
   /// Try setting each free cell to each domain value on a fresh clone; if a
@@ -878,10 +884,14 @@ class Puzzle {
   /// 10-step cascade when a 1-step refutation existed elsewhere on the
   /// grid. Short-circuits as soon as a depth-0 refutation is found (can't
   /// do better).
-  Move? _forceOneCell() {
+  ///
+  /// When [shouldStop] is provided, it is checked between cell iterations
+  /// so the caller can interrupt an expensive scan.
+  Move? _forceOneCell({bool Function()? shouldStop}) {
     Move? best;
     int bestDepth = -1;
     for (final (idx, cell) in cells.indexed) {
+      if (shouldStop?.call() == true) return best;
       if (cell.value != CellValue.free) continue;
       for (final value in cell.options) {
         final clone = this.clone();
@@ -1290,7 +1300,9 @@ class Puzzle {
   /// Does not modify the puzzle — works on a clone.
   /// If [timeoutMs] is provided, stops after that many milliseconds.
   /// If [shouldStop] is provided, it is invoked between iterations;
-  /// returning `true` aborts the trace.
+  /// returning `true` aborts the trace.  The timeout / stop flag is also
+  /// forwarded to [findAMove] so expensive force-probe loops can be
+  /// interrupted mid-scan.
   ///
   /// Returns the recorded deduction `steps` (partial when the loop is
   /// interrupted), `impossibleBy` — the `serialize()` of the constraint
@@ -1314,7 +1326,7 @@ class Puzzle {
         aborted = true;
         break;
       }
-      final m = test.findAMove(checkErrors: false);
+      final m = test.findAMove(checkErrors: false, shouldStop: timedOut);
       if (m == null) break;
       switch (m) {
         case Impossible(:final givenBy):
@@ -1375,6 +1387,82 @@ class Puzzle {
   }) {
     final trace = solveTrace(timeoutMs: timeoutMs, shouldStop: shouldStop);
     return trace.aborted ? [] : trace.steps;
+  }
+
+  /// Async variant of [solveTrace] that periodically yields to the event
+  /// loop (via [Future.value]) so the UI stays responsive on platforms
+  /// where isolates run on the main thread (Flutter web).
+  ///
+  /// [yieldEvery] controls how many solve steps run between yields.
+  Future<({List<SolveStep> steps, String? impossibleBy, bool aborted})>
+  solveTraceAsync({
+    int? timeoutMs,
+    bool Function()? shouldStop,
+    int yieldEvery = 5,
+  }) async {
+    final steps = <SolveStep>[];
+    final test = clone();
+    final stopwatch = timeoutMs != null ? (Stopwatch()..start()) : null;
+    bool timedOut() =>
+        stopwatch != null && stopwatch.elapsedMilliseconds > timeoutMs!;
+
+    String? impossibleBy;
+    bool aborted = false;
+    solveLoop:
+    for (int step = 0; step < 1000; step++) {
+      if (step % yieldEvery == 0) {
+        await Future.value();
+        if (timedOut() || shouldStop?.call() == true) {
+          aborted = true;
+          break;
+        }
+      }
+      final m = test.findAMove(checkErrors: false, shouldStop: timedOut);
+      if (m == null) break;
+      switch (m) {
+        case Impossible(:final givenBy):
+          impossibleBy = givenBy.serialize();
+          break solveLoop;
+        case SetValue(:final idx, :final value, :final complexity):
+          final cell = test.cells[idx];
+          if (cell.value == CellValue.free && !cell.options.contains(value)) {
+            break solveLoop;
+          }
+          test.setValue(idx, value);
+          steps.add(
+            SetValueStep(
+              cellIdx: idx,
+              value: value,
+              constraint: m.givenBy.serialize(),
+              method: SolveMethod.propagation,
+              complexity: complexity,
+              isComplicity: m.givenBy is Complicity,
+            ),
+          );
+        case RemoveOption(
+          :final idx,
+          :final option,
+          :final complexity,
+          :final isForce,
+          :final forceDepth,
+        ):
+          if (!test.removeOption(idx, option)) break solveLoop;
+          steps.add(
+            RemoveOptionStep(
+              cellIdx: idx,
+              option: option,
+              constraint: isForce ? '' : m.givenBy.serialize(),
+              method: isForce ? SolveMethod.force : SolveMethod.propagation,
+              forceDepth: isForce ? forceDepth : 0,
+              complexity: isForce ? 0 : complexity,
+              isComplicity: !isForce && m.givenBy is Complicity,
+            ),
+          );
+      }
+      if (test.complete) break;
+    }
+
+    return (steps: steps, impossibleBy: impossibleBy, aborted: aborted);
   }
 
   /// Unified solving: loop `findAMove` until stuck, contradiction, or complete.

@@ -1276,9 +1276,7 @@ class Database {
         return false;
       }
       if (effectiveBanned.isNotEmpty &&
-          effectiveBanned
-              .intersection(puz.rules.toSet())
-              .isNotEmpty) {
+          effectiveBanned.intersection(puz.rules.toSet()).isNotEmpty) {
         return false;
       }
       if (currentFilters.wantedScenario != null &&

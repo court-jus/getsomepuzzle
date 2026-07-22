@@ -5,6 +5,7 @@ class SolverReport {
   final List<SolveStep> steps;
   final String? impossibleBy;
   final bool solved;
+  final bool aborted;
   final Set<int> propagationCells;
   final Set<int> forceCells;
   final Map<int, CellValue> cornerValues;
@@ -16,6 +17,7 @@ class SolverReport {
     required this.steps,
     this.impossibleBy,
     required this.solved,
+    this.aborted = false,
     required this.propagationCells,
     required this.forceCells,
     required this.cornerValues,

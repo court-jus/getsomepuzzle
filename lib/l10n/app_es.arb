@@ -321,6 +321,22 @@
     "@createSolverIncomplete": {
         "description": "Solver report verdict when the puzzle is not contradictory but the solver stalled before completing it"
     },
+    "createSolverTimedOut": "Dejé de pensar después de 1 minuto y pude deducir {deduced} celda(s) de {total}",
+    "@createSolverTimedOut": {
+        "description": "Solver report verdict when the solver was interrupted by the 2-minute timeout",
+        "placeholders": {
+            "deduced": { "type": "String" },
+            "total": { "type": "String" }
+        }
+    },
+    "createSolverWebExplanation": "En la web, el cálculo bloquea la interfaz mientras se ejecuta. Pulsa «Lanzar» para empezar la verificación.",
+    "@createSolverWebExplanation": {
+        "description": "Explanation shown in the solver dialog on web before the user starts the computation"
+    },
+    "createSolverWebLaunch": "Lanzar",
+    "@createSolverWebLaunch": {
+        "description": "Button label to start the solver computation on web"
+    },
     "createSolverValid": "¡Felicidades, tu puzzle es válido! Su complejidad estimada es {collection}",
     "@createSolverValid": {
         "description": "Solver report verdict when the puzzle is solved, with the difficulty collection name interpolated",

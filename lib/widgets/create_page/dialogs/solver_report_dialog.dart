@@ -8,25 +8,41 @@ import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 /// then replaces its content with the solver report (deduction counts,
 /// verdict, OK button).
 ///
-/// The dialog is never barrier-dismissible (`barrierDismissible: false`)
-/// and has no close button: the only way out is the single *OK* button
-/// shown once the report is ready, which pops the dialog and returns
-/// the [SolverReport]. If [solverFuture] fails, the dialog pops with
-/// `null`.
+/// The dialog is never barrier-dismissible (`barrierDismissible: false`).
+/// During the progress phase a *Cancel* button is shown that invokes
+/// [onCancel] and pops the dialog with `null`.  Once the report is ready
+/// a single *OK* button returns the [SolverReport].
+/// If [solverFuture] fails, the dialog pops with `null`.
+///
+/// When [webMode] is true, the dialog initially shows an explanatory
+/// message and a *Launch* button instead of the spinner. The computation
+/// only starts once the user taps *Launch*.
 Future<SolverReport?> showSolverReportDialog(
   BuildContext context, {
   required Future<SolverReport> solverFuture,
+  VoidCallback? onCancel,
+  bool webMode = false,
 }) {
   return showDialog<SolverReport>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => _SolverReportDialogBody(solverFuture: solverFuture),
+    builder: (ctx) => _SolverReportDialogBody(
+      solverFuture: solverFuture,
+      onCancel: onCancel,
+      webMode: webMode,
+    ),
   );
 }
 
 class _SolverReportDialogBody extends StatefulWidget {
   final Future<SolverReport> solverFuture;
-  const _SolverReportDialogBody({required this.solverFuture});
+  final VoidCallback? onCancel;
+  final bool webMode;
+  const _SolverReportDialogBody({
+    required this.solverFuture,
+    this.onCancel,
+    this.webMode = false,
+  });
 
   @override
   State<_SolverReportDialogBody> createState() =>
@@ -35,16 +51,20 @@ class _SolverReportDialogBody extends StatefulWidget {
 
 class _SolverReportDialogBodyState extends State<_SolverReportDialogBody> {
   SolverReport? _report;
+  bool _webLaunched = false;
 
   @override
   void initState() {
     super.initState();
+    if (!widget.webMode) _startListening();
+  }
+
+  void _startListening() {
     widget.solverFuture.then(
       (report) {
         if (mounted) setState(() => _report = report);
       },
       onError: (Object error, StackTrace stackTrace) {
-        // Without this the dialog would sit on the spinner forever.
         debugPrint('[editor] solver report failed: $error');
         if (mounted) Navigator.pop(context);
       },
@@ -55,6 +75,26 @@ class _SolverReportDialogBodyState extends State<_SolverReportDialogBody> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
 
+    // Web mode, not yet launched: show explanation + launch button.
+    if (widget.webMode && !_webLaunched) {
+      return AlertDialog(
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Text(loc.createSolverWebExplanation),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() => _webLaunched = true);
+              _startListening();
+            },
+            child: Text(loc.createSolverWebLaunch),
+          ),
+        ],
+      );
+    }
+
+    // Waiting for the solver (spinner + cancel).
     if (_report == null) {
       return AlertDialog(
         content: Row(
@@ -64,9 +104,19 @@ class _SolverReportDialogBodyState extends State<_SolverReportDialogBody> {
             Text(loc.createSolverChecking),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              widget.onCancel?.call();
+              Navigator.pop(context);
+            },
+            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+          ),
+        ],
       );
     }
 
+    // Report ready.
     final report = _report!;
     return AlertDialog(
       content: ConstrainedBox(
@@ -99,6 +149,23 @@ class _SolverReportDialogBodyState extends State<_SolverReportDialogBody> {
           Expanded(
             child: Text(
               loc.createSolverContradiction(report.impossibleBy!),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      );
+    }
+    if (report.aborted) {
+      return Row(
+        children: [
+          const Icon(Icons.timer_off, color: Colors.orange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              loc.createSolverTimedOut(
+                report.deducedCount.toString(),
+                report.totalFreeCells.toString(),
+              ),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),

@@ -38,11 +38,10 @@ class _OpenPageState extends State<OpenPage> {
   /// value ("Any"), so we need a different default to detect "not passed".
   static const _notPassed = Object();
 
-  static List<String> get existingRules =>
-      constraintRegistry
-          .map((r) => r.slug)
-          .where((s) => !hiddenSlugs.contains(s))
-          .toList();
+  static List<String> get existingRules => constraintRegistry
+      .map((r) => r.slug)
+      .where((s) => !hiddenSlugs.contains(s))
+      .toList();
 
   Widget? _rulePreview(String slug) {
     for (final r in constraintUIRegistry) {

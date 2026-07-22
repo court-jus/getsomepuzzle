@@ -45,11 +45,10 @@ class _GeneratePageState extends State<GeneratePage> {
   StreamSubscription<GeneratorMessage>? _subscription;
   Timer? _uiTimer;
 
-  static List<(String, String)> get _ruleOptions =>
-      constraintUIRegistry
-          .where((r) => !hiddenSlugs.contains(r.slug))
-          .map((r) => (r.slug, r.slug))
-          .toList();
+  static List<(String, String)> get _ruleOptions => constraintUIRegistry
+      .where((r) => !hiddenSlugs.contains(r.slug))
+      .map((r) => (r.slug, r.slug))
+      .toList();
 
   Widget? _rulePreview(String slug) {
     for (final r in constraintUIRegistry) {

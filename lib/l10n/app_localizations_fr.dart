@@ -448,6 +448,18 @@ class AppLocalizationsFr extends AppLocalizations {
       'Votre puzzle ne peut pas être entièrement résolu, ajoutez des contraintes supplémentaires';
 
   @override
+  String createSolverTimedOut(String deduced, String total) {
+    return 'J\'ai arrêté de réfléchir au bout d\'1 minute et j\'ai pu déduire $deduced cellule(s) sur $total';
+  }
+
+  @override
+  String get createSolverWebExplanation =>
+      'Sur le web, le calcul bloque l\'interface pendant qu\'il s\'exécute. Cliquez sur « Lancer » pour démarrer la vérification.';
+
+  @override
+  String get createSolverWebLaunch => 'Lancer';
+
+  @override
   String createSolverValid(String collection) {
     return 'Bravo, votre puzzle est valable, sa complexité estimée est $collection';
   }
