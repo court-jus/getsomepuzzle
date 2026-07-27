@@ -1110,9 +1110,12 @@ class Database {
   void loadStats(List<StatEntry> allEntries) {
     log.finest("loadStats");
     _allStats = allEntries;
-    // Index by canonical key (identity-only): old stats lines that embed
-    // a stale complexity score or constraint order still match the current
-    // puzzle line. See lib/getsomepuzzle/model/canonical.dart.
+    // Index by identity key (string-only, no Puzzle construction): old
+    // stats lines that embed a stale complexity score or constraint order
+    // still match the current puzzle line. The cheap `identityKey` is
+    // sufficient here — rotation-invariance and constraint normalisation
+    // are not needed for stats↔catalogue matching.
+    // See lib/getsomepuzzle/model/canonical.dart.
     //
     // The stats file now keeps the *full* play history (multiple rows per
     // puzzle — see writeStats). Phase 1 collapses that history back to one
@@ -1121,7 +1124,7 @@ class Database {
     // puzzle: we surface the latest play, not an inflated replay count.
     final Map<String, StatEntry> solvedPuzzles = {};
     for (final entry in allEntries) {
-      final key = canonicalPuzzleKey(entry.puzzleLine);
+      final key = identityKey(entry.puzzleLine);
       final existing = solvedPuzzles[key];
       if (existing == null || _isMoreRecentPlay(entry, existing)) {
         solvedPuzzles[key] = entry;
@@ -1195,7 +1198,7 @@ class Database {
     }
     log.finest("solved $solvedPuzzles");
     for (final puz in [...puzzles, ..._overfilledPuzzles]) {
-      final entry = solvedPuzzles[canonicalPuzzleKey(puz.lineRepresentation)];
+      final entry = solvedPuzzles[identityKey(puz.lineRepresentation)];
       if (entry == null) continue;
       puz.played = true;
       if (entry.finished != null) {

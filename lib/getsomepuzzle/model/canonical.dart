@@ -39,16 +39,29 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 /// stats lines and any line previously canonicalized both produce the
 /// same key.
 String canonicalPuzzleKey(String line) {
-  final base = _identityKey(line);
+  final base = _tryIdentityKey(line);
   if (base == null) return line.trim();
   final orbitMin = _orbitMinIdentityKey(line);
   return orbitMin ?? base;
 }
 
-/// Compute the bare identity key for a v2 line: `domain_dim_prefill_constraints`,
-/// with constraints deduped and sorted. Returns `null` if the line is
-/// malformed enough that the four required fields can't be extracted.
-String? _identityKey(String line) {
+/// Fast, string-only identity key for a v2 puzzle line:
+/// `domain_dim_prefill_sortedConstraints`. Always returns a non-null
+/// result — falls back to `line.trim()` for malformed lines.
+///
+/// This is the cheap key: it only splits, deduplicates and sorts the
+/// constraint tokens — no [Puzzle] construction, no rotation orbit.
+/// Use it where canonical identity (not rotation-invariance or
+/// constraint-normalisation) is sufficient. For the full, normalised
+/// key see [canonicalPuzzleKey].
+String identityKey(String line) {
+  return _tryIdentityKey(line) ?? line.trim();
+}
+
+/// Same as [identityKey] but returns `null` when the line is too
+/// malformed to extract the four required fields, so the caller can
+/// supply its own fallback. Used by [canonicalPuzzleKey].
+String? _tryIdentityKey(String line) {
   final parts = line.trim().split('_');
   // Skip a leading version tag (`v2`/`v3`/...) if present. The 4 fields
   // we care about (domain, wxh, prefill, constraints) come right after.
@@ -81,7 +94,7 @@ String? _orbitMinIdentityKey(String line) {
     String? best;
     for (int i = 0; i < 4; i++) {
       p = p.rotated();
-      final k = _identityKey(p.lineRepresentation);
+      final k = _tryIdentityKey(p.lineRepresentation);
       if (k != null && (best == null || k.compareTo(best) < 0)) best = k;
     }
     return best;
