@@ -169,7 +169,7 @@ jobs:
           tag: v${{ env.VERSION }}-exp.${{ needs.prepare.outputs.slug }}
           name: v${{ env.VERSION }}-exp.${{ needs.prepare.outputs.slug }}
           prerelease: true
-          commitish: ${{ github.sha }}
+          commit: ${{ github.sha }}
           artifacts: >-
             artifacts/apk/getsomepuzzle-v${{ env.VERSION }}-exp.${{ needs.prepare.outputs.slug }}.apk,
             artifacts/windows/getsomepuzzle-v${{ env.VERSION }}-exp.${{ needs.prepare.outputs.slug }}-windows.tgz,
