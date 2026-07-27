@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "build": {
+      "prompt": "prompt/shared/default.md",
+      "model": "opencode-go/deepseek-v4-flash"
+    },
+    "plan": {
+      "prompt": "prompt/shared/default.md",
+      "model": "opencode-go/deepseek-v4-pro"
+    },
+    "general": {
+      "prompt": "prompt/shared/general.md",
+      "mode": "subagent",
+      "model": "opencode/deepseek-v4-flash-free"
+    },
+    "explore": {
+      "prompt": "prompt/shared/explore.md",
+      "mode": "subagent",
+      "model": "opencode/deepseek-v4-flash-free"
+    },
+    "compaction": {
+      "prompt": "prompt/shared/compaction.md",
+      "model": "opencode-go/deepseek-v4-flash"
+    }
+  }
+}
