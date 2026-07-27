@@ -2,6 +2,10 @@ name: CI
 on:
   workflow_dispatch:
   push:
+    branches-ignore:
+      - develop
+    tags-ignore:
+      - '*-exp.*'
 
 permissions:
   contents: write
