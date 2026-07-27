@@ -429,6 +429,27 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     game.refresh();
   }
 
+  /// Reload stats from storage and recompute auto-level if enabled.
+  /// Marks the playlist dirty so it is rebuilt when the settings page
+  /// closes, following the same deferred-rebuild pattern used for
+  /// manual level changes (see `onSettingsChange` → `_playlistDirty`).
+  Future<void> _reloadStatsAndLevel() async {
+    if (database == null) return;
+    await database!.reloadStatsFromStorage();
+    if (settings.autoLevel) {
+      final newLevel = database!.computePlayerLevel(
+        fallback: settings.playerLevel,
+      );
+      if (newLevel != settings.playerLevel) {
+        settings.playerLevel = newLevel;
+        await settings.save();
+      }
+    }
+    database!.setPlayerLevel(settings.playerLevel);
+    _playlistDirty = true;
+    game.refresh();
+  }
+
   /// If the puzzle declares constraint slugs the player has never
   /// seen before, surface a single explanation modal listing all the
   /// new ones. We schedule a post-frame callback so the modal opens
@@ -1309,6 +1330,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       await settings.setStatsDirectory(null);
                       database!.statsDirectory = null;
                       database!.statsDirectoryError = null;
+                      // Reload stats from default-only storage now — this
+                      // re-parses entry state and recomputes auto-level.
+                      await _reloadStatsAndLevel();
+                      if (!context.mounted) return;
+                      setState(() {});
                       return;
                     }
                     await settings.setStatsDirectory(path);
@@ -1318,6 +1344,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     if (!valid) {
                       await database!.clearStatsDirectory();
                       await settings.setStatsDirectory(null);
+                      // Reload stats after falling back to the default
+                      // directory (the merged history has been flushed).
+                      await _reloadStatsAndLevel();
                       if (!context.mounted) return;
                       setState(() {});
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1330,7 +1359,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           duration: const Duration(seconds: 6),
                         ),
                       );
+                      return;
                     }
+                    // The directory is valid — reload stats so the new
+                    // directory's entries are reflected immediately.
+                    await _reloadStatsAndLevel();
+                    if (!context.mounted) return;
+                    setState(() {});
                   },
                   onChangeLanguage: () {
                     setState(() {

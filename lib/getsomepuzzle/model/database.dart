@@ -1220,6 +1220,20 @@ class Database {
     }
   }
 
+  /// Re-read stats from storage (default directory + [statsDirectory] if set),
+  /// parse them, and rebuild all derived data (play states, counters, etc.).
+  ///
+  /// Called at startup by [loadPuzzlesFile] and mid-session when the user
+  /// changes [statsDirectory] via the settings page.
+  Future<void> reloadStatsFromStorage() async {
+    final rawStats = await _readRawStatsFromStorage();
+    _allStats = rawStats
+        .map((line) => StatEntry.parse(line))
+        .whereType<StatEntry>()
+        .toList();
+    loadStats(_allStats);
+  }
+
   Iterable<PuzzleData> filter() => puzzles.where(_matchesFilters);
 
   /// Per-puzzle predicate behind [filter]. Extracted so the soft-discovery
@@ -1361,13 +1375,8 @@ class Database {
     await _augmentWithOverfilledIfOnboarding();
     await _loadOverfilledFallback();
     await currentFilters.load();
-    final rawStats = await _readRawStatsFromStorage();
-    _allStats = rawStats
-        .map((line) => StatEntry.parse(line))
-        .whereType<StatEntry>()
-        .toList();
-    loadStats(_allStats);
-    // After `loadStats` because it populates `progress.firstSeen` from
+    await reloadStatsFromStorage();
+    // After `reloadStatsFromStorage` because it populates `progress.firstSeen` from
     // the play history, which the soft-filter recommendation reads.
     await maybeApplyOnboardingFilterDefaults(prefs);
     // Cross-session guard: keep filters aligned when the phase advanced
