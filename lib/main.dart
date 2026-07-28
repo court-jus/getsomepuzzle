@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_print
 
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -215,18 +214,20 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Prevent screen sleep
-    if (!kIsWeb && Platform.isAndroid) {
-      WakelockPlus.enable();
-    }
     game.addListener(() {
+      // Trigger a rebuild so the build method picks up latest game state.
       if (mounted) setState(() {});
+      _syncWakelock();
     });
+    _syncWakelock();
     initialize();
   }
 
   @override
   void dispose() {
+    if (!kIsWeb) {
+      WakelockPlus.disable();
+    }
     WidgetsBinding.instance.removeObserver(this);
     game.dispose();
     super.dispose();
@@ -794,6 +795,21 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void _onDrawerChanged(bool isOpened) {
     if (isOpened && game.currentPuzzle != null && !game.betweenPuzzles) {
       game.pause();
+    }
+  }
+
+  /// Synchronise le wakelock avec l'état du jeu.
+  /// Actif uniquement quand un puzzle est en cours, non pausé,
+  /// et qu'on n'est pas entre deux puzzles.
+  void _syncWakelock() {
+    if (kIsWeb) return;
+    final active = game.currentPuzzle != null &&
+        !game.paused &&
+        !game.betweenPuzzles;
+    if (active) {
+      WakelockPlus.enable();
+    } else {
+      WakelockPlus.disable();
     }
   }
 
