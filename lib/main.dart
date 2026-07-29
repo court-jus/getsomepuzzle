@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
@@ -497,9 +499,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         }
       }
       if (!skipped) {
+        // Collapse merged pairs (CC↔RC, RT↔CT, JC↔JR) so the dialog
+        // renders each concept only once — they share the same
+        // explanation body and the row/column distinction is secondary.
+        final dialogSlugs = <String>{};
+        for (final slug in newSlugs) {
+          var display = slug;
+          for (final entry in mergedRuleGroups.entries) {
+            if (entry.value.contains(slug)) {
+              display = entry.key;
+              break;
+            }
+          }
+          dialogSlugs.add(display);
+        }
         skipped = await NewConstraintDialog.show(
           context,
-          newSlugs,
+          dialogSlugs,
           showSkipButton: true,
         );
       }
@@ -522,15 +538,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       } else {
         for (final slug in newSlugs) {
           progress.noteSeen(slug, now);
-          // Merged families: CC↔RC and RT↔CT share the same onboarding
-          // explanation. Mark the paired slug as seen too so the soft
-          // filter doesn't re-introduce it later as a separate discovery.
-          if (slug == 'CC' || slug == 'RC') {
-            progress.noteSeen('RC', now);
-            progress.noteSeen('CC', now);
-          } else if (slug == 'RT' || slug == 'CT') {
-            progress.noteSeen('RT', now);
-            progress.noteSeen('CT', now);
+          // Merged families (CC↔RC, RT↔CT, JC↔JR) share the same
+          // onboarding explanation. Mark every sibling as seen too so
+          // the soft filter doesn't re-introduce it later as a separate
+          // discovery.
+          for (final entry in mergedRuleGroups.entries) {
+            if (entry.value.contains(slug)) {
+              for (final sibling in entry.value) {
+                progress.noteSeen(sibling, now);
+              }
+              break;
+            }
           }
         }
       }
@@ -1082,7 +1100,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     double cellSize = 32.0;
     if (game.currentPuzzle != null) {
       final hasLeftBar = game.currentPuzzle!.constraints.any(
-        (c) => c is RowCountConstraint || c is RowTransitionConstraint,
+        (c) =>
+            c is RowCountConstraint ||
+            c is RowTransitionConstraint ||
+            c is RowMajorityConstraint,
       );
       double maxWidth = contextWidth / game.currentPuzzle!.width;
       if (hasLeftBar) {

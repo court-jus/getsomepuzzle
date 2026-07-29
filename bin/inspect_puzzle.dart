@@ -19,29 +19,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
-
-String _gridString(List<CellValue> values, int width) {
-  final sb = StringBuffer();
-  for (int i = 0; i < values.length; i++) {
-    final v = values[i];
-    String ch;
-    if (v == CellValue.free) {
-      ch = '.';
-    } else if (v == CellValue.black) {
-      ch = '#';
-    } else if (v == CellValue.white) {
-      ch = 'o';
-    } else if (v == CellValue.purple) {
-      ch = '¤';
-    } else {
-      ch = v.name;
-    }
-    sb.write(ch);
-    sb.write(' ');
-    if ((i + 1) % width == 0) sb.write('\n');
-  }
-  return sb.toString();
-}
+import 'package:getsomepuzzle/getsomepuzzle/utils/puzzle_display.dart';
 
 String _coord(int idx, int width) {
   final r = idx ~/ width;
@@ -99,13 +77,11 @@ void main(List<String> args) {
   );
   stdout.writeln('');
   stdout.writeln('Initial grid:');
-  stdout.write(_gridString(puzzle.cellValues, puzzle.width));
+  stdout.write(formatGrid(puzzle.cellValues, puzzle.width, puzzle.height));
   stdout.writeln('');
 
   stdout.writeln('Constraints:');
-  for (final c in puzzle.constraints) {
-    stdout.writeln('  ${c.serialize()}  -- ${c.toHuman(puzzle)}');
-  }
+  stdout.write(formatConstraints(puzzle.constraints, puzzle));
   stdout.writeln('');
 
   // --- solveExplained trace ---
@@ -133,7 +109,14 @@ void main(List<String> args) {
   }
   stdout.writeln('');
   stdout.writeln('Grid after trace:');
-  stdout.write(_gridString(replay.cellValues, replay.width));
+  stdout.write(
+    formatGrid(
+      replay.cellValues,
+      replay.width,
+      replay.height,
+      showHeaders: false,
+    ),
+  );
   stdout.writeln('Complete? ${replay.complete}');
   stdout.writeln(
     'Errors after trace: ${replay.check(saveResult: false).length}',
@@ -171,7 +154,14 @@ void main(List<String> args) {
       );
     }
     stdout.writeln('Grid after branch:');
-    stdout.write(_gridString(branched.cellValues, branched.width));
+    stdout.write(
+      formatGrid(
+        branched.cellValues,
+        branched.width,
+        branched.height,
+        showHeaders: false,
+      ),
+    );
     stdout.writeln('');
 
     // Step-by-step propagation. Use findAMove with checkErrors=true so any
@@ -249,7 +239,9 @@ void main(List<String> args) {
   );
   for (int i = 0; i < solutions.length; i++) {
     stdout.writeln('--- Solution ${i + 1} ---');
-    stdout.write(_gridString(solutions[i], puzzle.width));
+    stdout.write(
+      formatGrid(solutions[i], puzzle.width, puzzle.height, showHeaders: false),
+    );
   }
   if (solutions.length >= 2) {
     stdout.writeln('');
@@ -269,6 +261,13 @@ void main(List<String> args) {
   if (puzzle.cachedSolution != null) {
     stdout.writeln('');
     stdout.writeln('Cached solution from puzzle line:');
-    stdout.write(_gridString(puzzle.cachedSolution!, puzzle.width));
+    stdout.write(
+      formatGrid(
+        puzzle.cachedSolution!,
+        puzzle.width,
+        puzzle.height,
+        showHeaders: false,
+      ),
+    );
   }
 }

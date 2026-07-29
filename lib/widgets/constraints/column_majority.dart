@@ -21,7 +21,7 @@ class MajorityIndicatorWidget extends StatelessWidget {
     final circleSize = cellSize * 0.7;
 
     return SizedBox(
-      width: cellSize,
+      width: circleSize,
       height: cellSize,
       child: Center(
         child: SizedBox(

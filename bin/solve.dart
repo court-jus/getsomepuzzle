@@ -4,6 +4,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/utils/puzzle_display.dart';
 
 void main(List<String> args) {
   if (args.isEmpty) {
@@ -59,14 +60,9 @@ void _solvePuzzle(String line) {
   final p = Puzzle(line);
 
   print('Puzzle: $line');
-  print('Grid ${p.width}x${p.height}, constraints:');
-  for (final constraint in p.constraints) {
-    print('  ${constraint.serialize()} — ${constraint.toHuman(p)}');
-  }
   print('');
-
-  print('Initial state:');
-  _printGrid(p);
+  print(describePuzzle(p));
+  print('--- Solving steps ---');
 
   int step = 0;
   while (!p.complete) {
@@ -112,7 +108,7 @@ void _solvePuzzle(String line) {
         .where((c) => !c.verify(p))
         .toList(growable: false);
     print('Solution:');
-    _printGrid(p);
+    print(formatGrid(p.cellValues, p.width, p.height));
     if (violations.isEmpty) {
       print('VALID');
     } else {
@@ -123,25 +119,6 @@ void _solvePuzzle(String line) {
     }
   } else {
     print('Final state (incomplete):');
-    _printGrid(p);
-  }
-}
-
-void _printGrid(Puzzle p) {
-  for (int r = 0; r < p.height; r++) {
-    final row = <String>[];
-    for (int c = 0; c < p.width; c++) {
-      final v = p.cellValues[r * p.width + c];
-      row.add(
-        v == CellValue.free
-            ? '.'
-            : v == CellValue.black
-            ? 'B'
-            : v == CellValue.white
-            ? 'W'
-            : 'P',
-      );
-    }
-    print('  ${row.join(" ")}');
+    print(formatGrid(p.cellValues, p.width, p.height));
   }
 }
