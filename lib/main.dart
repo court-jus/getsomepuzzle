@@ -803,9 +803,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// et qu'on n'est pas entre deux puzzles.
   void _syncWakelock() {
     if (kIsWeb) return;
-    final active = game.currentPuzzle != null &&
-        !game.paused &&
-        !game.betweenPuzzles;
+    final active =
+        game.currentPuzzle != null && !game.paused && !game.betweenPuzzles;
     if (active) {
       WakelockPlus.enable();
     } else {
