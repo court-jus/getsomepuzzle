@@ -303,6 +303,28 @@ class GameModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Load a puzzle directly from a v2 line string, bypassing the Database,
+  /// playlist, onboarding, and locale machinery.
+  ///
+  /// Used by autopilot mode. Resets all interaction state, history and hint
+  /// state, then opens the puzzle as if it were the only one in a playlist.
+  /// No stats, no auto-rotation, and no modal dialogs fire.
+  void loadPuzzleFromLine(String v2Line) {
+    _beforeMutation();
+    history = [];
+    _cancelIdleTimer();
+    dbSize = 1;
+    currentMeta = PuzzleData(v2Line);
+    currentPuzzle = Puzzle(v2Line);
+    _isPuzzleRotated = false;
+    paused = false;
+    betweenPuzzles = false;
+    _stoppedForCompletion = false;
+    _autoPauseReason = null;
+    setTopMessage();
+    _afterMutation();
+  }
+
   void restart() {
     if (currentPuzzle == null) return;
     _beforeMutation();

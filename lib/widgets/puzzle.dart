@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
@@ -45,6 +46,8 @@ class PuzzleWidget extends StatefulWidget {
     this.onCellRightDrag,
     this.onCellRightDragEnd,
     this.onCellLongPress,
+    this.autopilotMode = false,
+    this.onStateReady,
   });
 
   final Puzzle currentPuzzle;
@@ -61,17 +64,116 @@ class PuzzleWidget extends StatefulWidget {
   /// on desktop — the host wires both to the same `GameModel` entry.
   final ValueChanged<int>? onCellLongPress;
 
+  /// When true, every constraint widget in the three bars gets a
+  /// [GlobalKey] (not just highlighted ones) so the autopilot engine can
+  /// look up any constraint's render position for `mouseTo <target>`.
+  final bool autopilotMode;
+
+  /// Called when the state is created. Used by the autopilot engine to
+  /// obtain a reference to [PuzzleWidgetState] without a GlobalKey.
+  final void Function(PuzzleWidgetState state)? onStateReady;
+
   @override
-  State<PuzzleWidget> createState() => _PuzzleWidgetState();
+  State<PuzzleWidget> createState() => PuzzleWidgetState();
 }
 
-class _PuzzleWidgetState extends State<PuzzleWidget> {
+class PuzzleWidgetState extends State<PuzzleWidget> {
   final Map<Object, GlobalKey> _arrowKeys = {};
   final GlobalKey _cellKey = GlobalKey();
   final GlobalKey _stackKey = GlobalKey();
   final GlobalKey _gridKey = GlobalKey();
   List<Offset>? _arrowStarts;
   Offset? _arrowEnd;
+
+  /// The actual cell size used during the most recent build, accounting for
+  /// constraint-bar adjustments. Stored so [getCellGlobalCenter] can compute
+  /// per-cell pixel positions even after the build pass finishes.
+  double _adjustedCellSize = 32.0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.onStateReady?.call(this);
+  }
+
+  /// Helper to assign a [GlobalKey] to a constraint widget when it is
+  /// highlighted for a hint arrow, or when in autopilot mode (so any
+  /// constraint can be a `mouseTo` target).
+  /// Returns the key for a [Constraint] when it should have a [GlobalKey]
+  /// (highlighted for arrow rendering, or in autopilot mode).
+  Key? _keyForConstraint(Object constraint) {
+    if (constraint is Constraint &&
+        (constraint.isHighlighted || widget.autopilotMode)) {
+      return _arrowKeys.putIfAbsent(constraint, () => GlobalKey());
+    }
+    return null;
+  }
+
+  /// Look up the global centre position of a constraint widget by its
+  /// serialized form (e.g. `"FM:1.2"`, `"RC:0.1.3"`).
+  ///
+  /// Returns `null` if the constraint is not present on the current puzzle
+  /// or its widget has not been laid out yet. Used by the autopilot engine
+  /// for the `mouseTo <SLUG:PARAMS>` action.
+  Offset? getConstraintGlobalPosition(String serialized) {
+    final c = widget.currentPuzzle.constraints
+        .where((c) => c.serialize() == serialized)
+        .firstOrNull;
+    if (c == null) return null;
+
+    // Constraints that have their own widget in the constraint bars get a
+    // GlobalKey in _arrowKeys — look up the widget's render position.
+    final key = _arrowKeys[c];
+    if (key != null) {
+      final box = key.currentContext?.findRenderObject() as RenderBox?;
+      if (box != null) {
+        return box.localToGlobal(box.size.center(Offset.zero));
+      }
+    }
+
+    // Constraints without a bar widget (e.g. GroupSize, LetterGroup, …)
+    // are still CellsCentricConstraint — compute the position from the
+    // grid and the anchor cell's coordinates.
+    if (c is CellsCentricConstraint) {
+      final gridBox = _gridKey.currentContext?.findRenderObject() as RenderBox?;
+      if (gridBox == null) return null;
+      final gridOrigin = gridBox.localToGlobal(Offset.zero);
+      final cellIdx = c.indices.first;
+      final col = cellIdx % widget.currentPuzzle.width;
+      final row = cellIdx ~/ widget.currentPuzzle.width;
+      return gridOrigin +
+          Offset(
+            (col + 0.5) * _adjustedCellSize,
+            (row + 0.5) * _adjustedCellSize,
+          );
+    }
+
+    // Unknown constraint type — no way to resolve a position.
+    Logger('PuzzleWidget').warning(
+      'autopilot: cannot resolve position for "$serialized" '
+      '(no widget key and not a CellsCentricConstraint)',
+    );
+    return null;
+  }
+
+  /// Return the global centre of the cell at flat index [idx].
+  ///
+  /// Uses the grid's render box and the stored adjusted cell size. Returns
+  /// `null` when the grid widget has not been laid out yet (which should
+  /// only happen during the first frame).
+  Offset? getCellGlobalCenter(int idx) {
+    final gridBox = _gridKey.currentContext?.findRenderObject() as RenderBox?;
+    if (gridBox == null) return null;
+    final gridOrigin = gridBox.localToGlobal(Offset.zero);
+    final w = widget.currentPuzzle.width;
+    final col = idx % w;
+    final row = idx ~/ w;
+    return gridOrigin +
+        Offset(
+          col * _adjustedCellSize + _adjustedCellSize / 2,
+          row * _adjustedCellSize + _adjustedCellSize / 2,
+        );
+  }
 
   void _handleCellTap(int idx, {bool secondary = false}) {
     widget.onCellTap(idx);
@@ -207,6 +309,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
       double marginNeeded = (numberOfRows - 1) * topBarConstraintsSize;
       adjustedCellSize -= marginNeeded / widget.currentPuzzle.height;
     }
+    _adjustedCellSize = adjustedCellSize;
 
     // Build a map of column index → ColumnCountConstraint for the column header row
     final ccByColumn = <int, ColumnCountConstraint>{};
@@ -319,23 +422,13 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                     for (var constraint in widget.currentPuzzle.constraints)
                       if (constraint is Motif)
                         MotifWidget(
-                          key: constraint.isHighlighted
-                              ? _arrowKeys.putIfAbsent(
-                                  constraint,
-                                  () => GlobalKey(),
-                                )
-                              : null,
+                          key: _keyForConstraint(constraint),
                           constraint: constraint,
                           cellSize: topBarConstraintsSize,
                         )
                       else if (constraint is QuantityConstraint)
                         QuantityWidget(
-                          key: constraint.isHighlighted
-                              ? _arrowKeys.putIfAbsent(
-                                  constraint,
-                                  () => GlobalKey(),
-                                )
-                              : null,
+                          key: _keyForConstraint(constraint),
                           constraint: constraint,
                           actualCount: widget.currentPuzzle.cellValues
                               .where((val) => val == constraint.color)
@@ -358,12 +451,7 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                         )
                       else if (constraint is GroupCountConstraint)
                         GroupCountWidget(
-                          key: constraint.isHighlighted
-                              ? _arrowKeys.putIfAbsent(
-                                  constraint,
-                                  () => GlobalKey(),
-                                )
-                              : null,
+                          key: _keyForConstraint(constraint),
                           constraint: constraint,
                           actualGroupCount: groups
                               .where(
@@ -377,23 +465,13 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                         )
                       else if (constraint is BoundingBoxConstraint)
                         BoundingBoxWidget(
-                          key: constraint.isHighlighted
-                              ? _arrowKeys.putIfAbsent(
-                                  constraint,
-                                  () => GlobalKey(),
-                                )
-                              : null,
+                          key: _keyForConstraint(constraint),
                           constraint: constraint,
                           cellSize: topBarConstraintsSize,
                         )
                       else if (constraint is ChainConstraint)
                         ChainWidget(
-                          key: constraint.isHighlighted
-                              ? _arrowKeys.putIfAbsent(
-                                  constraint,
-                                  () => GlobalKey(),
-                                )
-                              : null,
+                          key: _keyForConstraint(constraint),
                           constraint: constraint,
                           cellSize: topBarConstraintsSize,
                         ),
@@ -422,35 +500,20 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                 children: [
                                   if (rcByRow.containsKey(row))
                                     RowCountWidget(
-                                      key: rcByRow[row]!.isHighlighted
-                                          ? _arrowKeys.putIfAbsent(
-                                              rcByRow[row]!,
-                                              () => GlobalKey(),
-                                            )
-                                          : null,
+                                      key: _keyForConstraint(rcByRow[row]!),
                                       constraint: rcByRow[row]!,
                                       cellSize: adjustedCellSize,
                                     ),
                                   if (rtByRow.containsKey(row))
                                     TransitionWidget(
-                                      key: rtByRow[row]!.isHighlighted
-                                          ? _arrowKeys.putIfAbsent(
-                                              rtByRow[row]!,
-                                              () => GlobalKey(),
-                                            )
-                                          : null,
+                                      key: _keyForConstraint(rtByRow[row]!),
                                       constraint: rtByRow[row]!,
                                       cellSize: adjustedCellSize,
                                       axis: Axis.horizontal,
                                     ),
                                   if (jrByRow.containsKey(row))
                                     MajorityIndicatorWidget(
-                                      key: jrByRow[row]!.isHighlighted
-                                          ? _arrowKeys.putIfAbsent(
-                                              jrByRow[row]!,
-                                              () => GlobalKey(),
-                                            )
-                                          : null,
+                                      key: _keyForConstraint(jrByRow[row]!),
                                       constraint: jrByRow[row]!,
                                       cellSize: adjustedCellSize,
                                     ),
@@ -487,37 +550,26 @@ class _PuzzleWidgetState extends State<PuzzleWidget> {
                                         children: [
                                           if (ctByCol.containsKey(col))
                                             TransitionWidget(
-                                              key: ctByCol[col]!.isHighlighted
-                                                  ? _arrowKeys.putIfAbsent(
-                                                      ctByCol[col]!,
-                                                      () => GlobalKey(),
-                                                    )
-                                                  : null,
+                                              key: _keyForConstraint(
+                                                ctByCol[col]!,
+                                              ),
                                               constraint: ctByCol[col]!,
                                               cellSize: adjustedCellSize,
                                               axis: Axis.vertical,
                                             ),
                                           if (ccByColumn.containsKey(col))
                                             ColumnCountWidget(
-                                              key:
-                                                  ccByColumn[col]!.isHighlighted
-                                                  ? _arrowKeys.putIfAbsent(
-                                                      ccByColumn[col]!,
-                                                      () => GlobalKey(),
-                                                    )
-                                                  : null,
+                                              key: _keyForConstraint(
+                                                ccByColumn[col]!,
+                                              ),
                                               constraint: ccByColumn[col]!,
                                               cellSize: adjustedCellSize,
                                             ),
                                           if (jcByColumn.containsKey(col))
                                             MajorityIndicatorWidget(
-                                              key:
-                                                  jcByColumn[col]!.isHighlighted
-                                                  ? _arrowKeys.putIfAbsent(
-                                                      jcByColumn[col]!,
-                                                      () => GlobalKey(),
-                                                    )
-                                                  : null,
+                                              key: _keyForConstraint(
+                                                jcByColumn[col]!,
+                                              ),
                                               constraint: jcByColumn[col]!,
                                               cellSize: adjustedCellSize,
                                             ),

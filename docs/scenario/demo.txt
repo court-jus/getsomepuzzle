@@ -1,0 +1,34 @@
+loadState v2_12_3x3_010102100_GS:5.1;FM:111_1:121212212
+wait 500
+mouseTo GS:5.1
+wait 200
+dialog "Group Size" "This rule indicates that this cell must be part of a group of size 1. So it must be lonely and all cells around it should take the opposite color."
+wait 5000
+dialog
+mouse 2,0
+wait 100
+setValue 2,0,black
+wait 100
+mouse 1,1
+wait 100
+setValue 1,1,black
+wait 100
+mouse 2,2
+wait 100
+setValue 2,2,black
+wait 400
+mouseTo FM:111
+wait 200
+dialog "Forbidden Pattern" "This rule shows a pattern that is forbidden. So we cannot have 3 black cells in a row. This means that wherever there are already two blacl cells in a row, the third one must be white."
+wait 5000
+dialog
+wait 200
+mouse 0,0
+wait 100
+setValue 0,0,white
+wait 400
+mouseTo FM:111
+wait 200
+mouse 1,2
+wait 100
+setValue 1,2,white

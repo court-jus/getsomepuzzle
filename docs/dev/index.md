@@ -156,9 +156,15 @@ constraint introduces a novel `verify` contract pattern.
   collection type and onboarding state.
 - [`puzzle_orientation.md`](puzzle_orientation.md) — Auto-rotation
   keeping the puzzle readable in portrait/landscape.
+- [`timers.md`](timers.md) — When the clock runs / when it pauses.
+
+## Tools & automation
+
+- [`autopilot.md`](autopilot.md) — Autopilot mode (`--scenario=`)
+  driving the puzzle UI from a scenario file: actions, file format,
+  architecture, fake cursor overlay.
 - [`keyboard_shortcuts.md`](keyboard_shortcuts.md) — Desktop keyboard
   control of an in-progress puzzle (`_handleKeyEvent` in `main.dart`).
-- [`timers.md`](timers.md) — When the clock runs / when it pauses.
 
 ## CLI tools & corpus
 

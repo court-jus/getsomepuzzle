@@ -252,8 +252,9 @@ class _CreatePageState extends State<CreatePage> {
           solverIsolate?.kill();
           solverIsolate = null;
           port.close();
-          if (!completer.isCompleted)
+          if (!completer.isCompleted) {
             completer.completeError(StateError('cancelled'));
+          }
           Navigator.pop(context);
         },
       );

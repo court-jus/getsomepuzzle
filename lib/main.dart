@@ -1,26 +1,30 @@
 // ignore_for_file: avoid_print
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:getsomepuzzle/getsomepuzzle/autopilot/autopilot.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/autopilot_state.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/settings.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
-import 'package:getsomepuzzle/widgets/between_puzzles.dart';
 import 'package:getsomepuzzle/widgets/end_of_playlist.dart';
+import 'package:getsomepuzzle/widgets/fake_cursor.dart';
 import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
 import 'package:getsomepuzzle/widgets/learning_page.dart';
@@ -33,6 +37,8 @@ import 'package:getsomepuzzle/widgets/create_page/create_page.dart';
 import 'package:getsomepuzzle/widgets/generate_page.dart';
 import 'package:getsomepuzzle/widgets/open_page.dart';
 import 'package:getsomepuzzle/widgets/pause_overlay.dart';
+import 'package:getsomepuzzle/widgets/autopilot_dialog.dart';
+import 'package:getsomepuzzle/widgets/between_puzzles.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/save_progress_dialog.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
@@ -94,15 +100,62 @@ void main(List<String> args) {
   Logger.root.onRecord.listen((record) {
     print('${record.level.name}: ${record.time}: ${record.message}');
   });
-  final shared = parseSharedPuzzleLine(args, webUri: kIsWeb ? Uri.base : null);
-  runApp(MyApp(initialSharedLine: shared));
+
+  // Parse CLI flags (documentation-generation mode). Non-flag positional
+  // args are forwarded to [parseSharedPuzzleLine] so a v2_ line or a
+  // share URL can still be passed as the first positional argument.
+  bool noOnboarding = false;
+  String? forcedLocale;
+  String? scenarioPath;
+  final positionalArgs = <String>[];
+  for (final arg in args) {
+    if (arg == '--no-onboarding') {
+      noOnboarding = true;
+    } else if (arg.startsWith('--lang=')) {
+      forcedLocale = arg.substring('--lang='.length);
+    } else if (arg.startsWith('--scenario=')) {
+      scenarioPath = arg.substring('--scenario='.length);
+    } else {
+      positionalArgs.add(arg);
+    }
+  }
+
+  final shared = parseSharedPuzzleLine(
+    positionalArgs,
+    webUri: kIsWeb ? Uri.base : null,
+  );
+  runApp(
+    MyApp(
+      initialSharedLine: shared,
+      noOnboarding: noOnboarding,
+      forcedLocale: forcedLocale,
+      scenarioPath: scenarioPath,
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key, this.initialSharedLine});
+  const MyApp({
+    super.key,
+    this.initialSharedLine,
+    this.noOnboarding = false,
+    this.forcedLocale,
+    this.scenarioPath,
+  });
 
   /// Puzzle line extracted from the launch URL or CLI args, if any.
   final String? initialSharedLine;
+
+  /// When true, all onboarding dialogs and puzzle filtering are suppressed.
+  final bool noOnboarding;
+
+  /// When non-null, forces the app locale to the given language code
+  /// and skips the initial language-chooser dialog.
+  final String? forcedLocale;
+
+  /// Path to an autopilot scenario file. When set, the app enters autopilot
+  /// mode and drives the UI from the scenario actions.
+  final String? scenarioPath;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -127,6 +180,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    selectedLocale = Locale(widget.forcedLocale ?? 'en');
     _loadThemeMode();
   }
 
@@ -157,6 +211,9 @@ class _MyAppState extends State<MyApp> {
         setAppLocale: setAppLocale,
         setAppTheme: setAppTheme,
         initialSharedLine: widget.initialSharedLine,
+        noOnboarding: widget.noOnboarding,
+        forcedLocale: widget.forcedLocale,
+        scenarioPath: widget.scenarioPath,
       ),
     );
   }
@@ -169,6 +226,9 @@ class MyHomePage extends StatefulWidget {
     required this.setAppLocale,
     required this.setAppTheme,
     this.initialSharedLine,
+    this.noOnboarding = false,
+    this.forcedLocale,
+    this.scenarioPath,
   });
 
   final String title;
@@ -178,6 +238,21 @@ class MyHomePage extends StatefulWidget {
   /// Puzzle line forwarded from main(args)/Uri.base. Consumed once on first
   /// database init; subsequent loads fall back to the playlist.
   final String? initialSharedLine;
+
+  /// When true, onboarding dialogs, soft filtering, and all welcome/new-
+  /// constraint modals are suppressed. Used for automated documentation
+  /// screenshot generation.
+  final bool noOnboarding;
+
+  /// When non-null, the locale chooser dialog is skipped entirely and the
+  /// app starts in this locale immediately. The selected locale is also
+  /// persisted to SharedPreferences so subsequent manual launches remember
+  /// the choice.
+  final String? forcedLocale;
+
+  /// Path to an autopilot scenario file. When set, the app enters autopilot
+  /// mode and drives the UI from the scenario actions.
+  final String? scenarioPath;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -212,6 +287,44 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final log = Logger("HomePage");
 
+  // ---------------------------------------------------------------------------
+  // Autopilot mode
+  // ---------------------------------------------------------------------------
+
+  /// GlobalKey on the hint button so autopilot can query its position.
+  final GlobalKey _hintButtonKey = GlobalKey();
+
+  /// Reference to the current [PuzzleWidgetState], used for constraint
+  /// position lookups and cell position lookups via [onStateReady] callback.
+  PuzzleWidgetState? _puzzleWidgetState;
+
+  /// True when autopilot mode is active (a scenario path was provided).
+  bool get _autopilotMode => widget.scenarioPath != null;
+
+  /// Parsed actions from the scenario file.
+  List<AutopilotAction>? _autopilotActions;
+
+  /// Index of the next action to execute.
+  int _autopilotActionIndex = 0;
+
+  /// Whether the autopilot engine is currently processing actions. Prevents
+  /// re-entrance while waiting for a post-frame callback.
+  bool _autopilotBusy = false;
+
+  /// The autopilot driver (isolate or web fallback).
+  AutopilotDriver? _autopilotDriver;
+
+  /// Cursor overlay entry. Created lazily on first mouse/mouseTo action.
+  OverlayEntry? _cursorOverlay;
+
+  /// Position at which the cursor is currently drawn on screen.
+  Offset _cursorDisplayedPos = Offset.zero;
+
+  /// Monotonically increasing counter incremented every time a cursor
+  /// animation starts. When it changes mid‑flight the old loop exits
+  /// immediately so a newer move can take over.
+  int _cursorAnimationGeneration = 0;
+
   @override
   void initState() {
     super.initState();
@@ -230,6 +343,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (!kIsWeb) {
       WakelockPlus.disable();
     }
+    _removeCursorOverlay();
+    _autopilotDriver?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     game.dispose();
     super.dispose();
@@ -237,6 +352,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // In autopilot mode the scenario must keep running even when the
+    // window loses focus — skip the auto-pause entirely.
+    if (_autopilotMode) return;
     if (game.currentPuzzle == null || game.betweenPuzzles) return;
     switch (state) {
       case AppLifecycleState.inactive:
@@ -253,15 +371,64 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future<void> initialize() async {
-    var futures = <Future>[];
     await settings.load();
+
+    if (_autopilotMode) {
+      log.info('AUTOPILOT MODE — scenario="${widget.scenarioPath}"');
+      // Force the locale so no chooser appears.
+      toggleLocale(widget.forcedLocale ?? 'en');
+      // Disable the idle auto-pause — the scenario keeps running even
+      // while the user (or the system) is not interacting with the window.
+      game.idleTimeoutDuration = null;
+      game.hintType = settings.hintType;
+      game.learnedHintSlugs = const {};
+      initialized = true;
+      // Schedule the scenario engine on the next frame so the widget tree
+      // is fully laid out before any action fires.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _startAutopilot();
+      });
+      return;
+    }
+
     await progress.load();
+
+    // Apply forced locale before the database / locale futures so the
+    // language chooser never appears and toggleLocale is not called
+    // twice for the same code path.
+    if (widget.forcedLocale != null) {
+      toggleLocale(widget.forcedLocale!);
+    }
+
+    // When onboarding is disabled, pre-populate every slug as "already
+    // seen" so the new-constraint / welcome modals never fire during
+    // the very first puzzle load (which calls openPuzzle →
+    // _surfaceNewConstraintsIfAny inside initializeDatabase).
+    if (widget.noOnboarding) {
+      final now = DateTime.now();
+      for (final slug in OnboardingPhase.allKnownSlugs) {
+        progress.noteSeen(slug, now);
+      }
+      await progress.save();
+    }
+
     game.idleTimeoutDuration = settings.idleTimeoutDuration;
     game.hintType = settings.hintType;
     game.learnedHintSlugs = progress.firstSeen.keys.toSet();
+    var futures = <Future>[];
     futures.add(initializeDatabase(settings.playerLevel));
     futures.add(initializeLocale());
     await Future.wait(futures);
+
+    // Post-database: exit onboarding on the Database side too (reset
+    // phase counters + rebuild the playlist without any onboarding
+    // filtering) so subsequent puzzles are drawn from the full catalog.
+    if (widget.noOnboarding && database != null) {
+      await database!.skipOnboarding();
+      database!.preparePlaylist();
+    }
+
     // The database's stats load may have backfilled `progress` from
     // legacy plays — persist whatever new entries that produced so a
     // returning player doesn't have to re-derive them on every launch.
@@ -288,10 +455,312 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           content: Text(
             AppLocalizations.of(context)!.statsSyncDirectoryAutoCleared,
           ),
-          duration: const Duration(seconds: 6),
         ),
       );
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Autopilot engine
+  // ---------------------------------------------------------------------------
+
+  /// Wait for the next frame boundary so the widget tree is fully laid out
+  /// after a state mutation.
+  Future<void> _autopilotWaitFrame() {
+    final completer = Completer<void>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      completer.complete();
+    });
+    return completer.future;
+  }
+
+  /// Start the autopilot engine: read and parse the scenario file via the
+  /// [AutopilotDriver], then execute the actions sequentially.
+  Future<void> _startAutopilot() async {
+    final path = widget.scenarioPath;
+    if (path == null || path.isEmpty) return;
+
+    final driver = AutopilotDriver();
+    _autopilotDriver = driver;
+    final actions = await driver.compute(path);
+    if (actions.isEmpty) {
+      log.info('autopilot: scenario "$path" produced no actions');
+      return;
+    }
+
+    log.info('autopilot: loaded ${actions.length} actions from "$path"');
+    _autopilotActions = actions;
+    _autopilotActionIndex = 0;
+    _processNextAutopilotAction();
+  }
+
+  /// Process the next pending action from the scenario, or stop when depleted.
+  Future<void> _processNextAutopilotAction() async {
+    if (_autopilotBusy) return;
+    _autopilotBusy = true;
+
+    while (_autopilotActionIndex < (_autopilotActions?.length ?? 0)) {
+      final action = _autopilotActions![_autopilotActionIndex++];
+
+      // Build a human-readable description of the action for the log line.
+      final lineDesc = switch (action) {
+        LoadStateAction(:final v2Line) =>
+          'loadState ${v2Line.length > 40 ? "${v2Line.substring(0, 40)}…" : v2Line}',
+        WaitAction(:final milliseconds) => 'wait $milliseconds ms',
+        MouseAction(:final col, :final row) => 'mouse $col,$row',
+        MouseToAction(:final target) => 'mouseTo $target',
+        SetValueAction(:final col, :final row, :final value) =>
+          'setValue $col,$row,${value.name}',
+        DialogAction(:final title, :final text) =>
+          title == null && text == null ? 'dialog (close)' : 'dialog',
+        HintAction() => 'hint',
+      };
+      log.info('autopilot: START $lineDesc');
+
+      switch (action) {
+        case LoadStateAction(:final v2Line):
+          await _performLoadState(v2Line);
+
+        case WaitAction(:final milliseconds):
+          await Future.delayed(Duration(milliseconds: milliseconds));
+
+        case MouseAction(:final col, :final row):
+          await _performMouse(col, row);
+
+        case MouseToAction(:final target):
+          await _performMouseTo(target);
+
+        case SetValueAction(:final col, :final row, :final value):
+          await _performSetValue(col, row, value);
+
+        case DialogAction(:final title, :final text):
+          await _performDialog(title, text);
+
+        case HintAction():
+          await _performHint();
+      }
+
+      log.info('autopilot: END $lineDesc');
+    }
+
+    _autopilotBusy = false;
+    log.info('autopilot: scenario completed');
+  }
+
+  /// Ensure the cursor overlay is shown in the overlay.
+  void _ensureCursorOverlay() {
+    if (_cursorOverlay != null) return;
+    _cursorOverlay = OverlayEntry(
+      builder: (_) => Positioned(
+        left: _cursorDisplayedPos.dx,
+        top: _cursorDisplayedPos.dy,
+        child: const FakeCursor(),
+      ),
+    );
+    Overlay.of(context).insert(_cursorOverlay!);
+  }
+
+  /// Remove the cursor overlay if it exists.
+  void _removeCursorOverlay() {
+    _cursorOverlay?.remove();
+    _cursorOverlay = null;
+  }
+
+  /// Animate the cursor from its current displayed position to [target].
+  ///
+  /// The base speed is 1 px/ms, with a floor of 200 ms (short moves feel
+  /// deliberate) and a ceiling of 500 ms (long moves don't drag).
+  /// Returns when the animation is complete so the caller can await it.
+  Future<void> _updateCursorPosition(Offset target) async {
+    const speedPxPerMs = 1.0;
+    const minDurationMs = 200;
+    const maxDurationMs = 500;
+
+    final start = _cursorDisplayedPos;
+    final distance = (target - start).distance;
+
+    // Already at destination — show the position directly.
+    if (distance < 1.0) {
+      _cursorDisplayedPos = target;
+      _ensureCursorOverlay();
+      _cursorOverlay?.markNeedsBuild();
+      return;
+    }
+
+    final durationMs = (distance / speedPxPerMs).round().clamp(
+      minDurationMs,
+      maxDurationMs,
+    );
+    final dt = Duration(milliseconds: durationMs);
+    log.fine(
+      'autopilot: cursor move distance=${distance.toStringAsFixed(0)}px '
+      'duration=${durationMs}ms',
+    );
+
+    _ensureCursorOverlay();
+
+    // Bump the generation so any stale animation loop exits immediately.
+    final gen = ++_cursorAnimationGeneration;
+
+    // Time-based linear interpolation: sample every ~16 ms (≈60 fps).
+    final t0 = DateTime.now();
+    while (true) {
+      // A newer animation started — stop this one.
+      if (_cursorAnimationGeneration != gen) return;
+      final elapsed = DateTime.now().difference(t0);
+      if (elapsed >= dt) break;
+      final t = elapsed.inMicroseconds / dt.inMicroseconds;
+      _cursorDisplayedPos = Offset.lerp(start, target, t)!;
+      _cursorOverlay?.markNeedsBuild();
+      // Yield control so the next frame can paint the updated position.
+      await Future.delayed(const Duration(milliseconds: 16));
+    }
+    _cursorDisplayedPos = target;
+    _cursorOverlay?.markNeedsBuild();
+  }
+
+  /// Load a puzzle from a v2 line.
+  Future<void> _performLoadState(String v2Line) async {
+    try {
+      PuzzleData(v2Line); // validate syntax
+      game.loadPuzzleFromLine(v2Line);
+      // Wait for the framework to rebuild and lay out the PuzzleWidget
+      // before the next action fires.
+      await _autopilotWaitFrame();
+    } catch (e) {
+      log.warning('autopilot: loadState failed: $e');
+    }
+  }
+
+  /// Move the cursor to the centre of grid cell (col, row).
+  Future<void> _performMouse(int col, int row) async {
+    // Wait for the widget tree to be laid out after any preceding action
+    await _autopilotWaitFrame();
+
+    final state = _puzzleWidgetState;
+    if (state == null) {
+      log.warning('autopilot: mouse($col,$row) — puzzle widget not ready');
+      return;
+    }
+
+    final puzzle = game.currentPuzzle;
+    if (puzzle == null) {
+      log.warning('autopilot: mouse($col,$row) — no puzzle loaded');
+      return;
+    }
+    if (col < 0 || col >= puzzle.width || row < 0 || row >= puzzle.height) {
+      log.warning(
+        'autopilot: mouse($col,$row) — out of bounds '
+        '(${puzzle.width}x${puzzle.height})',
+      );
+      return;
+    }
+
+    final idx = row * puzzle.width + col;
+    final pos = state.getCellGlobalCenter(idx);
+    if (pos == null) {
+      log.warning('autopilot: mouse($col,$row) — grid not laid out yet');
+      return;
+    }
+    await _updateCursorPosition(pos);
+  }
+
+  /// Move the cursor to a named widget target.
+  Future<void> _performMouseTo(String target) async {
+    await _autopilotWaitFrame();
+
+    if (target == 'hint') {
+      final box =
+          _hintButtonKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null) {
+        log.warning('autopilot: mouseTo hint — button not laid out yet');
+        return;
+      }
+      await _updateCursorPosition(
+        box.localToGlobal(box.size.center(Offset.zero)),
+      );
+      return;
+    }
+
+    // Constraint reference: resolve via PuzzleWidgetState
+    final state = _puzzleWidgetState;
+    if (state == null) {
+      log.warning('autopilot: mouseTo $target — puzzle widget not ready');
+      return;
+    }
+    final pos = state.getConstraintGlobalPosition(target);
+    if (pos == null) {
+      log.warning(
+        'autopilot: mouseTo $target — constraint not found or not laid out',
+      );
+      return;
+    }
+    await _updateCursorPosition(pos);
+  }
+
+  /// Set a cell to an exact colour, then wait for the next frame so the UI
+  /// redraws before the next action fires.
+  Future<void> _performSetValue(int col, int row, CellValue value) async {
+    final puzzle = game.currentPuzzle;
+    if (puzzle == null) {
+      log.warning('autopilot: setValue($col,$row,$value) — no puzzle loaded');
+      return;
+    }
+    if (col < 0 || col >= puzzle.width || row < 0 || row >= puzzle.height) {
+      log.warning(
+        'autopilot: setValue($col,$row,$value) — out of bounds '
+        '(${puzzle.width}x${puzzle.height})',
+      );
+      return;
+    }
+    final idx = row * puzzle.width + col;
+    if (puzzle.cells[idx].readonly) {
+      log.warning('autopilot: setValue($col,$row,$value) — cell is readonly');
+      return;
+    }
+    puzzle.setValue(idx, value, ignoreOptions: true);
+    puzzle.updateConstraintStatus();
+    game.refresh();
+    // Wait for the widget tree to rebuild and display the new cell colour.
+    await _autopilotWaitFrame();
+  }
+
+  /// One tap on the hint button (mirrors the existing hint flow).
+  Future<void> _performHint() async {
+    if (game.currentPuzzle == null) return;
+    // Schedule the hint on the next frame so any pending setState from
+    // the previous action has committed, then wait for the hint's own
+    // rebuild to complete before the next action runs.
+    final done = Completer<void>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        done.complete();
+        return;
+      }
+      showHelpMove();
+      // Wait one more frame so the hint's visual changes (highlights,
+      // applied move, stage text) are painted.
+      WidgetsBinding.instance.addPostFrameCallback((_) => done.complete());
+    });
+    await done.future;
+  }
+
+  /// Show or close an informational dialog.
+  Future<void> _performDialog(String? title, String? text) async {
+    // Both null → close any open dialog.
+    if (title == null && text == null) {
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      return;
+    }
+    // Show a new dialog (matching onboarding style, no buttons).
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AutopilotDialog(title: title, text: text ?? ''),
+    );
+    await _autopilotWaitFrame();
   }
 
   Future<void> initializeDatabase(int playerLevel) async {
@@ -465,6 +934,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// is still loaded behind the chooser so the modal will fire as
   /// soon as the player picks a language).
   void _surfaceNewConstraintsIfAny(PuzzleData puz) {
+    // When onboarding is globally suppressed (--no-onboarding CLI flag)
+    // skip every modal including the welcome, new-rule, third-colour-
+    // suggestion and onboarding-complete dialogs.
+    if (widget.noOnboarding || _autopilotMode) return;
+
     // A single puzzle line typically declares the same slug several
     // times (e.g. two FM: rules with different params). Build a Set
     // so each slug fires its modal section exactly once.
@@ -591,7 +1065,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// from the wider pool. Either way the suggestion is marked as
   /// shown so it never fires again.
   Future<void> _maybeSuggestThirdColor() async {
-    if (!mounted || database == null) {
+    if (!mounted || database == null || _autopilotMode) {
       log.fine(
         '_maybeSuggestThirdColor: skipped (mounted=$mounted, '
         'db=${database != null})',
@@ -1073,7 +1547,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     // catches device-orientation changes that happen *after* the puzzle is
     // displayed (and a safety net if the orientation hint wasn't passed).
     // Scheduled post-frame to avoid mutating state during build.
-    if (game.currentPuzzle != null) {
+    // In autopilot mode the puzzle must stay in its original orientation
+    // so that scenario coordinates remain valid — skip auto-rotation.
+    if (_autopilotMode) {
+      // no-op
+    } else if (game.currentPuzzle != null) {
       final p = game.currentPuzzle!;
       if (p.width != p.height) {
         final screenW = MediaQuery.sizeOf(context).width;
@@ -1176,6 +1654,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               ),
             if (game.currentPuzzle != null && !shouldChooseLocale)
               IconButton(
+                key: _autopilotMode ? _hintButtonKey : null,
                 icon: Icon(Icons.lightbulb),
                 tooltip: AppLocalizations.of(context)!.tooltipClue,
                 onPressed: _isHintButtonEnabled() ? showHelpMove : null,
@@ -1511,6 +1990,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                             cellSize: cellSize,
                                             hintText: game.hintText,
                                             hintIsError: game.hintIsError,
+                                            autopilotMode: _autopilotMode,
+                                            onStateReady: _autopilotMode
+                                                ? (s) => _puzzleWidgetState = s
+                                                : null,
                                           )
                                         else
                                           Builder(
