@@ -37,8 +37,9 @@ actual newline.
 | `mouseTo` | `mouseTo <target>` | Move the fake cursor to a named UI widget (see targets below). Same animation rules as `mouse`. |
 | `setValue` | `setValue <col>,<row>,<color>` | Set the cell at `(col, row)` to the named colour value. Waits for one frame after the mutation so the UI redraws before the next action. |
 | `hint` | `hint` | One tap on the hint button. Follows the multi-tap flow: in `deducibleCell` mode each call advances the stage (errors → cell → cell+constraint → apply → restart); in `addConstraint` mode (errors → attach constraint). Waits for the hint's visual changes to paint before continuing. |
-| `dialog` | `dialog "title" "body"` | Show an informational dialog matching the onboarding-dialog style (no buttons, `barrierDismissible: false`). The body can contain `\n` for line breaks. |
-| `dialog` | `dialog` | Dismiss any currently open dialog. |
+| `dialog` | `dialog "title" "body"` | Show a subtitle overlay at the centre of the screen (light-green text with a thin black outline, transparent background, movie-subtitle style). The body can contain `\n` for line breaks. |
+| `dialog` | `dialog` | Dismiss any currently open subtitle overlay. |
+| `textcolor` | `textcolor <textColor> <fillColor> <borderColor>` | Change the colours used by subsequent `dialog` actions. Each colour is a [PuzzleColors] semantic name (`dialogAccent`, `highlight`, `forbidden`, `mandatory`, `constraintValid`, `pauseOverlayBg`, `transparent`, …) or a hex code (`#RRGGBB` or `#AARRGGBB`). Use `default` to reset a slot to its original value. All three arguments are required. |
 
 ### `mouseTo` targets
 
@@ -171,8 +172,10 @@ these subtypes:
 - `MouseToAction(target)` — named widget target (string)
 - `SetValueAction(col, row, value)` — cell colour assignment (`CellValue`)
 - `HintAction()` — trigger hint
-- `DialogAction(title?, text?)` — show or close informational dialog (both
+- `DialogAction(title?, text?)` — show or close subtitle overlay (both
   null = close)
+- `TextColorAction(textColor, fillColor, borderColor)` — change colours for
+  subsequent subtitle overlays (raw string tokens, resolved at runtime)
 
 ### Parsing
 
@@ -228,10 +231,16 @@ the action list, then enters a sequential loop. Every action is `await`ed:
 5. **Hint**: calls `showHelpMove()` on the next frame (the same multi-tap flow
    used by the lightbulb button). Waits an additional frame for visual changes
    (highlights, applied move, stage text) to paint.
-6. **Dialog**: if title+text are both null, pops the current dialog (if any)
-   via `Navigator.of(context, rootNavigator: true).pop()`. Otherwise shows a
-   new `AutopilotDialog` via `showDialog()` (no buttons, `barrierDismissible:
-   false`). Waits one frame so the dialog renders.
+6. **Dialog**: if title+text are both null, removes the subtitle overlay via
+   `_removeDialogOverlay()`. Otherwise inserts a new `OverlayEntry` containing
+   an `AutopilotDialog` (stroked-text subtitle style) into the Navigator's
+   overlay using the current text/fill/border colours. Waits one frame so
+   the overlay renders.
+7. **TextColor**: resolves each of the three colour tokens via
+   `_resolveColorToken()` (tries [PuzzleColors.resolveByName], then hex
+   parsing, then falls back to the default) and updates the corresponding
+   `_dialogTextColor`, `_dialogFillColor`, `_dialogBorderColor` fields for
+   subsequent `dialog` actions.
 
 After the final action the app stays on the last puzzle state — it does not
 exit, transition, or loop.
@@ -279,14 +288,20 @@ The `_arrowKeys` map in `PuzzleWidgetState` (`lib/widgets/puzzle.dart`) maps
 widget in the three bars receives a key (not just highlighted ones), via the
 `_keyForConstraint` helper.
 
-### Dialog widget
+### Dialog / Subtitle overlay
 
-The `AutopilotDialog` in `lib/widgets/autopilot_dialog.dart` is an
-`AlertDialog` with the same visual style as the onboarding dialogs: an
-`Icons.info_outline` icon with the `PuzzleColors.dialogAccent` colour in the
-title row, and a `SingleChildScrollView` body. It has no action buttons and
-`barrierDismissible: false` — the only way to dismiss it is a subsequent
-`dialog` action with no arguments.
+The `AutopilotDialog` in `lib/widgets/autopilot_dialog.dart` is a subtitle
+overlay rendered on top of the whole UI (via an `OverlayEntry` in the
+Navigator overlay). It displays the title and body text centred on screen
+with a stroked-text technique — each glyph gets a thin black outline
+(1.5 px) so it remains legible against any background, just like movie
+subtitles. The background defaults to `Colors.transparent`. The colours
+can be changed at runtime via the `textcolor` action, which resolves
+[PuzzleColors] semantic names and hex codes.
+
+The overlay is wrapped in `IgnorePointer` so it never intercepts input.
+The only way to dismiss it is a subsequent `dialog` action with no
+arguments.
 
 ### Error handling
 
@@ -324,7 +339,8 @@ skipped for:
 | `lib/getsomepuzzle/autopilot/autopilot_stub.dart` | Stub for unsupported platforms |
 | `lib/getsomepuzzle/autopilot/autopilot.dart` | Conditional exports |
 | `lib/widgets/fake_cursor.dart` | Cursor overlay widget (arrow + red shadow) |
-| `lib/widgets/autopilot_dialog.dart` | Informational dialog (no buttons) |
+| `lib/widgets/autopilot_dialog.dart` | Subtitle overlay widget (stroked-text, movie-subtitle style) |
+| `lib/getsomepuzzle/model/app_theme.dart` | `PuzzleColors.resolveByName()` — semantic colour resolution for `textcolor` |
 | `lib/main.dart` | CLI parsing, execution engine, overlay management |
 | `lib/getsomepuzzle/model/game_model.dart` | `loadPuzzleFromLine()` method |
 | `lib/widgets/puzzle.dart` | Autopilot-mode key assignment, position lookup |

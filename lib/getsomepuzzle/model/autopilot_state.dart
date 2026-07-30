@@ -48,13 +48,35 @@ class HintAction extends AutopilotAction {
   const HintAction();
 }
 
-/// Show or close an informational dialog.
+/// Show or close a subtitle overlay on top of the puzzle.
 ///
-/// When both [title] and [text] are non-null a new dialog is shown (matching
-/// the onboarding-dialog style, no buttons). When both are null any open
-/// dialog is dismissed.
+/// When both [title] and [text] are non-null a subtitle overlay is shown
+/// (light-green text with thin black outline, transparent background,
+/// centered on screen like movie subtitles). When both are null the
+/// overlay is removed.
 class DialogAction extends AutopilotAction {
   final String? title;
   final String? text;
   const DialogAction({this.title, this.text});
+}
+
+/// Change the colors used by subsequent [DialogAction] subtitle overlays.
+///
+/// Each field holds a raw colour token — either:
+/// - A [PuzzleColors] semantic name (e.g. `dialogAccent`, `highlight`)
+/// - A hex code (`#RRGGBB` or `#AARRGGBB`)
+/// - `default` to reset that slot to its original value
+///
+/// All three fields are always provided by the action; the execution engine
+/// resolves each token to a [Color] at runtime.
+class TextColorAction extends AutopilotAction {
+  final String textColor;
+  final String fillColor;
+  final String borderColor;
+
+  const TextColorAction({
+    required this.textColor,
+    required this.fillColor,
+    required this.borderColor,
+  });
 }

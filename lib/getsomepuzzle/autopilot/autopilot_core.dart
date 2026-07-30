@@ -113,6 +113,23 @@ List<AutopilotAction> parseScenario(String content) {
                   ),
           );
 
+        case 'textcolor':
+          if (args.length < 3) {
+            _log.warning(
+              'autopilot line ${lineIdx + 1}: '
+              'textcolor needs exactly three colors: textColor fillColor '
+              'borderColor',
+            );
+            continue;
+          }
+          actions.add(
+            TextColorAction(
+              textColor: args[0],
+              fillColor: args[1],
+              borderColor: args[2],
+            ),
+          );
+
         case 'hint':
           actions.add(const HintAction());
 

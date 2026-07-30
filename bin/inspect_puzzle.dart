@@ -15,7 +15,8 @@
 
 import 'dart:io';
 
-import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
+import 'dart:math';
+
 import 'package:getsomepuzzle/getsomepuzzle/generator/backtrack.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
@@ -164,65 +165,71 @@ void main(List<String> args) {
     );
     stdout.writeln('');
 
-    // Step-by-step propagation. Use findAMove with checkErrors=true so any
-    // inter-constraint violation surfaces as a corrective Move (with the
-    // responsible constraint in `givenBy`).
-    int s = 0;
-    while (true) {
-      // Check whether any constraint already reports a violation on the
-      // current state. This catches the bug where verify() and apply()
-      // disagree: if verify says ok but apply forces something invalid,
-      // we'll see verify start failing after the apply step.
-      final errors = branched.check(saveResult: false);
-      if (errors.isNotEmpty) {
-        stdout.writeln(
-          '!! verify() FAILS on ${errors.length} constraint(s) at this state:',
-        );
-        for (final e in errors) {
-          stdout.writeln('     ${e.serialize()}  -- ${e.toHuman(branched)}');
-        }
-      }
-
-      final m = branched.findAMove(checkErrors: false);
-      if (m == null) {
-        stdout.writeln('Stuck after $s extra step(s). No move available.');
-        break;
-      }
-      if (m.isImpossible != null) {
-        final imp = m.isImpossible!;
-        final human = imp is Constraint ? ' (${imp.toHuman(branched)})' : '';
-        stdout.writeln('CONTRADICTION reported by ${imp.serialize()}$human');
-        break;
-      }
-      s++;
-      final method = m.isForce ? 'FORCE(d=${m.forceDepth})' : 'PROP';
-      stdout.writeln(
-        'extra step ${s.toString().padLeft(2)}: '
-        '${_coord(m.idx, branched.width)} = ${m.value}  [$method] '
-        'by ${m.givenBy.serialize()}',
-      );
-      if (m.value != null) {
-        branched.setValue(m.idx, m.value!);
-      } else if (m.removeOption != null) {
-        branched.removeOption(m.idx, m.removeOption!);
-      }
-      if (branched.complete) {
-        final post = branched.check(saveResult: false);
-        if (post.isEmpty) {
-          stdout.writeln('Reached COMPLETE state, all constraints satisfied.');
-        } else {
+    // Propagation after the branch using solveExplained (includes drain).
+    // Replay the returned steps, cross-checking verify() at each state.
+    stdout.writeln('Propagating...');
+    final branchSteps = branched.solveExplained();
+    if (branchSteps.isEmpty) {
+      stdout.writeln('Stuck. No move available from this branch.');
+    } else {
+      final maxBranchSteps = 200;
+      for (int si = 0; si < branchSteps.length && si < maxBranchSteps; si++) {
+        // Cross-check at the state before this step.
+        final errors = branched.check(saveResult: false);
+        if (errors.isNotEmpty) {
           stdout.writeln(
-            'Reached complete state but ${post.length} constraint(s) FAIL:',
+            '!! verify() FAILS on ${errors.length} constraint(s) at this state:',
           );
-          for (final e in post) {
+          for (final e in errors) {
             stdout.writeln('     ${e.serialize()}  -- ${e.toHuman(branched)}');
           }
         }
-        break;
+
+        final s = branchSteps[si];
+        if (s.method == SolveMethod.force) {
+          stdout.writeln(
+            'extra step ${(si + 1).toString().padLeft(2)}: '
+            '${_coord(s.cellIdx, branched.width)} = ${s.value}  '
+            '[FORCE(d=${s.forceDepth})] by ${s.constraint}',
+          );
+        } else {
+          stdout.writeln(
+            'extra step ${(si + 1).toString().padLeft(2)}: '
+            '${_coord(s.cellIdx, branched.width)} = ${s.value}  '
+            '[PROP] by ${s.constraint}',
+          );
+        }
+
+        if (s.value != null) {
+          branched.setValue(s.cellIdx, s.value!);
+        } else if (s.removeOption != null) {
+          branched.removeOption(s.cellIdx, s.removeOption!);
+        }
+
+        if (branched.complete) {
+          final post = branched.check(saveResult: false);
+          if (post.isEmpty) {
+            stdout.writeln(
+              'Reached COMPLETE state, all constraints satisfied.',
+            );
+          } else {
+            stdout.writeln(
+              'Reached complete state but ${post.length} constraint(s) FAIL:',
+            );
+            for (final e in post) {
+              stdout.writeln(
+                '     ${e.serialize()}  -- ${e.toHuman(branched)}',
+              );
+            }
+          }
+          break;
+        }
       }
-      if (s > 200) {
-        stdout.writeln('Stopped after 200 extra steps (safety cap).');
-        break;
+      if (!branched.complete) {
+        stdout.writeln(
+          'Stopped after ${min(maxBranchSteps, branchSteps.length)} '
+          'extra step(s) (safety cap).',
+        );
       }
     }
     stdout.writeln('');

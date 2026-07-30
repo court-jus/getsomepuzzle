@@ -874,6 +874,35 @@ class Puzzle {
     return _forceOneCell(shouldStop: shouldStop);
   }
 
+  /// After a move from [givenBy] has been applied, keep calling
+  /// [givenBy.apply(this)] until it returns null, applying each
+  /// subsequent move immediately.
+  ///
+  /// [onEach] is invoked after each drained move so the caller can
+  /// update bookkeeping (move counts, fired lists, step traces, etc.)
+  /// without duplicating the switch-and-apply logic. Returns `false`
+  /// when a contradiction or stuck condition is encountered, `true` if
+  /// the source drained cleanly (no more moves).
+  bool _drainAfter(CanApply givenBy, {void Function(Move)? onEach}) {
+    while (true) {
+      final next = givenBy.apply(this);
+      if (next == null) return true;
+      switch (next) {
+        case Impossible():
+          return false;
+        case SetValue(:final idx, :final value):
+          final cell = cells[idx];
+          if (cell.value == CellValue.free && !cell.options.contains(value)) {
+            return false;
+          }
+          setValue(idx, value);
+        case RemoveOption(:final idx, :final option):
+          if (!removeOption(idx, option)) return false;
+      }
+      onEach?.call(next);
+    }
+  }
+
   /// Try setting each free cell to each domain value on a fresh clone; if a
   /// value leads to contradiction, remove this option.
   ///
@@ -985,6 +1014,18 @@ class Puzzle {
       }
       moves++;
       if (complete) return (moves: moves, failed: false, fired: fired);
+      // Drain the same constraint — it may have more deductions to offer
+      // without other constraints needing a turn.
+      if (!_drainAfter(
+        m.givenBy,
+        onEach: (next) {
+          moves++;
+          fired.add(next.givenBy);
+        },
+      )) {
+        return (moves: moves, failed: true, fired: fired);
+      }
+      if (complete) return (moves: moves, failed: false, fired: fired);
     }
   }
 
@@ -1094,6 +1135,21 @@ class Puzzle {
           }
       }
       moves++;
+      if (verifyAfterEachMove && check(saveResult: false).isNotEmpty) {
+        return null;
+      }
+      if (complete) return moves;
+      // Drain the same constraint — it may have more deductions.
+      // Note: verifyAfterEachMove checks are not re-run inside the drain
+      // loop because the flag is never true in production (see call-sites).
+      if (!_drainAfter(
+        m.givenBy,
+        onEach: (_) {
+          moves++;
+        },
+      )) {
+        return null;
+      }
       if (verifyAfterEachMove && check(saveResult: false).isNotEmpty) {
         return null;
       }
@@ -1277,6 +1333,16 @@ class Puzzle {
           effort += isForce ? (5 + 5 * forceDepth) : complexity;
       }
       if (test.complete) break;
+      // Drain the same constraint on the clone.
+      if (!test._drainAfter(
+        m.givenBy,
+        onEach: (n) {
+          effort += n.complexity;
+        },
+      )) {
+        return (effort: effort, solved: null);
+      }
+      if (test.complete) break;
     }
     if (test.freeCells().isNotEmpty) return (effort: effort, solved: null);
     return (effort: effort, solved: test.cellValues);
@@ -1370,6 +1436,46 @@ class Puzzle {
           );
       }
       if (test.complete) break;
+      // Drain the same constraint — consecutive deductions from the same
+      // source are recorded as separate steps (the scenario generator
+      // groups them by source).
+      if (!test._drainAfter(
+        m.givenBy,
+        onEach: (n) {
+          switch (n) {
+            case SetValue(:final idx, :final value, :final complexity):
+              steps.add(
+                SetValueStep(
+                  cellIdx: idx,
+                  value: value,
+                  constraint: n.givenBy.serialize(),
+                  method: SolveMethod.propagation,
+                  complexity: complexity,
+                  isComplicity: n.givenBy is Complicity,
+                ),
+              );
+            case RemoveOption(:final idx, :final option, :final complexity):
+              steps.add(
+                RemoveOptionStep(
+                  cellIdx: idx,
+                  option: option,
+                  constraint: n.givenBy.serialize(),
+                  method: SolveMethod.propagation,
+                  forceDepth: 0,
+                  complexity: complexity,
+                  isComplicity: n.givenBy is Complicity,
+                ),
+              );
+            case Impossible():
+            // Unreachable: _drainAfter returns false before calling onEach.
+          }
+        },
+      )) {
+        // Drain hit a contradiction sourced by the same constraint.
+        impossibleBy = m.givenBy.serialize();
+        break solveLoop;
+      }
+      if (test.complete) break;
     }
 
     return (steps: steps, impossibleBy: impossibleBy, aborted: aborted);
@@ -1460,6 +1566,44 @@ class Puzzle {
           );
       }
       if (test.complete) break;
+      // Drain the same constraint (no yielding inside the drain — it is
+      // fast; the next for-iteration will yield if needed).
+      if (!test._drainAfter(
+        m.givenBy,
+        onEach: (n) {
+          switch (n) {
+            case SetValue(:final idx, :final value, :final complexity):
+              steps.add(
+                SetValueStep(
+                  cellIdx: idx,
+                  value: value,
+                  constraint: n.givenBy.serialize(),
+                  method: SolveMethod.propagation,
+                  complexity: complexity,
+                  isComplicity: n.givenBy is Complicity,
+                ),
+              );
+            case RemoveOption(:final idx, :final option, :final complexity):
+              steps.add(
+                RemoveOptionStep(
+                  cellIdx: idx,
+                  option: option,
+                  constraint: n.givenBy.serialize(),
+                  method: SolveMethod.propagation,
+                  forceDepth: 0,
+                  complexity: complexity,
+                  isComplicity: n.givenBy is Complicity,
+                ),
+              );
+            case Impossible():
+            // Unreachable: _drainAfter returns false before calling onEach.
+          }
+        },
+      )) {
+        impossibleBy = m.givenBy.serialize();
+        break solveLoop;
+      }
+      if (test.complete) break;
     }
 
     return (steps: steps, impossibleBy: impossibleBy, aborted: aborted);
@@ -1491,6 +1635,10 @@ class Puzzle {
           setValue(idx, value);
         case RemoveOption(:final idx, :final option):
           if (!removeOption(idx, option)) break solveLoop;
+      }
+      // Drain the same constraint — it may have more deductions.
+      if (!_drainAfter(m.givenBy)) {
+        break solveLoop;
       }
     }
     return complete && check(saveResult: false).isEmpty;

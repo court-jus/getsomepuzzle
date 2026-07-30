@@ -1,11 +1,13 @@
 // ignore_for_file: avoid_print
 
 import 'dart:async';
+import 'dart:io' show exit;
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:getsomepuzzle/getsomepuzzle/autopilot/autopilot.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
@@ -90,7 +92,7 @@ String? parseSharedPuzzleLine(List<String> args, {Uri? webUri}) {
   return null;
 }
 
-void main(List<String> args) {
+Future<void> main(List<String> args) async {
   // Verbose only in debug builds, where we want to "watch" a play
   // session unfold: cell taps, validation outcomes, hint requests,
   // playlist transitions. Release builds stick to INFO so the player
@@ -107,6 +109,8 @@ void main(List<String> args) {
   bool noOnboarding = false;
   String? forcedLocale;
   String? scenarioPath;
+  double? windowWidth;
+  double? windowHeight;
   final positionalArgs = <String>[];
   for (final arg in args) {
     if (arg == '--no-onboarding') {
@@ -115,9 +119,21 @@ void main(List<String> args) {
       forcedLocale = arg.substring('--lang='.length);
     } else if (arg.startsWith('--scenario=')) {
       scenarioPath = arg.substring('--scenario='.length);
+    } else if (arg.startsWith('--width=')) {
+      windowWidth = double.tryParse(arg.substring('--width='.length));
+    } else if (arg.startsWith('--height=')) {
+      windowHeight = double.tryParse(arg.substring('--height='.length));
     } else {
       positionalArgs.add(arg);
     }
+  }
+
+  // Apply window size on desktop before the first frame.
+  if (windowWidth != null && windowHeight != null && !kIsWeb) {
+    WidgetsFlutterBinding.ensureInitialized();
+    await windowManager.ensureInitialized();
+    await windowManager.setSize(Size(windowWidth, windowHeight));
+    await windowManager.center();
   }
 
   final shared = parseSharedPuzzleLine(
@@ -325,6 +341,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// immediately so a newer move can take over.
   int _cursorAnimationGeneration = 0;
 
+  // -------------------------------------------------------------------------
+  // Dialog / subtitle overlay
+  // -------------------------------------------------------------------------
+
+  /// Subtitle overlay entry. Shown by `dialog "title" "text"`, removed by
+  /// `dialog` (no args).
+  OverlayEntry? _dialogOverlay;
+
+  static const Color _defaultDialogTextColor = Color(0xFF90EE90);
+  static const Color _defaultDialogFillColor = Colors.transparent;
+  static const Color _defaultDialogBorderColor = Colors.black;
+
+  Color _dialogTextColor = _defaultDialogTextColor;
+  Color _dialogFillColor = _defaultDialogFillColor;
+  Color _dialogBorderColor = _defaultDialogBorderColor;
+
   @override
   void initState() {
     super.initState();
@@ -343,6 +375,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (!kIsWeb) {
       WakelockPlus.disable();
     }
+    _removeDialogOverlay();
     _removeCursorOverlay();
     _autopilotDriver?.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -513,6 +546,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           'setValue $col,$row,${value.name}',
         DialogAction(:final title, :final text) =>
           title == null && text == null ? 'dialog (close)' : 'dialog',
+        TextColorAction(
+          :final textColor,
+          :final fillColor,
+          :final borderColor,
+        ) =>
+          'textcolor $textColor $fillColor $borderColor',
         HintAction() => 'hint',
       };
       log.info('autopilot: START $lineDesc');
@@ -536,6 +575,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         case DialogAction(:final title, :final text):
           await _performDialog(title, text);
 
+        case TextColorAction():
+          await _performTextColor(action);
+
         case HintAction():
           await _performHint();
       }
@@ -545,6 +587,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     _autopilotBusy = false;
     log.info('autopilot: scenario completed');
+    // Brief pause so the viewer sees the final state, then close.
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (!kIsWeb) exit(0);
   }
 
   /// Ensure the cursor overlay is shown in the overlay.
@@ -564,6 +609,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void _removeCursorOverlay() {
     _cursorOverlay?.remove();
     _cursorOverlay = null;
+  }
+
+  /// Remove the subtitle overlay if it exists.
+  void _removeDialogOverlay() {
+    _dialogOverlay?.remove();
+    _dialogOverlay = null;
   }
 
   /// Animate the cursor from its current displayed position to [target].
@@ -745,22 +796,77 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     await done.future;
   }
 
-  /// Show or close an informational dialog.
+  /// Show or close the subtitle overlay.
   Future<void> _performDialog(String? title, String? text) async {
-    // Both null → close any open dialog.
+    // Both null → close any open subtitle.
     if (title == null && text == null) {
-      if (Navigator.of(context, rootNavigator: true).canPop()) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
+      _removeDialogOverlay();
       return;
     }
-    // Show a new dialog (matching onboarding style, no buttons).
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AutopilotDialog(title: title, text: text ?? ''),
+    // Show subtitle overlay (movie-subtitle style, centered).
+    _removeDialogOverlay();
+    _dialogOverlay = OverlayEntry(
+      builder: (_) => Positioned.fill(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: AutopilotDialog(
+              title: title,
+              text: text ?? '',
+              textColor: _dialogTextColor,
+              fillColor: _dialogFillColor,
+              borderColor: _dialogBorderColor,
+            ),
+          ),
+        ),
+      ),
     );
+    Overlay.of(context).insert(_dialogOverlay!);
     await _autopilotWaitFrame();
+  }
+
+  /// Resolve a raw colour token from the scenario to a [Color].
+  ///
+  /// Resolution order:
+  ///   1. `default` → returns `null` (caller resets the slot)
+  ///   2. [PuzzleColors.resolveByName] → theme semantic colour
+  ///   3. `#RRGGBB` / `#AARRGGBB` hex code
+  ///   4. Otherwise → logged warning, returns `null`
+  Color? _resolveColorToken(String token) {
+    if (token.toLowerCase() == 'default') return null;
+
+    // Theme semantic colours.
+    final pc = Theme.of(context).extension<PuzzleColors>();
+    if (pc != null) {
+      final c = pc.resolveByName(token);
+      if (c != null) return c;
+    }
+
+    // Hex: #RRGGBB or #AARRGGBB
+    if (token.startsWith('#') && token.length > 1) {
+      final hex = token.substring(1);
+      if (hex.length == 6) {
+        final v = int.tryParse(hex, radix: 16);
+        if (v != null) return Color(0xFF000000 | v);
+      } else if (hex.length == 8) {
+        final v = int.tryParse(hex, radix: 16);
+        if (v != null) return Color(v);
+      }
+    }
+
+    log.warning('autopilot: unrecognized text colour token "$token"');
+    return null; // leave unchanged
+  }
+
+  /// Apply a [TextColorAction] from the scenario.
+  Future<void> _performTextColor(TextColorAction action) async {
+    final tc = _resolveColorToken(action.textColor);
+    final fc = _resolveColorToken(action.fillColor);
+    final bc = _resolveColorToken(action.borderColor);
+
+    _dialogTextColor = tc ?? _defaultDialogTextColor;
+    _dialogFillColor = fc ?? _defaultDialogFillColor;
+    _dialogBorderColor = bc ?? _defaultDialogBorderColor;
   }
 
   Future<void> initializeDatabase(int playerLevel) async {

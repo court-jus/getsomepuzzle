@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 void main(List<String> args) {
@@ -95,22 +94,31 @@ _ScanResult _scanLine(String line) {
     return _ScanResult.rejected('parse error');
   }
 
-  while (!p.complete) {
+  // Solve using the model (includes drain optimization). Works on a clone;
+  // we replay the steps on `p` to advance the puzzle state.
+  final steps = p.solveExplained();
+  if (steps.isEmpty) return _ScanResult.rejected('no move (stuck)');
+
+  for (final step in steps) {
+    // At each state, check that exactly one possible move exists.
     final moves = p.findAllMoves();
     if (moves.isEmpty) return _ScanResult.rejected('no move (stuck)');
     if (moves.length > 1) return _ScanResult.rejected('branching (>1 moves)');
     final m = moves.first;
     if (m.isImpossible != null) return _ScanResult.rejected('impossible move');
-    if (m is SetValue) {
-      p.cells[m.idx].setForSolver(m.value);
-    } else if (m is RemoveOption) {
-      p.cells[m.idx].removeOptionForSolver(m.option);
+
+    // Advance the puzzle state by replaying this step.
+    switch (step) {
+      case SetValueStep(:final cellIdx, :final value):
+        p.cells[cellIdx].setForSolver(value);
+      case RemoveOptionStep(:final cellIdx, :final option):
+        p.cells[cellIdx].removeOptionForSolver(option);
     }
   }
 
+  if (!p.complete) return _ScanResult.rejected('stuck at end');
+
   // Sanity-check that the resolved grid actually satisfies every constraint.
-  // A constraint that never violated during propagation could still be
-  // unsatisfied if it only triggers at completion.
   final violations = p.constraints.where((c) => !c.verify(p)).toList();
   if (violations.isNotEmpty) {
     return _ScanResult.rejected('violations at completion');

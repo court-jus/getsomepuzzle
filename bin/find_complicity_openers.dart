@@ -20,8 +20,6 @@
 
 import 'dart:io';
 
-import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 const _defaultAssets = [
@@ -169,7 +167,7 @@ void main(List<String> args) {
 
 /// Returns the leading move sequence as a list of tags.
 /// Each tag is either:
-///   'complicity:slugA+slugB'  — produced by a Complicity
+///   'complicity:slug'         — produced by a Complicity (slug from serialize)
 ///   'constraint'              — produced by a plain Constraint
 ///
 /// Returns null if parsing fails.
@@ -183,40 +181,24 @@ List<String>? _analyzeLeadingMoves(String line, {required int maxN}) {
     return null;
   }
 
-  final tags = <String>[];
-  for (int step = 0; step < maxN; step++) {
-    Move? move;
-    try {
-      move = p.apply();
-    } catch (_) {
-      break;
-    }
-    if (move == null) break;
-    if (move.isImpossible != null) break;
+  // Use solveExplained (includes drain optimization) and walk the first
+  // maxN steps. Propagating the steps onto `p` is unnecessary for the
+  // tag analysis — the steps are pre-computed.
+  final steps = p.solveExplained();
+  if (steps.isEmpty) return [];
 
-    final givenBy = move.givenBy;
-    if (givenBy is Complicity) {
-      final (a, b) = givenBy.slugs;
-      tags.add('complicity:$a+$b');
+  final tags = <String>[];
+  for (int i = 0; i < steps.length && i < maxN; i++) {
+    final step = steps[i];
+    // Force steps are not considered — the original script only inspects
+    // p.apply() which never returns force moves.
+    if (step.method != SolveMethod.propagation) break;
+    if (step.isComplicity) {
+      tags.add('complicity:${step.constraint}');
     } else {
       tags.add('constraint');
     }
-    if (move.value != null) {
-      try {
-        p.setValue(move.idx, move.value!);
-      } catch (_) {
-        break;
-      }
-    } else if (move.removeOption != null) {
-      try {
-        p.removeOption(move.idx, move.removeOption!);
-      } catch (_) {
-        break;
-      }
-    }
-    if (p.complete) break;
   }
-
   return tags;
 }
 

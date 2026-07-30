@@ -167,6 +167,50 @@ class PuzzleColors extends ThemeExtension<PuzzleColors> {
       )!,
     );
   }
+
+  /// Resolve a semantic colour name (case-insensitive) to this theme's
+  /// value. Returns `null` for unknown names.
+  ///
+  /// Used by the autopilot `textcolor` action so scenario files can
+  /// reference theme colours such as `dialogAccent`, `highlight`, etc.
+  Color? resolveByName(String name) {
+    switch (name.toLowerCase()) {
+      case 'dialogaccent':
+        return dialogAccent;
+      case 'highlight':
+        return highlight;
+      case 'forbidden':
+        return forbidden;
+      case 'mandatory':
+        return mandatory;
+      case 'constraintvalid':
+        return constraintValid;
+      case 'constraintinvalid':
+        return constraintInvalid;
+      case 'constraintgrayed':
+        return constraintGrayed;
+      case 'gridborder':
+        return gridBorder;
+      case 'drawerheaderbg':
+        return drawerHeaderBg;
+      case 'bottombarbg':
+        return bottomBarBg;
+      case 'validatebuttonbg':
+        return validateButtonBg;
+      case 'pauseoverlaybg':
+        return pauseOverlayBg;
+      case 'cellbgundecided':
+        return cellBgUndecided;
+      case 'rawblack':
+        return rawBlack;
+      case 'rawwhite':
+        return rawWhite;
+      case 'transparent':
+        return const Color(0x00000000);
+      default:
+        return null;
+    }
+  }
 }
 
 const puzzleColorsLight = PuzzleColors(

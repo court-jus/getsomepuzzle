@@ -1,8 +1,6 @@
 import 'dart:io';
 
-import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/complicity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
-import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/puzzle_display.dart';
 
@@ -64,46 +62,41 @@ void _solvePuzzle(String line) {
   print(describePuzzle(p));
   print('--- Solving steps ---');
 
-  int step = 0;
-  while (!p.complete) {
-    // p.apply() tries constraints first, then complicities — same order
-    // as the production solver. findAMove falls back to force when both
-    // levels are stuck.
-    Move? move = p.apply();
-    String foundBy = move == null
-        ? 'findAMove'
-        : (move.givenBy is Complicity ? 'complicity' : 'constraint');
-    move ??= p.findAMove();
-    if (move == null) {
-      print('Stuck — no deduction possible');
-      break;
-    }
-    final source = move.givenBy;
-    if (move.isImpossible != null) {
-      print('IMPOSSIBLE detected by ${source.serialize()}');
-      break;
-    }
+  final trace = p.solveTrace();
 
+  int step = 0;
+  for (final s in trace.steps) {
     step++;
-    final r = move.idx ~/ p.width;
-    final c = move.idx % p.width;
-    if (move.value != null) {
-      final colorName = move.value!.name;
-      p.cells[move.idx].setForSolver(move.value!);
-      print(
-        'Step $step: ($r,$c) = $colorName  [$foundBy - ${source.serialize()}]',
-      );
-    } else if (move.removeOption != null) {
-      final colorName = move.removeOption!.name;
-      p.cells[move.idx].removeOptionForSolver(move.removeOption!);
-      print(
-        'Step $step: ($r,$c) != $colorName  [$foundBy - ${source.serialize()}]',
-      );
+    final r = s.cellIdx ~/ p.width;
+    final c = s.cellIdx % p.width;
+    switch (s) {
+      case SetValueStep(:final value, :final method, :final isComplicity):
+        p.setValue(s.cellIdx, value);
+        final foundBy = switch (method) {
+          SolveMethod.force => 'findAMove',
+          SolveMethod.propagation when isComplicity => 'complicity',
+          SolveMethod.propagation => 'constraint',
+        };
+        print(
+          'Step $step: ($r,$c) = ${value.name}  [$foundBy - ${s.constraint}]',
+        );
+      case RemoveOptionStep(:final option, :final method, :final isComplicity):
+        p.removeOption(s.cellIdx, option);
+        final foundBy = switch (method) {
+          SolveMethod.force => 'findAMove',
+          SolveMethod.propagation when isComplicity => 'complicity',
+          SolveMethod.propagation => 'constraint',
+        };
+        print(
+          'Step $step: ($r,$c) != ${option.name}  [$foundBy - ${s.constraint}]',
+        );
     }
   }
 
   print('');
-  if (p.complete) {
+  if (trace.impossibleBy != null) {
+    print('IMPOSSIBLE detected by ${trace.impossibleBy}');
+  } else if (p.complete) {
     final violations = p.constraints
         .where((c) => !c.verify(p))
         .toList(growable: false);
@@ -118,6 +111,7 @@ void _solvePuzzle(String line) {
       }
     }
   } else {
+    print('Stuck — no deduction possible');
     print('Final state (incomplete):');
     print(formatGrid(p.cellValues, p.width, p.height));
   }
