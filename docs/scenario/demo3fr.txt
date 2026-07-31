@@ -1,0 +1,165 @@
+background bottomBarBg
+dialog "Bienvenue !" "On va résoudre un puzzle ensemble"
+wait 2000
+loadState v2_12_3x5_121000002000000_CH:1.top.bottom;FM:2.2.1;IM:3.8.1;JR:2.21;PA:2.bottom_1:121211212211212_24_scenario:classic
+wait 500
+background transparent
+# IM:3.8.1
+mouseTo IM:3.8.1
+wait 200
+dialog "Implication" "Si cette case est noire, l'autre doit l'être aussi."
+wait 3000
+dialog
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "Cette case est déjà blanche."
+wait 3000
+mouse 0,1
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 0,1,white
+wait 1000
+# CH:1.top.bottom
+mouseTo CH:1.top.bottom
+wait 200
+dialog "Chaîne" "Une chaîne de cases noires doit relier le bord haut au bord bas."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+dialog "..." "Cette case du bord haut est déjà noire — la chaîne doit partir d'ici."
+wait 3000
+mouse 1,1
+wait 100
+dialog "..." "Donc la chaîne doit descendre par ici — ces cases doivent être noires."
+wait 3000
+dialog
+wait 200
+setValue 1,1,black
+wait 100
+mouse 2,1
+wait 100
+setValue 2,1,black
+wait 100
+mouse 1,2
+wait 100
+setValue 1,2,black
+wait 1000
+# JR:2.21
+mouseTo JR:2.21
+wait 200
+dialog "Majorité" "Dans cette ligne, le blanc doit être plus nombreux que le noir."
+wait 3000
+dialog
+wait 500
+mouse 1,2
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "La ligne a déjà une case noire et une case blanche."
+wait 3000
+mouse 0,2
+wait 100
+dialog "..." "Donc cette case doit être blanche pour donner la majorité au blanc."
+wait 3000
+dialog
+wait 200
+setValue 0,2,white
+wait 1000
+# CH:1.top.bottom
+mouseTo CH:1.top.bottom
+wait 200
+dialog "Chaîne" "Une chaîne de cases noires doit relier le bord haut au bord bas."
+wait 3000
+dialog
+wait 500
+mouse 1,2
+wait 500
+dialog "..." "La chaîne atteint déjà cette case."
+wait 3000
+mouse 1,3
+wait 100
+dialog "..." "Donc elle doit continuer par ici — cette case doit être noire."
+wait 3000
+dialog
+wait 200
+setValue 1,3,black
+wait 1000
+# FM:2.2.1
+mouseTo FM:2.2.1
+wait 200
+dialog "Motif interdit" "Trois cases alignées ne peuvent pas former le motif blanc-blanc-noir."
+wait 3000
+dialog
+wait 500
+mouse 0,1
+wait 500
+mouse 0,2
+wait 500
+dialog "..." "Ces cases sont déjà blanches."
+wait 3000
+mouse 0,3
+wait 100
+dialog "..." "Donc celles du dessous ne peuvent pas être noires — elles doivent être blanches."
+wait 3000
+dialog
+wait 200
+setValue 0,3,white
+wait 100
+mouse 0,4
+wait 100
+setValue 0,4,white
+wait 1000
+# PABalancedSideComplicity
+dialog "Parité et autres règles" "La parité et les autres règles agissent ensemble ici."
+wait 3000
+dialog
+wait 500
+mouse 2,1
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "Ce côté a déjà une case noire et une case blanche."
+wait 3000
+mouse 2,3
+wait 100
+dialog "..." "Donc les deux dernières doivent s'équilibrer — et seul cet ordre évite le motif interdit."
+wait 3000
+dialog
+wait 200
+setValue 2,3,black
+wait 100
+mouse 2,4
+wait 100
+setValue 2,4,white
+wait 1000
+# CH:1.top.bottom
+mouseTo CH:1.top.bottom
+wait 200
+dialog "Chaîne" "Une chaîne de cases noires doit relier le bord haut au bord bas."
+wait 3000
+dialog
+wait 500
+mouse 1,3
+wait 500
+dialog "..." "La chaîne atteint déjà cette case."
+wait 3000
+mouse 1,4
+wait 100
+dialog "..." "Donc cette dernière case doit être noire pour amener la chaîne au bord bas."
+wait 3000
+dialog
+wait 200
+setValue 1,4,black
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle terminé !" "Essayez par vous même sur leveque.cc/getsomepuzzle"
+wait 5000

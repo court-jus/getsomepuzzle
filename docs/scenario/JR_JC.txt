@@ -1,0 +1,102 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_3x3_020010000_JC:0.21;JR:0.12;JR:1.12;JR:2.12_1:121211211_13_scenario:classic
+wait 500
+background transparent
+# JR:0.12
+mouseTo JR:0.12
+wait 200
+dialog "Row Majority" "In this row, black must outnumber white."
+wait 3000
+dialog
+wait 500
+mouse 1,0
+wait 500
+dialog "..." "The middle cell is already white."
+wait 3000
+mouse 0,0
+wait 100
+dialog "..." "So the other two cells must be black to give black the majority."
+wait 3000
+dialog
+wait 200
+setValue 0,0,black
+wait 100
+mouse 2,0
+wait 100
+setValue 2,0,black
+wait 1000
+# JC:0.21
+mouseTo JC:0.21
+wait 200
+dialog "Column Majority" "In this column, white must outnumber black."
+wait 3000
+dialog
+wait 500
+mouse 0,0
+wait 500
+dialog "..." "The top cell is already black."
+wait 3000
+mouse 0,1
+wait 100
+dialog "..." "So the other cells must be white to give white the majority."
+wait 3000
+dialog
+wait 200
+setValue 0,1,white
+wait 100
+mouse 0,2
+wait 100
+setValue 0,2,white
+wait 1000
+# JR:1.12
+mouseTo JR:1.12
+wait 200
+dialog "Row Majority" "In this row, black must outnumber white."
+wait 3000
+dialog
+wait 500
+mouse 0,1
+wait 500
+mouse 1,1
+wait 500
+dialog "..." "The row already has one black and one white cell."
+wait 3000
+mouse 2,1
+wait 100
+dialog "..." "So this cell must be black to give black the majority."
+wait 3000
+dialog
+wait 200
+setValue 2,1,black
+wait 1000
+# JR:2.12
+mouseTo JR:2.12
+wait 200
+dialog "Row Majority" "In this row, black must outnumber white."
+wait 3000
+dialog
+wait 500
+mouse 0,2
+wait 500
+dialog "..." "The first cell of the row is already white."
+wait 3000
+mouse 1,2
+wait 100
+dialog "..." "So the remaining cells must be black to give black the majority."
+wait 3000
+dialog
+wait 200
+setValue 1,2,black
+wait 100
+mouse 2,2
+wait 100
+setValue 2,2,black
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000

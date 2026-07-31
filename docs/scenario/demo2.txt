@@ -1,0 +1,153 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_3x3_001000000_PA:8.left;CH:2.left.right;FM:101;IM:3.4.1;IM:8.2.2;FM:11.02_1:221222211_17_scenario:classic
+wait 500
+background transparent
+# FM:101
+mouseTo FM:101
+wait 200
+dialog "Forbidden Pattern" "We cannot have two black cells separated by one cell."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+dialog "..." "This cell is already black."
+wait 3000
+mouse 0,0
+wait 100
+dialog "..." "So this cell cannot be black — it must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,0,white
+wait 1000
+# IM:8.2.2
+mouseTo IM:8.2.2
+wait 200
+dialog "Implication" "If this cell is white, that cell must be white too."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+dialog "..." "That cell is already black."
+wait 3000
+mouse 2,2
+wait 100
+dialog "..." "So this cell cannot be white — it must be black."
+wait 3000
+dialog
+wait 200
+setValue 2,2,black
+wait 1000
+# CH:2.left.right
+mouseTo CH:2.left.right
+wait 200
+dialog "Chain" "A chain of white cells must connect the left and right edges."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "Both other cells on the right edge are already black."
+wait 3000
+mouse 2,1
+wait 100
+dialog "..." "So the chain can only pass through here — this cell and its neighbour must be white."
+wait 3000
+dialog
+wait 200
+setValue 2,1,white
+wait 100
+mouse 1,1
+wait 100
+setValue 1,1,white
+wait 1000
+# FM:101
+mouseTo FM:101
+wait 200
+dialog "Forbidden Pattern" "We cannot have two black cells separated by one cell."
+wait 3000
+dialog
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "This cell is already black."
+wait 3000
+mouse 0,2
+wait 100
+dialog "..." "So this cell cannot be black — it must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,2,white
+wait 1000
+# PA:8.left
+mouseTo PA:8.left
+wait 200
+dialog "Parity" "On this side of the anchor cell, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 0,2
+wait 500
+dialog "..." "This cell is already white."
+wait 3000
+mouse 1,2
+wait 100
+dialog "..." "So this cell must be black to balance the side."
+wait 3000
+dialog
+wait 200
+setValue 1,2,black
+wait 1000
+# IM:3.4.1
+mouseTo IM:3.4.1
+wait 200
+dialog "Implication" "If this cell is black, that cell must be black too."
+wait 3000
+dialog
+wait 500
+mouse 1,1
+wait 500
+dialog "..." "That cell is already white."
+wait 3000
+mouse 0,1
+wait 100
+dialog "..." "So this cell cannot be black — it must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,1,white
+wait 1000
+# FM:11.02
+mouseTo FM:11.02
+wait 200
+dialog "Forbidden Pattern" "This two-by-two pattern is forbidden: two black cells in a row with a white cell beneath."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+mouse 2,1
+wait 500
+dialog "..." "The rest of the pattern is already in place."
+wait 3000
+mouse 1,0
+wait 100
+dialog "..." "So this cell cannot be black — it must be white."
+wait 3000
+dialog
+wait 200
+setValue 1,0,white
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000

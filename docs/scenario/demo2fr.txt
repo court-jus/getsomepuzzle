@@ -1,0 +1,153 @@
+background bottomBarBg
+dialog "Bienvenue !" "On va résoudre un puzzle ensemble"
+wait 2000
+loadState v2_12_3x3_001000000_PA:8.left;CH:2.left.right;FM:101;IM:3.4.1;IM:8.2.2;FM:11.02_1:221222211_17_scenario:classic
+wait 500
+background transparent
+# FM:101
+mouseTo FM:101
+wait 200
+dialog "Motif interdit" "On ne peut pas avoir deux cases noires séparées par une case."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+dialog "..." "Cette case est déjà noire."
+wait 3000
+mouse 0,0
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 0,0,white
+wait 1000
+# IM:8.2.2
+mouseTo IM:8.2.2
+wait 200
+dialog "Implication" "Si cette case est blanche, l'autre doit l'être aussi."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+dialog "..." "Cette case est déjà noire."
+wait 3000
+mouse 2,2
+wait 100
+dialog "..." "Donc cette case ne peut pas être blanche — elle doit être noire."
+wait 3000
+dialog
+wait 200
+setValue 2,2,black
+wait 1000
+# CH:2.left.right
+mouseTo CH:2.left.right
+wait 200
+dialog "Chaîne" "Une chaîne de cases blanches doit relier le bord gauche au bord droit."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "Les deux autres cases du bord droit sont déjà noires."
+wait 3000
+mouse 2,1
+wait 100
+dialog "..." "Donc la chaîne ne peut passer que par ici — cette case et sa voisine doivent être blanches."
+wait 3000
+dialog
+wait 200
+setValue 2,1,white
+wait 100
+mouse 1,1
+wait 100
+setValue 1,1,white
+wait 1000
+# FM:101
+mouseTo FM:101
+wait 200
+dialog "Motif interdit" "On ne peut pas avoir deux cases noires séparées par une case."
+wait 3000
+dialog
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "Cette case est déjà noire."
+wait 3000
+mouse 0,2
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 0,2,white
+wait 1000
+# PA:8.left
+mouseTo PA:8.left
+wait 200
+dialog "Parité" "De ce côté de la case repère, le noir et le blanc doivent apparaître autant de fois."
+wait 3000
+dialog
+wait 500
+mouse 0,2
+wait 500
+dialog "..." "Cette case est déjà blanche."
+wait 3000
+mouse 1,2
+wait 100
+dialog "..." "Donc celle-ci doit être noire pour équilibrer le côté."
+wait 3000
+dialog
+wait 200
+setValue 1,2,black
+wait 1000
+# IM:3.4.1
+mouseTo IM:3.4.1
+wait 200
+dialog "Implication" "Si cette case est noire, l'autre doit l'être aussi."
+wait 3000
+dialog
+wait 500
+mouse 1,1
+wait 500
+dialog "..." "Cette case est déjà blanche."
+wait 3000
+mouse 0,1
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 0,1,white
+wait 1000
+# FM:11.02
+mouseTo FM:11.02
+wait 200
+dialog "Motif interdit" "Ce motif 2×2 est interdit : deux cases noires côte à côte avec une case blanche dessous."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+mouse 2,1
+wait 500
+dialog "..." "Le reste du motif est déjà en place."
+wait 3000
+mouse 1,0
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 1,0,white
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle terminé !" "Essayez par vous même sur leveque.cc/getsomepuzzle"
+wait 5000

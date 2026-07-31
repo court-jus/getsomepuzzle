@@ -1,0 +1,65 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_3x4_000000010021_QA:1.2_1:222222212221_5_scenario:classic
+wait 500
+background transparent
+# QA:1.2
+mouseTo QA:1.2
+wait 200
+dialog "Quantity" "The whole grid must contain exactly 2 black cells."
+wait 3000
+dialog
+wait 500
+mouse 1,2
+wait 500
+mouse 2,3
+wait 500
+dialog "..." "The two black cells are already here."
+wait 3000
+mouse 0,0
+wait 100
+dialog "..." "So every other cell must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,0,white
+wait 100
+mouse 1,0
+wait 100
+setValue 1,0,white
+wait 100
+mouse 2,0
+wait 100
+setValue 2,0,white
+wait 100
+mouse 0,1
+wait 100
+setValue 0,1,white
+wait 100
+mouse 1,1
+wait 100
+setValue 1,1,white
+wait 100
+mouse 2,1
+wait 100
+setValue 2,1,white
+wait 100
+mouse 0,2
+wait 100
+setValue 0,2,white
+wait 100
+mouse 2,2
+wait 100
+setValue 2,2,white
+wait 100
+mouse 0,3
+wait 100
+setValue 0,3,white
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000

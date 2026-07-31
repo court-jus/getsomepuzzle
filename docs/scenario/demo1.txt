@@ -1,0 +1,202 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_3x6_000000000000000020_DF:3.right;NC:0.2.1;NC:15.1.0;CC:0.2.1;CC:2.2.1;JR:4.21;RC:2.1.1;RC:3.1.2_1:121121122121221121_23_scenario:classic
+wait 500
+background transparent
+# NC:15.1.0
+mouseTo NC:15.1.0
+wait 200
+dialog "Neighbour Count" "This corner cell must have exactly 0 black neighbours."
+wait 3000
+dialog
+wait 500
+mouse 1,5
+wait 500
+dialog "..." "The neighbour beside it is already white."
+wait 3000
+mouse 0,4
+wait 100
+dialog "..." "So this remaining neighbour must be white too."
+wait 3000
+dialog
+wait 200
+setValue 0,4,white
+wait 1000
+# CC:0.2.1
+mouseTo CC:0.2.1
+wait 200
+dialog "Column Count" "This column must contain exactly 1 white cell."
+wait 3000
+dialog
+wait 200
+mouse 0,4
+wait 100
+dialog "..." "It already has its one white cell."
+wait 3000
+dialog "..." "So all the other cells must be black."
+wait 3000
+dialog
+mouse 0,0
+wait 100
+setValue 0,0,black
+wait 100
+mouse 0,1
+wait 100
+setValue 0,1,black
+wait 100
+mouse 0,2
+wait 100
+setValue 0,2,black
+wait 100
+mouse 0,3
+wait 100
+setValue 0,3,black
+wait 100
+mouse 0,5
+wait 100
+setValue 0,5,black
+wait 1000
+# DF:3.right
+mouseTo DF:3.right
+wait 200
+dialog "Different From" "This cell must be different from its neighbour."
+wait 3000
+dialog
+mouse 0,1
+wait 200
+dialog "..." "We just set this neighbour to black."
+wait 3000
+mouse 1,1
+wait 100
+dialog "..." "So this cell must be white."
+wait 3000
+dialog
+wait 200
+setValue 1,1,white
+wait 1000
+# NC:0.2.1
+mouseTo NC:0.2.1
+wait 200
+dialog "Neighbour Count" "This cell must have exactly 1 white neighbour."
+wait 3000
+dialog
+wait 500
+mouse 0,1
+wait 500
+dialog "..." "One of its neighbours is already black."
+wait 3000
+mouse 1,0
+wait 100
+dialog "..." "So the other neighbour must be white."
+wait 3000
+dialog
+wait 200
+setValue 1,0,white
+wait 1000
+# RC:2.1.1
+mouseTo RC:2.1.1
+wait 200
+dialog "Row Count" "This row must contain exactly 1 black cell."
+wait 3000
+dialog
+wait 500
+mouse 0,2
+wait 500
+dialog "..." "It already has its one black cell."
+wait 3000
+dialog "..." "So the other cells must be white."
+wait 3000
+dialog
+wait 200
+mouse 1,2
+wait 100
+setValue 1,2,white
+wait 100
+mouse 2,2
+wait 100
+setValue 2,2,white
+wait 1000
+# CC:2.2.1
+mouseTo CC:2.2.1
+wait 200
+dialog "Column Count" "This column must contain exactly 1 white cell."
+wait 3000
+dialog
+wait 200
+mouse 2,2
+wait 200
+dialog "..." "It already has its one white cell."
+wait 3000
+dialog "..." "So all the other cells must be black."
+wait 3000
+dialog
+wait 200
+mouse 2,0
+wait 100
+setValue 2,0,black
+wait 100
+mouse 2,1
+wait 100
+setValue 2,1,black
+wait 100
+mouse 2,3
+wait 100
+setValue 2,3,black
+wait 100
+mouse 2,4
+wait 100
+setValue 2,4,black
+wait 100
+mouse 2,5
+wait 100
+setValue 2,5,black
+wait 1000
+# JR:4.21
+mouseTo JR:4.21
+wait 200
+dialog "Majority" "In this row, white must outnumber black."
+wait 3000
+dialog
+wait 500
+mouse 0,4
+wait 500
+mouse 2,4
+wait 500
+dialog "..." "The current tally is 1 white against 1 black."
+wait 3000
+mouse 1,4
+wait 100
+dialog "..." "So this cell must be white to give the majority."
+wait 3000
+dialog
+wait 200
+setValue 1,4,white
+wait 1000
+# RC:3.1.2
+mouseTo RC:3.1.2
+wait 200
+dialog "Row Count" "This row must contain exactly 2 black cells."
+wait 3000
+dialog
+wait 500
+mouse 0,3
+wait 500
+mouse 2,3
+wait 500
+dialog "..." "It already has its two black cells."
+wait 3000
+mouse 1,3
+wait 100
+dialog "..." "So this cell must be white."
+wait 3000
+dialog
+wait 200
+setValue 1,3,white
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000

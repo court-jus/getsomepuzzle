@@ -80,3 +80,19 @@ class TextColorAction extends AutopilotAction {
     required this.borderColor,
   });
 }
+
+/// Set a full-screen background colour for subsequent [DialogAction] overlays.
+///
+/// Holds a single raw colour token — either:
+/// - A [PuzzleColors] semantic name (e.g. `dialogAccent`, `highlight`)
+/// - A hex code (`#RRGGBB` or `#AARRGGBB`)
+/// - `default` to reset the background to transparent
+///
+/// The rectangle is drawn behind the dialog text so the text stays legible
+/// on top of it. The execution engine resolves the token to a [Color] at
+/// runtime.
+class BackgroundAction extends AutopilotAction {
+  final String color;
+
+  const BackgroundAction({required this.color});
+}

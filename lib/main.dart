@@ -357,6 +357,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Color _dialogFillColor = _defaultDialogFillColor;
   Color _dialogBorderColor = _defaultDialogBorderColor;
 
+  /// Full-screen background colour behind the dialog text. Drawn as a
+  /// rectangle covering the entire screen, below the subtitle text. Set by
+  /// the `background` action; transparent by default.
+  Color _dialogBackgroundColor = Colors.transparent;
+
   @override
   void initState() {
     super.initState();
@@ -552,6 +557,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           :final borderColor,
         ) =>
           'textcolor $textColor $fillColor $borderColor',
+        BackgroundAction(:final color) => 'background $color',
         HintAction() => 'hint',
       };
       log.info('autopilot: START $lineDesc');
@@ -577,6 +583,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
         case TextColorAction():
           await _performTextColor(action);
+
+        case BackgroundAction(:final color):
+          await _performBackground(color);
 
         case HintAction():
           await _performHint();
@@ -803,21 +812,32 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       _removeDialogOverlay();
       return;
     }
-    // Show subtitle overlay (movie-subtitle style, centered).
+    // Show subtitle overlay (movie-subtitle style, centered), optionally on
+    // top of a full-screen background rectangle set by `background`.
     _removeDialogOverlay();
     _dialogOverlay = OverlayEntry(
       builder: (_) => Positioned.fill(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: AutopilotDialog(
-              title: title,
-              text: text ?? '',
-              textColor: _dialogTextColor,
-              fillColor: _dialogFillColor,
-              borderColor: _dialogBorderColor,
+        child: Stack(
+          children: [
+            // Full-screen background rectangle, below the dialog text.
+            if (_dialogBackgroundColor != Colors.transparent)
+              Positioned.fill(
+                child: ColoredBox(color: _dialogBackgroundColor),
+              ),
+            // Centered dialog text on top of the background.
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: AutopilotDialog(
+                  title: title,
+                  text: text ?? '',
+                  textColor: _dialogTextColor,
+                  fillColor: _dialogFillColor,
+                  borderColor: _dialogBorderColor,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -867,6 +887,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     _dialogTextColor = tc ?? _defaultDialogTextColor;
     _dialogFillColor = fc ?? _defaultDialogFillColor;
     _dialogBorderColor = bc ?? _defaultDialogBorderColor;
+  }
+
+  /// Apply a [BackgroundAction] from the scenario.
+  ///
+  /// Resolves the colour token and stores it; the rectangle is drawn on the
+  /// next [DialogAction]'s overlay, below the dialog text.
+  Future<void> _performBackground(String token) async {
+    final c = _resolveColorToken(token);
+    _dialogBackgroundColor = c ?? Colors.transparent;
   }
 
   Future<void> initializeDatabase(int playerLevel) async {

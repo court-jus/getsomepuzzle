@@ -40,6 +40,7 @@ actual newline.
 | `dialog` | `dialog "title" "body"` | Show a subtitle overlay at the centre of the screen (light-green text with a thin black outline, transparent background, movie-subtitle style). The body can contain `\n` for line breaks. |
 | `dialog` | `dialog` | Dismiss any currently open subtitle overlay. |
 | `textcolor` | `textcolor <textColor> <fillColor> <borderColor>` | Change the colours used by subsequent `dialog` actions. Each colour is a [PuzzleColors] semantic name (`dialogAccent`, `highlight`, `forbidden`, `mandatory`, `constraintValid`, `pauseOverlayBg`, `transparent`, …) or a hex code (`#RRGGBB` or `#AARRGGBB`). Use `default` to reset a slot to its original value. All three arguments are required. |
+| `background` | `background <color>` | Set a full-screen background colour for subsequent `dialog` actions. A rectangle covering the entire screen is drawn **behind** the dialog text, so the title/body stay legible on top of it. Accepts the same colour tokens as `textcolor` (semantic names, `#RRGGBB`/`#AARRGGBB`, or `default` to reset to transparent). The background is part of the dialog overlay: it appears with the next `dialog "title" "text"` and is removed when `dialog` (no args) dismisses it. |
 
 ### `mouseTo` targets
 
@@ -116,7 +117,7 @@ and writes a scenario file with explanatory dialogs.
 3. It parses the solver output — v2 line, domain, grid dimensions, each
    deduction step.
 4. Steps are grouped by constraint source; steps from the same constraint
-   share one explanatory dialog.
+   share an explanatory dialog sequence (rule → already-known → deduction).
 5. The agent generates the scenario file in `docs/scenario/`.
 
 ### Naming
@@ -144,15 +145,18 @@ etc.).
 | `complicity - NAME` | Dialog explaining the cross-constraint interaction (no `mouseTo` — complicity classes have no widget) |
 | `findAMove - SLUG:PARAMS` | All `findAMove` steps grouped under one "Trial Deduction" dialog explaining trial-and-error reasoning |
 
-### Dialog read time
+### Dialog style
 
-The wait after each dialog is **dynamic**: word count × 300 ms, clamped to
-**min 2000 ms / max 8000 ms**.
+Each constraint group is explained with **three short dialogs** — the rule,
+what is already known (with the mouse moved over the relevant already-set
+cells in between), and the deduction. All dialog read times are a fixed
+**3000 ms**.
 
-### Ending
+### Intro and ending
 
-Every generated scenario concludes with a "Solved!" dialog and a `mouseTo
-hint` to draw attention to the completed puzzle.
+Every generated scenario starts with a welcome dialog on a filled background
+(`background bottomBarBg`) before `loadState`, and ends with a "Puzzle
+solved!" dialog on a filled background.
 
 See `.opencode/skills/create-scenario/SKILL.md` for the full specification,
 including explanation templates for every constraint type and complicity.
@@ -176,6 +180,8 @@ these subtypes:
   null = close)
 - `TextColorAction(textColor, fillColor, borderColor)` — change colours for
   subsequent subtitle overlays (raw string tokens, resolved at runtime)
+- `BackgroundAction(color)` — full-screen background colour for subsequent
+  subtitle overlays (raw string token, resolved at runtime)
 
 ### Parsing
 
@@ -241,6 +247,12 @@ the action list, then enters a sequential loop. Every action is `await`ed:
    parsing, then falls back to the default) and updates the corresponding
    `_dialogTextColor`, `_dialogFillColor`, `_dialogBorderColor` fields for
    subsequent `dialog` actions.
+8. **Background**: resolves the colour token via `_resolveColorToken()` and
+   stores it in `_dialogBackgroundColor` (`default` / unresolved tokens reset
+   to `Colors.transparent`). On the next `dialog` action the overlay's
+   `Positioned.fill` stack draws a full-screen `ColoredBox` with that colour
+   first, then the centered `AutopilotDialog` on top, so the text always sits
+   above the background.
 
 After the final action the app stays on the last puzzle state — it does not
 exit, transition, or loop.
@@ -302,6 +314,11 @@ can be changed at runtime via the `textcolor` action, which resolves
 The overlay is wrapped in `IgnorePointer` so it never intercepts input.
 The only way to dismiss it is a subsequent `dialog` action with no
 arguments.
+
+When a `background` action has been issued, the dialog overlay first draws a
+full-screen coloured rectangle (the `_dialogBackgroundColor`, transparent by
+default) and then the centered text on top of it — the background is removed
+together with the dialog.
 
 ### Error handling
 

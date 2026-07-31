@@ -1,0 +1,160 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_4x4_0101000000000020_EY:4.1.0;EY:6.2.1;EY:10.1.1;EY:13.2.5;EY:14.1.2_1:2111122122112122_18_scenario:classic
+wait 500
+background transparent
+# EY:4.1.0
+mouseTo EY:4.1.0
+wait 200
+dialog "Eyes" "This eye must see exactly 0 black cells."
+wait 3000
+dialog
+wait 500
+mouse 0,1
+wait 500
+dialog "..." "This is the eye — it must see no black at all."
+wait 3000
+mouse 1,1
+wait 100
+dialog "..." "So none of its neighbours can be black."
+wait 3000
+dialog
+wait 200
+setValue 1,1,white
+wait 100
+mouse 0,0
+wait 100
+setValue 0,0,white
+wait 100
+mouse 0,2
+wait 100
+setValue 0,2,white
+wait 1000
+# EY:6.2.1
+mouseTo EY:6.2.1
+wait 200
+dialog "Eyes" "This eye must see exactly 1 white cell."
+wait 3000
+dialog
+wait 500
+mouse 1,1
+wait 500
+dialog "..." "The eye already sees its one white cell — here."
+wait 3000
+mouse 0,1
+wait 100
+dialog "..." "So no other cell in its sight can be white."
+wait 3000
+dialog
+wait 200
+setValue 0,1,black
+wait 100
+mouse 3,1
+wait 100
+setValue 3,1,black
+wait 100
+mouse 2,0
+wait 100
+setValue 2,0,black
+wait 100
+mouse 2,2
+wait 100
+setValue 2,2,black
+wait 1000
+# EY:10.1.1
+mouseTo EY:10.1.1
+wait 200
+dialog "Eyes" "This eye must see exactly 1 black cell."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+dialog "..." "There is already a black cell further up the line of sight."
+wait 3000
+mouse 2,1
+wait 100
+dialog "..." "So this cell cannot be black — it must be white."
+wait 3000
+dialog
+wait 200
+setValue 2,1,white
+wait 1000
+# EY:13.2.5
+mouseTo EY:13.2.5
+wait 200
+dialog "Eyes" "This eye must see exactly 5 white cells."
+wait 3000
+dialog
+wait 500
+mouse 1,1
+wait 500
+mouse 2,3
+wait 500
+dialog "..." "The eye already sees two white cells."
+wait 3000
+mouse 0,3
+wait 100
+dialog "..." "So these cells must be white too, to reach five."
+wait 3000
+dialog
+wait 200
+setValue 0,3,white
+wait 100
+mouse 3,3
+wait 100
+setValue 3,3,white
+wait 100
+mouse 1,2
+wait 100
+setValue 1,2,white
+wait 1000
+# EY:10.1.1
+mouseTo EY:10.1.1
+wait 200
+dialog "Eyes" "This eye must see exactly 1 black cell."
+wait 3000
+dialog
+wait 500
+mouse 2,1
+wait 500
+mouse 1,2
+wait 500
+mouse 2,3
+wait 500
+dialog "..." "None of the other neighbours are black."
+wait 3000
+mouse 3,2
+wait 100
+dialog "..." "So this cell must be black — the eye needs its one black cell."
+wait 3000
+dialog
+wait 200
+setValue 3,2,black
+wait 1000
+# EY:14.1.2
+mouseTo EY:14.1.2
+wait 200
+dialog "Eyes" "This eye must see exactly 2 black cells."
+wait 3000
+dialog
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "The cell above is already black."
+wait 3000
+mouse 1,3
+wait 100
+dialog "..." "So this cell must be black too — the eye needs two."
+wait 3000
+dialog
+wait 200
+setValue 1,3,black
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000

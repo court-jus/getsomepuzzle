@@ -1,0 +1,139 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_5x3_000000001020001_CC:2.1.1;RC:1.2.4;CC:3.2.1;RC:0.1.2;RC:2.1.1_1:221122221222221_13_scenario:classic
+wait 500
+background transparent
+# RC:1.2.4
+mouseTo RC:1.2.4
+wait 200
+dialog "Row Count" "This row must contain exactly 4 white cells."
+wait 3000
+dialog
+wait 500
+mouse 3,1
+wait 500
+dialog "..." "This row already has its one black cell."
+wait 3000
+mouse 0,1
+wait 100
+dialog "..." "So all the other cells must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,1,white
+wait 100
+mouse 1,1
+wait 100
+setValue 1,1,white
+wait 100
+mouse 2,1
+wait 100
+setValue 2,1,white
+wait 100
+mouse 4,1
+wait 100
+setValue 4,1,white
+wait 1000
+# RC:2.1.1
+mouseTo RC:2.1.1
+wait 200
+dialog "Row Count" "This row must contain exactly 1 black cell."
+wait 3000
+dialog
+wait 500
+mouse 4,2
+wait 500
+dialog "..." "This row already has its one black cell."
+wait 3000
+mouse 1,2
+wait 100
+dialog "..." "So all the other cells must be white."
+wait 3000
+dialog
+wait 200
+setValue 1,2,white
+wait 100
+mouse 2,2
+wait 100
+setValue 2,2,white
+wait 100
+mouse 3,2
+wait 100
+setValue 3,2,white
+wait 1000
+# CC:2.1.1
+mouseTo CC:2.1.1
+wait 200
+dialog "Column Count" "This column must contain exactly 1 black cell."
+wait 3000
+dialog
+wait 500
+mouse 2,1
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "The other two cells of the column are already white."
+wait 3000
+mouse 2,0
+wait 100
+dialog "..." "So this cell must be black."
+wait 3000
+dialog
+wait 200
+setValue 2,0,black
+wait 1000
+# CC:3.2.1
+mouseTo CC:3.2.1
+wait 200
+dialog "Column Count" "This column must contain exactly 1 white cell."
+wait 3000
+dialog
+wait 500
+mouse 3,2
+wait 500
+dialog "..." "This cell is already the column's one white cell."
+wait 3000
+mouse 3,0
+wait 100
+dialog "..." "So this cell cannot be white — it must be black."
+wait 3000
+dialog
+wait 200
+setValue 3,0,black
+wait 1000
+# RC:0.1.2
+mouseTo RC:0.1.2
+wait 200
+dialog "Row Count" "This row must contain exactly 2 black cells."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+mouse 3,0
+wait 500
+dialog "..." "This row already has its two black cells."
+wait 3000
+mouse 0,0
+wait 100
+dialog "..." "So all the other cells must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,0,white
+wait 100
+mouse 1,0
+wait 100
+setValue 1,0,white
+wait 100
+mouse 4,0
+wait 100
+setValue 4,0,white
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000

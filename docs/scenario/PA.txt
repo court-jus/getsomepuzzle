@@ -1,0 +1,210 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_3x5_000220010001000_PA:0.right;PA:14.left;PA:2.left;PA:6.vertical;PA:8.vertical;PA:9.right;PA:12.top;PA:2.bottom;PA:0.bottom_1:121222111221122_26_scenario:classic
+wait 500
+background transparent
+# PA:6.vertical
+mouseTo PA:6.vertical
+wait 200
+dialog "Parity" "On each side of the anchor, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 0,1
+wait 500
+dialog "..." "The cell closest to the anchor is already white."
+wait 3000
+mouse 0,0
+wait 100
+dialog "..." "So this cell must be black to balance the side."
+wait 3000
+dialog
+wait 200
+setValue 0,0,black
+wait 1000
+# PA:2.left
+mouseTo PA:2.left
+wait 200
+dialog "Parity" "On this side of the anchor, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 0,0
+wait 500
+dialog "..." "This cell is already black."
+wait 3000
+mouse 1,0
+wait 100
+dialog "..." "So this cell must be white to balance the side."
+wait 3000
+dialog
+wait 200
+setValue 1,0,white
+wait 1000
+# PA:0.right
+mouseTo PA:0.right
+wait 200
+dialog "Parity" "On this side of the anchor, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 1,0
+wait 500
+dialog "..." "This cell is already white."
+wait 3000
+mouse 2,0
+wait 100
+dialog "..." "So this cell must be black to balance the side."
+wait 3000
+dialog
+wait 200
+setValue 2,0,black
+wait 1000
+# PA:8.vertical
+mouseTo PA:8.vertical
+wait 200
+dialog "Parity" "On each side of the anchor, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+mouse 2,3
+wait 500
+dialog "..." "The cells closest to the anchor are already black on both sides."
+wait 3000
+mouse 2,1
+wait 100
+dialog "..." "So the outer cells must be white to keep each side balanced."
+wait 3000
+dialog
+wait 200
+setValue 2,1,white
+wait 100
+mouse 2,4
+wait 100
+setValue 2,4,white
+wait 1000
+# PA:9.right
+mouseTo PA:9.right
+wait 200
+dialog "Parity" "On this side of the anchor, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 2,3
+wait 500
+dialog "..." "This cell is already black."
+wait 3000
+mouse 1,3
+wait 100
+dialog "..." "So this cell must be white to balance the side."
+wait 3000
+dialog
+wait 200
+setValue 1,3,white
+wait 1000
+# PA:2.bottom
+mouseTo PA:2.bottom
+wait 200
+dialog "Parity" "Below this anchor, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 2,1
+wait 500
+mouse 2,3
+wait 500
+mouse 2,4
+wait 500
+dialog "..." "This side already has two white cells and one black."
+wait 3000
+mouse 2,2
+wait 100
+dialog "..." "So this cell must be black to keep two of each."
+wait 3000
+dialog
+wait 200
+setValue 2,2,black
+wait 1000
+# TrialDeduction
+dialog "Trial Deduction" "The solver tried every colour for this cell and ran all the rules each time."
+wait 3000
+dialog
+wait 500
+dialog "..." "Each wrong colour led to a contradiction."
+wait 3000
+mouse 0,2
+wait 100
+dialog "..." "So only black was possible here."
+wait 3000
+dialog
+wait 200
+setValue 0,2,black
+wait 1000
+# PA:12.top
+mouseTo PA:12.top
+wait 200
+dialog "Parity" "Above this anchor, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 0,0
+wait 500
+mouse 0,2
+wait 500
+dialog "..." "This side already has two black cells and one white."
+wait 3000
+mouse 0,3
+wait 100
+dialog "..." "So this cell must be white to keep two of each."
+wait 3000
+dialog
+wait 200
+setValue 0,3,white
+wait 1000
+# PA:6.vertical
+mouseTo PA:6.vertical
+wait 200
+dialog "Parity" "On each side of the anchor, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 0,3
+wait 500
+dialog "..." "This cell is already white."
+wait 3000
+mouse 0,4
+wait 100
+dialog "..." "So this cell must be black to balance the side."
+wait 3000
+dialog
+wait 200
+setValue 0,4,black
+wait 1000
+# PA:14.left
+mouseTo PA:14.left
+wait 200
+dialog "Parity" "On this side of the anchor, black and white must appear equally often."
+wait 3000
+dialog
+wait 500
+mouse 0,4
+wait 500
+dialog "..." "This cell is already black."
+wait 3000
+mouse 1,4
+wait 100
+dialog "..." "So this cell must be white to balance the side."
+wait 3000
+dialog
+wait 200
+setValue 1,4,white
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000

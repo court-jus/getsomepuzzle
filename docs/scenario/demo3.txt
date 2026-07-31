@@ -1,0 +1,165 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_3x5_121000002000000_CH:1.top.bottom;FM:2.2.1;IM:3.8.1;JR:2.21;PA:2.bottom_1:121211212211212_24_scenario:classic
+wait 500
+background transparent
+# IM:3.8.1
+mouseTo IM:3.8.1
+wait 200
+dialog "Implication" "If this cell is black, that cell must be black too."
+wait 3000
+dialog
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "That cell is already white."
+wait 3000
+mouse 0,1
+wait 100
+dialog "..." "So this cell cannot be black — it must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,1,white
+wait 1000
+# CH:1.top.bottom
+mouseTo CH:1.top.bottom
+wait 200
+dialog "Chain" "A chain of black cells must connect the top and bottom edges."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+dialog "..." "This top cell is black — the chain must start from it."
+wait 3000
+mouse 1,1
+wait 100
+dialog "..." "So the chain must descend through here — these cells all have to be black."
+wait 3000
+dialog
+wait 200
+setValue 1,1,black
+wait 100
+mouse 2,1
+wait 100
+setValue 2,1,black
+wait 100
+mouse 1,2
+wait 100
+setValue 1,2,black
+wait 1000
+# JR:2.21
+mouseTo JR:2.21
+wait 200
+dialog "Majority" "In this row, white must outnumber black."
+wait 3000
+dialog
+wait 500
+mouse 1,2
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "The row already has one black and one white cell."
+wait 3000
+mouse 0,2
+wait 100
+dialog "..." "So this cell must be white to give white the majority."
+wait 3000
+dialog
+wait 200
+setValue 0,2,white
+wait 1000
+# CH:1.top.bottom
+mouseTo CH:1.top.bottom
+wait 200
+dialog "Chain" "A chain of black cells must connect the top and bottom edges."
+wait 3000
+dialog
+wait 500
+mouse 1,2
+wait 500
+dialog "..." "The chain already reaches this cell."
+wait 3000
+mouse 1,3
+wait 100
+dialog "..." "So it must continue through here — this cell must be black."
+wait 3000
+dialog
+wait 200
+setValue 1,3,black
+wait 1000
+# FM:2.2.1
+mouseTo FM:2.2.1
+wait 200
+dialog "Forbidden Pattern" "Three cells in a column cannot form the pattern white-white-black."
+wait 3000
+dialog
+wait 500
+mouse 0,1
+wait 500
+mouse 0,2
+wait 500
+dialog "..." "These cells are already white."
+wait 3000
+mouse 0,3
+wait 100
+dialog "..." "So the cells below cannot be black — they must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,3,white
+wait 100
+mouse 0,4
+wait 100
+setValue 0,4,white
+wait 1000
+# PABalancedSideComplicity
+dialog "Parity + Others" "Parity and other rules interact here."
+wait 3000
+dialog
+wait 500
+mouse 2,1
+wait 500
+mouse 2,2
+wait 500
+dialog "..." "This side already has one black and one white cell."
+wait 3000
+mouse 2,3
+wait 100
+dialog "..." "So the last two must balance — and only this order avoids the forbidden pattern."
+wait 3000
+dialog
+wait 200
+setValue 2,3,black
+wait 100
+mouse 2,4
+wait 100
+setValue 2,4,white
+wait 1000
+# CH:1.top.bottom
+mouseTo CH:1.top.bottom
+wait 200
+dialog "Chain" "A chain of black cells must connect the top and bottom edges."
+wait 3000
+dialog
+wait 500
+mouse 1,3
+wait 500
+dialog "..." "The chain already reaches this cell."
+wait 3000
+mouse 1,4
+wait 100
+dialog "..." "So this last cell must be black to bring the chain to the bottom edge."
+wait 3000
+dialog
+wait 200
+setValue 1,4,black
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000

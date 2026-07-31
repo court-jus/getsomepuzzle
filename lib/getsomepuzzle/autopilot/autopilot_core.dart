@@ -130,6 +130,16 @@ List<AutopilotAction> parseScenario(String content) {
             ),
           );
 
+        case 'background':
+          if (args.isEmpty) {
+            _log.warning(
+              'autopilot line ${lineIdx + 1}: '
+              'background needs a colour token',
+            );
+            continue;
+          }
+          actions.add(BackgroundAction(color: args[0]));
+
         case 'hint':
           actions.add(const HintAction());
 

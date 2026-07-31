@@ -68,23 +68,34 @@ the *other* colour (e.g. `(0,2) != black` → `setValue 2,0,white`).
 
 Group the (filtered) steps by their **source** field (the text after the
 `foundBy - ` prefix). Consecutive steps with the same source form one group.
-Each group produces:
+Each group produces a **three-dialog sequence** — rule → already-known →
+deduction — with a mouse movement between the first two dialogs to show the
+relevant already-set cells:
 
 1. A `mouseTo <source>` action (to point at the relevant constraint widget)
    — **skip** if the source is a complicity name (e.g.
    `PABalancedSideComplicity`) or `TrialDeduction`, since those have no
-   widget.
-2. A `dialog` explaining the rule and what it deduces.
-3. A `wait` for reading time (dynamic, see below).
-4. A `dialog` (close).
-5. A short `wait` (e.g. 200ms).
-6. Each cell assignment in the group as `mouse <col>,<row>` + `setValue`.
+   widget — followed by `wait 200`.
+2. **Rule dialog**: the constraint rule in one short sentence (title: the
+   readable constraint name), `wait 3000`.
+3. `dialog` (close), `wait 500`.
+4. A **TODO section**: a commented-out skeleton of `# mouse <col>,<row>` +
+   `# wait 500` pairs that will show the relevant already-set cells (filled
+   in manually by the user; copy the pair for each cell to show).
+5. **Already-known dialog**: one short sentence about what is already known
+   (title: `"..."`), `wait 3000`.
+6. **Deduction dialog**: one short sentence with the conclusion (title:
+   `"..."`) — shown immediately after, *replacing* the already-known dialog
+   without closing it — `wait 3000`.
+7. `dialog` (close), `wait 200`.
+8. Each cell assignment in the group as `mouse <col>,<row>` + `wait 100` +
+   `setValue` + `wait 1000`.
 
 **Special handling by foundBy type:**
 
 | foundBy | Grouping | Dialog content |
 |---------|----------|----------------|
-| `constraint` | Group by source (`FM:2`, `GS:0.1`, etc.) | Explain the constraint rule in plain language, referencing the specific cells in the group. Use the constraint slug reference below for explanations. |
+| `constraint` | Group by source (`FM:2`, `GS:0.1`, etc.) | Explain the constraint rule in plain language. Use the constraint slug reference below for explanations. |
 | `complicity` | Group by complicity name (`PABalancedSideComplicity`, etc.) | Explain the cross-constraint interaction. Skip `mouseTo` (no widget). |
 | `findAMove` | **All** findAMove steps into one group with source `TrialDeduction` | Explain trial-and-error: "The solver tried each possible colour for these cells and ran all rules each time. Only one colour avoided a contradiction for each cell." |
 
@@ -93,88 +104,134 @@ Each group produces:
 **Structure:**
 
 ```scenario
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
 loadState <v2_line>
 wait 500
-# --- Group 1: first constraint ---
-mouseTo FM:2
+background transparent
+# <source1>
+mouseTo <source1>
 wait 200
-dialog "Forbidden Pattern" "The FM:2 pattern is forbidden. Since \
-cell (0,2) is adjacent to an existing black cell, setting it to black \
-would create the forbidden pattern. Therefore (0,2) must be white."
-wait <dynamic_read_time>
+dialog "<Constraint Name>" "<rule, 1 sentence>"
+wait 3000
+dialog
+wait 500
+# TODO: Mouse to relevant already-set cells
+# mouse <col>,<row>
+# wait 500
+dialog "..." "<what is already known, 1 sentence>"
+wait 3000
+dialog "..." "<deduction, 1 sentence>"
+wait 3000
 dialog
 wait 200
-mouse 2,0
+mouse <col>,<row>
 wait 100
-setValue 2,0,white
-wait 100
-# --- Group 2: next constraint ---
+setValue <col>,<row>,<colour>
+wait 1000
+# <source2>
 ...
-# --- Finished ---
-mouseTo hint
-wait 300
-dialog "Solved!" "The puzzle is complete!\nAll constraints are satisfied."
+# End
+dialog
 wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 2000
 dialog
 ```
 
 **Rules:**
-- `loadState` always first, then `wait 500` for the UI to settle.
-- Each group starts with `mouseTo <source>` (skipped for complicity groups).
-- Dialog title: the readable constraint name (see slug reference), the
-  complicity readable name, or `"Trial Deduction"`.
-- Dialog body: natural-language explanation that answers "why does this
-  constraint force these cells?". Reference the specific cells in the group
-  by coordinate.
-- Dialog read time: **dynamic** — count the words in the dialog body,
-  multiply by 300 ms, clamp to **min 2000 ms / max 8000 ms**.
-- After each dialog, close it, wait 200 ms, then execute the assignments.
-- Between mouse and setValue: `wait 100`.
-- Between setValue and the next mouse: `wait 100`.
-- End with a "Solved!" dialog (fixed 3000 ms read time).
+- **Intro block**: the scenario always starts with `background bottomBarBg`,
+  a `dialog "Welcome!" "Let's solve a puzzle together"`, `wait 2000`, then
+  `loadState <v2_line>` + `wait 500`, then `background transparent` — the
+  intro dialog gets a filled background; after the puzzle loads the
+  background is removed so the grid is fully visible.
+- **Outro block**: the scenario always ends with `dialog` (close any open
+  dialog), `wait 3000`, `background bottomBarBg`,
+  `dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"`,
+  `wait 2000`, `dialog` (close).
+- Each group starts with `mouseTo <source>` (skipped for complicity groups)
+  + `wait 200`.
+- Each group produces **three short dialogs**:
+  1. **Rule dialog** — the constraint rule, one sentence. Title: the
+     readable constraint name (see slug reference), the complicity readable
+     name, or `"Trial Deduction"`.
+  2. **Already-known dialog** — one sentence about what was established
+     before this group. Title: `"..."`.
+  3. **Deduction dialog** — one sentence with the conclusion. Title:
+     `"..."`. It is shown immediately after the already-known dialog,
+     *replacing* it (no close in between) so the narration flows.
+- **TODO section**: between the rule dialog and the already-known dialog,
+  insert a commented-out skeleton that the user will fill in manually to
+  move the mouse over the relevant already-set cells:
+  ```
+  # TODO: Mouse to relevant already-set cells
+  # mouse <col>,<row>
+  # wait 500
+  ```
+  Repeat the `# mouse` + `# wait` pair once per cell the user needs to show
+  (copy-paste).
+- Dialog text: **one sentence per dialog**, no `\n` line breaks, no cell
+  coordinates — the mouse (or the constraint widget it points to) provides
+  the visual context, so use demonstratives ("this cell", "this row", "the
+  other cells") instead.
+- All dialog read times are **fixed at 3000 ms** (no word-count
+  calculation).
+- After the last dialog of a group, close it, `wait 200`, then execute the
+  assignments: `mouse <col>,<row>` + `wait 100` + `setValue` + `wait 1000`.
+  Chain several cells with no extra wait between `setValue` and the next
+  `mouse`.
+- Group separator comments are simple `# <source>` lines (no descriptive
+  text).
 
 **Dialog explanation templates (by slug):**
 
-| Slug(s) | Dialog title | Explanation template |
-|---------|-------------|----------------------|
-| CC, RC | Row/Column Count | "Each [row/column] must contain exactly N cells of colour C.\n[List cells from the group:] (r,c) is the last unfilled cell → it must be C." |
-| FM | Forbidden Pattern | "The pattern FM:PATTERN is forbidden in the grid. Making (r,c) colour X would complete this pattern — therefore it must be the opposite colour." |
-| GS | Group Size | "Cell IDX must belong to a connected group of exactly SIZE cells.\n[List cells from the group:] Since the group is full, surrounding cells must be the opposite colour to isolate it." |
-| PA | Parity | "On the [side] side of cell IDX, every colour must appear equally often. Remaining free cells must balance the count → (r,c) = C." |
-| LT | Letter Group | "Letter-group constraint: cells sharing letter X must form a specific shape and share the same colour pattern. This forces (r,c) to C." |
-| JR, JC | Majority | "In this [row/column], one colour must outnumber the other. The remaining cells must be C to achieve the majority." |
-| RT, CT | Transition | "This [row/column] must have exactly N colour changes. The current pattern means (r,c) must be C to reach (or stay within) that limit." |
-| QA | Quantity | "The puzzle must contain exactly N colour C cells. Since N are already placed, (r,c) must be C to reach the total (or: cannot be C)." |
-| SY | Symmetry | "Symmetry constraint: cell (r,c) mirrors another cell. That cell is C, so this one must be C as well." |
-| DF | Different From | "Cell (r,c) must differ from a set of other cells. Those cells are C, so this cell cannot be C → it must be the opposite." |
-| SH | Shape | "A shape motif must appear somewhere in the grid. The current arrangement forces (r,c) = C to complete the shape." |
-| CH | Chain | "Chain constraint: the chain from cell A to cell B must follow specific rules. This forces (r,c) = C." |
-| GC | Group Count | "There must be exactly N groups of colour C in the puzzle. The current group count forces (r,c) = C." |
-| MJ | Majority (zone) | "In this zone of the grid, black must outnumber white. This forces (r,c) = C." |
-| NC | Neighbour Count | "Cell (r,c) has at most N neighbours of colour C. Given the filled neighbours, this cell must be C (or cannot be C)." |
-| EY | Eyes | "Eyes constraint: the pattern formed by these cells must have exactly N of colour C. This forces (r,c) = C." |
-| IM | Implication | "If one cell is a certain colour, another must be a different colour. This chain of implications forces (r,c) = C." |
-| BB | Bounding Box | "All colour C cells must fit in an N×M box. The current bounding box forces (r,c) = C." |
+Each constraint provides three slots — the rule (dialog 1, titled with the
+constraint name), what is already known (dialog 2, title `"..."`), and the
+deduction (dialog 3, title `"..."`):
 
-For **complicity** sources, use this table:
+| Slug(s) | Dialog 1 title | Rule | Already-known | Deduction |
+|---------|----------------|------|---------------|-----------|
+| CC, RC | Row/Column Count | "This [row/column] must contain exactly N cells of colour C." | "It already has N cell(s) of this colour." | "So all the other cells must be the opposite colour." |
+| FM | Forbidden Pattern | "This pattern is forbidden in the grid." | "These cells already form part of the pattern." | "So this cell cannot be that colour — it must be the opposite." |
+| GS | Group Size | "This group must be exactly N cells." | "The group already has N cells." | "So the surrounding cells must be the opposite colour." |
+| PA | Parity | "On this side, each colour must appear equally often." | "We already have N of each colour here." | "So the remaining cells must balance the count." |
+| LT | Letter Group | "This letter must be a connected group of exactly N cells." | "The group already has N cells." | "So the surrounding cells must be the opposite colour." |
+| JR, JC | Majority | "In this [row/column], one colour must outnumber the other." | "The current tally is N-N." | "So this cell must be [colour] to give it the majority." |
+| RT, CT | Transition | "This [row/column] must have exactly N colour changes." | "The current pattern already has N changes." | "So this cell must be [colour]." |
+| QA | Quantity | "The puzzle must contain exactly N cells of this colour." | "We already have N of them placed." | "So no other cell can be this colour." |
+| SY | Symmetry | "This cell mirrors another cell." | "The mirrored cell is [colour]." | "So this cell must be [colour] too." |
+| DF | Different From | "This cell must be different from its neighbour." | "We just set this neighbour to [colour]." | "So this cell must be the opposite colour." |
+| SH | Shape | "This shape must appear somewhere in the grid." | "The shape is already partly in place." | "So this cell must be [colour] to complete it." |
+| CH | Chain | "This chain must follow specific rules." | "The chain already has this configuration." | "So this cell must be [colour]." |
+| GC | Group Count | "There must be exactly N groups of this colour." | "We already have N groups." | "So this cell cannot start a new group." |
+| MJ | Majority (zone) | "In this zone, one colour must outnumber the other." | "The current tally is N-N." | "So this cell must be [colour]." |
+| NC | Neighbour Count | "This cell must have exactly N neighbours of that colour." | "This neighbour is already [colour]." | "So the remaining neighbour must be [colour]." |
+| EY | Eyes | "This pattern must have exactly N cells of that colour." | "We already have N in this pattern." | "So this cell must be [colour]." |
+| IM | Implication | "One colour forces the other cell's colour." | "This cell is already [colour]." | "So the other cell must be [colour]." |
+| BB | Bounding Box | "All cells of this colour must fit in an N×M box." | "The box is already filled." | "So this cell cannot be that colour." |
 
-| Complicity name | Dialog title | Explanation |
-|-----------------|-------------|-------------|
-| `PABalancedSideComplicity` | Parity + Others | "The Parity constraint and other rules interact: on this side, each colour must appear equally, but nearby constraints limit the options. Together they force the only remaining colour." |
-| `LTFMComplicity` | Letter + Forbidden Pattern | "A letter-shaped group and a forbidden pattern together eliminate possibilities. The letter group's fixed cells, combined with the banned motif, leave only one valid colour." |
-| `FMFMComplicity` | Dual Forbidden Patterns | "Two different forbidden patterns overlap in their effect on this cell. Neither pattern alone forces the cell, but together they cover all but one colour." |
-| `SYFMComplicity` | Symmetry + Forbidden Pattern | "A symmetry constraint pairs this cell with another, and a forbidden pattern restricts the colours. Together they force this cell's colour." |
-| `GSQAComplicity` | Group Size + Quantity | "The group containing this cell must be exactly N cells, and the puzzle must contain exactly M cells of each colour. These two totals together force the assignment." |
-| `LTGSComplicity` | Letter + Group Size | "A letter-shaped group's size constraint and another group-size rule interact. The fixed cells in the letter shape leave only one colour plausible for this cell." |
-| `GSAllComplicity` | Group Size + All Constraints | "The group-size rule for this cell interacts with multiple other constraints simultaneously, narrowing down to a single valid colour." |
-| `SHGSComplicity` | Shape + Group Size | "A shape constraint and a group-size constraint intersect. The shape limits the arrangement, while the size limits the group, together forcing this cell." |
-| `GSGSComplicity` | Dual Group Sizes | "Two different group-size constraints interact. Cell (r,c) belongs to one group of size N, but a neighbouring group of size M limits its colour options — only one remains." |
+For **complicity** sources, use this table (same three-dialog split, no
+`mouseTo`):
 
-For **findAMove** (use one group with this single explanation):
+| Complicity name | Dialog 1 title | Rule | Already-known | Deduction |
+|-----------------|----------------|------|---------------|-----------|
+| `PABalancedSideComplicity` | Parity + Others | "Parity and other rules interact here." | "We already have N cells of each colour." | "So the remaining cell must be the only colour left." |
+| `LTFMComplicity` | Letter + Forbidden Pattern | "This letter and a forbidden pattern interact." | "The letter group already has its cells." | "So this cell cannot be that colour." |
+| `FMFMComplicity` | Dual Forbidden Patterns | "Two forbidden patterns overlap here." | "Both patterns are already partly in place." | "So this cell must be the only colour left." |
+| `SYFMComplicity` | Symmetry + Forbidden Pattern | "Symmetry and a forbidden pattern interact." | "The mirrored cell is already [colour]." | "So this cell must be the only colour left." |
+| `GSQAComplicity` | Group Size + Quantity | "Group size and quantity constraints interact." | "The group already has N cells." | "So this cell cannot be that colour." |
+| `LTGSComplicity` | Letter + Group Size | "This letter and a group-size rule interact." | "The letter group already has its cells." | "So this cell must be the only colour left." |
+| `GSAllComplicity` | Group Size + All Constraints | "Group size interacts with several rules." | "The group already has N cells." | "So this cell must be the only colour left." |
+| `SHGSComplicity` | Shape + Group Size | "Shape and group-size constraints interact." | "The group already has N cells." | "So this cell must be the only colour left." |
+| `GSGSComplicity` | Dual Group Sizes | "Two group-size constraints interact." | "The neighbouring group already has N cells." | "So this cell must be the only colour left." |
 
-| foundBy | Dialog title | Explanation |
-|---------|-------------|-------------|
-| `findAMove` | Trial Deduction | "The solver ran out of purely deductive rules. It tried each possible colour for these cells and propagated all constraints. Each wrong colour led to a contradiction. Only [colour] remained possible for each cell. This proves the result by exhaustion." |
+For **findAMove** (one group, no `mouseTo`):
+
+| foundBy | Dialog 1 title | Rule | Already-known | Deduction |
+|---------|----------------|------|---------------|-----------|
+| `findAMove` | Trial Deduction | "The solver tried every colour for these cells." | "Each wrong colour led to a contradiction." | "So only [colour] was possible for each cell." |
 
 ### 7. Generate the filename
 
@@ -223,51 +280,72 @@ like `(2,0)=black  [constraint - GS:5.1]` and `(0,0)=white  [constraint - FM:111
 The skill generates `docs/scenario/GS_FM.txt`:
 
 ```scenario
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
 loadState v2_12_3x3_010102100_GS:5.1;FM:111_1:121212212
 wait 500
-# --- Group: GS:5.1 ---
+background transparent
+# GS:5.1
 mouseTo GS:5.1
 wait 200
-dialog "Group Size" "Cell 5 must be in a connected group of exactly 1 cell.\
-This means it must be isolated. The cells touching it — (2,0), (1,1), (2,2) —\
-must be the opposite colour (black) to ensure the group stays size 1."
+dialog "Group Size" "This group must be exactly 1 cell."
+wait 3000
+dialog
+wait 500
+# TODO: Mouse to relevant already-set cells
+# mouse 2,0
+# wait 500
+dialog "..." "The group already has its cell."
+wait 3000
+dialog "..." "So the surrounding cells must be black."
 wait 3000
 dialog
 wait 200
 mouse 2,0
 wait 100
 setValue 2,0,black
-wait 100
+wait 1000
 mouse 1,1
 wait 100
 setValue 1,1,black
-wait 100
+wait 1000
 mouse 2,2
 wait 100
 setValue 2,2,black
-wait 100
-# --- Group: FM:111 ---
+wait 1000
+# FM:111
 mouseTo FM:111
 wait 200
-dialog "Forbidden Pattern" "The pattern FM:111 — three black cells in a row —\
-is forbidden. Row 0 already has two black cells at (0,1) and (0,2). Making\
-(0,0) black would complete the pattern. Therefore (0,0) must be white."
-wait 2500
+dialog "Forbidden Pattern" "Three black cells in a row are forbidden."
+wait 3000
+dialog
+wait 500
+# TODO: Mouse to relevant already-set cells
+# mouse 0,1
+# wait 500
+# mouse 0,2
+# wait 500
+dialog "..." "This row already has two black cells."
+wait 3000
+dialog "..." "So this cell cannot be black — it must be white."
+wait 3000
 dialog
 wait 200
 mouse 0,0
 wait 100
 setValue 0,0,white
-wait 100
+wait 1000
 mouse 1,2
 wait 100
 setValue 1,2,white
-wait 100
-# --- Finished ---
-mouseTo hint
-wait 300
-dialog "Solved!" "The puzzle is complete!\nAll constraints are satisfied."
+wait 1000
+# End
+dialog
 wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 2000
 dialog
 ```
 

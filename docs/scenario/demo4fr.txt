@@ -1,0 +1,235 @@
+background bottomBarBg
+dialog "Bienvenue !" "On va résoudre un puzzle ensemble"
+wait 2000
+loadState v2_12_6x4_000010002000000000012100_GS:5.6;GS:7.9;PA:9.bottom;IM:9.8.1;FM:12.21;CT:0.1;CT:1.1;GS:6.9_1:221111222212112212112122_38_scenario:classic
+wait 500
+background transparent
+# PA:9.bottom
+mouseTo PA:9.bottom
+wait 200
+dialog "Parité" "De ce côté de la case repère, le noir et le blanc doivent apparaître autant de fois."
+wait 3000
+dialog
+wait 500
+mouse 3,3
+wait 500
+dialog "..." "Cette case du dessous est déjà noire."
+wait 3000
+mouse 3,2
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 3,2,white
+wait 1000
+# IM:9.8.1
+mouseTo IM:9.8.1
+wait 200
+dialog "Implication" "Si cette case est noire, l'autre doit l'être aussi."
+wait 3000
+dialog
+wait 500
+mouse 2,1
+wait 500
+dialog "..." "Cette case est déjà blanche."
+wait 3000
+mouse 3,1
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 3,1,white
+wait 1000
+# FM:12.21
+mouseTo FM:12.21
+wait 200
+dialog "Motif interdit" "Ce motif 2×2 est interdit : noir-blanc au-dessus de blanc-noir."
+wait 3000
+dialog
+wait 500
+mouse 3,2
+wait 500
+mouse 2,3
+wait 500
+mouse 3,3
+wait 500
+dialog "..." "Le reste du motif est déjà en place."
+wait 3000
+mouse 2,2
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 2,2,white
+wait 1000
+# CT:1.1
+mouseTo CT:1.1
+wait 200
+dialog "Transition" "Cette colonne doit contenir exactement un changement de couleur."
+wait 3000
+dialog
+wait 500
+mouse 1,3
+wait 500
+dialog "..." "La case du bas est déjà noire."
+wait 3000
+mouse 1,0
+wait 100
+dialog "..." "Donc cette case du haut doit être blanche, quelle que soit la façon dont le changement se produit."
+wait 3000
+dialog
+wait 200
+setValue 1,0,white
+wait 1000
+# GS:7.9
+mouseTo GS:7.9
+wait 200
+dialog "Taille du groupe" "Le groupe qui part d'ici doit contenir exactement 9 cases."
+wait 3000
+dialog
+wait 500
+mouse 2,1
+wait 500
+dialog "..." "Cette case voisine est déjà blanche."
+wait 3000
+mouse 1,1
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — son groupe ne pourrait jamais être assez grand."
+wait 3000
+dialog
+wait 200
+setValue 1,1,white
+wait 1000
+# GS:6.9
+mouseTo GS:6.9
+wait 200
+dialog "Taille du groupe" "Le groupe qui part d'ici doit contenir exactement 9 cases."
+wait 3000
+dialog
+wait 500
+mouse 1,1
+wait 500
+dialog "..." "Le groupe prend déjà forme ici en blanc."
+wait 3000
+mouse 0,1
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 0,1,white
+wait 1000
+# GSAllComplicity
+dialog "Taille de groupe + toutes les contraintes" "Les règles de taille de groupe s'appliquent avec toutes les autres contraintes."
+wait 3000
+dialog
+wait 500
+mouse 1,1
+wait 500
+mouse 0,1
+wait 500
+dialog "..." "Le groupe blanc de 9 cases est ancré ici."
+wait 3000
+mouse 5,0
+wait 100
+dialog "..." "Donc chacune de ces cases est forcée à sa seule couleur possible."
+wait 3000
+dialog
+wait 200
+setValue 5,0,black
+wait 100
+mouse 4,1
+wait 100
+setValue 4,1,black
+wait 100
+mouse 4,2
+wait 100
+setValue 4,2,black
+wait 100
+mouse 0,0
+wait 100
+setValue 0,0,white
+wait 100
+mouse 3,0
+wait 100
+setValue 3,0,black
+wait 100
+mouse 2,0
+wait 100
+setValue 2,0,black
+wait 100
+mouse 5,1
+wait 100
+setValue 5,1,white
+wait 100
+mouse 4,3
+wait 100
+setValue 4,3,white
+wait 100
+mouse 5,2
+wait 100
+setValue 5,2,white
+wait 100
+mouse 1,2
+wait 100
+setValue 1,2,black
+wait 100
+mouse 0,2
+wait 100
+setValue 0,2,black
+wait 1000
+# FM:12.21
+mouseTo FM:12.21
+wait 200
+dialog "Motif interdit" "Ce motif 2×2 est interdit : noir-blanc au-dessus de blanc-noir."
+wait 3000
+dialog
+wait 500
+mouse 4,2
+wait 500
+mouse 5,2
+wait 500
+mouse 4,3
+wait 500
+dialog "..." "Le reste du motif est déjà en place."
+wait 3000
+mouse 5,3
+wait 100
+dialog "..." "Donc cette case ne peut pas être noire — elle doit être blanche."
+wait 3000
+dialog
+wait 200
+setValue 5,3,white
+wait 1000
+# CT:0.1
+mouseTo CT:0.1
+wait 200
+dialog "Transition" "Cette colonne doit contenir exactement un changement de couleur."
+wait 3000
+dialog
+wait 500
+mouse 0,0
+wait 500
+mouse 0,1
+wait 500
+mouse 0,2
+wait 500
+dialog "..." "La colonne fait déjà blanc, blanc, noir."
+wait 3000
+mouse 0,3
+wait 100
+dialog "..." "Donc cette dernière case doit être noire pour garder un seul changement."
+wait 3000
+dialog
+wait 200
+setValue 0,3,black
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle terminé !" "Essayez par vous même sur leveque.cc/getsomepuzzle"
+wait 5000

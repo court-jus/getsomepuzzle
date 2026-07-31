@@ -1,0 +1,68 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_3x3_200200000_GC:1.4_1:221212121_34_scenario:classic
+wait 500
+background transparent
+# TrialDeduction
+dialog "Trial Deduction" "The solver tried every colour for these cells and ran all the rules each time."
+wait 3000
+dialog
+wait 500
+dialog "..." "Each wrong colour led to a contradiction."
+wait 3000
+mouse 2,1
+wait 100
+dialog "..." "So each cell takes its only remaining colour."
+wait 3000
+dialog
+wait 200
+setValue 2,1,white
+wait 100
+mouse 1,0
+wait 100
+setValue 1,0,white
+wait 100
+mouse 2,0
+wait 100
+setValue 2,0,black
+wait 100
+mouse 1,1
+wait 100
+setValue 1,1,black
+wait 1000
+# GC:1.4
+mouseTo GC:1.4
+wait 200
+dialog "Group Count" "There must be exactly 4 separate groups of black cells."
+wait 3000
+dialog
+wait 500
+mouse 0,0
+wait 500
+mouse 0,1
+wait 500
+dialog "..." "The two white cells are already placed."
+wait 3000
+mouse 0,2
+wait 100
+dialog "..." "So the black cells must stay isolated — each one a group on its own, never touching."
+wait 3000
+dialog
+wait 200
+setValue 0,2,black
+wait 100
+mouse 2,2
+wait 100
+setValue 2,2,black
+wait 100
+mouse 1,2
+wait 100
+setValue 1,2,white
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 /// It paints a small right-upward arrow whose tip approximates the cursor point.
 class FakeCursor extends StatelessWidget {
   /// Size of the cursor in logical pixels.
-  static const double cursorSize = 24.0;
+  static const double cursorSize = 96.0;
 
   const FakeCursor({super.key});
 

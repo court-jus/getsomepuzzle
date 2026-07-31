@@ -1,0 +1,126 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_3x3_001100000_SY:2.5;SY:3.1;SY:3.2;SY:8.1_1:221122221_22_scenario:classic
+wait 500
+background transparent
+# SY:2.5
+mouseTo SY:2.5
+wait 200
+dialog "Symmetry" "The group around the anchor must mirror itself exactly."
+wait 3000
+dialog
+wait 500
+mouse 2,0
+wait 500
+dialog "..." "The anchor cell is already black."
+wait 3000
+mouse 2,1
+wait 100
+dialog "..." "Its mirror would fall outside the grid — so these cells cannot be black."
+wait 3000
+dialog
+wait 200
+setValue 2,1,white
+wait 100
+mouse 1,0
+wait 100
+setValue 1,0,white
+wait 1000
+# SY:3.1
+mouseTo SY:3.1
+wait 200
+dialog "Symmetry" "The group around the anchor must mirror itself exactly."
+wait 3000
+dialog
+wait 500
+mouse 0,1
+wait 500
+dialog "..." "The anchor cell is already black."
+wait 3000
+mouse 0,0
+wait 100
+dialog "..." "Its mirror is outside the grid — so this cell cannot be black."
+wait 3000
+dialog
+wait 200
+setValue 0,0,white
+wait 1000
+# SY:3.2
+mouseTo SY:3.2
+wait 200
+dialog "Symmetry" "The group around the anchor must mirror itself exactly."
+wait 3000
+dialog
+wait 500
+mouse 0,1
+wait 500
+dialog "..." "The anchor cell is already black."
+wait 3000
+mouse 1,1
+wait 100
+dialog "..." "A black cell here would force a mirror that is already white — so it must be white."
+wait 3000
+dialog
+wait 200
+setValue 1,1,white
+wait 1000
+# SY:3.1
+mouseTo SY:3.1
+wait 200
+dialog "Symmetry" "The group around the anchor must mirror itself exactly."
+wait 3000
+dialog
+wait 500
+mouse 1,1
+wait 500
+dialog "..." "The mirror of this cell is already white."
+wait 3000
+mouse 0,2
+wait 100
+dialog "..." "So this cell cannot be black — it must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,2,white
+wait 1000
+# SY:8.1
+mouseTo SY:8.1
+wait 200
+dialog "Symmetry" "The grid mirrors itself across this diagonal."
+wait 3000
+dialog
+wait 500
+mouse 2,1
+wait 500
+dialog "..." "This cell is already white."
+wait 3000
+mouse 1,2
+wait 100
+dialog "..." "So its mirror across the diagonal must be white too."
+wait 3000
+dialog
+wait 200
+setValue 1,2,white
+wait 1000
+# TrialDeduction
+dialog "Trial Deduction" "The solver tried every colour for this cell and ran all the rules each time."
+wait 3000
+dialog
+wait 500
+dialog "..." "Each wrong colour led to a contradiction."
+wait 3000
+mouse 2,2
+wait 100
+dialog "..." "So only black was possible here."
+wait 3000
+dialog
+wait 200
+setValue 2,2,black
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 5000
