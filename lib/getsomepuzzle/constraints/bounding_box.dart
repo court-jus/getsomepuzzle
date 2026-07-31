@@ -182,117 +182,206 @@ class BoundingBoxConstraint extends Constraint {
       }
     }
 
-    // Pass 3: forced growth. When the W×H box position is uniquely pinned by
-    // the group's current extent and the grid borders, the group must reach
-    // all four sides of that box. If a side it does not yet occupy has exactly
-    // one `color`-capable cell, that cell is forced; if it has none, the box is
-    // unreachable.
+    // Pass A: merge-prevention. A free `color`-capable cell inside this
+    // group's current bounding box that, if coloured, would orthogonally
+    // connect this group to another same-colour group must lose `color` when
+    // the merged bounding box would exceed the target. Runs even for groups
+    // already at the target extent — an at-target box can still be broken by
+    // a bridging cell.
     for (final group in groups) {
       final (minR, maxR, minC, maxC) = _bounds(group, puzzle.width);
-      final h = maxR - minR + 1;
-      final w = maxC - minC + 1;
-      // Box already at target extent ⇒ pass 2 guards overflow, nothing to grow.
-      if (h == height && w == width) continue;
-      // Candidate top-left corners of the final box: it must contain the
-      // current extent and fit inside the grid.
-      final r0lo = max(0, maxR - height + 1);
-      final r0hi = min(minR, puzzle.height - height);
-      final c0lo = max(0, maxC - width + 1);
-      final c0hi = min(minC, puzzle.width - width);
-      // Box position not yet pinned in both axes — can't force an edge.
-      if (r0lo != r0hi || c0lo != c0hi) continue;
-      final r0 = r0lo;
-      final c0 = c0lo;
-      final boxMaxR = r0 + height - 1;
-      final boxMaxC = c0 + width - 1;
-      final groupSet = group.toSet();
-      final edges = <List<int>>[
-        [for (int c = c0; c <= boxMaxC; c++) r0 * puzzle.width + c], // top
-        [for (int c = c0; c <= boxMaxC; c++) boxMaxR * puzzle.width + c], // bot
-        [for (int r = r0; r <= boxMaxR; r++) r * puzzle.width + c0], // left
-        [for (int r = r0; r <= boxMaxR; r++) r * puzzle.width + boxMaxC], // rgt
-      ];
-      for (final edge in edges) {
-        // Already touching this side: nothing to force here.
-        if (edge.any(groupSet.contains)) continue;
-        final capable = edge
-            .where(
-              (i) =>
-                  puzzle.cellValues[i] == color ||
-                  (puzzle.cellValues[i] == CellValue.free &&
-                      puzzle.cells[i].options.contains(color)),
-            )
-            .toList();
-        if (capable.isEmpty) return Impossible(this);
-        if (capable.length == 1 &&
-            puzzle.cellValues[capable.first] == CellValue.free) {
-          return SetValue(capable.first, color, this, complexity: 3);
+      for (int r = minR; r <= maxR; r++) {
+        for (int c = minC; c <= maxC; c++) {
+          final i = r * puzzle.width + c;
+          if (puzzle.cellValues[i] != CellValue.free) continue;
+          if (!puzzle.cells[i].options.contains(color)) continue;
+          if (!puzzle.getNeighbors(i).any(group.contains)) continue;
+          for (final other in groups) {
+            if (identical(other, group)) continue;
+            if (!puzzle.getNeighbors(i).any(other.contains)) continue;
+            final otherMinR = other
+                .map((idx) => idx ~/ puzzle.width)
+                .reduce(min);
+            final otherMaxR = other
+                .map((idx) => idx ~/ puzzle.width)
+                .reduce(max);
+            final otherMinC = other
+                .map((idx) => idx % puzzle.width)
+                .reduce(min);
+            final otherMaxC = other
+                .map((idx) => idx % puzzle.width)
+                .reduce(max);
+            if (max(maxR, otherMaxR) - min(minR, otherMinR) + 1 > height ||
+                max(maxC, otherMaxC) - min(minC, otherMinC) + 1 > width) {
+              return RemoveOption(i, color, this, complexity: 2);
+            }
+          }
         }
       }
     }
 
-    // Pass 4: pinned-box connectivity. Within a pinned box the group must be a
-    // single connected run of `color`-capable cells touching all four sides. A
-    // free capable cell whose removal would sever a still-needed side from the
-    // group (the only link to a lone edge cell) is forced — the connectivity
-    // counterpart of pass 3's edge forcing.
+    // Pass 3: candidate-box analysis. Enumerate every W×H box position that
+    // can contain the group's current extent, keep only those the group can
+    // actually span as a single connected component touching all four sides,
+    // then force the cells every surviving candidate needs.
     for (final group in groups) {
       final (minR, maxR, minC, maxC) = _bounds(group, puzzle.width);
-      final h = maxR - minR + 1;
-      final w = maxC - minC + 1;
-      if (h == height && w == width) continue;
-      final r0lo = max(0, maxR - height + 1);
-      final r0hi = min(minR, puzzle.height - height);
-      final c0lo = max(0, maxC - width + 1);
-      final c0hi = min(minC, puzzle.width - width);
-      if (r0lo != r0hi || c0lo != c0hi) continue;
-      final r0 = r0lo;
-      final c0 = c0lo;
-      final boxMaxR = r0 + height - 1;
-      final boxMaxC = c0 + width - 1;
-      // `color`-capable cells inside the box (already `color`, or free with
-      // `color` still in options).
-      final capable = <int>{};
-      for (int r = r0; r <= boxMaxR; r++) {
-        for (int c = c0; c <= boxMaxC; c++) {
-          final i = r * puzzle.width + c;
-          if (puzzle.cellValues[i] == color ||
-              (puzzle.cellValues[i] == CellValue.free &&
-                  puzzle.cells[i].options.contains(color))) {
-            capable.add(i);
-          }
+      if (maxR - minR + 1 == height && maxC - minC + 1 == width) continue;
+      final candidates = <_CandidateBox>[];
+      for (
+        int r0 = max(0, maxR - height + 1);
+        r0 <= min(minR, puzzle.height - height);
+        r0++
+      ) {
+        final boxMaxR = r0 + height - 1;
+        for (
+          int c0 = max(0, maxC - width + 1);
+          c0 <= min(minC, puzzle.width - width);
+          c0++
+        ) {
+          final boxMaxC = c0 + width - 1;
+          final needed = _analyzeCandidateBox(
+            puzzle,
+            group,
+            r0,
+            boxMaxR,
+            c0,
+            boxMaxC,
+          );
+          if (needed != null) candidates.add(_CandidateBox(r0, c0, needed));
         }
       }
-      // Does the capable component containing the group (minus [removed]) still
-      // reach all four sides of the box?
-      bool spans(Set<int> removed) {
-        final allowed = capable.difference(removed);
-        if (!allowed.contains(group.first)) return false;
-        final comp = floodFill(puzzle, [
-          group.first,
-        ], (i) => allowed.contains(i));
-        bool top = false, bot = false, lft = false, rgt = false;
-        for (final i in comp) {
-          final r = i ~/ puzzle.width;
-          final c = i % puzzle.width;
-          if (r == r0) top = true;
-          if (r == boxMaxR) bot = true;
-          if (c == c0) lft = true;
-          if (c == boxMaxC) rgt = true;
+      if (candidates.isEmpty) return Impossible(this);
+      if (candidates.length == 1) {
+        final needed = candidates.first.needed;
+        if (needed.isNotEmpty) {
+          return SetValue(needed.first, color, this, complexity: 3);
         }
-        return top && bot && lft && rgt;
       }
-
-      if (!spans(<int>{})) return Impossible(this);
-      for (final p in capable) {
-        if (puzzle.cellValues[p] != CellValue.free) continue;
-        if (!spans({p})) {
-          return SetValue(p, color, this, complexity: 4);
-        }
+      final common = candidates
+          .map((c) => c.needed)
+          .reduce((a, b) => a.intersection(b));
+      if (common.isNotEmpty) {
+        return SetValue(common.first, color, this, complexity: 3);
       }
     }
 
     return null;
+  }
+
+  /// Analyses whether [group] can complete the W×H box with top-left corner
+  /// (r0,c0) (rows r0..[boxMaxR], columns c0..[boxMaxC]) as its final bounding
+  /// box. Returns `null` when the box is unreachable, otherwise the set of
+  /// free cells forced by choosing this box.
+  Set<int>? _analyzeCandidateBox(
+    Puzzle puzzle,
+    List<int> group,
+    int r0,
+    int boxMaxR,
+    int c0,
+    int boxMaxC,
+  ) {
+    // 1. Reachable: the connected region inside the box the group could ever
+    //    occupy — its own cells plus every free `color`-capable cell reachable
+    //    through `color`-capable cells. Already-`color` cells of other groups
+    //    are traversable: merging keeps the box valid as long as it still fits
+    //    the target.
+    final reachable = floodFill(puzzle, group, (i) {
+      if (puzzle.cellValues[i] != color &&
+          !puzzle.cells[i].options.contains(color)) {
+        return false;
+      }
+      final r = i ~/ puzzle.width;
+      final c = i % puzzle.width;
+      return r >= r0 && r <= boxMaxR && c >= c0 && c <= boxMaxC;
+    });
+
+    // 2. Reachable cells touching a `color` cell outside this box can never be
+    //    used — they would merge the group with an external group and overshoot
+    //    the target. They are pruned from the per-candidate `possible` set (no
+    //    global RemoveOption needed).
+    final excluded = reachable.where((i) {
+      return puzzle.getNeighbors(i).any((n) {
+        if (puzzle.cellValues[n] != color) return false;
+        final r = n ~/ puzzle.width;
+        final c = n % puzzle.width;
+        return r < r0 || r > boxMaxR || c < c0 || c > boxMaxC;
+      });
+    }).toSet();
+    final possible = reachable.difference(excluded);
+    final groupSet = group.toSet();
+
+    // 3. Edge coverage: every box side needs at least one cell the group can
+    //    occupy. A side with exactly one free possible cell forces it.
+    final edges = <List<int>>[
+      [for (int c = c0; c <= boxMaxC; c++) r0 * puzzle.width + c], // top
+      [for (int c = c0; c <= boxMaxC; c++) boxMaxR * puzzle.width + c], // bot
+      [for (int r = r0; r <= boxMaxR; r++) r * puzzle.width + c0], // left
+      [for (int r = r0; r <= boxMaxR; r++) r * puzzle.width + boxMaxC], // rgt
+    ];
+    final needed = <int>{};
+    for (final edge in edges) {
+      final (feasible, forced) = _analyzeBoxEdge(
+        edge,
+        groupSet,
+        possible,
+        puzzle,
+      );
+      if (!feasible) return null;
+      if (forced != null) needed.add(forced);
+    }
+
+    // 4. Connectivity: the group must end up as ONE component spanning all four
+    //    sides. A free possible cell whose removal severs a side (an
+    //    articulation point of the spanning property) is forced — e.g. a
+    //    connector cell that keeps two diagonally-adjacent parts in the same
+    //    group.
+    bool spans(Set<int> removed) {
+      final allowed = possible.difference(removed);
+      final comp = floodFill(puzzle, group, allowed.contains);
+      if (!comp.contains(group.first)) return false;
+      bool top = false, bot = false, lft = false, rgt = false;
+      for (final i in comp) {
+        final r = i ~/ puzzle.width;
+        final c = i % puzzle.width;
+        if (r == r0) top = true;
+        if (r == boxMaxR) bot = true;
+        if (c == c0) lft = true;
+        if (c == boxMaxC) rgt = true;
+      }
+      return top && bot && lft && rgt;
+    }
+
+    if (!spans(const <int>{})) return null;
+    for (final p in possible) {
+      if (puzzle.cellValues[p] != CellValue.free) continue;
+      if (!spans({p})) needed.add(p);
+    }
+
+    return needed;
+  }
+
+  /// Checks whether [edge] has at least one cell the group can occupy.
+  /// Returns `(feasible, forced)`:
+  /// - `feasible = false` — no cell lies on this side, the box is unreachable.
+  /// - `feasible = true, forced != null` — exactly one free possible cell on
+  ///   this side; it is forced.
+  /// - `feasible = true, forced == null` — side covered, nothing forced.
+  (bool, int?) _analyzeBoxEdge(
+    List<int> edge,
+    Set<int> groupSet,
+    Set<int> possible,
+    Puzzle puzzle,
+  ) {
+    final covered = edge
+        .where((i) => possible.contains(i) || groupSet.contains(i))
+        .toList();
+    if (covered.isEmpty) return (false, null);
+    if (covered.length == 1 &&
+        puzzle.cellValues[covered.first] == CellValue.free) {
+      return (true, covered.first);
+    }
+    return (true, null);
   }
 
   @override
@@ -322,4 +411,13 @@ class BoundingBoxConstraint extends Constraint {
     }
     return true;
   }
+}
+
+/// One candidate box position for a group's final bounding box, together with
+/// the free cells forced by choosing it.
+class _CandidateBox {
+  final int r0;
+  final int c0;
+  final Set<int> needed;
+  const _CandidateBox(this.r0, this.c0, this.needed);
 }

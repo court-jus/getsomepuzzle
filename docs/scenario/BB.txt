@@ -1,0 +1,88 @@
+background bottomBarBg
+dialog "Welcome!" "Let's solve a puzzle together"
+wait 2000
+loadState v2_12_3x3_100001000_BB:1.2.2_1:112121211_42_scenario:bb
+wait 500
+background transparent
+# BB:1.2.2
+mouseTo BB:1.2.2
+wait 200
+dialog "Bounding Box" "Every group of black cells must fit inside a 2×2 box."
+wait 3000
+dialog
+wait 500
+mouse 0,0
+wait 500
+dialog "..." "The corner black cell pins its box to the top-left corner."
+wait 3000
+mouse 0,1
+wait 100
+dialog "..." "So the box needs black on its bottom and right edges — and the cells outside must be white."
+wait 3000
+dialog
+wait 200
+setValue 0,1,black
+wait 1000
+mouse 0,2
+wait 100
+setValue 0,2,white
+wait 1000
+mouse 1,0
+wait 100
+setValue 1,0,black
+wait 1000
+mouse 2,0
+wait 100
+setValue 2,0,white
+wait 1000
+# BB:1.2.2
+mouseTo BB:1.2.2
+wait 200
+dialog "Bounding Box" "Every group of black cells must fit inside a 2×2 box."
+wait 3000
+dialog
+wait 500
+mouse 1,0
+wait 500
+mouse 2,1
+wait 500
+dialog "..." "The first box is complete, and another black cell sits at the right."
+wait 3000
+mouse 1,1
+wait 100
+dialog "..." "This cell would bridge the two boxes into one shape that is too wide."
+wait 3000
+dialog
+wait 200
+setValue 1,1,white
+wait 1000
+# BB:1.2.2
+mouseTo BB:1.2.2
+wait 200
+dialog "Bounding Box" "Every group of black cells must fit inside a 2×2 box."
+wait 3000
+dialog
+wait 500
+mouse 2,1
+wait 500
+dialog "..." "The last black cell can only grow downwards — the cells around it are white."
+wait 3000
+mouse 1,2
+wait 100
+dialog "..." "So it must spread down into these two cells to fill its box."
+wait 3000
+dialog
+wait 200
+setValue 1,2,black
+wait 1000
+mouse 2,2
+wait 100
+setValue 2,2,black
+wait 1000
+# End
+dialog
+wait 3000
+background bottomBarBg
+dialog "Puzzle solved!" "Go try it by yourself at leveque.cc/getsomepuzzle"
+wait 2000
+dialog

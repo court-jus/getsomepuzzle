@@ -821,9 +821,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           children: [
             // Full-screen background rectangle, below the dialog text.
             if (_dialogBackgroundColor != Colors.transparent)
-              Positioned.fill(
-                child: ColoredBox(color: _dialogBackgroundColor),
-              ),
+              Positioned.fill(child: ColoredBox(color: _dialogBackgroundColor)),
             // Centered dialog text on top of the background.
             Center(
               child: Padding(
