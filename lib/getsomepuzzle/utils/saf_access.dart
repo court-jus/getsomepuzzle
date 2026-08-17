@@ -62,7 +62,7 @@ class SafAccess {
         });
         return result ?? '';
       }
-      return File(p.join(dirPath, fileName)).readAsString();
+      return await File(p.join(dirPath, fileName)).readAsString();
     } on Exception catch (e) {
       _log.warning('readFile($dirPath, $fileName) failed: $e');
       rethrow;

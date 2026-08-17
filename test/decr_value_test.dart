@@ -43,11 +43,11 @@ void main() {
       expect(p.cellValues[4], CellValue.black);
       p.decrValue(4);
       expect(p.cellValues[4], CellValue.free);
-      expect(
-        p.cells[4].options.toSet(),
-        {CellValue.black, CellValue.white, CellValue.purple},
-        reason: 'wrap to free must restore the full option set',
-      );
+      expect(p.cells[4].options.toSet(), {
+        CellValue.black,
+        CellValue.white,
+        CellValue.purple,
+      }, reason: 'wrap to free must restore the full option set');
       // One more step proves the cycle is truly cyclic (not a one-shot).
       p.decrValue(4);
       expect(p.cellValues[4], CellValue.purple);

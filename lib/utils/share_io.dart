@@ -41,7 +41,7 @@ Future<ShareOutcome> shareData(String content) async {
       await File(filePath).writeAsString(content);
       final result = await OpenFile.open(filePath, type: "text/plain");
       if (result.type != ResultType.done) {
-        return _fallbackToClipboard(content);
+        return await _fallbackToClipboard(content);
       }
       return ShareOutcome.opened;
     } catch (_) {
