@@ -106,6 +106,12 @@ abstract class AppLocalizations {
   /// **'Help'**
   String get help;
 
+  /// Heading of the constraints catalogue section in the help page
+  ///
+  /// In en, this message translates to:
+  /// **'Constraints'**
+  String get helpConstraints;
+
   /// Label of the link in the help page that opens the privacy-policy page on the web
   ///
   /// In en, this message translates to:
@@ -700,18 +706,6 @@ abstract class AppLocalizations {
   /// **'majority color'**
   String get constraintMajority;
 
-  /// Name of the column majority constraint
-  ///
-  /// In en, this message translates to:
-  /// **'column majority'**
-  String get constraintColumnMajority;
-
-  /// Name of the row majority constraint
-  ///
-  /// In en, this message translates to:
-  /// **'row majority'**
-  String get constraintRowMajority;
-
   /// Name of the parity constraint
   ///
   /// In en, this message translates to:
@@ -1282,6 +1276,12 @@ abstract class AppLocalizations {
   /// **'transition'**
   String get constraintTransition;
 
+  /// Name of the line majority constraint (merged row/column majority)
+  ///
+  /// In en, this message translates to:
+  /// **'line majority'**
+  String get constraintLineMajority;
+
   /// Name of the shape constraint
   ///
   /// In en, this message translates to:
@@ -1441,7 +1441,7 @@ abstract class AppLocalizations {
   /// Body of the new-constraint explanation modal for the Majority (MJ) constraint
   ///
   /// In en, this message translates to:
-  /// **'A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half).'**
+  /// **'A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half). The border itself tells you which color must dominate.'**
   String get constraintExplainMJ;
 
   /// Body of the new-constraint explanation modal for the Quantity (QA) constraint
@@ -1495,19 +1495,19 @@ abstract class AppLocalizations {
   /// Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint
   ///
   /// In en, this message translates to:
-  /// **'A cell shown as a cross containing a number must have exactly that number of orthogonal neighbors of the marked color.'**
+  /// **'A cell shown as a cross containing a number must have exactly that number of orthogonal neighbors of the marked color. The cross is filled with the target color and outlined in the opposite color so it stays readable on any background. For instance, a black cross holding the digit 2 means the cell must have exactly 2 black neighbors among its top/bottom/left/right cells.'**
   String get constraintExplainNC;
 
   /// Body of the new-constraint explanation modal for the Eyes (EY) constraint
   ///
   /// In en, this message translates to:
-  /// **'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).'**
+  /// **'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view). The eye\'s color is the target color; the border around the eye is the opposite color.'**
   String get constraintExplainEY;
 
   /// Body of the new-constraint explanation modal for the Chain (CH) constraint
   ///
   /// In en, this message translates to:
-  /// **'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.'**
+  /// **'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side. The path does not need to be a straight line — it can bend, branch, or widen, as long as there is at least one continuous connection between the two sides.'**
   String get constraintExplainCH;
 
   /// Body of the new-constraint explanation modal for the Implication (IM) constraint

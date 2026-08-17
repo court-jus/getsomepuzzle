@@ -73,9 +73,18 @@ class NewConstraintDialog extends StatelessWidget {
           children: [
             for (final (i, slug) in slugs.toList().indexed) ...[
               if (i > 0) const SizedBox(height: 16),
-              Text(
-                _capitalise(constraintNameForSlug(l, slug)),
-                style: Theme.of(context).textTheme.titleMedium,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  ConstraintIcon(slug: slug, size: 36),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _capitalise(constraintNameForSlug(l, slug)),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(constraintExplanationForSlug(l, slug)),
@@ -98,53 +107,8 @@ class NewConstraintDialog extends StatelessWidget {
   }
 }
 
-/// Localised body text for a constraint slug. Returns the slug itself
-/// as a fallback so an unknown constraint doesn't break the UI.
-String constraintExplanationForSlug(AppLocalizations l, String slug) {
-  switch (slug) {
-    case 'FM':
-      return l.constraintExplainFM;
-    case 'PA':
-      return l.constraintExplainPA;
-    case 'RC':
-    case 'CC':
-      return l.constraintExplainLineCount;
-    case 'GS':
-      return l.constraintExplainGS;
-    case 'LT':
-      return l.constraintExplainLT;
-    case 'MJ':
-      return l.constraintExplainMJ;
-    case 'JC':
-    case 'JR':
-      return l.constraintExplainLineMajority;
-    case 'QA':
-      return l.constraintExplainQA;
-    case 'SY':
-      return l.constraintExplainSY;
-    case 'DF':
-      return l.constraintExplainDF;
-    case 'SH':
-      return l.constraintExplainSH;
-    case 'GC':
-      return l.constraintExplainGC;
-    case 'CH':
-      return l.constraintExplainCH;
-    case 'NC':
-      return l.constraintExplainNC;
-    case 'EY':
-      return l.constraintExplainEY;
-    case 'IM':
-      return l.constraintExplainIM;
-    case 'BB':
-      return l.constraintExplainBB;
-    case 'RT':
-    case 'CT':
-      return l.constraintExplainTransition;
-    default:
-      return slug;
-  }
-}
-
+/// Localised body text for a constraint slug lives in
+/// `widgets/constraints/registry.dart` (`constraintExplanationForSlug`),
+/// shared with the help-page catalogue so the two surfaces stay in sync.
 String _capitalise(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';

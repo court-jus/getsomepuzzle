@@ -12,6 +12,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get help => 'Aide';
 
   @override
+  String get helpConstraints => 'Contraintes';
+
+  @override
   String get viewPrivacyPolicy => 'Voir la politique de confidentialité';
 
   @override
@@ -346,12 +349,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintMajority => 'couleur majoritaire';
 
   @override
-  String get constraintColumnMajority => 'majorité colonne';
-
-  @override
-  String get constraintRowMajority => 'majorité ligne';
-
-  @override
   String get constraintParity => 'parité';
 
   @override
@@ -662,6 +659,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintTransition => 'transition';
 
   @override
+  String get constraintLineMajority => 'majorité par ligne';
+
+  @override
   String get constraintShape => 'forme';
 
   @override
@@ -760,7 +760,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get constraintExplainMJ =>
-      'Un cadre en pointillés d\'une couleur donnée indique que la majorité des cellules à l\'intérieur de la zone doivent être de cette couleur (plus de la moitié).';
+      'Un cadre en pointillés d\'une couleur donnée indique que la majorité des cellules à l\'intérieur de la zone doivent être de cette couleur (plus de la moitié). La couleur de la bordure vous indique elle-même quelle couleur doit dominer.';
 
   @override
   String get constraintExplainQA =>
@@ -796,15 +796,15 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get constraintExplainNC =>
-      'Une case affichée sous forme de croix contenant un chiffre doit avoir exactement ce nombre de voisins orthogonaux de la couleur indiquée.';
+      'Une case affichée sous forme de croix contenant un chiffre doit avoir exactement ce nombre de voisins orthogonaux de la couleur indiquée. La croix est de la couleur cible et son contour est de la couleur opposée pour rester lisible quel que soit le fond. Par exemple, une croix noire avec le chiffre 2 demande que la case ait exactement 2 voisins noirs parmi ses voisins haut/bas/gauche/droite.';
 
   @override
   String get constraintExplainEY =>
-      'Une case affichée comme un œil doit « voir » exactement le nombre indiqué de cases de la couleur de l\'œil. Le regard se propage en ligne droite dans chacune des quatre directions orthogonales jusqu\'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue).';
+      'Une case affichée comme un œil doit « voir » exactement le nombre indiqué de cases de la couleur de l\'œil. Le regard se propage en ligne droite dans chacune des quatre directions orthogonales jusqu\'à atteindre le bord de la grille ou une case de la couleur opposée (qui bloque la vue). La couleur de l\'œil est la couleur cible ; la bordure autour de l\'œil est la couleur opposée.';
 
   @override
   String get constraintExplainCH =>
-      'Une icône de mini-grille montre deux côtés de la grille reliés par une chaîne. La solution doit contenir un chemin orthogonal ininterrompu de cette couleur allant du côté marqué à l\'autre côté marqué.';
+      'Une icône de mini-grille montre deux côtés de la grille reliés par une chaîne. La solution doit contenir un chemin orthogonal ininterrompu de cette couleur allant du côté marqué à l\'autre côté marqué. Le chemin n\'a pas besoin d\'être une ligne droite — il peut tourner, se ramifier ou s\'élargir, tant qu\'il existe au moins une connexion continue entre les deux côtés.';
 
   @override
   String get constraintExplainIM =>

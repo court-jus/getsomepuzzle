@@ -12,6 +12,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get help => 'Help';
 
   @override
+  String get helpConstraints => 'Constraints';
+
+  @override
   String get viewPrivacyPolicy => 'View privacy policy';
 
   @override
@@ -343,12 +346,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintMajority => 'majority color';
 
   @override
-  String get constraintColumnMajority => 'column majority';
-
-  @override
-  String get constraintRowMajority => 'row majority';
-
-  @override
   String get constraintParity => 'parity';
 
   @override
@@ -657,6 +654,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintTransition => 'transition';
 
   @override
+  String get constraintLineMajority => 'line majority';
+
+  @override
   String get constraintShape => 'shape';
 
   @override
@@ -755,7 +755,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get constraintExplainMJ =>
-      'A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half).';
+      'A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half). The border itself tells you which color must dominate.';
 
   @override
   String get constraintExplainQA =>
@@ -791,15 +791,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get constraintExplainNC =>
-      'A cell shown as a cross containing a number must have exactly that number of orthogonal neighbors of the marked color.';
+      'A cell shown as a cross containing a number must have exactly that number of orthogonal neighbors of the marked color. The cross is filled with the target color and outlined in the opposite color so it stays readable on any background. For instance, a black cross holding the digit 2 means the cell must have exactly 2 black neighbors among its top/bottom/left/right cells.';
 
   @override
   String get constraintExplainEY =>
-      'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).';
+      'A cell with an eye must \"see\" exactly the indicated number of cells of the eye\'s color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view). The eye\'s color is the target color; the border around the eye is the opposite color.';
 
   @override
   String get constraintExplainCH =>
-      'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.';
+      'A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side. The path does not need to be a straight line — it can bend, branch, or widen, as long as there is at least one continuous connection between the two sides.';
 
   @override
   String get constraintExplainIM =>

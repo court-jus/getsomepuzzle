@@ -4,6 +4,10 @@
     "@help": {
         "description": "Label of the menu choice that opens the help text"
     },
+    "helpConstraints": "Constraints",
+    "@helpConstraints": {
+        "description": "Heading of the constraints catalogue section in the help page"
+    },
     "viewPrivacyPolicy": "View privacy policy",
     "@viewPrivacyPolicy": {
         "description": "Label of the link in the help page that opens the privacy-policy page on the web"
@@ -458,14 +462,6 @@
     "@constraintMajority": {
         "description": "Name of the majority zone constraint"
     },
-    "constraintColumnMajority": "column majority",
-    "@constraintColumnMajority": {
-        "description": "Name of the column majority constraint"
-    },
-    "constraintRowMajority": "row majority",
-    "@constraintRowMajority": {
-        "description": "Name of the row majority constraint"
-    },
     "constraintParity": "parity",
     "@constraintParity": {
         "description": "Name of the parity constraint"
@@ -727,6 +723,10 @@
     "@constraintTransition": {
         "description": "Name of the transition constraint (merged row/column transition)"
     },
+    "constraintLineMajority": "line majority",
+    "@constraintLineMajority": {
+        "description": "Name of the line majority constraint (merged row/column majority)"
+    },
     "constraintShape": "shape",
     "@constraintShape": {
         "description": "Name of the shape constraint"
@@ -841,7 +841,7 @@
     "@constraintExplainLT": {
         "description": "Body of the new-constraint explanation modal for the Letter Group (LT) constraint"
     },
-    "constraintExplainMJ": "A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half).",
+    "constraintExplainMJ": "A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half). The border itself tells you which color must dominate.",
     "@constraintExplainMJ": {
         "description": "Body of the new-constraint explanation modal for the Majority (MJ) constraint"
     },
@@ -874,15 +874,15 @@
     "@constraintExplainGC": {
         "description": "Body of the new-constraint explanation modal for the Group Count (GC) constraint"
     },
-    "constraintExplainNC": "A cell shown as a cross containing a number must have exactly that number of orthogonal neighbors of the marked color.",
+    "constraintExplainNC": "A cell shown as a cross containing a number must have exactly that number of orthogonal neighbors of the marked color. The cross is filled with the target color and outlined in the opposite color so it stays readable on any background. For instance, a black cross holding the digit 2 means the cell must have exactly 2 black neighbors among its top/bottom/left/right cells.",
     "@constraintExplainNC": {
         "description": "Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint"
     },
-    "constraintExplainEY": "A cell with an eye must \"see\" exactly the indicated number of cells of the eye's color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view).",
+    "constraintExplainEY": "A cell with an eye must \"see\" exactly the indicated number of cells of the eye's color. Sight travels in a straight line in each of the four orthogonal directions until it hits the grid edge or a cell of the opposite color (which blocks the view). The eye's color is the target color; the border around the eye is the opposite color.",
     "@constraintExplainEY": {
         "description": "Body of the new-constraint explanation modal for the Eyes (EY) constraint"
     },
-    "constraintExplainCH": "A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side.",
+    "constraintExplainCH": "A mini-grid icon shows two sides of the grid connected by a chain. The solution must contain an unbroken orthogonal path of that color from the marked side to the other marked side. The path does not need to be a straight line — it can bend, branch, or widen, as long as there is at least one continuous connection between the two sides.",
     "@constraintExplainCH": {
         "description": "Body of the new-constraint explanation modal for the Chain (CH) constraint"
     },

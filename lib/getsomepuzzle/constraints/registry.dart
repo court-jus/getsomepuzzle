@@ -23,12 +23,11 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 
 /// Registry of all player-facing constraint types.
-/// Centralizes slug, label, and factory for each constraint type.
+/// Centralizes slug and factory for each constraint type.
 final constraintRegistry =
     <
       ({
         String slug,
-        String label,
         Constraint Function(String) fromParams,
         List<String> Function(
           int width,
@@ -41,127 +40,106 @@ final constraintRegistry =
     >[
       (
         slug: 'FM',
-        label: 'Forbidden motif',
         fromParams: ForbiddenMotif.new,
         generateAllParameters: ForbiddenMotif.generateAllParameters,
       ),
       (
         slug: 'PA',
-        label: 'Parity',
         fromParams: ParityConstraint.new,
         generateAllParameters: ParityConstraint.generateAllParameters,
       ),
       (
         slug: 'RC',
-        label: 'Row count',
         fromParams: RowCountConstraint.new,
         generateAllParameters: RowCountConstraint.generateAllParameters,
       ),
       (
         slug: 'RT',
-        label: 'Row transition',
         fromParams: RowTransitionConstraint.new,
         generateAllParameters: RowTransitionConstraint.generateAllParameters,
       ),
       (
         slug: 'GS',
-        label: 'Group size',
         fromParams: GroupSize.new,
         generateAllParameters: GroupSize.generateAllParameters,
       ),
       (
         slug: 'LT',
-        label: 'Letter',
         fromParams: LetterGroup.new,
         generateAllParameters: LetterGroup.generateAllParameters,
       ),
       (
         slug: 'QA',
-        label: 'Quantity',
         fromParams: QuantityConstraint.new,
         generateAllParameters: QuantityConstraint.generateAllParameters,
       ),
       (
         slug: 'SY',
-        label: 'Symmetry',
         fromParams: SymmetryConstraint.new,
         generateAllParameters: SymmetryConstraint.generateAllParameters,
       ),
       (
         slug: 'DF',
-        label: 'Different from',
         fromParams: DifferentFromConstraint.new,
         generateAllParameters: DifferentFromConstraint.generateAllParameters,
       ),
       (
         slug: 'SH',
-        label: 'Shape',
         fromParams: ShapeConstraint.new,
         generateAllParameters: ShapeConstraint.generateAllParameters,
       ),
       (
         slug: 'CC',
-        label: 'Column count',
         fromParams: ColumnCountConstraint.new,
         generateAllParameters: ColumnCountConstraint.generateAllParameters,
       ),
       (
         slug: 'JC',
-        label: 'Column majority',
         fromParams: ColumnMajorityConstraint.new,
         generateAllParameters: ColumnMajorityConstraint.generateAllParameters,
       ),
       (
         slug: 'CH',
-        label: 'Chain',
         fromParams: ChainConstraint.new,
         generateAllParameters: ChainConstraint.generateAllParameters,
       ),
       (
         slug: 'CT',
-        label: 'Column transition',
         fromParams: ColumnTransitionConstraint.new,
         generateAllParameters: ColumnTransitionConstraint.generateAllParameters,
       ),
       (
         slug: 'GC',
-        label: 'Group count',
         fromParams: GroupCountConstraint.new,
         generateAllParameters: GroupCountConstraint.generateAllParameters,
       ),
       (
         slug: 'MJ',
-        label: 'Majority',
         fromParams: MajorityConstraint.new,
         generateAllParameters: MajorityConstraint.generateAllParameters,
       ),
       (
         slug: 'NC',
-        label: 'Neighbor count',
         fromParams: NeighborCountConstraint.new,
         generateAllParameters: NeighborCountConstraint.generateAllParameters,
       ),
       (
         slug: 'EY',
-        label: 'Eyes',
         fromParams: EyesConstraint.new,
         generateAllParameters: EyesConstraint.generateAllParameters,
       ),
       (
         slug: 'IM',
-        label: 'Implication',
         fromParams: ImplicationConstraint.new,
         generateAllParameters: ImplicationConstraint.generateAllParameters,
       ),
       (
         slug: 'JR',
-        label: 'Row majority',
         fromParams: RowMajorityConstraint.new,
         generateAllParameters: RowMajorityConstraint.generateAllParameters,
       ),
       (
         slug: 'BB',
-        label: 'Bounding box',
         fromParams: BoundingBoxConstraint.new,
         generateAllParameters: BoundingBoxConstraint.generateAllParameters,
       ),
@@ -170,11 +148,6 @@ final constraintRegistry =
 /// All player-facing constraint slugs.
 List<String> get constraintSlugs =>
     constraintRegistry.map((r) => r.slug).toList();
-
-/// Lookup: slug → label.
-Map<String, String> get constraintLabels => {
-  for (final r in constraintRegistry) r.slug: r.label,
-};
 
 /// Create a constraint from its slug and params string. Returns null if slug unknown.
 Constraint? createConstraint(String slug, String params) {

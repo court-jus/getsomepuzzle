@@ -12,6 +12,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get help => 'Ayuda';
 
   @override
+  String get helpConstraints => 'Restricciones';
+
+  @override
   String get viewPrivacyPolicy => 'Ver la política de privacidad';
 
   @override
@@ -346,12 +349,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintMajority => 'color mayoritario';
 
   @override
-  String get constraintColumnMajority => 'mayoría columna';
-
-  @override
-  String get constraintRowMajority => 'mayoría fila';
-
-  @override
   String get constraintParity => 'paridad';
 
   @override
@@ -662,6 +659,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintTransition => 'transición';
 
   @override
+  String get constraintLineMajority => 'mayoría por línea';
+
+  @override
   String get constraintShape => 'forma';
 
   @override
@@ -760,7 +760,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get constraintExplainMJ =>
-      'Un borde punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad).';
+      'Un borde punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad). El color del borde te indica qué color debe dominar.';
 
   @override
   String get constraintExplainQA =>
@@ -796,15 +796,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get constraintExplainNC =>
-      'Una casilla mostrada como una cruz que contiene un número debe tener exactamente ese número de vecinos ortogonales del color indicado.';
+      'Una casilla mostrada como una cruz que contiene un número debe tener exactamente ese número de vecinos ortogonales del color indicado. La cruz está rellena con el color objetivo y delineada con el color opuesto para que siga siendo legible sobre cualquier fondo. Por ejemplo, una cruz negra con el dígito 2 significa que la celda debe tener exactamente 2 vecinos negros entre sus celdas arriba/abajo/izquierda/derecha.';
 
   @override
   String get constraintExplainEY =>
-      'Una casilla mostrada como un ojo debe «ver» exactamente el número indicado de casillas del color del ojo. La vista se propaga en línea recta en cada una de las cuatro direcciones ortogonales hasta alcanzar el borde de la cuadrícula o una casilla del color opuesto (que bloquea la vista).';
+      'Una casilla mostrada como un ojo debe «ver» exactamente el número indicado de casillas del color del ojo. La vista se propaga en línea recta en cada una de las cuatro direcciones ortogonales hasta alcanzar el borde de la cuadrícula o una casilla del color opuesto (que bloquea la vista). El color del ojo es el color objetivo; el borde alrededor del ojo es el color opuesto.';
 
   @override
   String get constraintExplainCH =>
-      'Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por una cadena. La solución debe contener un camino ortogonal ininterrumpido de ese color desde el lado marcado hasta el otro lado marcado.';
+      'Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por una cadena. La solución debe contener un camino ortogonal ininterrumpido de ese color desde el lado marcado hasta el otro lado marcado. El camino no necesita ser una línea recta — puede girar, ramificarse o ensancharse, siempre que haya al menos una conexión continua entre los dos lados.';
 
   @override
   String get constraintExplainIM =>

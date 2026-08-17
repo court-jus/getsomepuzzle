@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 import 'package:getsomepuzzle/utils/share_outcome.dart';
 import 'package:getsomepuzzle/utils/share_stub.dart'
     if (dart.library.html) 'package:getsomepuzzle/utils/share_html.dart'
@@ -212,7 +213,7 @@ class _StatsPageState extends State<StatsPage> {
           ],
           const SizedBox(height: 20),
           _buildSectionTitle(loc.statsSectionConstraint),
-          _buildConstraintSection(d, colorScheme),
+          _buildConstraintSection(d, colorScheme, loc),
           const SizedBox(height: 20),
           _buildSectionTitle(loc.statsSectionDifficulty),
           _buildDifficultySection(d, colorScheme),
@@ -362,7 +363,11 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  Widget _buildConstraintSection(StatsDashboard d, ColorScheme colorScheme) {
+  Widget _buildConstraintSection(
+    StatsDashboard d,
+    ColorScheme colorScheme,
+    AppLocalizations loc,
+  ) {
     if (d.byConstraint.isEmpty) return const SizedBox.shrink();
     final maxCount = d.byConstraint
         .map((b) => b.instanceCount)
@@ -372,7 +377,7 @@ class _StatsPageState extends State<StatsPage> {
         for (final bucket in d.byConstraint)
           _buildStatRow(
             label:
-                '${bucket.slug} — ${constraintLabels[bucket.slug] ?? bucket.slug}',
+                '${bucket.slug} — ${_constraintDisplayName(loc, bucket.slug)}',
             subtitle: bucket.instanceCount == bucket.puzzleCount
                 ? '${bucket.puzzleCount} pz · ${_formatDuration(bucket.avgDuration)}'
                 : '${bucket.puzzleCount} pz (${bucket.instanceCount} ctr) · ${_formatDuration(bucket.avgDuration)}',
@@ -382,6 +387,11 @@ class _StatsPageState extends State<StatsPage> {
       ],
     );
   }
+
+  /// Localised name for a constraint slug, falling back to the raw slug
+  /// for legacy slugs (e.g. `TX`) that never entered the UI registry.
+  String _constraintDisplayName(AppLocalizations loc, String slug) =>
+      constraintSlugs.contains(slug) ? constraintNameForSlug(loc, slug) : slug;
 
   Widget _buildStatRow({
     required String label,

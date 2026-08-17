@@ -9,12 +9,14 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
@@ -32,22 +34,14 @@ import 'package:getsomepuzzle/widgets/constraints/symmetry.dart';
 import 'package:getsomepuzzle/widgets/constraints/transition.dart';
 
 final constraintUIRegistry =
-    <
-      ({
-        String slug,
-        String label,
-        Widget Function(Color fgcolor, double size) buildPreview,
-      })
-    >[
+    <({String slug, Widget Function(Color fgcolor, double size) buildPreview})>[
       (
         slug: 'FM',
-        label: 'Forbidden motif',
         buildPreview: (fg, size) =>
             MotifWidget(constraint: ForbiddenMotif('12.21'), cellSize: size),
       ),
       (
         slug: 'PA',
-        label: 'Parity',
         buildPreview: (fg, size) => Icon(
           Icons.arrow_circle_right_outlined,
           color: fg,
@@ -56,7 +50,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'RC',
-        label: 'Row count',
         buildPreview: (fg, size) => RowCountWidget(
           constraint: RowCountConstraint('0.1.3'),
           cellSize: size,
@@ -64,7 +57,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'RT',
-        label: 'Row transition',
         buildPreview: (fg, size) => TransitionWidget(
           constraint: RowTransitionConstraint('0.3'),
           cellSize: size,
@@ -73,7 +65,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'GS',
-        label: 'Group size',
         buildPreview: (fg, size) => GroupSizeWidget(
           constraint: GroupSize('0.3'),
           actualGroupSize: 0,
@@ -83,7 +74,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'LT',
-        label: 'Letter',
         buildPreview: (fg, size) => Text(
           'A',
           style: TextStyle(fontSize: size * 0.7, color: fg),
@@ -91,7 +81,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'QA',
-        label: 'Quantity',
         buildPreview: (fg, size) => QuantityWidget(
           constraint: QuantityConstraint('1.3'),
           actualCount: 0,
@@ -102,7 +91,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'SY',
-        label: 'Symmetry',
         buildPreview: (fg, size) => SymmetryWidget(
           constraint: SymmetryConstraint('0.2'),
           fgcolor: fg,
@@ -111,7 +99,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'DF',
-        label: 'Different from',
         buildPreview: (fg, size) => Text(
           '≠',
           style: TextStyle(fontSize: size * 0.7, color: fg),
@@ -119,13 +106,11 @@ final constraintUIRegistry =
       ),
       (
         slug: 'SH',
-        label: 'Shape',
         buildPreview: (fg, size) =>
             MotifWidget(constraint: ShapeConstraint('11.10'), cellSize: size),
       ),
       (
         slug: 'CC',
-        label: 'Column count',
         buildPreview: (fg, size) => ColumnCountWidget(
           constraint: ColumnCountConstraint('0.1.3'),
           cellSize: size,
@@ -133,7 +118,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'JC',
-        label: 'Column majority',
         buildPreview: (fg, size) => MajorityIndicatorWidget(
           constraint: ColumnMajorityConstraint('0.21'),
           cellSize: size,
@@ -141,7 +125,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'CH',
-        label: 'Chain',
         buildPreview: (fg, size) => ChainWidget(
           constraint: ChainConstraint('1.top.bottom'),
           fgcolor: fg,
@@ -150,7 +133,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'CT',
-        label: 'Column transition',
         buildPreview: (fg, size) => TransitionWidget(
           constraint: ColumnTransitionConstraint('0.3'),
           cellSize: size,
@@ -159,7 +141,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'GC',
-        label: 'Group count',
         buildPreview: (fg, size) => GroupCountWidget(
           constraint: GroupCountConstraint('1.2'),
           actualGroupCount: 0,
@@ -168,7 +149,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'MJ',
-        label: 'Majority',
         buildPreview: (fg, size) => Container(
           width: size,
           height: size,
@@ -180,7 +160,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'NC',
-        label: 'Neighbor count',
         buildPreview: (fg, size) => NeighborCountWidget(
           constraint: NeighborCountConstraint('0.1.2'),
           cellSize: size,
@@ -188,19 +167,16 @@ final constraintUIRegistry =
       ),
       (
         slug: 'EY',
-        label: 'Eyes',
         buildPreview: (fg, size) =>
             EyesWidget(constraint: EyesConstraint('2.1.5'), cellSize: size),
       ),
       (
         slug: 'IM',
-        label: 'Implication',
         buildPreview: (fg, size) =>
             ImplicationWidget(fgcolor: fg, cellSize: size),
       ),
       (
         slug: 'JR',
-        label: 'Row majority',
         buildPreview: (fg, size) => MajorityIndicatorWidget(
           constraint: RowMajorityConstraint('0.21'),
           cellSize: size,
@@ -208,7 +184,6 @@ final constraintUIRegistry =
       ),
       (
         slug: 'BB',
-        label: 'Bounding box',
         buildPreview: (fg, size) => BoundingBoxWidget(
           constraint: BoundingBoxConstraint('1.3.3'),
           cellSize: size,
@@ -221,6 +196,33 @@ Widget previewForSlug(String slug, Color fgcolor, double size) {
     if (r.slug == slug) return r.buildPreview(fgcolor, size);
   }
   throw ArgumentError('Unknown slug: $slug');
+}
+
+/// Icon for a constraint slug, rendered with the registry's preview
+/// builders at a fixed square footprint.
+///
+/// Resolves the foreground color from the ambient theme so the glyph
+/// adapts to light/dark themes, and centers the preview inside a
+/// [size]-sized box so every slug renders at the same footprint
+/// regardless of the preview's intrinsic size.
+class ConstraintIcon extends StatelessWidget {
+  const ConstraintIcon({super.key, required this.slug, this.size = 40});
+
+  /// Slug of the constraint to render; must exist in [constraintUIRegistry].
+  final String slug;
+
+  /// Side of the square box the icon is rendered into.
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = Theme.of(context).colorScheme.onSurface;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(child: previewForSlug(slug, fg, size)),
+    );
+  }
 }
 
 String constraintNameForSlug(AppLocalizations l, String slug) {
@@ -239,9 +241,8 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
     case 'MJ':
       return l.constraintMajority;
     case 'JC':
-      return l.constraintColumnMajority;
     case 'JR':
-      return l.constraintRowMajority;
+      return l.constraintLineMajority;
     case 'QA':
       return l.constraintQuantity;
     case 'SY':
@@ -271,4 +272,77 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       assert(false, 'Unmapped constraint slug "$slug"');
       return slug;
   }
+}
+
+/// Localised body text for a constraint slug. Returns the slug itself
+/// as a fallback so an unknown constraint doesn't break the UI.
+///
+/// Shared by the onboarding dialogs (`NewConstraintDialog`) and the
+/// constraints catalogue on the help page, so both surfaces stay in sync.
+String constraintExplanationForSlug(AppLocalizations l, String slug) {
+  switch (slug) {
+    case 'FM':
+      return l.constraintExplainFM;
+    case 'PA':
+      return l.constraintExplainPA;
+    case 'RC':
+    case 'CC':
+      return l.constraintExplainLineCount;
+    case 'GS':
+      return l.constraintExplainGS;
+    case 'LT':
+      return l.constraintExplainLT;
+    case 'MJ':
+      return l.constraintExplainMJ;
+    case 'JC':
+    case 'JR':
+      return l.constraintExplainLineMajority;
+    case 'QA':
+      return l.constraintExplainQA;
+    case 'SY':
+      return l.constraintExplainSY;
+    case 'DF':
+      return l.constraintExplainDF;
+    case 'SH':
+      return l.constraintExplainSH;
+    case 'GC':
+      return l.constraintExplainGC;
+    case 'CH':
+      return l.constraintExplainCH;
+    case 'NC':
+      return l.constraintExplainNC;
+    case 'EY':
+      return l.constraintExplainEY;
+    case 'IM':
+      return l.constraintExplainIM;
+    case 'BB':
+      return l.constraintExplainBB;
+    case 'RT':
+    case 'CT':
+      return l.constraintExplainTransition;
+    default:
+      return slug;
+  }
+}
+
+/// Slugs shown by the help-page constraints catalogue, in teaching
+/// order: the strict-onboarding phase introducers first (the order the
+/// player learns them), then every remaining slug in registry order.
+/// Adding a new constraint to the registries extends this list for free.
+///
+/// Row/column pairs that share one explanation (RC/CC, JC/JR, RT/CT)
+/// are collapsed to their display slug (CC, JC, RT) — the same pairing
+/// as the model registry's `mergedRuleGroups` — so each catalogue row
+/// covers both orientations instead of duplicating identical text.
+List<String> get constraintCatalogueSlugs {
+  final ordered = <String>[];
+  final seen = <String>{};
+  for (final phase in OnboardingPhase.phases) {
+    if (seen.add(phase.introducing)) ordered.add(phase.introducing);
+  }
+  for (final entry in constraintUIRegistry) {
+    if (hiddenSlugs.contains(entry.slug)) continue;
+    if (seen.add(entry.slug)) ordered.add(entry.slug);
+  }
+  return List.unmodifiable(ordered);
 }

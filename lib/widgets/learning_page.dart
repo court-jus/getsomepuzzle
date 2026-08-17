@@ -71,11 +71,31 @@ class LearningPage extends StatelessWidget {
                 ? l.learningNeverSeen
                 : l.learningSeenOn(dateFormat.format(firstSeen));
             return ListTile(
-              leading: Icon(
-                firstSeen == null ? Icons.lock_outline : Icons.check_circle,
-                color: firstSeen == null
-                    ? Theme.of(context).disabledColor
-                    : Theme.of(context).colorScheme.primary,
+              leading: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Opacity(
+                    opacity: firstSeen == null ? 0.35 : 1.0,
+                    child: ConstraintIcon(slug: slug, size: 36),
+                  ),
+                  if (firstSeen == null)
+                    Positioned(
+                      right: -4,
+                      bottom: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(1),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.lock_outline,
+                          size: 14,
+                          color: Theme.of(context).disabledColor,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               title: Text(_capitalise(name)),
               subtitle: Column(

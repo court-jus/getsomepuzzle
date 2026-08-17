@@ -1951,9 +1951,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
 }
 
 void _printUsage() {
-  final String rules = constraintRegistry
-      .map((regEntry) => "${regEntry.slug} (${regEntry.label})")
-      .join(", ");
+  final String rules = constraintRegistry.map((r) => r.slug).join(", ");
   stderr.writeln('''
 Usage: dart run bin/generate.dart [options]
 

@@ -151,8 +151,11 @@ neighbor being forced.
 ### Localization
 
 ARB key `constraintNeighborCount` is present in `lib/l10n/app_en.arb`,
-`app_fr.arb`, and `app_es.arb`. The help texts in `assets/help.*.md`
-include the description of the constraint.
+`app_fr.arb`, and `app_es.arb`. The explanation is shown in the
+onboarding dialog, the learning page and the help-page constraints
+catalogue (see [`../constraint_icons.md`](../constraint_icons.md));
+the per-constraint prose moved out of `assets/help.*.md` when the
+catalogue replaced it.
 
 ### Tests
 

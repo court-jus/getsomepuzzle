@@ -102,6 +102,11 @@ for completeness.
      with a `buildPreview` callback.
    - Add a `case 'XX':` to `constraintNameForSlug()` returning the
      localized name from `AppLocalizations`.
+   - Add a `case 'XX':` to `constraintExplanationForSlug()` returning
+     the localized explanation from `AppLocalizations`. Both functions
+     feed the onboarding dialog, the Learning page, the help-page
+     catalogue and the generated icons — all four surfaces pick the new
+     slug up automatically.
 
 7. **Flutter bridge** → `lib/getsomepuzzle/constraints/to_flutter.dart`
    - If the constraint renders inside grid cells, add
@@ -114,8 +119,9 @@ for completeness.
 9. **Editor switch** → `lib/widgets/create_page/create_page.dart`
    - Add `case 'XX':` to the `_pickConstraintParameters` switch.
 
-10. **Explanation text** → `lib/widgets/new_constraint_dialog.dart`
-    - Add a `case 'XX':` to `constraintExplanationForSlug()`.
+10. **Icon regeneration** → `bin/build_constraint_icons.sh`
+    - Regenerate the website PNGs under `assets/constraint_icons/`
+      (see [`constraint_icons.md`](constraint_icons.md)).
 
 11. **Localization** → `lib/l10n/app_en.arb`, `app_fr.arb`, `app_es.arb`
     - Add a `"constraint<Name>"` key for the localized display name
@@ -152,6 +158,10 @@ constraint introduces a novel `verify` contract pattern.
   and Gaussian sampling of puzzles around that level.
 - [`onboarding.md`](onboarding.md) — Gradual replacement of the
   `tutorial` with a slug-by-slug intro driven by stats.
+- [`constraint_icons.md`](constraint_icons.md) — The shared
+  `ConstraintIcon` widget (onboarding dialog, Learning page, help-page
+  catalogue) and the script that exports the same glyphs as static PNGs
+  for the website (`bin/build_constraint_icons.sh`).
 - [`playlist.md`](playlist.md) — In-memory playlist construction by
   collection type and onboarding state.
 - [`puzzle_orientation.md`](puzzle_orientation.md) — Auto-rotation

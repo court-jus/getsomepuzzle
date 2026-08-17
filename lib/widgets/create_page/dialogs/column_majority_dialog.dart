@@ -20,7 +20,7 @@ Future<ColumnMajorityConstraint?> showColumnMajorityDialog(
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setDialogState) => AlertDialog(
-        title: Text(loc.constraintColumnMajority),
+        title: Text(loc.constraintLineMajority),
         content: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: Column(

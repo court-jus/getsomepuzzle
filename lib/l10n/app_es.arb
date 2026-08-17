@@ -1,6 +1,7 @@
 {
     "@@locale": "es",
     "help": "Ayuda",
+    "helpConstraints": "Restricciones",
     "viewPrivacyPolicy": "Ver la política de privacidad",
     "stats": "Stats",
     "open": "Abrir",
@@ -130,8 +131,6 @@
     "constraintGroupSize": "tamaño de grupo",
     "constraintLetterGroup": "grupo de letras",
     "constraintMajority": "color mayoritario",
-    "constraintColumnMajority": "mayoría columna",
-    "constraintRowMajority": "mayoría fila",
     "constraintParity": "paridad",
     "constraintQuantity": "cantidad",
     "constraintGroupCount": "número de grupos",
@@ -175,7 +174,7 @@
     "constraintExplainGS": "Cuando una casilla contiene un número, debe pertenecer a un grupo de casillas del mismo color, adyacentes ortogonalmente, cuyo tamaño coincida con ese número.",
     "constraintExplainPA": "Cuando una casilla contiene una flecha, debe haber el mismo número de casillas negras y blancas delante de la flecha. Una flecha doble extiende la regla a ambos lados.",
     "constraintExplainLT": "Las casillas marcadas con la misma letra deben pertenecer al mismo grupo. Un grupo no puede contener dos letras diferentes.",
-    "constraintExplainMJ": "Un borde punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad).",
+    "constraintExplainMJ": "Un borde punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad). El color del borde te indica qué color debe dominar.",
     "constraintExplainQA": "Un indicador numérico sobre fondo azul encima del puzzle señala cuántas casillas de ese color debe contener la solución en total.",
     "constraintExplainSY": "Cuando una casilla contiene uno de estos símbolos (⟍, |, ⟋, ―, 🞋), el grupo del que forma parte debe respetar la simetría asociada. La simetría central (🞋) equivale a un giro de media vuelta.",
     "constraintExplainDF": "Cuando dos celdas están separadas por el símbolo ≠, deben ser de colores diferentes.",
@@ -191,15 +190,15 @@
     "@constraintExplainTransition": {
         "description": "Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)"
     },
-    "constraintExplainNC": "Una casilla mostrada como una cruz que contiene un número debe tener exactamente ese número de vecinos ortogonales del color indicado.",
+    "constraintExplainNC": "Una casilla mostrada como una cruz que contiene un número debe tener exactamente ese número de vecinos ortogonales del color indicado. La cruz está rellena con el color objetivo y delineada con el color opuesto para que siga siendo legible sobre cualquier fondo. Por ejemplo, una cruz negra con el dígito 2 significa que la celda debe tener exactamente 2 vecinos negros entre sus celdas arriba/abajo/izquierda/derecha.",
     "@constraintExplainNC": {
         "description": "Body of the new-constraint explanation modal for the Neighbor Count (NC) constraint"
     },
-    "constraintExplainEY": "Una casilla mostrada como un ojo debe «ver» exactamente el número indicado de casillas del color del ojo. La vista se propaga en línea recta en cada una de las cuatro direcciones ortogonales hasta alcanzar el borde de la cuadrícula o una casilla del color opuesto (que bloquea la vista).",
+    "constraintExplainEY": "Una casilla mostrada como un ojo debe «ver» exactamente el número indicado de casillas del color del ojo. La vista se propaga en línea recta en cada una de las cuatro direcciones ortogonales hasta alcanzar el borde de la cuadrícula o una casilla del color opuesto (que bloquea la vista). El color del ojo es el color objetivo; el borde alrededor del ojo es el color opuesto.",
     "@constraintExplainEY": {
         "description": "Body of the new-constraint explanation modal for the Eyes (EY) constraint"
     },
-    "constraintExplainCH": "Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por una cadena. La solución debe contener un camino ortogonal ininterrumpido de ese color desde el lado marcado hasta el otro lado marcado.",
+    "constraintExplainCH": "Un icono de cuadrícula mini muestra dos lados de la cuadrícula conectados por una cadena. La solución debe contener un camino ortogonal ininterrumpido de ese color desde el lado marcado hasta el otro lado marcado. El camino no necesita ser una línea recta — puede girar, ramificarse o ensancharse, siempre que haya al menos una conexión continua entre los dos lados.",
     "@constraintExplainCH": {
         "description": "Body of the new-constraint explanation modal for the Chain (CH) constraint"
     },
@@ -270,6 +269,10 @@
     "constraintTransition": "transición",
     "@constraintTransition": {
         "description": "Name of the transition constraint (merged row/column transition)"
+    },
+    "constraintLineMajority": "mayoría por línea",
+    "@constraintLineMajority": {
+        "description": "Name of the line majority constraint (merged row/column majority)"
     },
     "complicityOtherConstraint": "otra restricción",
     "settingReplayOnboarding": "Repetir la introducción",

@@ -146,7 +146,7 @@ name comes from
 adds a `BB` via `showBoundingBoxDialog`
 (`lib/widgets/create_page/dialogs/bounding_box_dialog.dart`) — color + width +
 height — wired into `create_page.dart`. First-contact help text is
-`constraintExplainBB` (`new_constraint_dialog.dart`), and `BB` sits in the
+`constraintExplainBB` (`lib/widgets/constraints/registry.dart`), and `BB` sits in the
 onboarding post-strict discovery order (auto-extended from the registry).
 
 ### Tests
