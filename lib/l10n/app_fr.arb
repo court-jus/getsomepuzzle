@@ -92,7 +92,7 @@
     "@settingAutoLevel": {
         "description": "Setting label for automatic level adaptation"
     },
-    "endOfPlaylistCongrats": "Tu as joué {count} puzzles dans cette collection.",
+    "endOfPlaylistCongrats": "Vous avez joué {count} puzzles dans cette collection.",
     "@endOfPlaylistCongrats": {
         "placeholders": {
             "count": {
@@ -114,7 +114,7 @@
     "hintComplicityTwin": "Cette cellule peut être déduite en combinant deux contraintes {c}",
     "hintComplicityWithAny": "Cette cellule peut être déduite en combinant la contrainte {c} avec une autre",
     "hintForce": "Cette cellule peut être déduite en combinant plusieurs contraintes",
-    "hintImpossible": "Une contrainte est violée — une erreur a été commise",
+    "hintImpossible": "Une contrainte n'est pas respectée — une erreur a été commise",
     "hintConstraintAdded": "Une nouvelle contrainte a été ajoutée",
     "hintConstraintInprogress": "Une nouvelle contrainte est en cours de calcul...",
     "hintConstraintNone": "Plus de contraintes disponibles",
@@ -260,8 +260,8 @@
             }
         }
     },
-    "endOfPlaylistSuggestedHint": "D'après ton niveau, tu pourrais aimer cette collection.",
-    "endOfPlaylistOnboardingNote": "Tu n'as pas encore croisé toutes les règles — continue à jouer pour les découvrir une par une.",
+    "endOfPlaylistSuggestedHint": "D'après ton niveau, vous pourriez aimer cette collection.",
+    "endOfPlaylistOnboardingNote": "Vous n'avez pas encore croisé toutes les règles — continuez à jouer pour les découvrir une par une.",
     "endOfPlaylistPickAnother": "Choisir une autre collection",
     "constraintLineCount": "cellules par ligne",
     "@constraintLineCount": {
@@ -280,7 +280,7 @@
     "settingClearStatsConfirmTitle": "Effacer toutes les statistiques ?",
     "settingClearStatsConfirmBody": "Tout l'historique de jeu sera supprimé : temps, notes, statuts joué/passé. Cette action est irréversible.",
     "settingStatsCleared": "Toutes les statistiques ont été effacées.",
-    "someConstraintsInvalid": "Certaines contraintes ne sont pas valides.",
+    "someConstraintsInvalid": "Certaines contraintes ne sont pas respectées.",
     "errorsCount": "{count} erreurs.",
     "menuSectionCurrentPuzzle": "Puzzle en cours",
     "menuSectionLibrary": "Bibliothèque",
@@ -403,8 +403,8 @@
     "emptyPlaylistNoPuzzlesLoaded": "Aucun puzzle chargé pour cette collection.",
     "emptyPlaylistFiltersTooStrict": "Tes filtres excluent tous les puzzles de cette collection. Essaie d'élargir les dimensions, les règles ou les marqueurs.",
     "emptyPlaylistGeneric": "Aucun puzzle n'est actuellement disponible.",
-    "bannerOnboardingFiltersDefault": "Ces filtres correspondent à ta progression d'apprentissage. Tu peux les modifier — appuie sur l'icône reset pour revenir aux recommandations.",
-    "bannerOnboardingFiltersOverridden": "Tu utilises tes propres filtres. Appuie sur reset pour revenir aux filtres recommandés par l'apprentissage.",
+    "bannerOnboardingFiltersDefault": "Ces filtres correspondent à ta progression d'apprentissage. Vous pouvez les modifier — appuyez sur l'icône reset pour revenir aux recommandations.",
+    "bannerOnboardingFiltersOverridden": "Vous utilisez vos propres filtres. Appuyez sur reset pour revenir aux filtres recommandés par l'apprentissage.",
     "onboardingCompleteTitle": "Apprentissage terminé !",
     "@onboardingCompleteTitle": {
         "description": "Title of the dialog shown when the player has completed all onboarding steps (every rule encountered)."

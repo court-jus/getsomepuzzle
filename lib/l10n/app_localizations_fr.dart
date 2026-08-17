@@ -251,7 +251,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String endOfPlaylistCongrats(int count) {
-    return 'Tu as joué $count puzzles dans cette collection.';
+    return 'Vous avez joué $count puzzles dans cette collection.';
   }
 
   @override
@@ -289,7 +289,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get hintImpossible =>
-      'Une contrainte est violée — une erreur a été commise';
+      'Une contrainte n\'est pas respectée — une erreur a été commise';
 
   @override
   String get hintConstraintAdded => 'Une nouvelle contrainte a été ajoutée';
@@ -849,11 +849,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get endOfPlaylistSuggestedHint =>
-      'D\'après ton niveau, tu pourrais aimer cette collection.';
+      'D\'après ton niveau, vous pourriez aimer cette collection.';
 
   @override
   String get endOfPlaylistOnboardingNote =>
-      'Tu n\'as pas encore croisé toutes les règles — continue à jouer pour les découvrir une par une.';
+      'Vous n\'avez pas encore croisé toutes les règles — continuez à jouer pour les découvrir une par une.';
 
   @override
   String get endOfPlaylistPickAnother => 'Choisir une autre collection';
@@ -887,7 +887,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get someConstraintsInvalid =>
-      'Certaines contraintes ne sont pas valides.';
+      'Certaines contraintes ne sont pas respectées.';
 
   @override
   String errorsCount(int count) {
@@ -931,11 +931,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get bannerOnboardingFiltersDefault =>
-      'Ces filtres correspondent à ta progression d\'apprentissage. Tu peux les modifier — appuie sur l\'icône reset pour revenir aux recommandations.';
+      'Ces filtres correspondent à ta progression d\'apprentissage. Vous pouvez les modifier — appuyez sur l\'icône reset pour revenir aux recommandations.';
 
   @override
   String get bannerOnboardingFiltersOverridden =>
-      'Tu utilises tes propres filtres. Appuie sur reset pour revenir aux filtres recommandés par l\'apprentissage.';
+      'Vous utilisez vos propres filtres. Appuyez sur reset pour revenir aux filtres recommandés par l\'apprentissage.';
 
   @override
   String get browse => 'Parcourir';
