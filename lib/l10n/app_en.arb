@@ -759,6 +759,24 @@
     "@newConstraintModalSkip": {
         "description": "Button on the new-rule dialog that lets the player skip onboarding entirely: every rule is marked as seen and the phase counter jumps past all defined phases."
     },
+    "tooltipPuzzleHelp": "Puzzle help",
+    "@tooltipPuzzleHelp": {
+        "description": "Tooltip displayed while the mouse is over the top-bar help button, which opens a reminder of the constraints used by the current puzzle"
+    },
+    "puzzleHelpTitle": "Puzzle help",
+    "@puzzleHelpTitle": {
+        "description": "Title of the modal listing the constraints of the current puzzle with a quick reminder of each rule"
+    },
+    "puzzleHelpIntro": "{count, plural, =1{This puzzle uses 1 constraint, here is a quick reminder of it.} other{This puzzle uses {count} constraints, here is a quick reminder of them.}}",
+    "@puzzleHelpIntro": {
+        "description": "Introductory paragraph of the puzzle-help modal, naming how many distinct constraint types the current puzzle uses",
+        "placeholders": {
+            "count": {
+                "type": "int",
+                "example": "3"
+            }
+        }
+    },
     "thirdColorSuggestionTitle": "Ready for 3 colors?",
     "@thirdColorSuggestionTitle": {
         "description": "Title of the modal suggesting the player try 3-color puzzles. Shown once after onboarding plus 50 plays, only if the player has never played a 3-color puzzle."

@@ -180,6 +180,24 @@ Set<String> expandMergedRules(Set<String> rules) {
   return expanded;
 }
 
+/// Collapse real slugs to their user-facing display slug (the reverse
+/// of [expandMergedRules]): RC→CC, JR→JC, CT→RT. Used whenever the UI
+/// renders one concept per row/column pair (help modal, catalogues).
+Set<String> collapseMergedRules(Iterable<String> slugs) {
+  final collapsed = <String>{};
+  for (final slug in slugs) {
+    var display = slug;
+    for (final entry in mergedRuleGroups.entries) {
+      if (entry.value.contains(slug)) {
+        display = entry.key;
+        break;
+      }
+    }
+    collapsed.add(display);
+  }
+  return collapsed;
+}
+
 List<String>? generateAllParameters(
   String slug,
   int width,

@@ -142,6 +142,16 @@
     "constraintBoundingBox": "boîte englobante",
     "newConstraintModalTitle": "Nouvelle règle !",
     "newConstraintModalSkip": "Ignorer l'apprentissage",
+    "tooltipPuzzleHelp": "Aide du puzzle",
+    "puzzleHelpTitle": "Aide du puzzle",
+    "puzzleHelpIntro": "{count, plural, =1{Ce puzzle utilise 1 contrainte, voici un rapide rappel.} other{Ce puzzle utilise {count} contraintes, voici un rapide rappel.}}",
+    "@puzzleHelpIntro": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
     "thirdColorSuggestionTitle": "Prêt pour les 3 couleurs ?",
     "thirdColorSuggestionBody": "Vous avez résolu un bon nombre de puzzles en noir et blanc. Envie d'essayer le mode 3 couleurs ? Une nouvelle couleur — le violet — rejoint le noir et le blanc, et les règles s'appliquent à chaque couleur indépendamment. C'est un nouveau type de défi qui s'appuie sur ce que vous savez déjà.",
     "thirdColorSuggestionTryLabel": "J'essaie",

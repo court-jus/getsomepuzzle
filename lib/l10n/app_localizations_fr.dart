@@ -686,6 +686,23 @@ class AppLocalizationsFr extends AppLocalizations {
   String get newConstraintModalSkip => 'Ignorer l\'apprentissage';
 
   @override
+  String get tooltipPuzzleHelp => 'Aide du puzzle';
+
+  @override
+  String get puzzleHelpTitle => 'Aide du puzzle';
+
+  @override
+  String puzzleHelpIntro(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Ce puzzle utilise $count contraintes, voici un rapide rappel.',
+      one: 'Ce puzzle utilise 1 contrainte, voici un rapide rappel.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get thirdColorSuggestionTitle => 'Prêt pour les 3 couleurs ?';
 
   @override

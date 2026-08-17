@@ -1330,6 +1330,24 @@ abstract class AppLocalizations {
   /// **'Skip learning'**
   String get newConstraintModalSkip;
 
+  /// Tooltip displayed while the mouse is over the top-bar help button, which opens a reminder of the constraints used by the current puzzle
+  ///
+  /// In en, this message translates to:
+  /// **'Puzzle help'**
+  String get tooltipPuzzleHelp;
+
+  /// Title of the modal listing the constraints of the current puzzle with a quick reminder of each rule
+  ///
+  /// In en, this message translates to:
+  /// **'Puzzle help'**
+  String get puzzleHelpTitle;
+
+  /// Introductory paragraph of the puzzle-help modal, naming how many distinct constraint types the current puzzle uses
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{This puzzle uses 1 constraint, here is a quick reminder of it.} other{This puzzle uses {count} constraints, here is a quick reminder of them.}}'**
+  String puzzleHelpIntro(int count);
+
   /// Title of the modal suggesting the player try 3-color puzzles. Shown once after onboarding plus 50 plays, only if the player has never played a 3-color puzzle.
   ///
   /// In en, this message translates to:

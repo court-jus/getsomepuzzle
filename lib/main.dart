@@ -41,6 +41,7 @@ import 'package:getsomepuzzle/widgets/open_page.dart';
 import 'package:getsomepuzzle/widgets/pause_overlay.dart';
 import 'package:getsomepuzzle/widgets/autopilot_dialog.dart';
 import 'package:getsomepuzzle/widgets/between_puzzles.dart';
+import 'package:getsomepuzzle/widgets/constraint_help_dialog.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/save_progress_dialog.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
@@ -1521,6 +1522,20 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     );
   }
 
+  /// Top-bar help button: open a reminder of the constraints used by
+  /// the current puzzle. Row/column pairs (RC/CC, JR/JC, RT/CT) are
+  /// collapsed to their display slug so the modal lists each concept
+  /// once, matching the onboarding ("New rule!") modal.
+  void _showConstraintsHelp() {
+    final p = game.currentPuzzle;
+    if (p == null) return;
+    final slugs = collapseMergedRules(
+      p.constraints.map((c) => c.slug).where((s) => s.isNotEmpty),
+    );
+    if (slugs.isEmpty) return;
+    ConstraintHelpDialog.show(context, slugs);
+  }
+
   void _onHintTypeChanged() {
     if (game.currentPuzzle == null) return;
     // Force a clean cycle: a stage from the previous mode would be confusing
@@ -1784,6 +1799,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 onPressed: () {
                   setState(() => _removeOptionMode = !_removeOptionMode);
                 },
+              ),
+            if (game.currentPuzzle != null && !shouldChooseLocale)
+              IconButton(
+                icon: const Icon(Icons.help_outline),
+                tooltip: AppLocalizations.of(context)!.tooltipPuzzleHelp,
+                onPressed: _showConstraintsHelp,
               ),
             if (game.currentPuzzle != null && !shouldChooseLocale)
               IconButton(

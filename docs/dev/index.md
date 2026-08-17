@@ -158,6 +158,9 @@ constraint introduces a novel `verify` contract pattern.
   and Gaussian sampling of puzzles around that level.
 - [`onboarding.md`](onboarding.md) — Gradual replacement of the
   `tutorial` with a slug-by-slug intro driven by stats.
+- [`puzzle_help.md`](puzzle_help.md) — Top-bar help button and the
+  "Puzzle help" modal reminding the player of the current puzzle's
+  constraints.
 - [`constraint_icons.md`](constraint_icons.md) — The shared
   `ConstraintIcon` widget (onboarding dialog, Learning page, help-page
   catalogue) and the script that exports the same glyphs as static PNGs

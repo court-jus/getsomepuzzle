@@ -142,6 +142,16 @@
     "constraintBoundingBox": "caja delimitadora",
     "newConstraintModalTitle": "¡Regla nueva!",
     "newConstraintModalSkip": "Saltar aprendizaje",
+    "tooltipPuzzleHelp": "Ayuda del puzzle",
+    "puzzleHelpTitle": "Ayuda del puzzle",
+    "puzzleHelpIntro": "{count, plural, =1{Este puzzle utiliza 1 restricción, aquí tienes un rápido recordatorio.} other{Este puzzle utiliza {count} restricciones, aquí tienes un rápido recordatorio.}}",
+    "@puzzleHelpIntro": {
+        "placeholders": {
+            "count": {
+                "type": "int"
+            }
+        }
+    },
     "thirdColorSuggestionTitle": "¿Listo para 3 colores?",
     "thirdColorSuggestionBody": "Has resuelto un buen número de puzles en blanco y negro. ¿Quieres probar el modo 3 colores? Un nuevo color — el púrpura — se une al negro y al blanco, y las reglas se aplican a cada color de forma independiente. Es un nuevo tipo de desafío basado en lo que ya conoces.",
     "thirdColorSuggestionTryLabel": "Probar",

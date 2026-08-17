@@ -67,30 +67,7 @@ class NewConstraintDialog extends StatelessWidget {
         ],
       ),
       content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final (i, slug) in slugs.toList().indexed) ...[
-              if (i > 0) const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  ConstraintIcon(slug: slug, size: 36),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _capitalise(constraintNameForSlug(l, slug)),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(constraintExplanationForSlug(l, slug)),
-            ],
-          ],
-        ),
+        child: ConstraintExplanationList(slugs: slugs.toList()),
       ),
       actions: [
         if (showSkipButton)
@@ -112,3 +89,44 @@ class NewConstraintDialog extends StatelessWidget {
 /// shared with the help-page catalogue so the two surfaces stay in sync.
 String _capitalise(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+
+/// One section per constraint slug: the localised name (with its icon)
+/// as a header, then the localised explanation paragraph. Shared by the
+/// onboarding modal (`NewConstraintDialog`) and the puzzle-help modal
+/// (`ConstraintHelpDialog`) so both surfaces render identically.
+class ConstraintExplanationList extends StatelessWidget {
+  const ConstraintExplanationList({super.key, required this.slugs});
+
+  /// Constraint slugs to explain, in display order. A [Set] passed by
+  /// callers is converted to a list preserving iteration order.
+  final List<String> slugs;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (i, slug) in slugs.indexed) ...[
+          if (i > 0) const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              ConstraintIcon(slug: slug, size: 36),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _capitalise(constraintNameForSlug(l, slug)),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(constraintExplanationForSlug(l, slug)),
+        ],
+      ],
+    );
+  }
+}
