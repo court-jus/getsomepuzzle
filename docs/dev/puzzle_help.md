@@ -86,7 +86,12 @@ matching the onboarding modal. The per-section rendering itself is
 shared through the `ConstraintExplanationList` widget in
 `lib/widgets/new_constraint_dialog.dart`, used by both
 `NewConstraintDialog` and `ConstraintHelpDialog` — one source of truth,
-no drift between the two surfaces.
+no drift between the two surfaces. The one deliberate divergence: the
+onboarding modal passes `showLearnMore: true`, so each of its sections
+additionally renders a "Learn more" button opening the detailed online
+explanation page for that slug
+(`https://leveque.cc/getsomepuzzle/doc/{en,fr,es}/<SLUG>.html`) in the
+system browser; the puzzle-help modal stays a pure in-app reminder.
 
 ## Localization
 
@@ -107,6 +112,9 @@ The intro uses ICU plural placeholders (same mechanism as
 - Complicity deductions (`GS+QA`, `SY+FM`, …) are not listed in the
   modal — they are engine-internal cross-rule effects, not constraints.
 - General "how to play" help is a separate surface: `HelpPage`
-  (`lib/widgets/help_page.dart`, menu entry "Help").
+  (`lib/widgets/help_page.dart`, menu entry "Help"). It carries a
+  "Visit online player guide" button opening
+  `https://leveque.cc/getsomepuzzle/doc/{en,fr,es}/index.html` in the
+  system browser, next to the existing privacy-policy link.
 - The Apprentissage page's per-rule "Refresh my memory" button is
   independent: it re-opens `NewConstraintDialog` per slug.

@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
@@ -16,8 +17,6 @@ import 'package:getsomepuzzle/utils/share_stub.dart'
 import 'package:getsomepuzzle/utils/share_link_stub.dart'
     if (dart.library.html) 'package:getsomepuzzle/utils/share_link_html.dart'
     if (dart.library.io) 'package:getsomepuzzle/utils/share_link_io.dart';
-
-const _kShareBaseUrl = 'https://leveque.cc/getsomepuzzle/play/';
 
 const _durationFormat = 60;
 
@@ -114,7 +113,7 @@ class _StatsPageState extends State<StatsPage> {
 
   Future<void> _shareRecentPuzzle(StatEntry entry) async {
     final url =
-        '$_kShareBaseUrl?puzzle=${Uri.encodeQueryComponent(entry.puzzleLine)}';
+        '$kShareBaseUrl?puzzle=${Uri.encodeQueryComponent(entry.puzzleLine)}';
     final shared = await shareUrl(url);
     if (!mounted) return;
     if (!shared) {

@@ -18,6 +18,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get viewPrivacyPolicy => 'Ver la política de privacidad';
 
   @override
+  String get visitOnlinePlayerGuide => 'Visitar la guía del jugador en línea';
+
+  @override
+  String get learnMore => 'Saber más';
+
+  @override
   String get stats => 'Stats';
 
   @override

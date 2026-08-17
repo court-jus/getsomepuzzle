@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/registry.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Modal shown the first time the player encounters one or more
 /// constraint slugs. Body text per slug is fetched from the localised
@@ -67,7 +69,10 @@ class NewConstraintDialog extends StatelessWidget {
         ],
       ),
       content: SingleChildScrollView(
-        child: ConstraintExplanationList(slugs: slugs.toList()),
+        child: ConstraintExplanationList(
+          slugs: slugs.toList(),
+          showLearnMore: true,
+        ),
       ),
       actions: [
         if (showSkipButton)
@@ -95,11 +100,21 @@ String _capitalise(String s) =>
 /// onboarding modal (`NewConstraintDialog`) and the puzzle-help modal
 /// (`ConstraintHelpDialog`) so both surfaces render identically.
 class ConstraintExplanationList extends StatelessWidget {
-  const ConstraintExplanationList({super.key, required this.slugs});
+  const ConstraintExplanationList({
+    super.key,
+    required this.slugs,
+    this.showLearnMore = false,
+  });
 
   /// Constraint slugs to explain, in display order. A [Set] passed by
   /// callers is converted to a list preserving iteration order.
   final List<String> slugs;
+
+  /// When true, each section gets a "Learn more" button linking to the
+  /// detailed online explanation page for that slug. On by the
+  /// onboarding modal, off by the puzzle-help modal (which stays a
+  /// pure in-app reminder).
+  final bool showLearnMore;
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +140,25 @@ class ConstraintExplanationList extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(constraintExplanationForSlug(l, slug)),
+          if (showLearnMore) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: Text(l.learnMore),
+                onPressed: () {
+                  final languageCode =
+                      Localizations.localeOf(context).languageCode;
+                  final locale = (languageCode == 'fr' || languageCode == 'es')
+                      ? languageCode
+                      : 'en';
+                  final url = Uri.parse('$kDocBaseUrl/$locale/$slug.html');
+                  launchUrl(url, mode: LaunchMode.externalApplication);
+                },
+              ),
+            ),
+          ],
         ],
       ],
     );

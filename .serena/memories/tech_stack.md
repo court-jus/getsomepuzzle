@@ -1,27 +1,9 @@
-# getsomepuzzle — Tech Stack
+# Tech stack
 
-## Primary (Flutter/Dart)
-
-- **Language**: Dart (SDK ^3.10.0)
-- **Framework**: Flutter (^3.41.0)
-- **State management**: None — `StatefulWidget` + `setState` throughout
-- **Localization**: `flutter_localizations` via ARB (`l10n.yaml` → `lib/l10n/`); locales: en, es, fr
-- **CI**: GitHub Actions (`.github/workflows/ci.yml`) — manual trigger + push to master
-- **Supported targets**: Android, iOS, Web, Windows, Linux, macOS
-
-### Key dependencies
-- `collection`, `path_provider`, `flutter_md`, `intl`, `shared_preferences`, `wakelock_plus`, `logging`, `font_awesome_flutter`, `unicons`, `share_plus`, `file_picker`, `url_launcher`, `cross_file`, `open_file`
-- **Dev**: `flutter_test`, `integration_test`, `fake_async`, `flutter_lints`, `flutter_launcher_icons`, `msix`, `markdown`
-
-## Stale Python (Beeware)
-
-- `pyproject.toml` references Beeware 0.3.24 with Toga 0.5.0
-- `src/getsomepuzzle/` has NO `.py` source files — only `__pycache__` bytecode remains
-- The Python codebase is fully superseded by the Dart port; config is legacy
-
-## Platform-specific notes
-
-- **Windows MSIX**: configured in `pubspec.yaml` (`msix_config`), built via `dart run msix:create`
-- **Web**: deployed to GitHub Pages at `/getsomepuzzle/` base href
-- **Linux CI**: uses `xvfb-run` for integration tests
-- **macOS**: universal build enabled
+- Language: Dart 3 (records, patterns, switch expressions used throughout), Flutter (SDK via `flutter` CLI).
+- Package manager: pub (`pubspec.yaml`, lockfile committed).
+- Key deps: `flutter_md` (markdown→widgets, no images), `url_launcher` (external links), `shared_preferences` (locale/onboarding/stats persistence), `intl`, `path_provider`, `file_picker`, `share_plus`, `font_awesome_flutter`, `unicons`, `logging`, `wakelock_plus`, `window_manager`, `flutter_localizations` (gen-l10n).
+- L10n: ARB files in `lib/l10n/` (`app_en.arb` template with `@key` metadata blocks; fr/es files carry values only, no metadata), `l10n.yaml` config, generated `app_localizations{,_en,_es,_fr}.dart` via `flutter gen-l10n`.
+- Tests: `flutter_test` (+ `integration_test/` for device tests). CI workflow runs only `flutter test`.
+- Platforms: android, ios, linux, macos, windows, web; tests run on Linux desktop/WSL2.
+- Dev docs tooling: `bin/` Dart scripts, `dart run bin/…`.

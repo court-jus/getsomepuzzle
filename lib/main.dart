@@ -19,6 +19,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/autopilot_state.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/game_model.dart';
@@ -57,11 +58,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 const versionText = "Version 2.0.0";
-
-/// Share links target this URL with a `?puzzle=<line>` query — works as a
-/// browser fallback everywhere, and later as the App Links / Universal Links
-/// target on mobile when set up.
-const kShareBaseUrl = 'https://leveque.cc/getsomepuzzle/play/';
 
 /// Extract a puzzle line passed at startup, either via web URL
 /// (`?puzzle=v2_...`) or as a desktop CLI argument (raw `v2_...` line, or

@@ -118,6 +118,18 @@ abstract class AppLocalizations {
   /// **'View privacy policy'**
   String get viewPrivacyPolicy;
 
+  /// Label of the button in the help page that opens the online player guide on the web
+  ///
+  /// In en, this message translates to:
+  /// **'Visit online player guide'**
+  String get visitOnlinePlayerGuide;
+
+  /// Label of the button in the new-rule dialog that opens the detailed online explanation for the presented rule
+  ///
+  /// In en, this message translates to:
+  /// **'Learn more'**
+  String get learnMore;
+
   /// Label of the menu choice that displays game statistics
   ///
   /// In en, this message translates to:

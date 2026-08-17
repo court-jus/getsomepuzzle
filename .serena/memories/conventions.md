@@ -1,49 +1,25 @@
-# getsomepuzzle — Conventions
+# Conventions
 
-## Code style & formatting
+## Code style
+- Dart: `analysis_options.yaml` enforced (flutter_lints defaults); use records `({String slug, …})`, switch expressions, collection-if/for spreads (`.indexed`).
+- Widgets: `StatelessWidget` preferred; private helpers/constants get `_` prefix; class-per-concept files under `lib/widgets/` mirroring `lib/getsomepuzzle/` names.
+- Long/mostly-verbatim doc comments on widgets explaining invariants and caller responsibilities (e.g. side effects belong to the caller, why a flag exists).
 
-- **Formatter**: `dart format` is mandatory after editing any `.dart` file
-- **Linting**: `flutter_lints` (via `package:flutter_lints/flutter.yaml`) with `avoid_print: ignore`
-- **Imports**: use relative package imports (`package:getsomepuzzle/...`)
-
-## State management
-
-- No external state lib — `StatefulWidget` + `setState` exclusively
-- App state lives in `_MyHomePageState` (main.dart); game state in `GameModel`
-
-## Constraint contract (`Constraint` subclass in `lib/getsomepuzzle/constraints/`)
-
-- `verify(puzzle)` → **false** only when constraint is **definitely violated** (now or unreachable). Incomplete-but-still-reachable returns **true**.
-- `apply(puzzle)` → may be more aggressive than verify. Returns `Move` or `Move(isImpossible: this)`.
-- `isCompleteFor(puzzle)` → grayout signal: return true only when no future play can make `apply` fire again.
-- Every new constraint: paired regression tests (reachable-incomplete → verify true, unreachable-incomplete → verify false).
-
-## Move system (`lib/getsomepuzzle/model/cell.dart`)
-
-- `Move` is a sealed class with subtypes: `SetValue`, `RemoveOption`, `Impossible`.
-- Pattern-match on subtype; accessor getters exist for test convenience.
-
-## Testing
-
-- Framework: `flutter_test`
-- Each test must be necessary, clear, well-commented.
-- Prefer edge cases and real bugs over happy paths already covered.
-- Tests encode *why* behaviour matters, not just *what* it does.
+## UI patterns
+- `AlertDialog` with title `Row[Icon, SizedBox(8), Expanded(Text)]`; per-surface accent via `Theme.of(context).extension<PuzzleColors>()!.dialogAccent`.
+- Constraint sections shared via `ConstraintExplanationList` (in `new_constraint_dialog.dart`): icon+name header, explanation body; optional per-section buttons gated by flags (`showLearnMore`, `showSkipButton`).
+- External links: `TextButton.icon` + `launchUrl(Uri, mode: LaunchMode.externalApplication)`; icon `Icons.open_in_new` for external-link affordance.
+- URL constants: file-private `const _…BaseUrl`, one per file (help_page, stats_page, main.dart each define their own; no shared URL module).
 
 ## Localization
+- New strings: add key+`@key`(description) to `app_en.arb` (template), plain value to `app_fr.arb`/`app_es.arb`, then run `flutter gen-l10n`. Getter names camelCase; description must be written for translators.
+- Locale plumbing: `help_page.dart` receives `locale` param ('en'/'fr'/'es', from main.dart prefs "locale"); other widgets derive via `Localizations.localeOf(context).languageCode` with `'en'` fallback for anything else.
+- ICU plurals for counts (e.g. `puzzleHelpIntro`, `learningPlayCount`).
 
-- ARB files in `lib/l10n/` (source: `app_en.arb`, targets: `app_es.arb`, `app_fr.arb`)
-- After editing any ARB, run `flutter gen-l10n` to regenerate Dart code.
-- Generated files (`app_localizations*.dart`) are committed.
+## Dialogs & side effects
+- Mandatory-read dialogs: `barrierDismissible: false`; optional reference dialogs: true.
+- Dialog widgets stay dumb: callers perform persistence/side effects after dismissal.
+- Set-based slug dedup for constraint lists (a puzzle repeats slugs across rules); merged row/column pairs collapsed before display.
 
-## Naming
-
-- Files: snake_case for `.dart` files
-- Types: PascalCase
-- Variables/functions: camelCase
-- Constraint slugs: uppercase 2-letter codes (FM, PA, GS, ...)
-
-## Git
-
-- Tags auto-created by CI on master push (format: `vX.Y.Z` from pubspec.yaml version minus build number)
-- CI commits use `github-actions[bot]`
+## Docs
+- `docs/dev/` mirrors subsystems one file each; update the relevant page when changing behavior of a surface (checklist in `docs/dev/index.md`; e.g. `puzzle_help.md`, `onboarding.md`, `ready_to_publish.md` checklist items).

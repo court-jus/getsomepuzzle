@@ -1,40 +1,13 @@
-# getsomepuzzle — Suggested Commands
+# Commands (run from repo root)
 
-```bash
-# Dependencies
-flutter pub get
+All shell commands must be prefixed with `rtk` per AGENTS.md (token-optimized passthrough; e.g. `rtk git diff`). Use `workdir=/home/ghislain/perso/getsomepuzzle`.
 
-# Run app (debug)
-flutter run
-
-# Tests
-flutter test                          # All
-flutter test test/<file>             # Single file
-xvfb-run -a flutter test integration_test/ -d linux   # Integration (Linux)
-
-# Lint / format / analyze
-dart format .
-flutter analyze
-
-# Build targets
-flutter build apk --release
-flutter build web --base-href=/getsomepuzzle/
-flutter build windows
-flutter build linux
-flutter build macos
-flutter build ios
-flutter build appbundle --release -PenableMinify=true
-
-# MSIX packaging (Windows)
-dart run msix:create
-
-# Localization
-flutter gen-l10n
-
-# Launcher icons
-dart run flutter_launcher_icons
-
-# CLI puzzle tools
-dart run bin/generate.dart -n 100 -o puzzles.txt        # Generate
-dart run bin/generate.dart --check assets/default.txt   # Validate
-dart run bin/generate.dart --read-stats <dir>           # Sort by difficulty
+- Analyze: `rtk flutter analyze` (must be clean).
+- Test (unit+widget, what CI runs): `rtk flutter test` (≈1000+ tests, ~30s; failure-only output via rtk).
+- Single test file: `rtk flutter test test/<name>.dart`.
+- Integration tests: `rtk flutter test integration_test/<name>_test.dart -d linux` (needs a device/display; not part of CI — skip unless explicitly asked).
+- Regenerate l10n bindings after editing `.arb` files: `rtk flutter gen-l10n` (uses `l10n.yaml`).
+- Solvers/descriptors: `dart run bin/solve.dart <url|v2>`, `dart run bin/describe_puzzle.dart`, `dart run bin/query_corpus.dart --playlist N`.
+- Corpus maintenance: `dart run bin/maintain.dart` (6-step pipeline incl. `extract_onboarding.dart`), `dart run bin/onboarding_stats.dart`, `dart run bin/check_phase_coverage.dart`.
+- Git: `rtk git status`, `rtk git diff`, `rtk git log` (rtk filters save context).
+- Serena memory integrity: `serena memories check` from project root.

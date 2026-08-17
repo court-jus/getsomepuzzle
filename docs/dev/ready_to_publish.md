@@ -69,9 +69,11 @@ Center). Apple reviewers work in English, so these are kept in English.
   locally via `shared_preferences` and on-device files.
 - No payments: no `in_app_purchase` dependency, no subscriptions. App is free.
 - No active network telemetry: all outbound calls were removed (see
-  *Already done*). The only "URL" (`kShareBaseUrl` in `lib/main.dart`) just
-  builds a share link handed to the native iOS share sheet; the app sends
-  nothing to a server.
+  *Already done*). The only "URLs" are `kShareBaseUrl`, `kDocBaseUrl` and
+  `kPrivacyBaseUrl` in `lib/getsomepuzzle/model/constants.dart`: they build
+  share links handed to the native iOS share sheet and external links the
+  user taps (player guide, per-constraint pages, privacy policy); the app
+  sends nothing to a server on its own.
 - User-generated content stays local: the in-app editor saves puzzles on the
   device only; sharing produces a link. No public feed, no other users'
   content shown ⇒ no reporting/blocking mechanism needed (say so explicitly).
@@ -336,6 +338,12 @@ Do NOT film (and mention in the review note): login/registration/account-deletio
 - [x] **In-app link to the privacy policy**. The help page has a "View
       privacy policy" button that opens the locale-appropriate URL via
       `url_launcher` in the system browser (no in-app web view).
+- [x] **In-app links to the online docs**. The help page carries a
+      "Visit online player guide" button opening
+      `https://leveque.cc/getsomepuzzle/doc/{en,fr,es}/index.html`, and
+      every onboarding ("New rule!") modal has a per-rule "Learn more"
+      button opening `…/doc/{en,fr,es}/<SLUG>.html` — both locale- and
+      slug-derived, both `url_launcher` external-browser links.
 - [x] **`CHANGELOG` initialised** at the repo root, following
       [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
       SemVer. Anchored at `[1.7.0] — TBD` as the first public release;

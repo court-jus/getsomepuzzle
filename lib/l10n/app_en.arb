@@ -12,6 +12,14 @@
     "@viewPrivacyPolicy": {
         "description": "Label of the link in the help page that opens the privacy-policy page on the web"
     },
+    "visitOnlinePlayerGuide": "Visit online player guide",
+    "@visitOnlinePlayerGuide": {
+        "description": "Label of the button in the help page that opens the online player guide on the web"
+    },
+    "learnMore": "Learn more",
+    "@learnMore": {
+        "description": "Label of the button in the new-rule dialog that opens the detailed online explanation for the presented rule"
+    },
     "stats": "Stats",
     "@stats": {
         "description": "Label of the menu choice that displays game statistics"
