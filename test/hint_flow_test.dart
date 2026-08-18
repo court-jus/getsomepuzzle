@@ -25,12 +25,18 @@ PuzzleData _deducibleFixture() =>
 PuzzleData _searchableFixture() =>
     PuzzleData('v2_12_3x3_100000000_LT:A.0.4_1:111111111_0');
 
+/// Two LT letter groups on disjoint cell pairs, cells 0 and 1 given black
+/// (solution all black). Setting one member of each group white violates
+/// both constraints — used to exercise the multi-violation error pass.
+PuzzleData _twoLTFixture() =>
+    PuzzleData('v2_12_3x3_110000000_LT:A.0.4;LT:B.1.5_1:111111111_0');
+
 /// Empty 2x2 with no real constraints. `findAMove` will return null because
 /// nothing is deducible — used to exercise the `helpMove == null` guards.
 PuzzleData _emptyFixture() => PuzzleData('v2_12_2x2_0000_NOOP_0_0');
 
 const HintTexts _texts = HintTexts(
-  someConstraintsInvalid: 'invalid',
+  hintConstraintsInvalid: _hintConstraintsInvalid,
   hintCellWrong: 'wrong cell',
   hintAllCorrectSoFar: 'all correct',
   hintCellDeducible: 'cell deducible',
@@ -44,6 +50,8 @@ const HintTexts _texts = HintTexts(
   hintForceRemoveOption: 'force remove option',
   hintRemoveOptionDeducedFrom: _hintRemoveOptionDeducedFrom,
 );
+
+String _hintConstraintsInvalid(int count) => '$count invalid';
 
 String _hintRemoveOptionDeducedFrom(CanApply givenBy) => givenBy is Constraint
     ? 'remove option from ${givenBy.slug}'
@@ -404,6 +412,79 @@ void main() {
 
       game.dispose();
     });
+
+    test(
+      'error pass flags every violated constraint (red border) and counts them',
+      () {
+        final game = GameModel();
+        final settings = Settings(hintType: HintType.addConstraint);
+        game.hintType = HintType.addConstraint;
+        game.openPuzzle(_twoLTFixture(), 1);
+
+        // Violate both LT groups: each has one black given (cells 0, 1) and
+        // one member we turn white (cells 4, 5).
+        game.currentPuzzle!.setValue(4, CellValue.white);
+        game.currentPuzzle!.setValue(5, CellValue.white);
+        expect(
+          game.currentPuzzle!.check(saveResult: false),
+          hasLength(2),
+          reason: 'fixture must produce exactly two violated constraints',
+        );
+
+        game.onHintTap(settings, _texts); // stage 0 → 1, error pass
+        expect(game.hintIsError, isTrue);
+        expect(game.hintText, '2 invalid');
+        expect(
+          game.currentPuzzle!.constraints.where((c) => !c.isValid).toList(),
+          hasLength(2),
+          reason: 'every violated constraint must show the invalid border',
+        );
+        expect(
+          game.currentPuzzle!.constraints.every((c) => !c.isHighlighted),
+          isTrue,
+          reason: 'error pass must not highlight (no hint arrows)',
+        );
+
+        // A player interaction rolls the invalid flags back to valid.
+        final cell = game.currentPuzzle!.cells.firstWhere((c) => !c.readonly);
+        game.handleTap(cell.idx);
+        expect(
+          game.currentPuzzle!.constraints.every((c) => c.isValid),
+          isTrue,
+          reason: 'interaction must roll back isValid to true',
+        );
+
+        game.dispose();
+      },
+    );
+
+    test(
+      'error pass reports a single violated constraint with singular text',
+      () {
+        final game = GameModel();
+        final settings = Settings(hintType: HintType.addConstraint);
+        game.hintType = HintType.addConstraint;
+        game.openPuzzle(_searchableFixture(), 1);
+
+        // Violate the lone LT (cell 0 is a black given, cell 4 turned white).
+        game.currentPuzzle!.setValue(4, CellValue.white);
+        expect(
+          game.currentPuzzle!.check(saveResult: false),
+          hasLength(1),
+          reason: 'fixture must produce exactly one violated constraint',
+        );
+
+        game.onHintTap(settings, _texts); // stage 0 → 1, error pass
+        expect(game.hintIsError, isTrue);
+        expect(game.hintText, '1 invalid');
+        expect(
+          game.currentPuzzle!.constraints.where((c) => !c.isValid).toList(),
+          hasLength(1),
+        );
+
+        game.dispose();
+      },
+    );
   });
 
   group('Hint cycle reset', () {

@@ -118,6 +118,7 @@
     "hintComplicityWithAny": "Cette cellule peut être déduite en combinant la contrainte {c} avec une autre",
     "hintForce": "Cette cellule peut être déduite en combinant plusieurs contraintes",
     "hintImpossible": "Une contrainte n'est pas respectée — une erreur a été commise",
+    "hintConstraintsInvalid": "{count, plural, =1{1 contrainte n'est pas respectée} other{{count} contraintes ne sont pas respectées}}",
     "hintConstraintAdded": "Une nouvelle contrainte a été ajoutée",
     "hintConstraintInprogress": "Une nouvelle contrainte est en cours de calcul...",
     "hintConstraintNone": "Plus de contraintes disponibles",

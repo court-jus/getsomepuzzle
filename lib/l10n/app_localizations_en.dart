@@ -299,6 +299,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hintImpossible => 'A constraint is violated — a mistake was made';
 
   @override
+  String hintConstraintsInvalid(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count constraints are not valid',
+      one: '1 constraint is not valid',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get hintConstraintAdded => 'A new constraint has been added';
 
   @override

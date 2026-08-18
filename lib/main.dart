@@ -1462,7 +1462,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   HintTexts _buildHintTexts() {
     final l10n = AppLocalizations.of(context)!;
     return HintTexts(
-      someConstraintsInvalid: l10n.someConstraintsInvalid,
+      hintConstraintsInvalid: (count) => l10n.hintConstraintsInvalid(count),
       hintCellWrong: l10n.hintCellWrong,
       hintAllCorrectSoFar: l10n.hintAllCorrectSoFar,
       hintCellDeducible: l10n.hintCellDeducible,

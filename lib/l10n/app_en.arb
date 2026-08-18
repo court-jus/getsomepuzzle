@@ -391,6 +391,16 @@
     "@hintImpossible": {
         "description": "Hint message shown when the puzzle is in an impossible state"
     },
+    "hintConstraintsInvalid": "{count, plural, =1{1 constraint is not valid} other{{count} constraints are not valid}}",
+    "@hintConstraintsInvalid": {
+        "description": "Hint message shown on the first hint tap when one or more constraints of the current puzzle are violated",
+        "placeholders": {
+            "count": {
+                "type": "int",
+                "example": "2"
+            }
+        }
+    },
     "hintConstraintAdded": "A new constraint has been added",
     "@hintConstraintAdded": {
         "description": "Hint message shown when a constraint is added as a hint"

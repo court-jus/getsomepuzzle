@@ -134,8 +134,15 @@ class GameModel extends ChangeNotifier {
   /// that the hint button would apply, and the multi-tap stage. Called on
   /// every mutation so a stale hint can't be applied to a puzzle that has
   /// since changed.
+  ///
+  /// Also rolls back the `isValid` flags the error pass may have cleared
+  /// ([_revealErrors] marks violated constraints invalid to show their red
+  /// border) — without this, a red border set by a hint would stay stuck
+  /// after the player interacts (e.g. after a drag, which has no explicit
+  /// `clearConstraintsValidity` call of its own).
   void _clearHint() {
     currentPuzzle?.clearHighlights();
+    currentPuzzle?.clearConstraintsValidity();
     hintText = "";
     hintIsError = false;
     helpMove = null;
@@ -858,7 +865,9 @@ class GameModel extends ChangeNotifier {
 
   /// Tap 1 — surface error info (or "all correct" when the grid is fine).
   /// Shared between both hint modes. Three sub-cases, in priority order:
-  ///   (a) a constraint is currently violated → highlight it
+  ///   (a) constraints are currently violated → mark every violated
+  ///       constraint invalid (red border, no arrows — no cell is
+  ///       highlighted) and report how many are violated
   ///   (b) a filled cell diverges from the cached solution → highlight it
   ///   (c) nothing wrong → "all correct so far" message, no highlight
   void _revealErrors(HintTexts texts) {
@@ -867,8 +876,10 @@ class GameModel extends ChangeNotifier {
 
     final failed = puzzle.check(saveResult: false);
     if (failed.isNotEmpty) {
-      failed.first.isHighlighted = true;
-      hintText = texts.someConstraintsInvalid;
+      for (final constraint in failed) {
+        constraint.isValid = false;
+      }
+      hintText = texts.hintConstraintsInvalid(failed.length);
       hintIsError = true;
       return;
     }
@@ -1171,7 +1182,9 @@ class GameModel extends ChangeNotifier {
 /// struct rather than passed individually because [GameModel.onHintTap] picks
 /// the right one based on the (mode, stage, sub-case) combo at call time.
 class HintTexts {
-  final String someConstraintsInvalid;
+  /// Message shown when one or more constraints are violated on the first
+  /// hint tap; takes the number of violated constraints.
+  final String Function(int count) hintConstraintsInvalid;
   final String hintCellWrong;
   final String hintAllCorrectSoFar;
   final String hintCellDeducible;
@@ -1190,7 +1203,7 @@ class HintTexts {
   final String Function(CanApply givenBy) hintRemoveOptionDeducedFrom;
 
   const HintTexts({
-    required this.someConstraintsInvalid,
+    required this.hintConstraintsInvalid,
     required this.hintCellWrong,
     required this.hintAllCorrectSoFar,
     required this.hintCellDeducible,

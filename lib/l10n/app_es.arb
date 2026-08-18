@@ -118,6 +118,7 @@
     "hintComplicityWithAny": "Esta celda se puede deducir combinando la restricción {c} con otra",
     "hintForce": "Esta celda se puede deducir combinando múltiples restricciones",
     "hintImpossible": "Una restricción está violada — se ha cometido un error",
+    "hintConstraintsInvalid": "{count, plural, =1{1 restricción no es válida} other{{count} restricciones no son válidas}}",
     "hintConstraintAdded": "Se ha añadido una nueva restricción",
     "hintConstraintInprogress": "Se está calculando una nueva restricción",
     "hintConstraintNone": "No hay más restricciones disponibles",

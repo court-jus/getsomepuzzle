@@ -628,6 +628,12 @@ abstract class AppLocalizations {
   /// **'A constraint is violated — a mistake was made'**
   String get hintImpossible;
 
+  /// Hint message shown on the first hint tap when one or more constraints of the current puzzle are violated
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 constraint is not valid} other{{count} constraints are not valid}}'**
+  String hintConstraintsInvalid(int count);
+
   /// Hint message shown when a constraint is added as a hint
   ///
   /// In en, this message translates to:

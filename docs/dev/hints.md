@@ -26,12 +26,15 @@ work as they want for themselves.
 
 ### Tap flow
 
-1. **Errors / "all correct".** If a constraint is currently violated, show
-   that constraint. Otherwise, if a solution is known for the puzzle (from
-   its line representation) and a colored cell differs from the solution,
-   show the cell as an error without saying which constraint flagged it.
-   Otherwise, tell the player that everything they have filled so far is
-   correct.
+1. **Errors / "all correct".** If constraints are currently violated, mark
+   every violated constraint invalid — red border, no arrow — and report how
+   many are violated (`hintConstraintsInvalid`). The invalid flags roll back
+   to valid on the next player interaction (`_clearHint` →
+   `clearConstraintsValidity`). Otherwise, if a solution is known for the
+   puzzle (from its line representation) and a colored cell differs from the
+   solution, show the cell as an error without saying which constraint
+   flagged it. Otherwise, tell the player that everything they have filled
+   so far is correct.
 2. **Cell only.** Highlight the deducible cell, without revealing which
    constraint produces the deduction.
 3. **Cell + constraint.** Reveal the constraint and draw the arrow from

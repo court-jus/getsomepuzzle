@@ -301,6 +301,17 @@ class AppLocalizationsFr extends AppLocalizations {
       'Une contrainte n\'est pas respectée — une erreur a été commise';
 
   @override
+  String hintConstraintsInvalid(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count contraintes ne sont pas respectées',
+      one: '1 contrainte n\'est pas respectée',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get hintConstraintAdded => 'Une nouvelle contrainte a été ajoutée';
 
   @override

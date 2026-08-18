@@ -148,8 +148,9 @@ class ConstraintExplanationList extends StatelessWidget {
                 icon: const Icon(Icons.open_in_new, size: 16),
                 label: Text(l.learnMore),
                 onPressed: () {
-                  final languageCode =
-                      Localizations.localeOf(context).languageCode;
+                  final languageCode = Localizations.localeOf(
+                    context,
+                  ).languageCode;
                   final locale = (languageCode == 'fr' || languageCode == 'es')
                       ? languageCode
                       : 'en';

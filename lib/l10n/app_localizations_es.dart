@@ -301,6 +301,17 @@ class AppLocalizationsEs extends AppLocalizations {
       'Una restricción está violada — se ha cometido un error';
 
   @override
+  String hintConstraintsInvalid(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count restricciones no son válidas',
+      one: '1 restricción no es válida',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get hintConstraintAdded => 'Se ha añadido una nueva restricción';
 
   @override
