@@ -9,11 +9,16 @@ import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'helpers/onboarding_completions.dart';
 
 /// Minimal-but-valid `PuzzleData` line. The constraint section repeats
-/// `FM:12` `nCons` times by default so `PuzzleData.rules.length == nCons`,
+/// `FM` `nCons` times by default so `PuzzleData.rules.length == nCons`,
 /// which the duration model now consumes. Pass `slugs` to override the
 /// default `FM` repetition with an explicit list (e.g. `['FM', 'GS']`) —
-/// each slug gets a single dummy parameter `:1` appended, since the
+/// each slug gets a distinct dummy parameter appended, since the
 /// adapt-to-player logic only cares about the slug name.
+///
+/// The params are made distinct per occurrence (`FM:0;FM:1;…`) on purpose:
+/// the level computation counts constraints from the *stored* puzzle line,
+/// which is normalized by `normalizeV2Line` (exact-duplicate constraints
+/// are dropped), so identical repeats would collapse and change `nCons`.
 ///
 /// None of the adapt-to-player logic cares about semantic validity — only
 /// width, height, the trailing `cplx`, and the parsed `rules`.
@@ -25,7 +30,12 @@ PuzzleData _puz({
   List<String>? slugs,
 }) {
   final cellsStr = '0' * (width * height);
-  final cons = (slugs ?? List.filled(nCons, 'FM')).map((s) => '$s:1').join(';');
+  final slugsToUse = slugs ?? List.filled(nCons, 'FM');
+  final cons = slugsToUse
+      .asMap()
+      .entries
+      .map((e) => '${e.value}:${e.key}')
+      .join(';');
   return PuzzleData('v2_12_${width}x${height}_${cellsStr}_${cons}_0:0_$cplx');
 }
 
@@ -40,6 +50,38 @@ double _expectedFor(int cplx, int cells, int failures, int nCons) =>
     math.exp(cplx / 123.82) *
     math.pow(1.1627, failures) *
     math.pow(1.1069, nCons);
+
+/// `n` finished, non-skipped stat entries for a puzzle played at the
+/// expected duration of `cplx` (so each play's implicit level ≈ `cplx`).
+/// All entries share the same puzzle line but carry distinct completion
+/// stamps, so they count as `n` separate samples (full-history semantics).
+/// `durationS` overrides the duration (e.g. a left-open outlier);
+/// `longestGapMs` plants an idle gap (AFK outlier); `stampOffsetSeconds`
+/// shifts the completion stamps so two lists can be concatenated without
+/// colliding in the `(canonical key, completion stamp)` dedup.
+List<StatEntry> nPlays(
+  int n, {
+  required int cplx,
+  int width = 4,
+  int height = 5,
+  int nCons = 3,
+  int? durationS,
+  int? longestGapMs,
+  int stampOffsetSeconds = 0,
+}) {
+  final cells = width * height;
+  final dur = durationS ?? _expectedFor(cplx, cells, 0, nCons).round();
+  final prefill = '0' * cells;
+  final cons = List.generate(nCons, (i) => 'FM:$i').join(';');
+  final line = 'v2_12_${width}x${height}_${prefill}_${cons}_0:0_$cplx';
+  final gap = longestGapMs == null ? '' : ' ${longestGapMs}lg';
+  return List.generate(n, (i) {
+    final s = stampOffsetSeconds + i;
+    final stamp =
+        '2026-01-01T12:${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+    return StatEntry.parse('$stamp ${dur}s 0f $line$gap')!;
+  });
+}
 
 void main() {
   group('Database.computePlayerLevel', () {
@@ -124,6 +166,95 @@ void main() {
       final lowCons = build(2).computePlayerLevel(fallback: 0);
       final highCons = build(15).computePlayerLevel(fallback: 0);
       expect(highCons, greaterThan(lowCons));
+    });
+
+    test('counts plays across all collections, not just the loaded one', () {
+      // Regression for "played a bunch but Lv 0": the sample must come from
+      // the global play history. Here the current collection has no
+      // in-memory plays at all (returning player who just switched
+      // collections), yet the 12 finished plays recorded elsewhere still
+      // drive the level.
+      final db = Database(playerLevel: 0);
+      db.collection = '2-player';
+      db.puzzles = [];
+      db.loadStats(nPlays(12, cplx: 40));
+      expect(db.computePlayerLevel(fallback: 0), closeTo(40, 2));
+    });
+
+    test('replays of the same puzzle count as separate samples', () {
+      // Full-history semantics: 12 plays of the *same* puzzle line with
+      // distinct completion stamps are 12 samples, not one. A history
+      // collapsed to one entry per puzzle would yield a single sample and
+      // fall back instead.
+      final db = Database(playerLevel: 0);
+      db.loadStats(nPlays(12, cplx: 40));
+      expect(db.computePlayerLevel(fallback: 0), closeTo(40, 2));
+    });
+
+    test('a single left-open play cannot drag the level to 0 (winsorization)', () {
+      // The left-open play clamps its duration to 10×expected, which would
+      // give level_i ≈ cplx − 285 ≈ −245; without winsorization the
+      // weighted average (the newest play weighs 1.0) collapses below 0 and
+      // is pinned at 0. The floor max(cplx − 30, 0) = 10 bounds it instead,
+      // so the result stays a plausible mix of the two plays.
+      final db = Database(playerLevel: 0);
+      const cplx = 40;
+      const nCons = 3;
+      final expected = _expectedFor(cplx, 20, 0, nCons);
+      db.loadStats([
+        ...nPlays(1, cplx: cplx, nCons: nCons),
+        ...nPlays(
+          1,
+          cplx: cplx,
+          nCons: nCons,
+          durationS: (expected * 10).round(),
+          stampOffsetSeconds: 300,
+        ),
+      ]);
+      final level = db.computePlayerLevel(fallback: 0);
+      expect(level, greaterThan(0));
+      expect(level, lessThan(cplx));
+    });
+
+    test('plays with an idle gap > 5 min are dropped (AFK guard)', () {
+      // The 6 AFK plays (left-open duration + 400 000 ms idle gap) are
+      // dropped; only the 6 at-expected plays remain, so the level stays
+      // ≈ cplx. Without the guard the long outliers would drag it toward
+      // the winsorization floor.
+      final db = Database(playerLevel: 0);
+      final expected = _expectedFor(40, 20, 0, 3);
+      db.loadStats([
+        ...nPlays(6, cplx: 40),
+        ...nPlays(
+          6,
+          cplx: 40,
+          durationS: (expected * 10).round(),
+          longestGapMs: 400000,
+          stampOffsetSeconds: 300,
+        ),
+      ]);
+      expect(db.computePlayerLevel(fallback: 0), closeTo(40, 2));
+    });
+
+    test('plays without a cached complexity are skipped', () {
+      // Custom / user playlists may carry no cplx tail (field [6] == 0):
+      // those plays would give level_i = −impliedCplx < 0 and drag the
+      // level to 0, so they must be excluded from the sample.
+      final db = Database(playerLevel: 0);
+      db.loadStats([
+        ...nPlays(6, cplx: 40),
+        ...nPlays(6, cplx: 0, stampOffsetSeconds: 300),
+      ]);
+      expect(db.computePlayerLevel(fallback: 0), closeTo(40, 2));
+    });
+
+    test('a very fast player can exceed level 100 (no upper clamp)', () {
+      // 12 plays solved in 1 s at cplx 100: level_i ≈ 2·100 −
+      // impliedCplx(1 s) ≈ 590, winsorized to cplx + 60 = 160 — still above
+      // 100. The level must not be clamped back to 100.
+      final db = Database(playerLevel: 0);
+      db.loadStats(nPlays(12, cplx: 100, durationS: 1));
+      expect(db.computePlayerLevel(fallback: 0), greaterThan(100));
     });
   });
 

@@ -230,9 +230,17 @@ class _SettingsPageState extends State<SettingsPage> {
                           SizedBox(
                             width: 150,
                             child: Slider(
+                              // Clamp the displayed value to the slider's
+                              // [0, 100] range: with the now-unbounded
+                              // auto-level, `settings.playerLevel` can exceed
+                              // 100, and a Slider asserts when value is out of
+                              // range. The stored level itself stays unbounded;
+                              // the first manual drag snaps the committed
+                              // value back into range.
                               value:
                                   (_pendingPlayerLevel ??
                                           widget.settings.playerLevel)
+                                      .clamp(0, 100)
                                       .toDouble(),
                               min: 0,
                               max: 100,

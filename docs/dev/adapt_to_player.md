@@ -26,11 +26,11 @@ ahead of that level, nudging them upward while keeping the pace comfortable.
 
 ### Scale
 
-`playerLevel` lives in `Settings` (0–100, persisted in `SharedPreferences`).
-The scale is **anchored at 50 = the calibration cohort's pace**: a
-player who solves at the same speed as the historical baseline trends
-toward 50, faster players go above, slower below. This puts the
-"average" player in the middle of [0, 100] instead of at 0 or near 0.
+`playerLevel` lives in `Settings` (≥ 0 — **unbounded above** — persisted in
+`SharedPreferences`). The scale is **anchored at 50 = the calibration
+cohort's pace**: a player who solves at the same speed as the historical
+baseline trends toward 50, faster players go above, slower below. This puts
+the "average" player in the middle of the range instead of at 0 or near 0.
 
 The unit is still puzzle-`cplx`-compatible: the puzzle selector compares
 `level` against `cplx` directly via the Gaussian weighting (see below).
@@ -39,10 +39,11 @@ solver" — it means "42 in the centred-on-50 skill scale".
 
 > **`cplx` is unbounded (since 2026-08).** Puzzle complexity is no longer
 > capped at 100 — force-heavy 6-mad puzzles compute to 100–230 (see
-> `complexity.md`). `playerLevel` remains a clamped 0–100 skill scale,
-> and the Gaussian targeting uses cplx *differences*, so matching still
-> behaves. The one place that must be revisited on the next corpus
-> recompute is the **anchor**: the duration model
+> `complexity.md`). `playerLevel` is **≥ 0 with no upper clamp** (a very
+> fast player may exceed 100), and the Gaussian targeting uses cplx
+> *differences*, so matching still behaves. The one place that must be
+> revisited on the next corpus recompute is the **anchor**: the duration
+> model
 > (`expectedDuration ≈ 3.31 · cells^0.515 · exp(cplx/123.8)` in
 > `database.dart`) and the `intercept + observed-speed` anchor were
 > calibrated on the old capped distribution. After stored cplx values are
@@ -111,13 +112,33 @@ When a play's duration matches the (anchored) expected duration for its
 faster than this anchored expected — by design — so cohort plays come
 in around 50 on average rather than around their puzzle's `cplx`.
 
-For each of the last 50 plays — filtered to `played && finished &&
-!skipped && duration > 0` — we compute `level_i` and take a weighted
-average with **exponential decay, half-life = 25 puzzles**. The
-duration is clamped to `[1, 10·expected]` up front so a puzzle left
-open for hours does not swing the result.
+The sample is the **global full play history**: every finished, non-skipped
+play across **all collections** counts, and replays of the same puzzle are
+separate samples (each distinct completion stamp). For each of the last 50
+samples we compute `level_i` and take a weighted average with
+**exponential decay, half-life = 25 puzzles**. The duration is clamped to
+`[1, 10·expected]` up front so a puzzle left open for hours does not swing
+the result — and two further guards prevent outliers from zeroing the
+level:
 
-If fewer than 2 usable plays are available, we return `fallback`
+- **Gross-AFK drop**: plays with `longestGapMs > 5 min` are excluded
+  entirely rather than read as "very slow".
+- **Winsorization**: each `level_i` is clamped to
+  `[max(cplx − 30, 0), cplx + 60]` before weighting. The lower bound is
+  deliberately gentler (a novice may legitimately take long on an easy
+  puzzle and must not be pinned at 0); the upper bound guards against the
+  opposite outlier — implausibly fast plays of hard puzzles (random
+  tapping + luck).
+- **No cached complexity**: plays whose puzzle line carries no `cplx`
+  (custom / user playlists) are skipped, since they would otherwise read
+  as `level_i = −impliedCplx < 0` and drag the average down.
+
+The computed level is floored at 0 (never negative) with **no upper
+clamp** — a very fast player can exceed 100. The manual slider in
+Settings stays on a 0–100 scale (its displayed value is clamped); the
+first manual drag snaps the committed value back into that range.
+
+If fewer than 2 usable samples are available, we return `fallback`
 (usually the currently stored level) rather than snapping to 0 — this
 preserves any manually set level during onboarding. Two is a low bar:
 the noise floor on a single play is large (per-play std ~ 35 of
@@ -192,8 +213,11 @@ them.
 ### When `playerLevel` recomputes (auto mode)
 
 With `autoLevel == true`, `Database.computePlayerLevel` is called
-exactly **at the end of each batch** (when `_onPuzzleCompleted` finds
-`playlist.isEmpty` after the last puzzle of the batch was consumed).
+- **at app startup** (right after the stats are loaded, so a returning
+  player's level is refreshed even if they never complete a batch), and
+- exactly **at the end of each batch** (when `_onPuzzleCompleted` finds
+  `playlist.isEmpty` after the last puzzle of the batch was consumed).
+
 It is **not** called after every puzzle.
 
 The reason is mechanical: every time the level changes,

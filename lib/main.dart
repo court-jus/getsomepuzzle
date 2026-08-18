@@ -464,6 +464,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       database!.preparePlaylist();
     }
 
+    // Refresh the auto-level from the freshly loaded global play history.
+    // Without this, a returning player's level would only update at the end
+    // of the first drained batch — so it could stay stale (e.g. 0) across
+    // many sessions if they never complete a batch. The level is computed
+    // over the full history across every collection, so a player who
+    // spread their plays over several collections still gets a value.
+    if (settings.autoLevel && database != null) {
+      final newLevel = database!.computePlayerLevel(
+        fallback: settings.playerLevel,
+      );
+      if (newLevel != settings.playerLevel) {
+        settings.playerLevel = newLevel;
+        await settings.save();
+        database!.setPlayerLevel(newLevel);
+      }
+    }
+
     // The database's stats load may have backfilled `progress` from
     // legacy plays — persist whatever new entries that produced so a
     // returning player doesn't have to re-derive them on every launch.

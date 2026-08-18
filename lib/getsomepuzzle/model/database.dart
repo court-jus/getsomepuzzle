@@ -1994,55 +1994,133 @@ class Database {
             nConstraints * math.log(_kNConsMul));
   }
 
+  /// Gross-AFK guard for [computePlayerLevel]: plays with a longest idle gap
+  /// longer than this (5 min) are dropped instead of being read as "slow".
+  static const int _levelAfkMaxGapMs = 300000;
+
+  /// Winsorization deltas for the per-play implicit level in
+  /// [computePlayerLevel]. Each `level_i` is clamped to
+  /// `[max(cplx − lower, 0), cplx + upper]` before weighting so a single
+  /// outlier play (e.g. a puzzle left open, whose duration clamps to
+  /// 10×expected) can no longer drag the rolling average to 0. The lower
+  /// bound is deliberately gentler: a novice may legitimately take long on
+  /// an easy puzzle and must not be pinned at 0. The upper bound guards
+  /// against the opposite outlier — implausibly fast plays of hard puzzles
+  /// (random tapping + luck).
+  static const int _levelWinsorLowerDelta = 30;
+  static const int _levelWinsorUpperDelta = 60;
+
+  /// Lightweight extraction of the fields the level model needs from a
+  /// puzzle line: cached complexity (field [6]), cell count (from the
+  /// dimensions at field [2]) and constraint count (field [4]). Mirrors
+  /// `PuzzleData`'s own parsing without the heavier construction (which
+  /// would also run the equilibrium profile detection). Returns null for
+  /// unparseable lines.
+  static ({int cplx, int cells, int nCons})? _playFieldsForLevel(
+    String line,
+  ) {
+    final parts = line.split('_');
+    if (parts.length <= 4) return null;
+    final dims = parts[2].split('x');
+    final w = int.tryParse(dims[0]);
+    final h = dims.length > 1 ? int.tryParse(dims[1]) : null;
+    if (w == null || h == null || w <= 0 || h <= 0) return null;
+    final cplx = parts.length > 6 ? (int.tryParse(parts[6]) ?? 0) : 0;
+    final nCons = parts[4].split(';').length;
+    return (cplx: cplx, cells: w * h, nCons: nCons);
+  }
+
+  /// Global play history for the level computation: the cached full history
+  /// ([_allStats], which preserves replays as separate rows) plus the
+  /// current session's plays that have not been flushed into [_allStats]
+  /// yet (they land there on the next `writeStats`, e.g. when the following
+  /// puzzle is handed out). Deduplicated by `(canonical key, completion
+  /// stamp)` — the same key [_mergedStatHistory] uses — so a play folded in
+  /// from the session supersedes its older on-disk snapshot instead of
+  /// double-counting it.
+  List<StatEntry> _levelHistory() {
+    String key(StatEntry e) =>
+        '${e.finished ?? "unfinished"}|${canonicalPuzzleKey(e.puzzleLine)}';
+    final byKey = <String, StatEntry>{};
+    for (final entry in _allStats) {
+      byKey[key(entry)] = entry;
+    }
+    for (final line in getStats()) {
+      final entry = StatEntry.parse(line);
+      if (entry == null) continue;
+      byKey[key(entry)] = entry;
+    }
+    return byKey.values.toList();
+  }
+
   /// Compute the player's implicit level (in `cplx` units) from recent plays.
   ///
-  /// Returns `fallback` when there are fewer than 10 usable samples — this
+  /// The sample is the **global** full play history ([_levelHistory]):
+  /// every finished, non-skipped play across all collections counts, and
+  /// replays of the same puzzle are separate samples. Entries with no
+  /// cached complexity (`cplx <= 0`) and gross-AFK plays
+  /// (`longestGapMs > 5 min`) are excluded; each `level_i` is winsorized to
+  /// `[max(cplx − 30, 0), cplx + 60]` so a single outlier play can no
+  /// longer drag the rolling average below zero.
+  ///
+  /// Returns `fallback` when there are fewer than 2 usable samples — this
   /// preserves a manually set level rather than snapping back to 0.
   int computePlayerLevel({required int fallback}) {
-    final playedPuzzles = puzzles
+    final samples = _levelHistory()
         .where(
-          (p) =>
-              p.played &&
-              p.finished != null &&
-              p.skipped == null &&
-              p.duration > 0,
+          (e) => e.finished != null && e.skipped == null && e.duration > 0,
         )
         .toList();
-    if (playedPuzzles.length < 2) {
+    if (samples.length < 2) {
       log.fine(
-        "computePlayerLevel: only ${playedPuzzles.length} usable samples, keeping stored level $fallback",
+        "computePlayerLevel: only ${samples.length} usable samples, keeping stored level $fallback",
       );
       return fallback;
     }
-    playedPuzzles.sort((a, b) => b.finished!.compareTo(a.finished!));
-    final toAnalyze = playedPuzzles.take(50).toList();
+    samples.sort((a, b) => b.finished!.compareTo(a.finished!));
+    final toAnalyze = samples.take(50).toList();
 
     double weightedSum = 0;
     double weightTotal = 0;
     for (var i = 0; i < toAnalyze.length; i++) {
-      final puz = toAnalyze[i];
-      final cells = puz.width * puz.height;
-      if (cells <= 0) continue;
-      final nCons = puz.rules.length;
-      final expected = _expectedDuration(puz.cplx, cells, puz.failures, nCons);
+      final entry = toAnalyze[i];
+      final parsed = _playFieldsForLevel(entry.puzzleLine);
+      if (parsed == null) continue;
+      final cplx = parsed.cplx;
+      final cells = parsed.cells;
+      // Entries without a cached complexity (custom / user playlists) are
+      // skipped rather than letting `level_i = −impliedCplx` drag the
+      // average to 0.
+      if (cplx <= 0) continue;
+      // Gross-AFK plays must not be counted as "very slow".
+      if (entry.longestGapMs > _levelAfkMaxGapMs) continue;
+      final nCons = parsed.nCons;
+      final expected = _expectedDuration(cplx, cells, entry.failures, nCons);
       // Clamp duration to neutralise puzzles left open for hours and to keep
       // log() finite if the timer recorded zero somehow.
-      final clampedDur = puz.duration.clamp(1, (expected * 10).round());
+      final clampedDur = entry.duration.clamp(1, (expected * 10).round());
       // Skill inversion: when the play's duration matches the expected
       // value for its `cplx`, `level_i = cplx`. Faster than expected ⇒
       // higher implicit level; slower ⇒ lower. Derived as
       //   level_i = 2·cplx − implied_cplx_for(this duration)
       // where implied_cplx is the proper inverse of `_expectedDuration`.
-      final levelI =
-          2 * puz.cplx - _impliedCplx(clampedDur, cells, puz.failures, nCons);
+      final levelI = (2 * cplx -
+              _impliedCplx(clampedDur, cells, entry.failures, nCons))
+          .clamp(
+            math.max(cplx - _levelWinsorLowerDelta, 0),
+            cplx + _levelWinsorUpperDelta,
+          )
+          .toDouble();
       // Exponential decay, half-life = 25 puzzles.
       final weight = math.pow(0.5, i / 25.0).toDouble();
       weightedSum += levelI * weight;
       weightTotal += weight;
     }
     if (weightTotal <= 0) return fallback;
-    final level = (weightedSum / weightTotal).round().clamp(0, 100);
-    log.fine("computePlayerLevel: ${toAnalyze.length} puzzles, level=$level");
+    // Floor at 0 (never negative); deliberately no upper clamp — a very fast
+    // player may exceed 100.
+    final level = math.max(0, (weightedSum / weightTotal).round());
+    log.fine("computePlayerLevel: ${toAnalyze.length} samples, level=$level");
     return level;
   }
 

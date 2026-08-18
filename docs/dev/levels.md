@@ -214,7 +214,8 @@ The six tiers tie into the adaptation system described in
   puzzles (`Database.playlistBatchSize`). `tutorial`, `custom`, and
   user playlists are not capped.
 - **Recommendation**: `Database.recommendedCollectionKey` maps
-  `playerLevel` (0..100, anchored at 50) to a tier via fixed thresholds
+  `playerLevel` (≥ 0, unbounded above, anchored at 50) to a tier via fixed
+  thresholds
   (`recommendedLevelFor` in `level.dart`), then clamps the result to one
   tier above or below the currently played playlist so the suggestion
   only ever moves the player ±1 level at a time. Surfaced as a star in
