@@ -5,6 +5,43 @@ particular, how individual deductions made by `Constraint.apply()` contribute
 to that score. The design goal is that the complexity reflects how hard a
 puzzle feels to a human player, not how hard it is for the solver.
 
+## Requirements
+
+The complexity system and the collection routing are governed by the five
+criteria below.
+
+1. Every decision made by the solver (each `CanApply` firing) carries a
+   complexity score.
+2. There is a clear correlation between a puzzle's complexity and its
+   routing into a collection.
+3. The domain size participates in the complexity computation.
+4. On a domain larger than 2, a `RemoveOption` move is more complex than
+   a `SetValue` move of the same tier.
+5. The total number of constraints is not a criterion.
+
+Status as of 2026-08-18:
+
+- **1, 3, 4 and 5 hold.** Every `SetValue`/`RemoveOption` construction
+  sets `complexity:` explicitly (verified by audit); `ruleDiversity`
+  counts distinct constraint *types*, never instances; on a domain
+  larger than 2 every propagation `RemoveOption` contributes
+  [kRemoveOptionComplexityBump] extra on top of its tier (see the
+  "Score formula" note below and `Puzzle.moveComplexity`); and the
+  score pays a flat domain term `(domain.length − 2) *
+  kDomainSizeComplexityBump` (see "Score formula"). The score is also
+  **unbounded** (no 90/100 caps) so force-heavy puzzles discriminate
+  past 100; [kUnsolvableComplexity] marks the not-deductively-solvable
+  case. A structural re-anchoring of the d3/adaptation constants
+  remains future work.
+- **2 holds statistically, not monotonically.** Spearman correlation
+  between collection index and stored cplx is ≈ 0.84 (d2) / 0.86 (d3),
+  but the `advanced`/`strong`/`expert` medians overlap and invert in
+  the 25–60 band (`recommendedLevelFor` in `level.dart` documents the
+  non-monotonicity).
+
+The sections below describe the current implementation; the gaps are
+tracked in [Future work](#future-work).
+
 ## Move.complexity
 
 Every `Move` returned by a constraint's `apply()` carries an integer
@@ -34,21 +71,91 @@ deductively solvable and the score is forced to 100.
 ```
 forceScore  = sum(move.complexity for prop moves)
             + sum(5 + 5 * move.forceDepth for force moves)
-            (clamped to 0..90)
 
-complexity  = forceScore + ruleDiversity + emptiness   (clamped 0..100)
+domainBonus = (domain.length − 2) * kDomainSizeComplexityBump
+
+complexity  = forceScore + ruleDiversity + emptiness + domainBonus
 ```
+
+**The score is unbounded** — it is a plain sum of non-negative components,
+with no effort cap and no total cap. This is deliberate (2026-08): the old
+`0..90` effort cap and `0..100` total cap flattened every force-heavy
+puzzle into the 96–100 band, destroying discrimination at the top of the
+scale. With the caps removed, real 6-mad puzzles compute to 100–230 and
+beyond, while easy/player/advanced puzzles keep their former values (they
+never reached the caps). Fixed reference points only:
+
+- **0** — the puzzle is already completely prefilled (no work left).
+- **[kUnsolvableComplexity]** (= 100, `model/puzzle.dart`) — the puzzle is
+  **not deductively solvable** (contradiction or stuck state). Since the
+  score is unbounded, a *solvable* puzzle may coincidentally also sum to
+  100; consumers needing certainty should check `Puzzle.cachedSolution ==
+  null` rather than compare scores.
 
 The `ruleDiversity` (0–4) and `emptiness` (0–6) components are unchanged.
 With this formula a puzzle solved purely by trivial saturation contributes
 0 to `forceScore` and finishes in the 0–10 band (rule diversity +
 emptiness only). A puzzle that requires repeated articulation reasoning
-or many force rounds saturates the 90-point ceiling.
+or many force rounds accumulates effort well past the old 90-point
+ceiling.
 
 The mapping `force = 5 + 5 * forceDepth` matches the previous
 implementation (`(1 + forceDepth) * 5`) so existing scores stay in the
 same neighbourhood for puzzles that were already force-heavy. The new
-contribution is the propagation tier sum, which used to be implicitly 0.
+(2026-08) contribution is the propagation tier sum, which used to be
+implicitly 0.
+
+> **Scale consequences to keep in mind.** The app surface still assumes a
+> "cplx = 0–100" mental model in two places, audited as of 2026-08:
+>
+> - **Stats dashboard** (`model/stats.dart`) buckets by cplx ranges;
+>   an explicit `101+` bucket was added for the overflow tail.
+> - **Player adaptation** (`model/database.dart`) keeps its 0–100
+>   `playerLevel` (still clamped there) but feeds `puzzle.cplx` into the
+>   duration model `exp(cplx/123.8)` and the `level_i = 2·cplx −
+>   implied(dur)` inversion. Unclamped stored cplx extrapolates that
+>   model past 100 monotonically (benign direction), **but the anchor
+>   ("mean player lands on 50") was calibrated on the old capped
+>   distribution** — after a corpus recompute the cohort mean drifts
+>   upward. Re-anchor by re-running the `bin/analyze_stats.dart`
+>   regression on the recomputed corpus and pasting fresh constants
+>   (see `adapt_to_player.md`).
+> - Collection *routing* (`classifyTrace`) is unaffected — it classifies
+>   trace *shape*, never total cplx.
+
+> **Domain size (requirement 3, implemented).** Every puzzle pays a flat
+> `(domain.length − 2) * kDomainSizeComplexityBump` (default 5) on top
+> of its score: 0 for the 2-colour baseline, +5 for 3-colour, +10 for
+> 4-colour, etc. Each extra colour doubles the option-tracking load per
+> free cell, hence the per-colour cost. The bonus is deliberately flat
+> (puzzle-level) rather than per-move, unlike the prune bump below; it is
+> added in both `computeComplexity` and `computeComplexityFromSteps`,
+> and any fully-prefilled puzzle short-circuits to 0 before it applies.
+> The constant lives in `model/cell.dart` next to
+> [kRemoveOptionComplexityBump] for one-place re-calibration. Combined
+> with the unbounded score (see above) the bonus simply lifts every
+> 3-colour puzzle's score by 5 — no ceiling effects any more.
+
+> **`RemoveOption` vs `SetValue` (requirement 4, implemented).** Every
+> *propagation* `RemoveOption` on a puzzle whose domain is larger than 2
+> contributes `Move.complexity + kRemoveOptionComplexityBump` (default
+> bump = 1) instead of its bare tier. This is correct on a 2-colour
+> domain, where a prune auto-collapses to an assignment
+> (`Cell.removeOption`, `model/cell.dart`) and the two move types are
+> semantically one — so there the bump stays 0. On a domain larger than
+> 2 a prune leaves the cell free with residual options, which a human
+> must keep tracking, hence the extra weight.
+>
+> The bump is applied in a single place — `Puzzle.moveComplexity`
+> (`model/puzzle.dart`) — which is called by `_solveEffort` (live solve
+> path) and by the `SolveStep` recorders in `solveTrace` /
+> `solveTraceAsync` (trace path). Every downstream consumer
+> (`computeComplexityFromSteps`, `classifyTrace`,
+> `sortConstraintsByDifficulty`) reads the *recorded* step complexity,
+> so hints, routing and scoring all see the same bumped value. Force
+> moves are never bumped: their weight is `5 + 5 * forceDepth` and
+> their recorded `complexity` stays 0. Covered by
+> `test/complexity_test.dart`.
 
 ## Caching and freshness
 
@@ -77,6 +184,13 @@ and commit the diff — otherwise the in-app sorter and level filter will
 keep using pre-change scores until the next corpus refresh. There is no
 in-app cache-invalidation hook tied to solver-version bumps; freshness
 is enforced at corpus-build time.
+
+> The batch trace cache (`solve_traces.tsv`, see `bin/_trace_cache.dart`)
+> stores each step's `tier` verbatim. A scoring change that alters
+> recorded step values — like the domain-aware prune bump — makes
+> cached traces stale for the *recompute* run itself. Delete
+> `solve_traces.tsv` before re-running `recompute` after such a change;
+> the cache file is gitignored and rebuilt from scratch.
 
 ## Per-constraint deduction inventory
 
@@ -294,7 +408,29 @@ and enumeration < combinatorial probing.
 
 ## Future work
 
-- Per-FM motif weighting could go finer than the 0–3 buckets above
+- **Re-calibrate the prune bump (requirement 4, default shipped).** The
+  per-prune `+1` on domain > 2 is in place via
+  [kRemoveOptionComplexityBump] (`model/cell.dart`) and applied by
+  `Puzzle.moveComplexity`. The default of 1 is a starting point: once
+  human-playtest data exists the value itself (which may end up
+  separate for plain works vs. complication tiers, or scaled by the
+  residual option count) should be re-tuned in that one constant.
+- **Re-calibrate the domain term (requirement 3, default shipped).**
+  The flat `(domain.length − 2) * kDomainSizeComplexityBump` (+5 on
+  3-colour) is implemented in `computeComplexity` /
+  `computeComplexityFromSteps`. The +5 default and the linear formula
+  are starting points; re-anchor the d3 bands against a 3-colour corpus
+  once playtest data exists (same TODO as in `third_color.md`), and
+  consider whether the term should also apply to over-prefilled
+  short-circuit cases.
+- **Monotone routing (requirement 2).** Either fold the cascade
+  dimensions (force count, max force depth, max complicity tier, max
+  prop tier) into the cplx formula so the `recommendedLevelFor`
+  thresholds become derivable, or re-derive the cascade thresholds from
+  the cplx distribution. Today the correlation is strong at the
+  extremes but the `advanced`/`strong`/`expert` medians overlap and
+  invert in the 25–60 band. See review §3 and §8.
+- **Per-FM motif weighting could go finer than the 0–3 buckets above**
   (e.g. weighting same-colour vs. mixed motifs differently inside the
   same area bucket).
 - Per-complicity weight calibration. PA+FM, GS+FM, LT+FM, SY+FM,

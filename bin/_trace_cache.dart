@@ -29,6 +29,13 @@
 //
 // The file is gitignored and is a local build artefact — delete it to force
 // a full re-solve on the next `dart run bin/recompute.dart` run.
+//
+// CAUTION: the `tier` column stores the recorded per-step complexity
+// verbatim. Any scoring change that alters recorded step values (e.g. the
+// domain-aware RemoveOption bump in `Puzzle.moveComplexity`) makes
+// existing cache entries stale — delete the file before a recompute run
+// after such a change, or the scores will be computed from pre-change
+// tiers.
 
 import 'dart:io';
 

@@ -637,11 +637,13 @@ cell), or store only the diff from the full domain.
 
 ## TODO
 
-* **Re-tune complexity scoring** for 3-colour puzzles. The scoring was
-  tuned for 2-colour traces; 3-colour traces produce more `removeOption`
-  steps that each carry a tier-0..5 complexity, so the bands
-  (`beginner` / … / `mad`) may need re-anchoring against a 3-colour
-  corpus.
+* **Re-tune complexity scoring** for 3-colour puzzles. Steps 1–2 landed
+  (2026-08): a per-prune complexity bump on domain > 2
+  (`kRemoveOptionComplexityBump`, applied by `Puzzle.moveComplexity`)
+  and a flat domain term `(domain.length − 2) * kDomainSizeComplexityBump`
+  in `computeComplexity` / `computeComplexityFromSteps` — see
+  `complexity.md`. The bands (`beginner` / … / `mad`) may still need
+  re-anchoring against a 3-colour corpus once playtest data exists.
 * **Option dots on small screens.** `_OptionDots` is not yet validated
   on a real phone < 5". Verify legibility before promoting 3-colour
   beyond opt-in; if cramped, bump the dot to 12-15 % or add a

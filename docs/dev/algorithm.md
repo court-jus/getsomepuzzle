@@ -9,7 +9,7 @@ Puzzles are stored as single-line strings:
 ```
 v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 │   │  │   │         │                    │   │
-│   │  │   │         │                    │   └─ complexity (0-100)
+│   │  │   │         │                    │   └─ complexity (unbounded)
 │   │  │   │         │                    └─ solutions (unused, always 0:0)
 │   │  │   │         └─ constraints (semicolon-separated)
 │   │  │   └─ cell values (0=empty, 1=black, 2=white)
@@ -210,16 +210,20 @@ in the earlier trace.
 
 ## Complexity Scoring
 
-Complexity measures how hard a puzzle is to solve, on a scale of 0 to 100.
-The detailed per-constraint weight table and the current formula are
-documented in `docs/dev/complexity.md`. The summary is:
+Complexity measures how hard a puzzle is to solve. The score is an
+**unbounded** sum of non-negative components (force-heavy puzzles exceed
+100); fixed points are 0 (already solved) and `kUnsolvableComplexity`
+(not deductively solvable). The detailed per-constraint weight table and
+the current formula are documented in `docs/dev/complexity.md`. The
+summary is:
 
 ```
-complexity = forceScore + ruleDiversity + emptiness   (clamped 0..100)
+complexity = forceScore + ruleDiversity + emptiness + domainBonus
 
 forceScore  = sum(move.complexity for propagation moves)
             + sum(5 + 5 * move.forceDepth for force moves)
-            (clamped to 0..90)
+
+domainBonus = (domain.length − 2) * kDomainSizeComplexityBump
 ```
 
 `move.complexity` is a 0–5 weight assigned by each constraint's `apply()`

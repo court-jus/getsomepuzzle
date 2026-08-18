@@ -13,6 +13,20 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/rotation.dart';
 
+/// Sentintel complexity value assigned by [Puzzle.computeComplexity] /
+/// [Puzzle.computeComplexityFromSteps] when the puzzle is **not
+/// deductively solvable** (contradiction, or a stuck state that only
+/// backtracking could finish).
+///
+/// The score itself is unbounded (deliberately — see [Puzzle.computeComplexity]),
+/// so this is a marker, not a cap: a *solvable* puzzle may coincidentally
+/// also sum to 100. Consumers needing certainty about solvability should
+/// check `Puzzle.cachedSolution == null` rather than compare scores. It is
+/// kept small (rather than `int.max`) because it lands in the v2 line's
+/// field [6] and feeds the duration model in `database.dart`, which must
+/// stay finite.
+const int kUnsolvableComplexity = 100;
+
 /// Outcome of [Puzzle.simplify]. Mirrors the `(success, level, count)`
 /// trio the easing loop needs to decide whether to emit or drop, plus
 /// the puzzle's solve trace **at the final state** so the caller can
@@ -1157,19 +1171,33 @@ class Puzzle {
     }
   }
 
-  /// Compute puzzle complexity on a 0-100 scale.
+  /// Compute puzzle complexity. **Unbounded above** — the score is a sum of
+  /// non-negative components (see below), so it can exceed 100 for
+  /// force-heavy puzzles; the only fixed reference points are 0 (already
+  /// solved) and [kUnsolvableComplexity] (not deductively solvable).
   ///
-  /// Three components:
-  /// - **Effort** (0-90): sum of per-move weights along the deduction chain.
-  ///   A propagation move contributes `Move.complexity` (0-5 tier; see
-  ///   docs/dev/complexity.md for the per-deduction inventory). A force
-  ///   move contributes `5 + 5 * forceDepth`, matching the pre-existing
-  ///   `(1 + depth) * 5` scaling so old scores stay in the same band. 100
-  ///   if the puzzle isn't deductively solvable at all.
+  /// Components:
+  /// - **Effort** (uncapped): sum of per-move weights along the deduction
+  ///   chain. A propagation move contributes `Move.complexity` (0-5 tier;
+  ///   see docs/dev/complexity.md for the per-deduction inventory) — and on
+  ///   a domain larger than 2 every propagation `RemoveOption` adds
+  ///   `kRemoveOptionComplexityBump` on top (see [moveComplexity]). A
+  ///   force move contributes `5 + 5 * forceDepth`, matching the
+  ///   pre-existing `(1 + depth) * 5` scaling so old scores stay in the
+  ///   same band.
   /// - **Rule diversity** (0-4): number of distinct constraint types.
   ///   1 type=0, 2=1, 3=2, 4-5=3, 6+=4.
   /// - **Emptiness** (0-6): proportion of free cells.
   ///   Fully empty=6, 50% filled=3, fully filled=0.
+  /// - **Domain size** (0-…): `(domain.length - 2) *
+  ///   kDomainSizeComplexityBump` — 0 for the 2-colour baseline, +5 per
+  ///   extra colour (3-colour puzzles pay +5, 4-colour +10, …).
+  ///
+  /// Reaching [kUnsolvableComplexity] means the puzzle can't be finished by
+  /// deduction (contradiction or stuck state). Note that since the score is
+  /// unbounded, a *solvable* puzzle may coincidentally also sum to that
+  /// value — consumers needing certainty about solvability should check
+  /// `cachedSolution == null` instead of comparing scores.
   int computeComplexity({bool force = false}) {
     if (!force && cachedComplexity != null) return cachedComplexity!;
 
@@ -1203,18 +1231,20 @@ class Puzzle {
     // Emptiness: ratio of free cells, scaled to 0-6
     final emptiness = (totalFree / size * 6).round();
 
+    // Domain size: flat bonus per extra colour past the 2-colour baseline.
+    final domainBonus = (domain.length - 2) * kDomainSizeComplexityBump;
+
     // Effort: weight of the deduction trace. A contradiction or a state that
     // can't be finished by deduction → puzzle isn't deductively solvable →
-    // complexity 100.
+    // the unsolvable sentinel.
     final trace = _solveEffort();
     if (trace.solved == null) {
-      cachedComplexity = 100;
-      return 100;
+      cachedComplexity = kUnsolvableComplexity;
+      return kUnsolvableComplexity;
     }
 
     cachedSolution = trace.solved;
-    final forceScore = trace.effort.clamp(0, 90);
-    cachedComplexity = (forceScore + ruleDiversity + emptiness).clamp(0, 100);
+    cachedComplexity = trace.effort + ruleDiversity + emptiness + domainBonus;
     return cachedComplexity!;
   }
 
@@ -1250,7 +1280,7 @@ class Puzzle {
     }
 
     if (failed || !test.complete) {
-      cachedComplexity = 100;
+      cachedComplexity = kUnsolvableComplexity;
       return;
     }
     cachedSolution = test.cellValues;
@@ -1290,11 +1320,36 @@ class Puzzle {
     }
 
     final emptiness = (totalFree / size * 6).round();
-    cachedComplexity = (effort.clamp(0, 90) + ruleDiversity + emptiness).clamp(
-      0,
-      100,
-    );
+    // Domain size: flat bonus per extra colour past the 2-colour baseline —
+    // same formula as computeComplexity.
+    final domainBonus = (domain.length - 2) * kDomainSizeComplexityBump;
+    // Unbounded total, matching computeComplexity: the score is a plain
+    // sum of non-negative components (no 90/100 caps).
+    cachedComplexity = effort + ruleDiversity + emptiness + domainBonus;
   }
+
+  /// Player-effort weight of [m] as it feeds into the complexity score and
+  /// the solve trace.
+  ///
+  /// Baseline is `Move.complexity` (the 0–5 tier set by the emitting
+  /// constraint). On a puzzle whose declared domain is larger than 2, a
+  /// *propagation* `RemoveOption` adds [kRemoveOptionComplexityBump] on
+  /// top: a prune leaves the cell free with residual options, which is
+  /// harder for a human to track than a completed assignment (see the
+  /// constant's doc). Force moves are never bumped — their weight is
+  /// `5 + 5 * forceDepth` (derived from [Move.forceDepth]) and their
+  /// `complexity` field stays 0 by construction.
+  ///
+  /// This is the single place that applies the domain-aware prune bump:
+  /// `_solveEffort` (the live solve path) and the `SolveStep` recorders
+  /// (the trace path used by `computeComplexityFromSteps`,
+  /// `classifyTrace` and `sortConstraintsByDifficulty`) all call it, so
+  /// every consumer sees the same value.
+  int moveComplexity(Move m) => switch (m) {
+    RemoveOption(:final isForce) when !isForce && domain.length > 2 =>
+      m.complexity + kRemoveOptionComplexityBump,
+    _ => m.complexity,
+  };
 
   /// Solve a clone with `findAMove` (propagation + force) and accumulate the
   /// player-effort weight of every step: propagation moves carry the 0-5
@@ -1325,19 +1380,18 @@ class Puzzle {
         case RemoveOption(
           :final idx,
           :final option,
-          :final complexity,
           :final isForce,
           :final forceDepth,
         ):
           if (!test.removeOption(idx, option)) break solveLoop;
-          effort += isForce ? (5 + 5 * forceDepth) : complexity;
+          effort += isForce ? (5 + 5 * forceDepth) : test.moveComplexity(m);
       }
       if (test.complete) break;
       // Drain the same constraint on the clone.
       if (!test._drainAfter(
         m.givenBy,
         onEach: (n) {
-          effort += n.complexity;
+          effort += test.moveComplexity(n);
         },
       )) {
         return (effort: effort, solved: null);
@@ -1418,7 +1472,6 @@ class Puzzle {
         case RemoveOption(
           :final idx,
           :final option,
-          :final complexity,
           :final isForce,
           :final forceDepth,
         ):
@@ -1430,7 +1483,7 @@ class Puzzle {
               constraint: isForce ? '' : m.givenBy.serialize(),
               method: isForce ? SolveMethod.force : SolveMethod.propagation,
               forceDepth: isForce ? forceDepth : 0,
-              complexity: isForce ? 0 : complexity,
+              complexity: isForce ? 0 : test.moveComplexity(m),
               isComplicity: !isForce && m.givenBy is Complicity,
             ),
           );
@@ -1443,18 +1496,18 @@ class Puzzle {
         m.givenBy,
         onEach: (n) {
           switch (n) {
-            case SetValue(:final idx, :final value, :final complexity):
+            case SetValue(:final idx, :final value):
               steps.add(
                 SetValueStep(
                   cellIdx: idx,
                   value: value,
                   constraint: n.givenBy.serialize(),
                   method: SolveMethod.propagation,
-                  complexity: complexity,
+                  complexity: test.moveComplexity(n),
                   isComplicity: n.givenBy is Complicity,
                 ),
               );
-            case RemoveOption(:final idx, :final option, :final complexity):
+            case RemoveOption(:final idx, :final option):
               steps.add(
                 RemoveOptionStep(
                   cellIdx: idx,
@@ -1462,7 +1515,7 @@ class Puzzle {
                   constraint: n.givenBy.serialize(),
                   method: SolveMethod.propagation,
                   forceDepth: 0,
-                  complexity: complexity,
+                  complexity: test.moveComplexity(n),
                   isComplicity: n.givenBy is Complicity,
                 ),
               );
@@ -1548,7 +1601,6 @@ class Puzzle {
         case RemoveOption(
           :final idx,
           :final option,
-          :final complexity,
           :final isForce,
           :final forceDepth,
         ):
@@ -1560,7 +1612,7 @@ class Puzzle {
               constraint: isForce ? '' : m.givenBy.serialize(),
               method: isForce ? SolveMethod.force : SolveMethod.propagation,
               forceDepth: isForce ? forceDepth : 0,
-              complexity: isForce ? 0 : complexity,
+              complexity: isForce ? 0 : test.moveComplexity(m),
               isComplicity: !isForce && m.givenBy is Complicity,
             ),
           );
@@ -1572,18 +1624,18 @@ class Puzzle {
         m.givenBy,
         onEach: (n) {
           switch (n) {
-            case SetValue(:final idx, :final value, :final complexity):
+            case SetValue(:final idx, :final value):
               steps.add(
                 SetValueStep(
                   cellIdx: idx,
                   value: value,
                   constraint: n.givenBy.serialize(),
                   method: SolveMethod.propagation,
-                  complexity: complexity,
+                  complexity: test.moveComplexity(n),
                   isComplicity: n.givenBy is Complicity,
                 ),
               );
-            case RemoveOption(:final idx, :final option, :final complexity):
+            case RemoveOption(:final idx, :final option):
               steps.add(
                 RemoveOptionStep(
                   cellIdx: idx,
@@ -1591,7 +1643,7 @@ class Puzzle {
                   constraint: n.givenBy.serialize(),
                   method: SolveMethod.propagation,
                   forceDepth: 0,
-                  complexity: complexity,
+                  complexity: test.moveComplexity(n),
                   isComplicity: n.givenBy is Complicity,
                 ),
               );

@@ -6,8 +6,9 @@ ahead of that level, nudging them upward while keeping the pace comfortable.
 
 ## Overview
 
-- **Player level** is an integer in the same scale as puzzle `cplx` (0–100).
-  It is either set manually with the slider in the settings, or computed
+- **Player level** is an integer on a 0–100 skill scale calibrated in
+  puzzle-`cplx` units (see "Scale" below). It is either set manually with
+  the slider in the settings, or computed
   automatically from the last plays (toggle `autoLevel`, `true` by default).
 - **Puzzle selection** weights the entire filtered catalog by a Gaussian
   centred on the player level (default `σ=5`). Every puzzle has a
@@ -35,6 +36,19 @@ The unit is still puzzle-`cplx`-compatible: the puzzle selector compares
 `level` against `cplx` directly via the Gaussian weighting (see below).
 But the absolute number `42` no longer means "performs like a `cplx=42`
 solver" — it means "42 in the centred-on-50 skill scale".
+
+> **`cplx` is unbounded (since 2026-08).** Puzzle complexity is no longer
+> capped at 100 — force-heavy 6-mad puzzles compute to 100–230 (see
+> `complexity.md`). `playerLevel` remains a clamped 0–100 skill scale,
+> and the Gaussian targeting uses cplx *differences*, so matching still
+> behaves. The one place that must be revisited on the next corpus
+> recompute is the **anchor**: the duration model
+> (`expectedDuration ≈ 3.31 · cells^0.515 · exp(cplx/123.8)` in
+> `database.dart`) and the `intercept + observed-speed` anchor were
+> calibrated on the old capped distribution. After stored cplx values are
+> refreshed, re-run `bin/analyze_stats.dart` on the recomputed corpus
+> and paste the fresh constants (the current constants in `database.dart`
+> already supersede the ones printed in this file's example below).
 
 ### Expected duration
 
@@ -67,12 +81,11 @@ expectedDuration(cplx, cells, failures, n_constraints)
   formula intentionally over-predicts the cohort's durations, because
   we want a "matches the cohort" pace to read as middle-of-the-bar,
   not bottom-of-the-bar.
-- No artificial clamp on `cplx`. Puzzles with `cplx=100` (the legacy
-  "non-deductively-solvable" bucket) are no longer emitted by the
-  generator; they may survive in legacy corpus files (the built-in
-  collection is now split across `assets/1-easy.txt` through
-  `assets/6-mad.txt`, plus `overfilled.txt` and `undetermined.txt`)
-  but no longer bias the calibration once recomputed.
+- No artificial clamp on the model input: puzzle `cplx` is unbounded
+  since 2026-08 (see the note under "Scale"). The legacy
+  `cplx=100` "non-deductively-solvable" bucket is no longer emitted by
+  the generator; it may survive in legacy corpus files but no longer
+  biases the calibration once recomputed.
 
 This model sits inside `Database` as `_expectedDuration` and is not exposed:
 nothing outside the level computation needs it. The companion

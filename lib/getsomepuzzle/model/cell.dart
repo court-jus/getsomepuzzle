@@ -242,6 +242,40 @@ final class SetValue extends Move {
   }) : super._();
 }
 
+/// Extra player-effort weight added to a *propagation* `RemoveOption` move
+/// on puzzles whose declared domain is larger than 2.
+///
+/// On a 2-colour domain a prune is semantically an assignment
+/// (`Cell.removeOption` collapses to the lone surviving option), so
+/// weighting it exactly like a `SetValue` is correct. On 3+ colours a
+/// prune leaves the cell free with residual options — strictly harder for
+/// a human to track than a completed cell — so every `RemoveOption`
+/// contributes this many extra points on top of its tier (requirement 4
+/// of the 2026-08 complexity review,
+/// `docs/review_complexity_202608.md`).
+///
+/// Kept as a named constant so a future calibration pass can change the
+/// default in a single place. The bump is applied by
+/// `Puzzle.moveComplexity` (see `model/puzzle.dart`).
+const int kRemoveOptionComplexityBump = 1;
+
+/// Flat complexity bonus added to a puzzle's score as a function of its
+/// declared domain size: `(domain.length - 2) * kDomainSizeComplexityBump`.
+///
+/// On a 2-colour domain this is 0 (the shipped baseline). Every additional
+/// colour doubles the option-tracking load per free cell, so each extra
+/// colour past the second adds this many points to the puzzle's overall
+/// complexity (requirement 3 of the 2026-08 complexity review,
+/// `docs/review_complexity_202608.md`). E.g. a 3-colour puzzle pays +5, a
+/// 4-colour puzzle +10 — kept as a named constant so a future calibration
+/// pass can re-tune the per-colour cost in a single place.
+///
+/// Applied as a flat additive term in `Puzzle.computeComplexity` and
+/// `Puzzle.computeComplexityFromSteps` (see `model/puzzle.dart`); it is
+/// deliberately *not* per-move — unlike [kRemoveOptionComplexityBump],
+/// which scales with the number of prunes in a trace.
+const int kDomainSizeComplexityBump = 5;
+
 /// Prune colour [option] from the still-free cell [idx]. Issued either by
 /// ordinary propagation (with a [complexity] tier) or by forced deduction
 /// ([isForce] true), in which case [forceDepth] is the length of the

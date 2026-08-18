@@ -105,7 +105,7 @@ class Record {
   final String canonicalKey;
   final int w;
   final int h;
-  final int complexity; // cached cplx 0-100, -1 if absent
+  final int complexity; // cached cplx, unbounded (see complexity.md), -1 if absent
   final bool isSh2x2;
   final Features f;
   final List<CellValue> solution; // row-major solved grid

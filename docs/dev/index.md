@@ -26,8 +26,9 @@ read the relevant page before touching the corresponding subsystem.
 
 ## Solving & reasoning
 
-- [`complexity.md`](complexity.md) — Complexity scoring (0–100):
-  per-constraint weights, force-step contribution, diversity bonus.
+- [`complexity.md`](complexity.md) — Complexity scoring (unbounded,
+  formerly 0–100): per-constraint weights, force-step contribution,
+  diversity/emptiness/domain bonuses.
 - [`levels.md`](levels.md) — Six-tier ranking (Beginner → Mad) built
   from the type of reasoning required.
 - [`hints.md`](hints.md) — The two hint modes

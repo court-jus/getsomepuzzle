@@ -332,10 +332,12 @@ class StatsDashboard {
     if (cplx <= 40) return '21-40';
     if (cplx <= 60) return '41-60';
     if (cplx <= 80) return '61-80';
-    return '81-100';
+    if (cplx <= 100) return '81-100';
+    // Complexity is unbounded; hard puzzles pile up past 100.
+    return '101+';
   }
 
-  static const _allBuckets = ['0-20', '21-40', '41-60', '61-80', '81-100'];
+  static const _allBuckets = ['0-20', '21-40', '41-60', '61-80', '81-100', '101+'];
 }
 
 class _BucketAccumulator {

@@ -11,7 +11,8 @@
 //   prefill_ratio, n_constraints, n_distinct_types
 //
 // Cached metadata block (cheap):
-//   complexity (cached cplx 0-100), level (0..7 from classifyTrace)
+//   complexity (cached cplx, unbounded — see docs/dev/complexity.md),
+//   level (0..7 from classifyTrace)
 //
 // Trace summary block (one solveExplained() per puzzle, ~20-50ms):
 //   n_prop_moves, n_force_rounds, max_force_depth, n_total_steps,
