@@ -41,15 +41,16 @@ solver" — it means "42 in the centred-on-50 skill scale".
 > capped at 100 — force-heavy 6-mad puzzles compute to 100–230 (see
 > `complexity.md`). `playerLevel` is **≥ 0 with no upper clamp** (a very
 > fast player may exceed 100), and the Gaussian targeting uses cplx
-> *differences*, so matching still behaves. The one place that must be
-> revisited on the next corpus recompute is the **anchor**: the duration
-> model
-> (`expectedDuration ≈ 3.31 · cells^0.515 · exp(cplx/123.8)` in
-> `database.dart`) and the `intercept + observed-speed` anchor were
-> calibrated on the old capped distribution. After stored cplx values are
-> refreshed, re-run `bin/analyze_stats.dart` on the recomputed corpus
-> and paste the fresh constants (the current constants in `database.dart`
-> already supersede the ones printed in this file's example below).
+> *differences*, so matching still behaves.
+>
+> **The duration-model anchor was re-calibrated on 2026-08-19**, after
+> the corpus recompute. Re-running `bin/analyze_stats.dart
+> --recompute-cplx` on the refreshed corpus showed the old constants
+> (`3.31 · cells^0.515 · exp(cplx/123.8)` — calibrated on the *capped*
+> distribution) pinned 56 % of plays at level 0/100. The current model is
+> `4.8834 · cells^0.3437 · exp(cplx/59.39) · 1.1943^failures ·
+> 1.0614^n_cons` (R² = 0.621, MAPE = 46 %), anchored so the cohort mean
+> lands on 50 (see the "Expected duration" section below).
 
 ### Expected duration
 
@@ -57,31 +58,38 @@ The core model is OLS-fit on real plays:
 
 ```
 expectedDuration(cplx, cells, failures, n_constraints)
-    ≈ 8.62 · cells^0.442 · exp(cplx / 27.3)
-         · 1.145^failures · 1.085^n_constraints      (R²=0.70, MAPE=29%)
+    ≈ 4.8834 · cells^0.3437 · exp(cplx / 59.39)
+         · 1.1943^failures · 1.0614^n_constraints      (R²=0.621, MAPE=46%)
 ```
 
 - `cells = width · height` — duration grows sub-linearly with the grid
-  (exponent 0.442): a fraction of the cells in larger grids are "obvious"
-  and cost little.
-- `cplx` slope of `1/27.3` — much steeper than the previous `1/74`
-  estimate. Once `n_constraints` is in the model, cplx and constraint
-  count untangle and `cplx` carries a stronger marginal signal.
-- `1.145^failures` penalises wrong-click episodes. Mild on purpose:
+  (exponent 0.344): a fraction of the cells in larger grids are "obvious"
+  and cost little. The exponent dropped from 0.515 in the previous fit
+  once the recomputed cplx — which now carries part of the grid-size
+  signal — entered the model.
+- `cplx` slope of `1/59.4` — the current value after the 2026-08 corpus
+  recompute. Unclamping the score restored discrimination at the top
+  end, so each cplx point now maps to a steeper duration increase than
+  under the old capped constants (`1/123.8`). The reference fit without
+  `n_constraints` is even steeper (`1/48.7`), because high-cplx puzzles
+  tend to carry more constraints; once constraint count is in the model,
+  cplx and constraint count untangle.
+- `1.1943^failures` penalises wrong-click episodes. Mild on purpose:
   ~84 % of plays have zero failures, so the multiplier is fit to the
   cases where there *are* failures; aggressive multipliers (1.65) have
   always overcorrected.
-- **`1.085^n_constraints`** captures parsing/setup cost, new in
-  v1.6.1. A 4×4 grid with 12 constraints takes meaningfully longer
-  than the same grid with 3, even at identical `cplx`. Adding the term
-  lifts R² from 0.61 to 0.70 on the calibration cohort.
-- The intercept (`8.62 = exp(2.155)`) is **anchored**: it is shifted
-  from the OLS-minimum-MSE intercept by `+1.50` so the cohort's mean
-  `level_i` lands on **50** instead of on the cohort's mean `cplx`.
-  This is a deliberate shift in interpretation, not a fit error: the
-  formula intentionally over-predicts the cohort's durations, because
-  we want a "matches the cohort" pace to read as middle-of-the-bar,
-  not bottom-of-the-bar.
+- **`1.0614^n_constraints`** captures parsing/setup cost, folded into
+  the model since v1.6.1. A 4×4 grid with 12 constraints takes
+  meaningfully longer than the same grid with 3, even at identical
+  `cplx`. Adding the term lifts R² from 0.566 to 0.621 on the
+  recomputed corpus.
+- The intercept (`4.8834 = exp(1.586)`) is **anchored**: it is shifted
+  from the OLS-minimum-MSE intercept by `+0.2399` (in log space) so the
+  cohort's mean `level_i` lands on **50** instead of on the cohort's
+  mean `cplx` (≈ 35.75 on the recomputed corpus). This is a deliberate
+  shift in interpretation, not a fit error: the formula intentionally
+  over-predicts the cohort's durations, because we want a "matches the
+  cohort" pace to read as middle-of-the-bar, not bottom-of-the-bar.
 - No artificial clamp on the model input: puzzle `cplx` is unbounded
   since 2026-08 (see the note under "Scale"). The legacy
   `cplx=100` "non-deductively-solvable" bucket is no longer emitted by
@@ -98,13 +106,14 @@ inverse, used by the level computation below.
 `Database.computePlayerLevel({required int fallback})` uses a skill
 inversion: faster than expected ⇒ implicit level above `cplx`; slower ⇒
 below. The intercept anchor on the duration model shifts the output up
-by ~41 cplx-units so the cohort centres on 50.
+by ~14 cplx-units so the cohort centres on 50 (the cohort's mean cplx
+on the recomputed corpus is ≈ 35.75).
 
 ```
 level_i = 2 · cplx_i − impliedCplx(duration_i, cells_i, failures_i, n_cons_i)
-       where impliedCplx(d, c, f, n) = 27.3 · ( log(d) − log(8.62)
-                                            − 0.442·log(c)
-                                            − 0.135·f − 0.082·n )
+       where impliedCplx(d, c, f, n) = 59.39 · ( log(d) − log(4.8834)
+                                            − 0.3437·log(c)
+                                            − 0.1775·f − 0.0596·n )
 ```
 
 When a play's duration matches the (anchored) expected duration for its
@@ -365,12 +374,13 @@ from earlier formulas that are not directly comparable):
 dart run bin/analyze_stats.dart --recompute-cplx stats/
 ```
 
-Current model and its immediate predecessor on the recomputed dataset:
+Current model and its predecessors on the recomputed dataset:
 
 | Formula | R² | MAPE | Notes |
 |---|---:|---:|---|
 | `1.4·cells^0.85·exp(cplx/74)·1.29^f` | 0.44 | 59 % | pre-1.6.1 (no `n_constraints`, OLS-minimum intercept) |
-| **`8.62·cells^0.442·exp(cplx/27.3)·1.145^f·1.085^n_cons`** | **0.70** | **29 %** | **current (1.6.1+, anchored at level 50)** |
+| `8.62·cells^0.442·exp(cplx/27.3)·1.145^f·1.085^n_cons` | 0.70 | 29 % | v1.6.1 (stale AFK-tolerant cleaning, capped cplx) |
+| **`4.8834·cells^0.3437·exp(cplx/59.39)·1.1943^f·1.0614^n_cons`** | **0.621** | **46 %** | **current (2026-08 re-anchor on recomputed, unclamped corpus)** |
 
 Three things changed in the v1.6.1 refit:
 
@@ -390,11 +400,23 @@ Three things changed in the v1.6.1 refit:
   `n_constraints` separated out, failures stop double-counting the
   parsing cost of busy puzzles.
 
-Per-play noise is still substantial — per-play std of `level_i` ≈ 13 on
-the cohort, so the rolling average over 50 plays (half-life 25) is what
-gives a stable reading. R² of 0.70 means ~30 % of variance is
-irreducible with this feature set; richer instrumentation (per-cell
-timestamps, per-constraint durations) would be needed to push further.
+In **2026-08** the complexity formula changed (unbounded score, domain
+term, per-prune bump — see `complexity.md`) and the corpus was
+recomputed. The re-anchor above refits the model on that recomputed
+corpus: the previously-capped cplx values spread out (mean cplx rose to
+≈ 35.75), and the old constants would have pinned 56 % of plays at
+level 0/100. The new anchor restores the cohort mean to 50. R² is
+slightly below the v1.6.1 number because the current cleaning
+(`longestGapMs ≤ 30 s`) deliberately stops fitting the AFK tail — what
+we lose in residual variance we gain in not pretending high-cplx
+puzzles take half an hour.
+
+Per-play noise is still substantial — the within-cplx-bucket std of
+`level_i` is ≈ 23–39 across buckets on the recomputed corpus, so the
+rolling average over 50 plays (half-life 25) is what gives a stable
+reading. R² of 0.62 means ~38 % of variance is irreducible with this
+feature set; richer instrumentation (per-cell timestamps, per-constraint
+durations) would be needed to push further.
 
 ## Hints and future refinements
 

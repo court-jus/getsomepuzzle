@@ -120,11 +120,11 @@ Play? parsePlay(String line) {
 // Must mirror `Database._expectedDuration` in
 // `lib/getsomepuzzle/model/database.dart`. Anchored so the calibration
 // corpus's mean `level_i` lands at 50.
-const double _kBase = 3.3108;
-const double _kCellsExp = 0.5146;
-const double _kCplxScale = 123.82;
-const double _kFailMul = 1.1627;
-const double _kNConsMul = 1.1069;
+const double _kBase = 4.8834;
+const double _kCellsExp = 0.3437;
+const double _kCplxScale = 59.39;
+const double _kFailMul = 1.1943;
+const double _kNConsMul = 1.0614;
 
 double expectedProd(int cplx, int cells, int failures, int nConstraints) {
   return _kBase *

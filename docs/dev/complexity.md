@@ -31,8 +31,10 @@ Status as of 2026-08-18:
   kDomainSizeComplexityBump` (see "Score formula"). The score is also
   **unbounded** (no 90/100 caps) so force-heavy puzzles discriminate
   past 100; [kUnsolvableComplexity] marks the not-deductively-solvable
-  case. A structural re-anchoring of the d3/adaptation constants
-  remains future work.
+  case. The d3 complexity bands still await human playtest data
+  (see `third_color.md`); the **adaptation anchor was re-calibrated**
+  on the recomputed corpus on 2026-08-19 (see the "Scale consequences"
+  note below).
 - **2 holds statistically, not monotonically.** Spearman correlation
   between collection index and stored cplx is ≈ 0.84 (d2) / 0.86 (d3),
   but the `advanced`/`strong`/`expert` medians overlap and invert in
@@ -112,14 +114,17 @@ implicitly 0.
 >   an explicit `101+` bucket was added for the overflow tail.
 > - **Player adaptation** (`model/database.dart`) keeps its 0–100
 >   `playerLevel` (still clamped there) but feeds `puzzle.cplx` into the
->   duration model `exp(cplx/123.8)` and the `level_i = 2·cplx −
->   implied(dur)` inversion. Unclamped stored cplx extrapolates that
->   model past 100 monotonically (benign direction), **but the anchor
->   ("mean player lands on 50") was calibrated on the old capped
->   distribution** — after a corpus recompute the cohort mean drifts
->   upward. Re-anchor by re-running the `bin/analyze_stats.dart`
->   regression on the recomputed corpus and pasting fresh constants
->   (see `adapt_to_player.md`).
+>   duration model `exp(cplx/59.4)` and the `level_i = 2·cplx −
+>   implied(dur)` inversion.
+>
+> **The adaptation anchor was re-calibrated on 2026-08-19.** The old
+> duration-model constants (`exp(cplx/123.8)`, calibrated on the capped
+> distribution) were stale after the corpus recompute: with the
+> recomputed, unclamped cplx they pinned 56 % of plays at level 0/100
+> (mean level 88). Fresh constants were obtained by re-running
+> `bin/analyze_stats.dart --recompute-cplx` on the recomputed corpus and
+> pasting the anchored block it prints (now `exp(cplx/59.4)`, R² = 0.621,
+> MAPE = 46 % — see `adapt_to_player.md`).
 > - Collection *routing* (`classifyTrace`) is unaffected — it classifies
 >   trace *shape*, never total cplx.
 

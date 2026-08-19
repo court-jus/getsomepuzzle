@@ -337,7 +337,14 @@ class StatsDashboard {
     return '101+';
   }
 
-  static const _allBuckets = ['0-20', '21-40', '41-60', '61-80', '81-100', '101+'];
+  static const _allBuckets = [
+    '0-20',
+    '21-40',
+    '41-60',
+    '61-80',
+    '81-100',
+    '101+',
+  ];
 }
 
 class _BucketAccumulator {

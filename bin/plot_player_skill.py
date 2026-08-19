@@ -44,12 +44,13 @@ from datetime import datetime
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
-# Constants mirror lib/getsomepuzzle/model/database.dart (v1.6.1+ fit).
-K_BASE = 3.3108
-K_CELLS_EXP = 0.5146
-K_CPLX_SCALE = 123.82
-K_FAIL_MUL = 1.1627
-K_NCONS_MUL = 1.1069
+# Constants mirror lib/getsomepuzzle/model/database.dart (2026-08 re-anchor
+# on the recomputed, unclamped cplx corpus).
+K_BASE = 4.8834
+K_CELLS_EXP = 0.3437
+K_CPLX_SCALE = 59.39
+K_FAIL_MUL = 1.1943
+K_NCONS_MUL = 1.0614
 
 LEVEL_FILES = [
     # Loaded in this order; later entries override earlier ones, so a

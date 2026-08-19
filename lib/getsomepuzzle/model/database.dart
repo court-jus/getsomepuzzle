@@ -1944,25 +1944,28 @@ class Database {
   /// slower below. This places the "average" right in the middle of
   /// [0, 100] instead of bunching at the low end.
   ///
-  /// **Why these constants and not the previous ones (8.62, 27.3, …)**:
-  /// the earlier fit used an AFK-tolerant outlier rule (cap at 1800 s but
-  /// no idle-gap filter), which let plays with multi-minute idle gaps
-  /// inflate the `exp(cplx/27.3)` slope to absurd levels (predicted
-  /// duration ~30 min for cplx=80, ~1.6 h for cplx=100 8×8). Refiltering
-  /// on `longestGapMs ≤ 30 s` flattens the cplx slope to its true
-  /// behaviour on the data. The new R²/MAPE are slightly worse than the
-  /// stale model's because we deliberately stop fitting the AFK tail —
-  /// what we lose in residual variance we gain in not pretending high-cplx
-  /// puzzles take half an hour.
+  /// **Why these constants and not the previous ones (3.3108, 123.82, …)**:
+  /// the previous set was calibrated on the *capped* cplx distribution
+  /// (effort cap 90, total cap 100). The 2026-08 formula change —
+  /// unbounded score, `(domain−2)·5` domain term, `+1` prune bump on
+  /// domains > 2 — recomputed the corpus with a wider, domain-aware cplx
+  /// scale (mean cplx on the calibration corpus rose to ~35.75). Under
+  /// the old constants every recomputed play then read as max level
+  /// (56 % saturated at 0/100, mean level 88). The current set is the OLS
+  /// refit on the recomputed corpus (same `longestGapMs ≤ 30 s` AFK
+  /// rule), with the intercept shifted by +0.2399 so the cohort mean
+  /// lands on 50 again. The steeper `exp(cplx/59.4)` slope reflects the
+  /// unclamped scale restoring discrimination at the top end: R² = 0.621,
+  /// MAPE = 46 % on the recomputed corpus.
   ///
   /// See `bin/analyze_stats.dart` for the regression tool (it both
   /// applies the same cleaning and prints anchored constants ready to
   /// paste back here).
-  static const _kBase = 3.3108;
-  static const _kCellsExp = 0.5146;
-  static const _kCplxScale = 123.82;
-  static const _kFailMul = 1.1627;
-  static const _kNConsMul = 1.1069;
+  static const _kBase = 4.8834;
+  static const _kCellsExp = 0.3437;
+  static const _kCplxScale = 59.39;
+  static const _kFailMul = 1.1943;
+  static const _kNConsMul = 1.0614;
 
   static double _expectedDuration(
     int cplx,
@@ -2016,9 +2019,7 @@ class Database {
   /// `PuzzleData`'s own parsing without the heavier construction (which
   /// would also run the equilibrium profile detection). Returns null for
   /// unparseable lines.
-  static ({int cplx, int cells, int nCons})? _playFieldsForLevel(
-    String line,
-  ) {
+  static ({int cplx, int cells, int nCons})? _playFieldsForLevel(String line) {
     final parts = line.split('_');
     if (parts.length <= 4) return null;
     final dims = parts[2].split('x');
@@ -2067,9 +2068,7 @@ class Database {
   /// preserves a manually set level rather than snapping back to 0.
   int computePlayerLevel({required int fallback}) {
     final samples = _levelHistory()
-        .where(
-          (e) => e.finished != null && e.skipped == null && e.duration > 0,
-        )
+        .where((e) => e.finished != null && e.skipped == null && e.duration > 0)
         .toList();
     if (samples.length < 2) {
       log.fine(
@@ -2104,13 +2103,13 @@ class Database {
       // higher implicit level; slower ⇒ lower. Derived as
       //   level_i = 2·cplx − implied_cplx_for(this duration)
       // where implied_cplx is the proper inverse of `_expectedDuration`.
-      final levelI = (2 * cplx -
-              _impliedCplx(clampedDur, cells, entry.failures, nCons))
-          .clamp(
-            math.max(cplx - _levelWinsorLowerDelta, 0),
-            cplx + _levelWinsorUpperDelta,
-          )
-          .toDouble();
+      final levelI =
+          (2 * cplx - _impliedCplx(clampedDur, cells, entry.failures, nCons))
+              .clamp(
+                math.max(cplx - _levelWinsorLowerDelta, 0),
+                cplx + _levelWinsorUpperDelta,
+              )
+              .toDouble();
       // Exponential decay, half-life = 25 puzzles.
       final weight = math.pow(0.5, i / 25.0).toDouble();
       weightedSum += levelI * weight;

@@ -42,14 +42,14 @@ PuzzleData _puz({
 /// Mirror of the private `Database._expectedDuration`. Tests use it to craft
 /// durations that satisfy the model's equilibrium so we can check the
 /// invariant `level ≈ cplx`. Must stay in sync with the constants in
-/// `database.dart` (anchored model: log(dur) = 1.197 + 0.00808·cplx
-/// + 0.5146·log(cells) + 0.151·failures + 0.102·n_cons).
+/// `database.dart` (anchored model: log(dur) = 1.586 + 0.01684·cplx
+/// + 0.3437·log(cells) + 0.1775·failures + 0.0596·n_cons).
 double _expectedFor(int cplx, int cells, int failures, int nCons) =>
-    3.3108 *
-    math.pow(cells, 0.5146) *
-    math.exp(cplx / 123.82) *
-    math.pow(1.1627, failures) *
-    math.pow(1.1069, nCons);
+    4.8834 *
+    math.pow(cells, 0.3437) *
+    math.exp(cplx / 59.39) *
+    math.pow(1.1943, failures) *
+    math.pow(1.0614, nCons);
 
 /// `n` finished, non-skipped stat entries for a puzzle played at the
 /// expected duration of `cplx` (so each play's implicit level ≈ `cplx`).
@@ -191,30 +191,33 @@ void main() {
       expect(db.computePlayerLevel(fallback: 0), closeTo(40, 2));
     });
 
-    test('a single left-open play cannot drag the level to 0 (winsorization)', () {
-      // The left-open play clamps its duration to 10×expected, which would
-      // give level_i ≈ cplx − 285 ≈ −245; without winsorization the
-      // weighted average (the newest play weighs 1.0) collapses below 0 and
-      // is pinned at 0. The floor max(cplx − 30, 0) = 10 bounds it instead,
-      // so the result stays a plausible mix of the two plays.
-      final db = Database(playerLevel: 0);
-      const cplx = 40;
-      const nCons = 3;
-      final expected = _expectedFor(cplx, 20, 0, nCons);
-      db.loadStats([
-        ...nPlays(1, cplx: cplx, nCons: nCons),
-        ...nPlays(
-          1,
-          cplx: cplx,
-          nCons: nCons,
-          durationS: (expected * 10).round(),
-          stampOffsetSeconds: 300,
-        ),
-      ]);
-      final level = db.computePlayerLevel(fallback: 0);
-      expect(level, greaterThan(0));
-      expect(level, lessThan(cplx));
-    });
+    test(
+      'a single left-open play cannot drag the level to 0 (winsorization)',
+      () {
+        // The left-open play clamps its duration to 10×expected, which would
+        // give level_i ≈ cplx − 285 ≈ −245; without winsorization the
+        // weighted average (the newest play weighs 1.0) collapses below 0 and
+        // is pinned at 0. The floor max(cplx − 30, 0) = 10 bounds it instead,
+        // so the result stays a plausible mix of the two plays.
+        final db = Database(playerLevel: 0);
+        const cplx = 40;
+        const nCons = 3;
+        final expected = _expectedFor(cplx, 20, 0, nCons);
+        db.loadStats([
+          ...nPlays(1, cplx: cplx, nCons: nCons),
+          ...nPlays(
+            1,
+            cplx: cplx,
+            nCons: nCons,
+            durationS: (expected * 10).round(),
+            stampOffsetSeconds: 300,
+          ),
+        ]);
+        final level = db.computePlayerLevel(fallback: 0);
+        expect(level, greaterThan(0));
+        expect(level, lessThan(cplx));
+      },
+    );
 
     test('plays with an idle gap > 5 min are dropped (AFK guard)', () {
       // The 6 AFK plays (left-open duration + 400 000 ms idle gap) are

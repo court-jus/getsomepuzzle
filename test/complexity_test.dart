@@ -117,16 +117,12 @@ void main() {
 
   test('moveComplexity bumps RemoveOption only on domains > 2', () {
     final by = _FakeCanApply();
-    final d2 = Puzzle.empty(
-      2,
-      2,
-      const [CellValue.black, CellValue.white],
-    );
-    final d3 = Puzzle.empty(
-      2,
-      2,
-      const [CellValue.black, CellValue.white, CellValue.purple],
-    );
+    final d2 = Puzzle.empty(2, 2, const [CellValue.black, CellValue.white]);
+    final d3 = Puzzle.empty(2, 2, const [
+      CellValue.black,
+      CellValue.white,
+      CellValue.purple,
+    ]);
     const tier = 2;
     final prune = RemoveOption(0, CellValue.black, by, complexity: tier);
     final set = SetValue(0, CellValue.black, by, complexity: tier);
@@ -162,7 +158,9 @@ void main() {
     final steps = p.solveExplained();
 
     final pruneSteps = steps
-        .where((s) => s is RemoveOptionStep && s.method == SolveMethod.propagation)
+        .where(
+          (s) => s is RemoveOptionStep && s.method == SolveMethod.propagation,
+        )
         .length;
     expect(pruneSteps, greaterThan(0), reason: 'fixture must contain prunes');
     // Every recorded prune carries the bump over its bare tier.
@@ -183,7 +181,11 @@ void main() {
     //   rule diversity = 2 (CC, PA, RC)
     //   emptiness = 5 (9/12 free)
     //   domain bonus = 5 (3-colour domain)
-    expect(bumped, 16, reason: '4 effort + 2 diversity + 5 emptiness + 5 domain');
+    expect(
+      bumped,
+      16,
+      reason: '4 effort + 2 diversity + 5 emptiness + 5 domain',
+    );
 
     // Stripping the prune bump from the trace drops the score by exactly
     // pruneSteps × bump (no clamping on this toy puzzle).
