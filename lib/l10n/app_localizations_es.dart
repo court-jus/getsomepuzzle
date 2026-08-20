@@ -247,6 +247,21 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingIdleTimeoutM2 => '2 minutos';
 
   @override
+  String get settingNextPuzzleDelay => 'Retraso al siguiente puzzle';
+
+  @override
+  String get settingNextPuzzleDelayS1 => '1 segundo';
+
+  @override
+  String get settingNextPuzzleDelayS3 => '3 segundos';
+
+  @override
+  String get settingNextPuzzleDelayS10 => '10 segundos';
+
+  @override
+  String get settingNextPuzzleDelayManual => 'Manual';
+
+  @override
   String get settingDifficultyLevel => 'Nivel de dificultad';
 
   @override

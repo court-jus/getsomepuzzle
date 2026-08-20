@@ -82,6 +82,11 @@
     "settingIdleTimeoutS30": "30 segundos",
     "settingIdleTimeoutM1": "1 minuto",
     "settingIdleTimeoutM2": "2 minutos",
+    "settingNextPuzzleDelay": "Retraso al siguiente puzzle",
+    "settingNextPuzzleDelayS1": "1 segundo",
+    "settingNextPuzzleDelayS3": "3 segundos",
+    "settingNextPuzzleDelayS10": "10 segundos",
+    "settingNextPuzzleDelayManual": "Manual",
     "settingDifficultyLevel": "Nivel de dificultad",
     "@settingDifficultyLevel": {
         "description": "Section header for difficulty level settings"

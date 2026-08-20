@@ -50,12 +50,15 @@ still active.
 
 In `LiveCheckType.all` / `count`, fixing an error that *also* completes the
 puzzle used to switch to the next puzzle instantaneously, which felt abrupt.
-The completion transition now goes through a unified debounce:
+The completion transition now goes through a debounce that delays both the
+error surfacing and the switch, so the player has a beat to register the
+state before the puzzle advances:
 
-1. `_completionDebounce` (a `Timer`) is started by `checkPuzzle` when the
-   puzzle is complete and has no failed constraints (and we are not in the
-   manual-validate branch).
-2. After 1 s the timer calls `currentMeta!.stop()` and `onPuzzleCompleted()`.
+1. `_checkDebounce` (a `Timer`) is started by `handleCheck` after every
+   mutation, counting from 0 each time.
+2. When it fires it calls `checkPuzzle`. If the puzzle is complete and has no
+   failed constraints (and we are not in the manual-validate branch), the play
+   is finalized: `currentMeta!.stop()` + `onPuzzleCompleted()`.
 3. Any user-initiated mutation cancels the timer: `handleTap`, `handleDrag`,
    `handleRightDrag`, `restart`, `undo`, `openPuzzle`, `clearPuzzle`, `pause`.
    If the puzzle is still complete and valid after the cancelling mutation,
@@ -63,11 +66,29 @@ The completion transition now goes through a unified debounce:
 4. The explicit manual Validate button bypasses the debounce — it calls
    `checkPuzzle(manualCheck: true)` and acts immediately.
 
-The previous 1 s branch in `handleCheck` for `LiveCheckType.complete` is now
-redundant: the debounce lives in `checkPuzzle`, so `handleCheck` calls
-`_autoCheck` synchronously for every live mode.
+The settle window is configurable via the `NextPuzzleDelay` setting
+(`settingsNextPuzzleDelay`, enum in `lib/getsomepuzzle/model/settings.dart`,
+default `s1`):
 
-**Tests**: `test/completion_debounce_test.dart`,
+- `s1` / `s3` / `s10` — the debounce waits 1 / 3 / 10 s before the check runs
+  (and thus before the auto-switch on a solve).
+- `manual` — the check still runs after a default 1 s settle (so errors
+  surface), but a solve never auto-advances. Instead:
+  - `checkPuzzle` freezes the stopwatch (`stats.pause()`, flag
+    `_stoppedForManualNext`) and flips `showNextFab`; the game screen shows a
+    floating "next" button.
+  - Tapping the button calls `advanceToNextPuzzle`, which runs the same
+    `_finalizeCompletion` path (recording the frozen solve time) as auto mode.
+  - Any mutation hides the button and resumes the stopwatch, since a solved
+    puzzle the player is editing again is no longer "done".
+
+The manual-next freeze is a separate flag from `_stoppedForCompletion`
+(manual-validation) so the two can coexist — e.g. `validateType.manual` +
+`nextPuzzleDelay.manual`. Both are cleared by `_finalizeCompletion`; the
+manual-next one is also resumed by `_beforeMutation` (mutation) and guarded by
+`resume()`.
+
+**Tests**: `test/completion_debounce_test.dart`, `test/next_puzzle_delay_test.dart`,
 `integration_test/completion_debounce_integration_test.dart`.
 
 ## 3. Idle detection

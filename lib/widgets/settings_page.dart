@@ -139,6 +139,23 @@ class _SettingsPageState extends State<SettingsPage> {
                           );
                         }),
                       ),
+                      _EnumSettingRow<NextPuzzleDelay>(
+                        label: l10n.settingNextPuzzleDelay,
+                        value: widget.settings.nextPuzzleDelay,
+                        options: NextPuzzleDelay.values,
+                        labels: {
+                          NextPuzzleDelay.s1: l10n.settingNextPuzzleDelayS1,
+                          NextPuzzleDelay.s3: l10n.settingNextPuzzleDelayS3,
+                          NextPuzzleDelay.s10: l10n.settingNextPuzzleDelayS10,
+                          NextPuzzleDelay.manual:
+                              l10n.settingNextPuzzleDelayManual,
+                        },
+                        onChanged: (v) => setState(() {
+                          widget.onSettingsChange(
+                            ChangeableSettings(nextPuzzleDelay: v),
+                          );
+                        }),
+                      ),
                       _EnumSettingRow<LiveCheckType>(
                         label: l10n.settingsLiveCheckType,
                         value: widget.settings.liveCheckType,

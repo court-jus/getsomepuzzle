@@ -61,6 +61,22 @@ class GameModel extends ChangeNotifier {
   /// breaks completeness (clears a cell) or the puzzle transitions away.
   bool _stoppedForCompletion = false;
 
+  /// True when the stopwatch was silently paused because the puzzle is
+  /// solved (complete + valid) in manual-next mode
+  /// (`Settings.nextPuzzleDelay == NextPuzzleDelay.manual`). Same semantics
+  /// as [_stoppedForCompletion] but keyed on *valid completion* rather than
+  /// a full grid, so it is a distinct flag: the manual-validation freeze
+  /// (which keyed on completeness alone) and this one can both be active
+  /// at once and must not clear each other. Cleared when the player mutates
+  /// the puzzle again (see [_beforeMutation]) or the play transitions away.
+  bool _stoppedForManualNext = false;
+
+  /// True when a solved puzzle waits for the player to tap the manual-next
+  /// floating button (only in manual-next mode). Shown by the game screen's
+  /// [Scaffold.floatingActionButton]; cleared on any mutation, on advance,
+  /// and on puzzle transition.
+  bool showNextFab = false;
+
   /// Non-null when `paused` was set automatically (idle timeout, app focus
   /// lost). Used by the pause overlay to tell the user *why* they were
   /// paused. Cleared by manual pause and resume.
@@ -169,10 +185,19 @@ class GameModel extends ChangeNotifier {
   /// restart, puzzle open). Cancels any pending debounced check so errors
   /// don't surface mid-interaction, and re-arms the idle watchdog so a
   /// long drag or multi-step interaction is not mistaken for inactivity.
+  ///
+  /// Also drops the manual-next state: once the player edits the grid again,
+  /// the puzzle is no longer "solved waiting for next" — the floating button
+  /// disappears and the frozen stopwatch resumes counting.
   void _beforeMutation() {
     _cancelCheckDebounce();
     cancelHintConstraintComputation();
     rearmIdleTimer();
+    showNextFab = false;
+    if (_stoppedForManualNext) {
+      currentMeta?.stats?.resume();
+      _stoppedForManualNext = false;
+    }
   }
 
   /// Called once a mutation settles into a stable state. Clears hints,
@@ -307,6 +332,8 @@ class GameModel extends ChangeNotifier {
     history = [];
     _isPuzzleRotated = false;
     betweenPuzzles = false;
+    _stoppedForManualNext = false;
+    showNextFab = false;
     notifyListeners();
   }
 
@@ -364,9 +391,12 @@ class GameModel extends ChangeNotifier {
   void resume() {
     paused = false;
     _autoPauseReason = null;
-    // If the puzzle is still complete in manual mode, keep the stopwatch
-    // frozen — the user must break completeness or validate.
-    if (currentPuzzle != null && !_stoppedForCompletion) {
+    // If the puzzle is still complete in manual mode, or solved in manual-
+    // next mode, keep the stopwatch frozen — the user must break the state
+    // or advance before it counts again.
+    if (currentPuzzle != null &&
+        !_stoppedForCompletion &&
+        !_stoppedForManualNext) {
       currentMeta?.stats?.resume();
     }
     notifyListeners();
@@ -672,12 +702,15 @@ class GameModel extends ChangeNotifier {
   }) {
     _syncManualCompletionPause(settings);
     // Every mutation re-arms the debounce from 0: the player must let the
-    // puzzle sit for 1s before errors surface or the switch happens. This is
-    // why the existing errors are cleared synchronously on tap (via
-    // `clearConstraintsValidity`) — they only reappear if the next check,
-    // after the debounce, still finds them.
+    // puzzle sit before errors surface or the switch happens. The settle
+    // window is the configured next-puzzle delay (1s / 3s / 10s); in manual
+    // mode there is no auto-switch delay, so errors still surface on the
+    // default 1s settle.
     _checkDebounce?.cancel();
-    _checkDebounce = Timer(const Duration(seconds: 1), () {
+    final delay = settings.nextPuzzleDelay == NextPuzzleDelay.manual
+        ? const Duration(seconds: 1)
+        : settings.nextPuzzleDelayDuration!;
+    _checkDebounce = Timer(delay, () {
       _checkDebounce = null;
       if (currentPuzzle == null) return;
       checkPuzzle(
@@ -748,6 +781,19 @@ class GameModel extends ChangeNotifier {
         currentPuzzle!.complete &&
         (manualCheck || settings.validateType != ValidateType.manual);
     if (shouldComplete) {
+      if (settings.nextPuzzleDelay == NextPuzzleDelay.manual) {
+        // Manual-next mode: no auto-switch. Freeze the solve time now (the
+        // play is over) and surface the floating "next" button instead of
+        // transitioning. The player advances via `advanceToNextPuzzle`.
+        _log.info('Puzzle completed — waiting for manual next');
+        if (!_stoppedForManualNext) {
+          currentMeta?.stats?.pause();
+          _stoppedForManualNext = true;
+        }
+        showNextFab = true;
+        notifyListeners();
+        return;
+      }
       _log.info('Puzzle completed');
       _finalizeCompletion(settings, onPuzzleCompleted);
     }
@@ -759,11 +805,38 @@ class GameModel extends ChangeNotifier {
   ) {
     currentMeta!.stop();
     _stoppedForCompletion = false;
+    _stoppedForManualNext = false;
+    showNextFab = false;
     onPuzzleCompleted();
     if (settings.showRating == ShowRating.yes) {
       betweenPuzzles = true;
     }
     notifyListeners();
+  }
+
+  /// Advance to the next puzzle from the manual-next floating button:
+  /// finalizes the play exactly like the automatic path does
+  /// ([_finalizeCompletion]). The solve was already recorded (stopwatch
+  /// frozen) when the button appeared, so this only runs the completion /
+  /// rating transition.
+  void advanceToNextPuzzle(
+    Settings settings,
+    void Function() onPuzzleCompleted,
+  ) {
+    _finalizeCompletion(settings, onPuzzleCompleted);
+  }
+
+  /// If the current puzzle is solved and waiting on the manual-next button,
+  /// finalize the play under [settings]. Used when the player switches the
+  /// next-puzzle-delay setting away from `manual` mid-solve: the pending
+  /// state must not survive, and auto mode would have advanced the solved
+  /// puzzle anyway. No-op when no manual-next state is active.
+  void advanceIfManualNextPending(
+    Settings settings,
+    void Function() onPuzzleCompleted,
+  ) {
+    if (!showNextFab && !_stoppedForManualNext) return;
+    _finalizeCompletion(settings, onPuzzleCompleted);
   }
 
   void _cancelCheckDebounce() {

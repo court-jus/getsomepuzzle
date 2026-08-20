@@ -1972,6 +1972,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       game.idleTimeoutDuration = settings.idleTimeoutDuration;
                       game.rearmIdleTimer();
                     }
+                    if (newValue.nextPuzzleDelay != null) {
+                      // Switching away from manual mid-solve: finalize the
+                      // pending solved puzzle under the new mode instead of
+                      // leaving a stale floating button / frozen stopwatch.
+                      game.advanceIfManualNextPending(
+                        settings,
+                        _onPuzzleCompleted,
+                      );
+                    }
                     if (newValue.grayoutEnabled != null) {
                       _applyGrayoutSetting();
                       setState(() {});
@@ -2273,6 +2282,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 dbSize: game.dbSize,
                 playerLevel: settings.playerLevel,
                 autoLevel: settings.autoLevel,
+              )
+            : null,
+        // Manual-next mode: a solved puzzle waits for the player to tap the
+        // "next" button instead of auto-advancing. Hidden while paused /
+        // between puzzles so it never overlaps the overlays.
+        floatingActionButton:
+            (game.showNextFab &&
+                initialized &&
+                !shouldChooseLocale &&
+                !game.betweenPuzzles &&
+                !game.paused &&
+                game.currentPuzzle != null)
+            ? FloatingActionButton(
+                tooltip: AppLocalizations.of(context)!.nextPuzzle,
+                onPressed: () =>
+                    game.advanceToNextPuzzle(settings, _onPuzzleCompleted),
+                child: const Icon(Icons.arrow_forward),
               )
             : null,
       ),

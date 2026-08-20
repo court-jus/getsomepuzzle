@@ -306,6 +306,26 @@
     "@settingIdleTimeoutM2": {
         "description": "Idle timeout value: 2 minutes"
     },
+    "settingNextPuzzleDelay": "Next puzzle delay",
+    "@settingNextPuzzleDelay": {
+        "description": "Delay before moving on to the next puzzle after a successful automatic check"
+    },
+    "settingNextPuzzleDelayS1": "1 second",
+    "@settingNextPuzzleDelayS1": {
+        "description": "Next puzzle delay value: 1 second"
+    },
+    "settingNextPuzzleDelayS3": "3 seconds",
+    "@settingNextPuzzleDelayS3": {
+        "description": "Next puzzle delay value: 3 seconds"
+    },
+    "settingNextPuzzleDelayS10": "10 seconds",
+    "@settingNextPuzzleDelayS10": {
+        "description": "Next puzzle delay value: 10 seconds"
+    },
+    "settingNextPuzzleDelayManual": "Manual",
+    "@settingNextPuzzleDelayManual": {
+        "description": "Next puzzle delay value: no automatic switch; a next button is shown instead"
+    },
     "settingDifficultyLevel": "Difficulty level",
     "@settingDifficultyLevel": {
         "description": "Section header for difficulty level settings"

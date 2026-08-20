@@ -550,6 +550,36 @@ abstract class AppLocalizations {
   /// **'2 minutes'**
   String get settingIdleTimeoutM2;
 
+  /// Delay before moving on to the next puzzle after a successful automatic check
+  ///
+  /// In en, this message translates to:
+  /// **'Next puzzle delay'**
+  String get settingNextPuzzleDelay;
+
+  /// Next puzzle delay value: 1 second
+  ///
+  /// In en, this message translates to:
+  /// **'1 second'**
+  String get settingNextPuzzleDelayS1;
+
+  /// Next puzzle delay value: 3 seconds
+  ///
+  /// In en, this message translates to:
+  /// **'3 seconds'**
+  String get settingNextPuzzleDelayS3;
+
+  /// Next puzzle delay value: 10 seconds
+  ///
+  /// In en, this message translates to:
+  /// **'10 seconds'**
+  String get settingNextPuzzleDelayS10;
+
+  /// Next puzzle delay value: no automatic switch; a next button is shown instead
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get settingNextPuzzleDelayManual;
+
   /// Section header for difficulty level settings
   ///
   /// In en, this message translates to:

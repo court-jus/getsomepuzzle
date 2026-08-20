@@ -11,6 +11,11 @@ enum HintType { deducibleCell, addConstraint }
 
 enum IdleTimeout { disabled, s5, s10, s30, m1, m2 }
 
+/// Delay between the automatic check confirming the puzzle is solved and the
+/// switch to the next puzzle. `manual` disables the auto-switch: a floating
+/// "next" button is shown instead, and the player advances by tapping it.
+enum NextPuzzleDelay { s1, s3, s10, manual }
+
 enum ThemeModeType { system, light, dark }
 
 class ChangeableSettings {
@@ -19,6 +24,7 @@ class ChangeableSettings {
   LiveCheckType? liveCheckType;
   HintType? hintType;
   IdleTimeout? idleTimeout;
+  NextPuzzleDelay? nextPuzzleDelay;
   int? playerLevel;
   bool? autoLevel;
   bool? grayoutEnabled;
@@ -31,6 +37,7 @@ class ChangeableSettings {
     this.liveCheckType,
     this.hintType,
     this.idleTimeout,
+    this.nextPuzzleDelay,
     this.playerLevel,
     this.autoLevel,
     this.grayoutEnabled,
@@ -40,7 +47,7 @@ class ChangeableSettings {
 
   @override
   String toString() {
-    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}; GrayoutOn: $grayoutEnabled";
+    return "Val: ${validateType?.name}; Sr: ${showRating?.name}; Liv: ${liveCheckType?.name}; Hint: ${hintType?.name}; Idle: ${idleTimeout?.name}; Next: ${nextPuzzleDelay?.name}; GrayoutOn: $grayoutEnabled";
   }
 }
 
@@ -50,6 +57,7 @@ class Settings {
   LiveCheckType liveCheckType;
   HintType hintType;
   IdleTimeout idleTimeout;
+  NextPuzzleDelay nextPuzzleDelay;
   int playerLevel;
   bool autoLevel;
   bool grayoutEnabled;
@@ -64,6 +72,7 @@ class Settings {
     this.liveCheckType = LiveCheckType.complete,
     this.hintType = HintType.deducibleCell,
     this.idleTimeout = IdleTimeout.disabled,
+    this.nextPuzzleDelay = NextPuzzleDelay.s1,
     this.playerLevel = 0,
     this.autoLevel = true,
     this.grayoutEnabled = true,
@@ -73,7 +82,7 @@ class Settings {
 
   @override
   String toString() {
-    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Hint: ${hintType.name}; Idle: ${idleTimeout.name}";
+    return "Val: ${validateType.name}; Sr: ${showRating.name}; Liv: ${liveCheckType.name}; Hint: ${hintType.name}; Idle: ${idleTimeout.name}; Next: ${nextPuzzleDelay.name}";
   }
 
   /// Duration corresponding to the current [idleTimeout], or null when the
@@ -92,6 +101,22 @@ class Settings {
         return const Duration(minutes: 1);
       case IdleTimeout.m2:
         return const Duration(minutes: 2);
+    }
+  }
+
+  /// Delay before the automatic check moves on to the next puzzle after a
+  /// solve, or null in [NextPuzzleDelay.manual] mode (the player advances via
+  /// the "next" button instead).
+  Duration? get nextPuzzleDelayDuration {
+    switch (nextPuzzleDelay) {
+      case NextPuzzleDelay.s1:
+        return const Duration(seconds: 1);
+      case NextPuzzleDelay.s3:
+        return const Duration(seconds: 3);
+      case NextPuzzleDelay.s10:
+        return const Duration(seconds: 10);
+      case NextPuzzleDelay.manual:
+        return null;
     }
   }
 
@@ -139,6 +164,12 @@ class Settings {
       (e) => e.name == settingsIdleTimeout,
       orElse: () => IdleTimeout.disabled,
     );
+    final String settingsNextPuzzleDelay =
+        prefs.getString("settingsNextPuzzleDelay") ?? "s1";
+    nextPuzzleDelay = NextPuzzleDelay.values.firstWhere(
+      (e) => e.name == settingsNextPuzzleDelay,
+      orElse: () => NextPuzzleDelay.s1,
+    );
     playerLevel = prefs.getInt("settingsPlayerLevel") ?? 0;
     autoLevel = prefs.getBool("settingsAutoLevel") ?? true;
     grayoutEnabled = prefs.getBool("settingsGrayoutEnabled") ?? true;
@@ -158,6 +189,7 @@ class Settings {
     prefs.setString("settingsShowRating", showRating.name);
     prefs.setString("settingsHintType", hintType.name);
     prefs.setString("settingsIdleTimeout", idleTimeout.name);
+    prefs.setString("settingsNextPuzzleDelay", nextPuzzleDelay.name);
     prefs.setInt("settingsPlayerLevel", playerLevel);
     prefs.setBool("settingsAutoLevel", autoLevel);
     prefs.setBool("settingsGrayoutEnabled", grayoutEnabled);
@@ -184,6 +216,9 @@ class Settings {
     }
     if (newValue.idleTimeout != null) {
       idleTimeout = newValue.idleTimeout!;
+    }
+    if (newValue.nextPuzzleDelay != null) {
+      nextPuzzleDelay = newValue.nextPuzzleDelay!;
     }
     if (newValue.playerLevel != null) {
       playerLevel = newValue.playerLevel!;
