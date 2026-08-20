@@ -98,7 +98,7 @@ class _HelpPageState extends State<HelpPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       MarkdownTheme(
-                        data: mdTheme,
+                        data: MarkdownThemeData.mergeTheme(Theme.of(context)),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [

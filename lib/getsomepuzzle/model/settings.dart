@@ -16,7 +16,7 @@ enum IdleTimeout { disabled, s5, s10, s30, m1, m2 }
 /// "next" button is shown instead, and the player advances by tapping it.
 enum NextPuzzleDelay { s1, s3, s10, manual }
 
-enum ThemeModeType { system, light, dark }
+enum ThemeModeType { system, light, dark, beige }
 
 class ChangeableSettings {
   ValidateType? validateType;

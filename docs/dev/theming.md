@@ -1,16 +1,25 @@
-# Theming (Light / Dark mode)
+# Theming (Light / Beige / Dark)
 
 ## Overview
 
-The app supports light and dark themes plus a "follow system" mode. Puzzle
-colors are carried by a `ThemeExtension` so widgets read them off
+The app supports three manual palettes — light, beige and dark — plus a
+"follow system" mode that only toggles between light and dark. Puzzle colors
+are carried by a `ThemeExtension` so widgets read them off
 `Theme.of(context)` instead of hardcoding `Color` literals.
+
+- **light** — the legacy palette restored from v1.6.22 (pre-solarized colors,
+  `seedColor: Colors.deepPurple`).
+- **beige** — the solarized-light palette (what "light" was before the legacy
+  colors were restored; `seedColor: solarized yellow`). Manual-only: the system
+  mode never selects it.
+- **dark** — the solarized-dark palette.
 
 **Files:**
 
 - `lib/getsomepuzzle/model/app_theme.dart` — `PuzzleColors` extension, the
-  `puzzleColorsLight` / `puzzleColorsDark` palettes, `lightTheme` / `darkTheme`
-  `ThemeData`, and `resolveThemeMode`.
+  `puzzleColorsLight` / `puzzleColorsBeige` / `puzzleColorsDark` palettes,
+  `lightTheme` / `beigeTheme` / `darkTheme` `ThemeData`, and
+  `resolveThemeMode`.
 - `lib/getsomepuzzle/model/settings.dart` — `ThemeModeType` enum + persistence.
 - `lib/main.dart` — wires `themeMode` into `MaterialApp` and reacts to changes.
 - `lib/widgets/settings_page.dart` — the theme selector UI.
@@ -19,9 +28,10 @@ colors are carried by a `ThemeExtension` so widgets read them off
 
 `PuzzleColors extends ThemeExtension<PuzzleColors>` holds every puzzle-specific
 color as a `final Color`, and implements the required `copyWith` and `lerp`
-(component-wise `Color.lerp`, enabling animated theme transitions). Two `const`
-instances are declared — `puzzleColorsLight` and `puzzleColorsDark` — and each is
-attached to its `ThemeData` via `extensions: const [...]`.
+(component-wise `Color.lerp`, enabling animated theme transitions). Three `const`
+instances are declared — `puzzleColorsLight`, `puzzleColorsBeige` and
+`puzzleColorsDark` — and each is attached to its `ThemeData` via
+`extensions: const [...]`.
 
 Consume it in a widget with:
 
@@ -30,7 +40,10 @@ final pc = Theme.of(context).extension<PuzzleColors>()!;
 ```
 
 Cell colors are resolved through the helpers `constraintColors` and
-`oppositeColors` declared in `app_theme.dart`.
+`oppositeColors` declared in `app_theme.dart`. The light palette defines its
+own map constants (`lightConstraintColors`, `lightOppositeColors`,
+`lightConstrastedColors`) so the restored legacy colors can differ from the
+shared solarized defaults used by beige and dark.
 
 ### Field groups
 
@@ -44,19 +57,31 @@ Cell colors are resolved through the helpers `constraintColors` and
 
 ## Theme mode setting
 
-`ThemeModeType { system, light, dark }` is stored in `Settings.themeMode`
+`ThemeModeType { system, light, dark, beige }` is stored in `Settings.themeMode`
 (default `system`), persisted under the `SharedPreferences` key
 `settingsThemeMode` (round-tripped by enum `.name`).
 
 `resolveThemeMode(ThemeModeType)` maps it to Flutter's `ThemeMode`. `main.dart`
 holds the active mode in `_MyAppState._themeMode`, loads it once in `initState`
 via `_loadThemeMode`, and exposes `setAppTheme` so the settings page can update
-the whole app live. `MaterialApp` receives `theme: lightTheme`,
-`darkTheme: darkTheme`, `themeMode: resolveThemeMode(_themeMode)`.
+the whole app live. `MaterialApp` receives
+`theme: _themeMode == ThemeModeType.beige ? beigeTheme : lightTheme`,
+`darkTheme: darkTheme`, `themeMode: resolveThemeMode(_themeMode)`. Because
+`beige` resolves to `ThemeMode.light` and `theme` swaps to `beigeTheme` only
+when beige is explicitly selected, the "system" mode keeps switching between
+light and dark only — beige is chosen manually.
 
 Note: `_loadThemeMode` reads `settingsThemeMode` directly from
 `SharedPreferences` in addition to `Settings.load`, so the two paths must keep
 the same key/default in sync.
+
+## Help-page markdown
+
+The localized help page (`lib/widgets/help_page.dart`) styles its markdown with
+`MarkdownThemeData.mergeTheme(Theme.of(context))`, so body text, headings,
+quotes, links and code follow the active theme and stay readable in light,
+beige and dark. There is no hardcoded markdown theme anymore
+(`mdTheme` was removed from `lib/getsomepuzzle/model/constants.dart`).
 
 ## Coverage
 

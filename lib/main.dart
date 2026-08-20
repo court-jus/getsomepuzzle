@@ -216,7 +216,10 @@ class _MyAppState extends State<MyApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: selectedLocale, // controlled by state
-      theme: lightTheme,
+      // `beige` is a manual-only light theme, so `theme` switches to it
+      // only when explicitly selected; `ThemeMode.system` keeps toggling
+      // between light and dark.
+      theme: _themeMode == ThemeModeType.beige ? beigeTheme : lightTheme,
       darkTheme: darkTheme,
       themeMode: resolveThemeMode(_themeMode),
       home: MyHomePage(

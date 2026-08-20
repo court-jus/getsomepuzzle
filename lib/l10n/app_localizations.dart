@@ -2002,6 +2002,12 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingThemeDark;
 
+  /// Theme option: always use the beige (solarized light) theme
+  ///
+  /// In en, this message translates to:
+  /// **'Beige'**
+  String get settingThemeBeige;
+
   /// Section header on the stats dashboard: stats grouped by puzzle complexity range.
   ///
   /// In en, this message translates to:

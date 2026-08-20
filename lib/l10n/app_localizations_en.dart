@@ -1094,6 +1094,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingThemeDark => 'Dark';
 
   @override
+  String get settingThemeBeige => 'Beige';
+
+  @override
   String get statsSectionDifficulty => 'By complexity';
 
   @override

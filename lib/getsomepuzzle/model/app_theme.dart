@@ -21,6 +21,26 @@ const Color constrastBlack = Color(0xFF586E75);
 
 const Color defaultInvalidColor = Color(0xFFDC322F);
 
+// Restored legacy (pre-solarized, v1.6.22) palette for the light theme.
+const Map<CellValue, Color> lightConstraintColors = {
+  CellValue.black: Color(0xFF000000),
+  CellValue.white: Color(0xFFFFFFFF),
+  CellValue.purple: Color(0xFFE1BEE7),
+};
+
+const Map<CellValue, Color> lightOppositeColors = {
+  CellValue.black: Color(0xFFFFFFFF),
+  CellValue.white: Color(0xFF000000),
+  CellValue.purple: Color(0xFF4A148C),
+};
+
+// Contrast colors for IM/MJ lines drawn on a light background (legacy look).
+const Map<CellValue, Color> lightConstrastedColors = {
+  CellValue.black: Color(0xFF333333),
+  CellValue.white: Color(0xFFDDDDDD),
+  CellValue.purple: Color(0xFF9C27B0),
+};
+
 /// Theme extension carrying all puzzle-specific colors.
 ///
 /// Attach an instance to each [ThemeData] via `extensions: [puzzleColorsLight]`
@@ -213,7 +233,9 @@ class PuzzleColors extends ThemeExtension<PuzzleColors> {
   }
 }
 
-const puzzleColorsLight = PuzzleColors(
+/// Solarized-light palette. Manual "beige" theme: the light theme as it was
+/// before the v1.6.22 colors were restored.
+const puzzleColorsBeige = PuzzleColors(
   constraintColors: defaultConstraintColors,
   oppositeColors: defaultOppositeColors,
   cellBgUndecided: Color(0xFFEEE8D5),
@@ -238,6 +260,30 @@ const puzzleColorsLight = PuzzleColors(
   constraintValid: Color(0xFF859900), // vert
   constraintInvalid: defaultInvalidColor, // rouge
   constraintGrayed: Color(0xFF93A1A1), // base1
+);
+
+/// Legacy light palette restored from v1.6.22 (pre-solarized colors).
+const puzzleColorsLight = PuzzleColors(
+  constraintColors: lightConstraintColors,
+  oppositeColors: lightOppositeColors,
+  constrastedColors: lightConstrastedColors,
+  cellBgUndecided: Color(0xFFC0EBF1),
+  rawBlack: Color(0xFF000000),
+  rawWhite: Color(0xFFFFFFFF),
+  cellFgUndecided: Colors.black,
+  cellFgReadonly: Colors.blueAccent,
+  highlight: Color(0xFF8B7D3C),
+  mandatory: Colors.lightBlue,
+  forbidden: Color(0xFFB956CA),
+  gridBorder: Colors.blueAccent,
+  drawerHeaderBg: Colors.blue,
+  bottomBarBg: Colors.amber,
+  validateButtonBg: Colors.lightGreen,
+  pauseOverlayBg: Colors.teal,
+  dialogAccent: Colors.amber,
+  constraintValid: Colors.green,
+  constraintInvalid: Colors.deepOrange,
+  constraintGrayed: Colors.grey,
 );
 
 const puzzleColorsDark = PuzzleColors(
@@ -267,26 +313,39 @@ const puzzleColorsDark = PuzzleColors(
   constraintGrayed: Color(0xFF586E75), // base01
 );
 
-/// Maps our [ThemeModeType] to Flutter's [ThemeMode].
+/// Maps our [ThemeModeType] to Flutter's [ThemeMode]. The manual "beige"
+/// theme is a light theme, so it resolves to [ThemeMode.light]; the system
+/// mode keeps switching between light and dark only.
 ThemeMode resolveThemeMode(ThemeModeType type) {
   switch (type) {
     case ThemeModeType.system:
       return ThemeMode.system;
     case ThemeModeType.light:
+    case ThemeModeType.beige:
       return ThemeMode.light;
     case ThemeModeType.dark:
       return ThemeMode.dark;
   }
 }
 
-/// Light theme.
+/// Light theme (legacy v1.6.22 colors).
 final lightTheme = ThemeData(
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: Colors.deepPurple,
+    brightness: Brightness.light,
+  ),
+  useMaterial3: true,
+  extensions: const [puzzleColorsLight],
+);
+
+/// Beige theme (solarized light colors), only selectable manually.
+final beigeTheme = ThemeData(
   colorScheme: ColorScheme.fromSeed(
     seedColor: const Color(0xFFB58900), // solarized yellow
     brightness: Brightness.light,
   ),
   useMaterial3: true,
-  extensions: const [puzzleColorsLight],
+  extensions: const [puzzleColorsBeige],
 );
 
 /// Dark theme.

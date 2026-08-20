@@ -558,6 +558,10 @@
     "@settingThemeDark": {
         "description": "Theme option: always use dark theme"
     },
+    "settingThemeBeige": "Beige",
+    "@settingThemeBeige": {
+        "description": "Theme option: always use the beige (solarized light) theme"
+    },
 
     "statsSectionDifficulty": "Por complejidad",
     "@statsSectionDifficulty": {

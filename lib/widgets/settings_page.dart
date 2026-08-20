@@ -97,6 +97,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ThemeModeType.system: l10n.settingThemeSystem,
                           ThemeModeType.light: l10n.settingThemeLight,
                           ThemeModeType.dark: l10n.settingThemeDark,
+                          ThemeModeType.beige: l10n.settingThemeBeige,
                         },
                         onChanged: (v) => setState(() {
                           widget.onSettingsChange(
