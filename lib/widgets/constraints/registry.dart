@@ -16,16 +16,19 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_majority.dart';
+import 'package:getsomepuzzle/widgets/constraints/different_from.dart';
 import 'package:getsomepuzzle/widgets/constraints/implication.dart';
 import 'package:getsomepuzzle/widgets/constraints/eyes.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_size.dart';
+import 'package:getsomepuzzle/widgets/constraints/majority.dart';
 import 'package:getsomepuzzle/widgets/constraints/motif.dart';
 import 'package:getsomepuzzle/widgets/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
@@ -42,10 +45,13 @@ final constraintUIRegistry =
       ),
       (
         slug: 'PA',
-        buildPreview: (fg, size) => Icon(
-          Icons.arrow_circle_right_outlined,
-          color: fg,
-          size: size * 0.8,
+        buildPreview: (fg, size) => _CellBorder(
+          size: size,
+          child: Icon(
+            Icons.arrow_circle_right_outlined,
+            color: fg,
+            size: size * 0.8,
+          ),
         ),
       ),
       (
@@ -65,18 +71,24 @@ final constraintUIRegistry =
       ),
       (
         slug: 'GS',
-        buildPreview: (fg, size) => GroupSizeWidget(
-          constraint: GroupSize('0.3'),
-          actualGroupSize: 0,
-          fgcolor: fg,
-          cellSize: size,
+        buildPreview: (fg, size) => _CellBorder(
+          size: size,
+          child: GroupSizeWidget(
+            constraint: GroupSize('0.3'),
+            actualGroupSize: 0,
+            fgcolor: fg,
+            cellSize: size,
+          ),
         ),
       ),
       (
         slug: 'LT',
-        buildPreview: (fg, size) => Text(
-          'A',
-          style: TextStyle(fontSize: size * 0.7, color: fg),
+        buildPreview: (fg, size) => _CellBorder(
+          size: size,
+          child: Text(
+            'A',
+            style: TextStyle(fontSize: size * 0.7, color: fg),
+          ),
         ),
       ),
       (
@@ -91,18 +103,19 @@ final constraintUIRegistry =
       ),
       (
         slug: 'SY',
-        buildPreview: (fg, size) => SymmetryWidget(
-          constraint: SymmetryConstraint('0.2'),
-          fgcolor: fg,
-          cellSize: size,
+        buildPreview: (fg, size) => _CellBorder(
+          size: size,
+          child: SymmetryWidget(
+            constraint: SymmetryConstraint('0.2'),
+            fgcolor: fg,
+            cellSize: size,
+          ),
         ),
       ),
       (
         slug: 'DF',
-        buildPreview: (fg, size) => Text(
-          '≠',
-          style: TextStyle(fontSize: size * 0.7, color: fg),
-        ),
+        buildPreview: (fg, size) =>
+            DifferentFromPreview(color: fg, cellSize: size),
       ),
       (
         slug: 'SH',
@@ -149,26 +162,28 @@ final constraintUIRegistry =
       ),
       (
         slug: 'MJ',
-        buildPreview: (fg, size) => Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            border: Border.all(color: fg, width: 1.5),
-            borderRadius: BorderRadius.circular(3),
+        buildPreview: (fg, size) =>
+            MajorityZonePreview(color: fg, cellSize: size),
+      ),
+      (
+        slug: 'NC',
+        buildPreview: (fg, size) => _CellBorder(
+          size: size,
+          child: NeighborCountWidget(
+            constraint: NeighborCountConstraint('0.1.2'),
+            cellSize: size,
           ),
         ),
       ),
       (
-        slug: 'NC',
-        buildPreview: (fg, size) => NeighborCountWidget(
-          constraint: NeighborCountConstraint('0.1.2'),
-          cellSize: size,
-        ),
-      ),
-      (
         slug: 'EY',
-        buildPreview: (fg, size) =>
-            EyesWidget(constraint: EyesConstraint('2.1.5'), cellSize: size),
+        buildPreview: (fg, size) => _CellBorder(
+          size: size,
+          child: EyesWidget(
+            constraint: EyesConstraint('2.1.5'),
+            cellSize: size,
+          ),
+        ),
       ),
       (
         slug: 'IM',
@@ -190,6 +205,30 @@ final constraintUIRegistry =
         ),
       ),
     ];
+
+/// Frames an in-cell constraint glyph with a cell border in the readonly
+/// cell's border color, so the picker / onboarding / catalogue previews and
+/// the exported website icons read as "a glyph inside a cell" — the way
+/// these constraints appear on the board.
+class _CellBorder extends StatelessWidget {
+  const _CellBorder({required this.size, required this.child});
+
+  final double size;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final pc = Theme.of(context).extension<PuzzleColors>()!;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        border: Border.all(color: pc.cellFgReadonly, width: 2.0),
+      ),
+      child: Center(child: child),
+    );
+  }
+}
 
 Widget previewForSlug(String slug, Color fgcolor, double size) {
   for (final r in constraintUIRegistry) {

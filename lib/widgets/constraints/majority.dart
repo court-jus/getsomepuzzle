@@ -101,3 +101,67 @@ class MajorityZonePainter extends CustomPainter {
         highlightColor != oldDelegate.highlightColor;
   }
 }
+
+/// Preview glyph for the MJ constraint: a thick dashed rectangle matching
+/// the border style [MajorityZonePainter] draws on the board (square
+/// corners, no rounded ones), so the picker/onboarding/catalogue icons and
+/// the exported website PNGs show the same look the player sees in-game.
+class MajorityZonePreview extends StatelessWidget {
+  const MajorityZonePreview({
+    super.key,
+    required this.color,
+    required this.cellSize,
+  });
+
+  final Color color;
+  final double cellSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.square(cellSize),
+      painter: _MajorityZonePreviewPainter(color: color, cellSize: cellSize),
+    );
+  }
+}
+
+class _MajorityZonePreviewPainter extends CustomPainter {
+  _MajorityZonePreviewPainter({required this.color, required this.cellSize});
+
+  final Color color;
+  final double cellSize;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Mirror the Math in MajorityZonePainter: same stroke width and the
+    // same 2:1.5 dash-to-gap ratio, drawn as straight dashed segments so
+    // corners stay square. Inset by half the stroke so the border isn't
+    // clipped at the box edge.
+    final borderWidth = (cellSize * 0.09).clamp(2.0, 4.0);
+    final inset = borderWidth / 2;
+    final rect = Rect.fromLTWH(
+      inset,
+      inset,
+      size.width - 2 * inset,
+      size.height - 2 * inset,
+    );
+
+    final borderPaint = Paint()
+      ..color = color
+      ..strokeWidth = borderWidth
+      ..style = PaintingStyle.stroke;
+
+    drawDashedRect(
+      canvas,
+      rect,
+      borderPaint,
+      borderWidth * 2,
+      borderWidth * 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _MajorityZonePreviewPainter oldDelegate) {
+    return color != oldDelegate.color || cellSize != oldDelegate.cellSize;
+  }
+}

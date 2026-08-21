@@ -58,7 +58,15 @@ Future<void> _captureIcon(
       home: Center(
         child: RepaintBoundary(
           key: _boundaryKey,
-          child: ConstraintIcon(slug: slug, size: _iconSize),
+          // A transparent Material provides the proper DefaultTextStyle so
+          // the Text-based previews (e.g. the "A"/"≠"/digit glyphs) don't
+          // inherit MaterialApp's fallback "not in a Material" style, which
+          // draws a yellow double underline. Transparent keeps the PNG
+          // background clear.
+          child: Material(
+            type: MaterialType.transparency,
+            child: ConstraintIcon(slug: slug, size: _iconSize),
+          ),
         ),
       ),
     ),
