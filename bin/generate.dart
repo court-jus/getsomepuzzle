@@ -13,6 +13,8 @@ import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/vector.dart';
 
 Future<void> main(List<String> args) async {
   final parsed = _parseArgs(args);
@@ -95,6 +97,38 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   // sinks (different levels) still parallelise.
   Future<void> singleSinkChain = Future.value();
   final levelSinkChains = <PuzzleLevel, Future<void>>{};
+
+  // Vector CSV sink for inline emission (asset routing only). Opened lazily
+  // on the first generated puzzle; the header is written only when the file
+  // is new or empty. Writes are funneled through `vectorChain` so concurrent
+  // worker puzzle messages can't interleave rows.
+  IOSink? vectorSink;
+  Future<void> vectorChain = Future.value();
+
+  /// Append one row to `puzzle_vectors.csv`. `fields` is the vector's CSV
+  /// field list (everything except `file`/`canonical_key`), which the worker
+  /// serialized into the puzzle message.
+  Future<void> emitVectorRow(String file, String key, List<String> fields) {
+    if (vectorSink == null) {
+      final f = File('puzzle_vectors.csv');
+      final isNew = !f.existsSync() || f.lengthSync() == 0;
+      vectorSink = f.openWrite(mode: FileMode.append);
+      if (isNew) {
+        vectorSink!.writeln(vectorCsvHeader());
+      }
+    }
+    final row = [
+      vectorCsvField(file),
+      vectorCsvField(key),
+      ...fields,
+    ].join(',');
+    vectorChain = vectorChain.then((_) async {
+      vectorSink!.writeln(row);
+      await vectorSink!.flush();
+    });
+    return vectorChain;
+  }
+
   if (output != null) {
     sink = File(output).openWrite(mode: FileMode.append);
   } else {
@@ -387,6 +421,9 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       domain: domain,
       strategy: workerStrategy,
       maxStall: Duration(seconds: maxStall),
+      // Always compute the inline feature vector so each accepted puzzle's
+      // row can be appended to puzzle_vectors.csv during asset routing.
+      computeVector: true,
     );
     final worker = GeneratorWorker();
     workers.add(worker);
@@ -428,7 +465,11 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
             } else {
               render();
             }
-          case GeneratorPuzzleMessage(:final puzzleLine, :final level):
+          case GeneratorPuzzleMessage(
+            :final puzzleLine,
+            :final level,
+            :final vectorFields,
+          ):
             successCounts[j]++;
             generated++;
             final now = totalSw.elapsedMilliseconds;
@@ -460,6 +501,16 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
                 );
               }
               currentLines = [...currentLines, puzzleLine];
+              // Inline vector emission: append the row to puzzle_vectors.csv
+              // (asset routing only — `--output` rows would carry a non-asset
+              // `file`, and those puzzles get re-vectorized after --route).
+              if (vectorFields != null) {
+                await emitVectorRow(
+                  'assets/${levelFilenames[level]!}',
+                  canonicalPuzzleKey(puzzleLine),
+                  vectorFields,
+                );
+              }
             }
             cachedStats = _CollectionStats.fromLines(currentLines);
             globalEquiStats = EquilibriumStats.fromLines(currentLines);
@@ -519,6 +570,8 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   // Drain any pending CSV writes before letting `finish()` call exit(0).
   await statsChain;
   await statsSink.close();
+  await vectorChain;
+  vectorSink?.close();
   finish();
 }
 

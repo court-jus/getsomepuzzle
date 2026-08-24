@@ -41,10 +41,8 @@ Future<IslandsConstraint?> showIslandsDialog(
             child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(
-              ctx,
-              IslandsConstraint(cellValueToString(color)),
-            ),
+            onPressed: () =>
+                Navigator.pop(ctx, IslandsConstraint(cellValueToString(color))),
             child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
           ),
         ],

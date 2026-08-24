@@ -12,6 +12,7 @@ import 'package:getsomepuzzle/getsomepuzzle/generator/messages.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/path.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/vector.dart';
 
 class GeneratorWorker {
   StreamController<GeneratorMessage>? _controller;
@@ -119,6 +120,7 @@ class GeneratorWorker {
         focusAxisName: focusAxisName,
         adaptiveK: adaptiveK,
         skipSafety: skipSafety,
+        computeVector: config.computeVector,
       ),
     );
 
@@ -149,6 +151,7 @@ class GeneratorWorker {
             GeneratorPuzzleMessage(
               message['line'] as String,
               PuzzleLevel.values[message['level'] as int],
+              (message['vector'] as List?)?.cast<String>(),
             ),
           );
         } else if (type == 'target') {
@@ -265,6 +268,11 @@ class _IsolateParams {
   /// tuples have been filtered out.
   final int skipSafety;
 
+  /// Forwarded from `GeneratorConfig.computeVector`: when true, `_finalize`
+  /// also computes the inline feature vector so the CLI can append a row to
+  /// `puzzle_vectors.csv` (see `docs/dev/collection_management.md`).
+  final bool computeVector;
+
   _IsolateParams({
     required this.sendPort,
     required this.width,
@@ -297,6 +305,7 @@ class _IsolateParams {
     this.focusAxisName,
     this.adaptiveK = 20,
     this.skipSafety = 100,
+    this.computeVector = false,
   });
 }
 
@@ -669,6 +678,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
       pathWindingProb: params.pathWindingProb,
       strategy: params.strategy,
       maxStall: Duration(milliseconds: params.maxStallMs),
+      computeVector: params.computeVector,
     );
 
     final attemptStartMs = stopwatch.elapsedMilliseconds;
@@ -706,7 +716,7 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
     // attempt to relabel the reject from `cancelled` to `attemptTimeout`.
     bool attemptDeadlineHit = false;
 
-    ({String line, PuzzleLevel level})? result;
+    GenerateOneResult? result;
     try {
       result = PuzzleGenerator.generateOne(
         config,
@@ -873,10 +883,14 @@ Future<void> _isolateEntryPoint(_IsolateParams params) async {
     if (result != null) {
       generated++;
       final line = result.line;
+      final vector = result.vector;
       params.sendPort.send({
         'type': 'puzzle',
         'line': line,
         'level': result.level.index,
+        // Inline vector CSV fields (all columns except file/canonical_key),
+        // serialized as a primitive list so it crosses the isolate boundary.
+        'vector': vector == null ? null : vectorCsvFields(vector),
       });
 
       // Update legacy usageStats (slug-only bias).

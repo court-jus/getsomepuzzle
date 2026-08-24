@@ -14,6 +14,15 @@ import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/groups.dart' as utils_groups;
+import 'package:getsomepuzzle/getsomepuzzle/vector.dart';
+
+/// Result of a successful generation attempt. [vector] is non-null only when
+/// the config requests inline vector emission (`GeneratorConfig.computeVector`).
+typedef GenerateOneResult = ({
+  String line,
+  PuzzleLevel level,
+  PuzzleVector? vector,
+});
 
 class GeneratorConfig {
   final int width;
@@ -108,6 +117,13 @@ class GeneratorConfig {
   /// legitimately slow successes.
   final Duration maxStall;
 
+  /// When true, `_finalize` also computes the per-puzzle feature vector
+  /// (from the *post-sort* trace) and returns it on [GenerateOneResult], so
+  /// the caller can append a row to `puzzle_vectors.csv` without a full
+  /// re-vectorize. Used by the CLI generator for asset routing. Off for the
+  /// in-app/web generator (no filesystem). See `docs/dev/collection_management.md`.
+  final bool computeVector;
+
   const GeneratorConfig({
     required this.width,
     required this.height,
@@ -131,6 +147,7 @@ class GeneratorConfig {
     this.domain = defaultDomain,
     this.strategy = GenerationStrategy.phaseGate,
     this.maxStall = const Duration(seconds: 15),
+    this.computeVector = false,
   });
 }
 
@@ -345,7 +362,7 @@ class PuzzleGenerator {
   /// loop stages (`loop_probe`, `loop_candidate`, `loop_sort`) run many
   /// times per attempt — the count map lets callers compute an average
   /// time per call.
-  static ({String line, PuzzleLevel level})? generateOne(
+  static GenerateOneResult? generateOne(
     GeneratorConfig config, {
     void Function(GeneratorProgress)? onProgress,
     void Function(GenerationRejectReason, Puzzle)? onReject,
@@ -436,7 +453,7 @@ class PuzzleGenerator {
   /// Body of [generateOne]. Split out so the public entry can wrap
   /// it in a `try/finally` that fires the timings callback even for
   /// early returns (rejections, `shouldStop`, exceptions).
-  static ({String line, PuzzleLevel level})? _generateOneTimed(
+  static GenerateOneResult? _generateOneTimed(
     GeneratorConfig config, {
     void Function(GeneratorProgress)? onProgress,
     void Function(GenerationRejectReason, Puzzle)? onReject,
@@ -1136,7 +1153,7 @@ class PuzzleGenerator {
   /// `classifyTrace`, optional target-collection routing / easing, and
   /// the "easier-first" constraint sort. Used by both the regular/SH
   /// flow and the path-based flow.
-  static ({String line, PuzzleLevel level})? _finalize(
+  static GenerateOneResult? _finalize(
     Puzzle pu,
     GeneratorConfig config, {
     void Function(GenerationRejectReason, Puzzle)? onReject,
@@ -1241,7 +1258,14 @@ class PuzzleGenerator {
       if (simplifyResult != null) {
         pu.sortConstraintsByDifficulty(simplifyResult.finalSteps);
         autoShrinkDomain(pu, replay);
-        return (line: pu.lineExport(), level: level);
+        final vector = _vectorizeFinalize(
+          pu,
+          replay,
+          config.computeVector,
+          shouldStop,
+        );
+        final line = pu.lineExport();
+        return (line: line, level: level, vector: vector);
       }
     }
 
@@ -1258,7 +1282,36 @@ class PuzzleGenerator {
     pu.sortConstraintsByDifficulty(steps);
     autoShrinkDomain(pu, replay);
 
-    return (line: pu.lineExport(), level: level);
+    final vector = _vectorizeFinalize(
+      pu,
+      replay,
+      config.computeVector,
+      shouldStop,
+    );
+    final line = pu.lineExport();
+    return (line: line, level: level, vector: vector);
+  }
+
+  /// Compute the inline feature vector for a puzzle being exported, or null
+  /// when [compute] is false (the in-app/web generator).
+  ///
+  /// When on, the puzzle has already been easier-first sorted and domain-
+  /// shrunk, but the trace held by `_finalize` ([steps]) predates the sort —
+  /// batch vectors (`bin/vectorize_puzzles.dart`) are computed on *post-sort*
+  /// traces, so we re-solve here for exact consistency. That re-solve also
+  /// sets the cached complexity/solution via `computeComplexityFromSteps`, so
+  /// the subsequent `lineExport()` reuses them instead of running its own
+  /// hidden solve — the per-puzzle solve count is unchanged vs. today.
+  static PuzzleVector? _vectorizeFinalize(
+    Puzzle pu,
+    Puzzle replay,
+    bool compute,
+    bool Function()? shouldStop,
+  ) {
+    if (!compute) return null;
+    final finalSteps = pu.solveExplained(shouldStop: shouldStop);
+    pu.computeComplexityFromSteps(finalSteps);
+    return computePuzzleVector(pu: pu, steps: finalSteps, replay: replay);
   }
 
   /// Auto-shrink the declared domain. When the validated solution never

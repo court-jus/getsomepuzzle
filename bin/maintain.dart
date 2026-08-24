@@ -31,6 +31,10 @@ const _allCollections = [..._playableLevels, ..._offCascade];
 const _onboardingBank = 'assets/1-easy_onboarding.txt';
 const _vectorCsv = 'puzzle_vectors.csv';
 
+/// The recycled mad feed produced by `cluster_puzzles --mode recycle` and
+/// consumed (emptied of routed lines) by `bin/recycle_mad.dart`.
+const _madRecycledFeed = 'assets/6-mad-recycled.txt';
+
 class StepResult {
   final String name;
   final Duration duration;
@@ -194,10 +198,75 @@ Future<StepResult> _stepCluster() async {
   );
 }
 
-// ─── Step 6: extract_onboarding ────────────────────────────────────
+// ─── Step 6: cluster_puzzles --mode recycle --apply ────────────────
+
+Future<StepResult> _stepRecycle() async {
+  stderr.writeln('\n━━━ STEP 6/8: cluster_puzzles --mode recycle --apply ━━━');
+  final sw = Stopwatch()..start();
+
+  // FPS prune-to-count: any collection above the 20k balance target keeps
+  // its `--target-count` most-diverse puzzles; the excess is moved to
+  // `<file>-recycled.txt` (e.g. assets/6-mad-recycled.txt, the feed of
+  // bin/recycle_mad.dart).
+  final code = await _runScript('bin/cluster_puzzles.dart', [
+    '--mode',
+    'recycle',
+    '--apply',
+    '-v',
+  ]);
+  sw.stop();
+  if (code != 0) {
+    return StepResult(
+      name: 'cluster_puzzles --mode recycle',
+      duration: sw.elapsed,
+      ok: false,
+      error: 'exit $code',
+    );
+  }
+  return StepResult(
+    name: 'cluster_puzzles --mode recycle',
+    duration: sw.elapsed,
+    ok: true,
+  );
+}
+
+// ─── Step 7: recycle_mad --apply ───────────────────────────────────
+
+Future<StepResult> _stepRecycleMad() async {
+  stderr.writeln('\n━━━ STEP 7/8: recycle_mad --apply ━━━');
+  final sw = Stopwatch()..start();
+
+  // No feed to ease (e.g. 6-mad already at/below the 20k target, so step 6
+  // moved nothing) — nothing to recycle, treat as a clean skip.
+  if (!File(_madRecycledFeed).existsSync()) {
+    return StepResult(
+      name: 'recycle_mad',
+      duration: sw.elapsed,
+      ok: true,
+      notes: ['$_madRecycledFeed absent — nothing to recycle'],
+    );
+  }
+
+  // Ease the recycled mad feed down into the deficient collections (targets
+  // player,expert,strong; cap 20000), routing each landed line into its
+  // classifyTrace collection and consuming (removing) it from the feed.
+  final code = await _runScript('bin/recycle_mad.dart', ['--apply', '-v']);
+  sw.stop();
+  if (code != 0) {
+    return StepResult(
+      name: 'recycle_mad',
+      duration: sw.elapsed,
+      ok: false,
+      error: 'exit $code',
+    );
+  }
+  return StepResult(name: 'recycle_mad', duration: sw.elapsed, ok: true);
+}
+
+// ─── Step 8: extract_onboarding ────────────────────────────────────
 
 Future<StepResult> _stepOnboarding() async {
-  stderr.writeln('\n━━━ STEP 6/6: extract_onboarding ━━━');
+  stderr.writeln('\n━━━ STEP 8/8: extract_onboarding ━━━');
   final sw = Stopwatch()..start();
   final code = await _runScript('bin/extract_onboarding.dart', [
     '--per-phase',
@@ -255,7 +324,12 @@ void _printSummary(
 
   print('');
   print('File line counts (before → after):');
-  final tracked = [..._allCollections, _onboardingBank, _vectorCsv];
+  final tracked = [
+    ..._allCollections,
+    _onboardingBank,
+    _vectorCsv,
+    _madRecycledFeed,
+  ];
   for (final f in tracked) {
     final b = before[f] ?? 0;
     final a = after[f] ?? 0;
@@ -297,7 +371,15 @@ Pipeline:
                             --keep-per-cluster 1, protecting the current
                             onboarding bank. Skips CSV rows whose puzzle was
                             removed in steps 3-4 (stale-row guard).
-  6. extract_onboarding     Refresh assets/1-easy_onboarding.txt
+  6. cluster_puzzles        --mode recycle --apply: FPS prune-to-count.
+                            Collections above the 20k target keep their
+                            most-diverse puzzles; the excess is moved to
+                            <file>-recycled.txt (e.g. assets/6-mad-recycled.txt).
+  7. recycle_mad            --apply: ease the recycled mad feed down into the
+                            deficient collections (targets player/expert/strong,
+                            cap 20000) and consume (remove) routed lines from
+                            the feed.
+  8. extract_onboarding     Refresh assets/1-easy_onboarding.txt
                             (300 puzzles per phase) from the post-
                             cleanup corpus.
 
@@ -316,7 +398,12 @@ Future<void> main(List<String> args) async {
     exit(64);
   }
 
-  final tracked = [..._allCollections, _onboardingBank, _vectorCsv];
+  final tracked = [
+    ..._allCollections,
+    _onboardingBank,
+    _vectorCsv,
+    _madRecycledFeed,
+  ];
   final before = _snapshot(tracked);
 
   // Order matters: recompute refreshes the cached solutions and re-routes
@@ -331,6 +418,8 @@ Future<void> main(List<String> args) async {
     _stepDedup,
     _stepCleanup,
     _stepCluster,
+    _stepRecycle,
+    _stepRecycleMad,
     _stepOnboarding,
   ];
 

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/puzzle_display.dart';
@@ -57,12 +58,19 @@ void main(List<String> args) {
 void _solvePuzzle(String line) {
   final p = Puzzle(line);
 
+  // Prefill ratio captured before the replay mutates the grid — needed by
+  // the difficulty cascade at the end.
+  final prefillRatio = 1 - p.freeCells().length / (p.width * p.height);
+
   print('Puzzle: $line');
   print('');
   print(describePuzzle(p));
   print('--- Solving steps ---');
-
   final trace = p.solveTrace();
+
+  // Must run while the puzzle is still in its initial state: the method
+  // short-circuits to 0 on a complete grid.
+  p.computeComplexityFromSteps(trace.steps);
 
   int step = 0;
   for (final s in trace.steps) {
@@ -78,7 +86,8 @@ void _solvePuzzle(String line) {
           SolveMethod.propagation => 'constraint',
         };
         print(
-          'Step $step: ($r,$c) = ${value.name}  [$foundBy - ${s.constraint}]',
+          'Step $step: ($r,$c) = ${value.name}  [$foundBy - ${s.constraint}]'
+          ' <cplx ${s.method == SolveMethod.force ? 5 + 5 * s.forceDepth : s.complexity}>',
         );
       case RemoveOptionStep(:final option, :final method, :final isComplicity):
         p.removeOption(s.cellIdx, option);
@@ -88,7 +97,8 @@ void _solvePuzzle(String line) {
           SolveMethod.propagation => 'constraint',
         };
         print(
-          'Step $step: ($r,$c) != ${option.name}  [$foundBy - ${s.constraint}]',
+          'Step $step: ($r,$c) != ${option.name}  [$foundBy - ${s.constraint}]'
+          ' <cplx ${s.method == SolveMethod.force ? 5 + 5 * s.forceDepth : s.complexity}>',
         );
     }
   }
@@ -115,4 +125,20 @@ void _solvePuzzle(String line) {
     print('Final state (incomplete):');
     print(formatGrid(p.cellValues, p.width, p.height));
   }
+
+  // Complexity + difficulty collection from the trace we already hold —
+  // no re-solve, no routing/redistribution, just classification output.
+  final level = classifyTrace(
+    steps: trace.steps,
+    prefillRatio: prefillRatio,
+    solved: trace.impossibleBy == null && p.complete,
+  );
+  final collectionKey = levelToPlayableCollectionKey[level];
+  print('');
+  print('--- Complexity ---');
+  print('Complexity: ${p.cachedComplexity}');
+  print(
+    'Collection: ${levelLabels[level]}'
+    '${collectionKey != null ? ' ($collectionKey.txt)' : ''}',
+  );
 }

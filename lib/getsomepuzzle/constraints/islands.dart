@@ -193,12 +193,10 @@ class IslandsConstraint extends Constraint {
         for (var x = 0; x < puzzle.cellValues.length; x++) {
           if (puzzle.cellValues[x] != CellValue.free) continue;
           if (!puzzle.cells[x].options.contains(color)) continue;
-          if (blockingDisconnectsMembers(
-            puzzle,
-            x,
-            color,
-            [groups[i].first, groups[j].first],
-          )) {
+          if (blockingDisconnectsMembers(puzzle, x, color, [
+            groups[i].first,
+            groups[j].first,
+          ])) {
             return SetValue(x, color, this, complexity: 3);
           }
         }

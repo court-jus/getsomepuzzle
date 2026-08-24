@@ -16,7 +16,14 @@ class GeneratorPuzzleMessage extends GeneratorMessage {
   /// `solveExplained` trace — the same trace it used to validate
   /// deductive uniqueness, so this comes for free.
   final PuzzleLevel level;
-  GeneratorPuzzleMessage(this.puzzleLine, this.level);
+
+  /// Inline feature-vector CSV fields (all columns except `file` /
+  /// `canonical_key`), when the generator was asked to compute vectors
+  /// (`GeneratorConfig.computeVector`). `null` otherwise (e.g. the web /
+  /// in-app generator, which has no filesystem). Lets the CLI append a fresh
+  /// row to `puzzle_vectors.csv` without a full re-vectorize.
+  final List<String>? vectorFields;
+  GeneratorPuzzleMessage(this.puzzleLine, this.level, [this.vectorFields]);
 }
 
 /// Emitted whenever a worker picks a new equilibrium target for the next

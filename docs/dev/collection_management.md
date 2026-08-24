@@ -36,8 +36,8 @@ declared slugs. See `levels.md` for the cascade.
 | `bin/recompute.dart`                  | Re-sort constraints, refresh stored cplx, re-route by level; writes `solve_traces.tsv` |
 | `bin/dedup_puzzles.dart`              | Drop puzzles that are exact duplicates (canonical key match) |
 | `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated / MJ-border-conflict / regular-pattern puzzles |
-| `bin/vectorize_puzzles.dart`          | Produce per-puzzle feature vector CSV (reads `solve_traces.tsv`) |
-| `bin/cluster_puzzles.dart`            | Find near-duplicate pairs/clusters (report or --apply mode)  |
+| `bin/vectorize_puzzles.dart`          | Produce per-puzzle feature vector CSV (reads `solve_traces.tsv`; thin driver over `lib/getsomepuzzle/vector.dart`) |
+| `bin/cluster_puzzles.dart`            | Near-duplicate pairs/clusters (cluster) or FPS prune-to-count recycle (report or `--apply` mode) |
 | `bin/extract_onboarding.dart`         | Build a diverse onboarding bank from 1-easy                  |
 | `bin/classify_difficulty.dart`        | Classify each puzzle into the level cascade (reads `solve_traces.tsv`) |
 | `bin/aggregate_player_stats.dart`     | Merge per-player stats files, dedup, refresh cplx            |
@@ -48,6 +48,11 @@ declared slugs. See `levels.md` for the cascade.
 | `bin/plot_vectors.py`                 | 2-D PCA projection + supervised separability of the vectors (matplotlib + numpy) |
 | `bin/detect_regular_solutions.dart`   | Diagnose globally-regular solutions (damier / colour bars) over-rated by the trace (read-only report + optional CSV) |
 | `bin/find_single_path_puzzles.dart`   | Filter puzzles that have a unique deduction path (exactly one move at every step) — no branching, no backtracking needed |
+| `bin/pilot_recycle.dart`              | Pilot: does `Puzzle.simplify()` convert mad puzzles into advanced/strong, and at what cost? (see "Collection orchestrator and puzzle recycling") |
+| `bin/pilot_readonly.dart`             | Pilot: does fixing readonly cells (instead of adding constraints) convert mad puzzles into advanced/strong, and is there prefill headroom? Thin sampler/reporter over `lib/getsomepuzzle/recycle.dart` |
+| `bin/experiment_landing.dart`         | Landing experiment: can readonly-easing deliberately land a mad puzzle in a specific level (player/expert/strong)? Uses `recycle.dart`'s `targetLevel` objective (see "Collection orchestrator and puzzle recycling") |
+| `bin/recycle_mad.dart`                | Recycling step: ease a mad-overflow feed into the deficient collections via target-level readonly-easing; routes landed lines by final level and consumes them from the feed (see "Collection orchestrator and puzzle recycling") |
+| `bin/balance_collections.dart`        | Orchestrator: endless generate→recycle→recycle_mad loop toward a common target size; full `maintain` on a cadence (see "Collection orchestrator and puzzle recycling") |
 
 ## Generation
 
@@ -292,6 +297,34 @@ The clustering empirically concentrates on `1-easy.txt` (~10 % at
 ε = 0.3) and `1-easy-overfilled.txt` (~5 %), with NC-only and
 FM-only puzzles dominating the dropped clusters — see the
 "Why redundancy concentrates in the easy tier" section below.
+
+### 4. Recycle over-full collections (FPS prune-to-count)
+
+`cluster_puzzles.dart --mode recycle` implements the collection
+orchestrator's "too similar" = farthest-point-sampling prune-to-count
+decision (see "Collection orchestrator and puzzle recycling"): it needs
+**no ε threshold**, so it works uniformly on the easy tier *and* on
+6-mad, where near-duplicate ε-clustering finds almost nothing.
+
+For each collection with more than `--target-count` puzzles (default
+20 000), the tool keeps the `--target-count` **most-diverse** puzzles in
+place (farthest-point sampling on the per-collection z-scored vector,
+`--protect-from` keys as forced seeds) and **moves** the excess to
+`<file>-recycled.txt` — e.g. `assets/6-mad-recycled.txt`, which is the
+default feed of `bin/recycle_mad.dart`. The move is idempotent: the
+collection is rewritten in place and the recycled feed is *appended*,
+deduped by canonical key, so a partially-consumed feed is never lost or
+duplicated across runs. Default scope is the six playable level files
+(the overfilled buckets stay out).
+
+```bash
+# Dry-run report (what would move, no writes)
+dart run bin/cluster_puzzles.dart --mode recycle -v
+
+# Apply — prune the six playable collections down to 20k each, moving the
+# excess of 6-mad into assets/6-mad-recycled.txt
+dart run bin/cluster_puzzles.dart --mode recycle --apply -v
+```
 
 ## Onboarding bank
 
@@ -618,7 +651,7 @@ pipeline.
 
 ## Periodic maintenance
 
-`bin/maintain.dart` chains the six routine maintenance tools into a
+`bin/maintain.dart` chains the eight routine maintenance tools into a
 single fail-fast pipeline that applies as it goes. Run it from the
 project root whenever the corpus needs a refresh — typically after a
 formula tweak, a new constraint, or just on a periodic cadence:
@@ -648,7 +681,17 @@ Pipeline (each step applies directly; the next step sees the updated
    current onboarding bank. Because the vector predates steps 3-4, it
    first drops CSV rows whose puzzle is no longer in any collection, so a
    stale row can never be picked as the representative that survives.
-6. **`extract_onboarding`** — refresh `assets/1-easy_onboarding.txt`
+6. **`cluster_puzzles --mode recycle --apply`** — FPS prune-to-count.
+   Any collection above the 20 k balance target keeps its
+   `--target-count` most-diverse puzzles; the excess is moved to
+   `<file>-recycled.txt` (see "Pruning the corpus" §4). Today this shrinks
+   6-mad down to 20 k and feeds `assets/6-mad-recycled.txt`.
+7. **`recycle_mad --apply`** — ease the recycled mad feed down into the
+   deficient collections (targets `player,expert,strong`, cap 20 k),
+   routing each landed line into its `classifyTrace` collection, and
+   consume (remove) the routed lines from the feed so it converges to just
+   the not-yet-easable hard cases.
+8. **`extract_onboarding`** — refresh `assets/1-easy_onboarding.txt`
    (300 per phase) from the post-cleanup corpus.
 
 The pipeline never commits — every change lands in `assets/*.txt`
@@ -658,8 +701,10 @@ line-count delta, and total wall time. The first failing step aborts
 the rest; subsequent steps can be resumed by re-running the script
 after fixing the issue (each step independently snapshots and applies).
 
-Wall time on a 26 k-puzzle corpus is dominated by step 4
-(vectorize, ~20-30 min) and step 5 (cluster, a few minutes).
+Wall time on a 26 k-puzzle corpus is dominated by step 2
+(vectorize, ~20-30 min) and step 5 (cluster, a few minutes); step 6
+(FPS prune-to-count over 6-mad) takes a few minutes, and step 7
+(recycle_mad easing) a few seconds per feed line.
 
 ## Typical workflows
 
@@ -733,6 +778,262 @@ The corpus-level equilibrium target therefore *does* what it
 promises — but the consequence at the easy end is more redundancy.
 Reducing NC's share in the equilibrium target would push the
 problem onto FM-only or PA-only puzzles with the same effect.
+
+## Collection orchestrator and puzzle recycling
+
+Forward-looking design for balancing the six playable collections around
+a common target size. Status: implemented in `bin/balance_collections.dart`
+(see decision 5). This section records what we are trying to achieve, the
+decisions made, and the questions still open.
+
+### What we are trying to achieve
+
+The six playable collections are badly skewed: 1-easy (~15 k puzzles) and
+6-mad (~23 k) dwarf the middle tiers (3-advanced ~0.4 k, 4-strong ~1.1 k,
+2-player ~9 k, 5-expert ~4.5 k). The goal is to bring **all six to ~20 000
+puzzles each** (± 10 %: floor 18 k, ceiling 22 k) with **one background
+command that alternates generation and pruning** until the whole corpus is
+in range.
+
+Two structural facts drive the design:
+
+* **Equilibrium does not steer difficulty.** The equilibrium engine
+  (`equilibrium.dart`) biases the slug / ntypes / pair / size / profile /
+  composition / domain axes — never the `classifyTrace` level. A free
+  generation run keeps over-producing 1-easy and 6-mad (the cascade's two
+  wide ends) while 3-advanced / 4-strong trickle in: `advanced` requires
+  `forceMoves == 0` **and** a complicity at tier 1-3, `strong` requires
+  `forceMoves == 0` **and** a complicity at tier ≥ 4 — randomly-produced
+  puzzles almost always either solve by pure propagation (beginner/player)
+  or need a force round (expert/mad).
+* **Similarity pruning only bites on the easy tier.** `cluster_puzzles`
+  removes ~10 % of 1-easy at ε = 0.3 but ~0 % of the high tiers (see
+  "Why redundancy concentrates in the easy tier"): 6-mad puzzles are
+  near-unique in the 91-dim feature space, so "drop the too-similar ones"
+  cannot shrink 6-mad on its own.
+
+### Decisions made
+
+1. **Targets.** ~20 000 per collection, tolerance ±10 % → floor 18 000,
+   ceiling 22 000. Main six collections only; the overfilled buckets are
+   deferred (possible future lever: raise the per-collection prefill cap to
+   borrow from them).
+2. **"Too similar" = farthest-point sampling prune-to-count**, not the
+   ε-threshold clustering. FPS keeps the `target` most-diverse puzzles of
+   an over-full collection (maximising mutual vector distance) and moves
+   the rest to the per-collection recycled feed (`<file>-recycled.txt`).
+   Implemented as `cluster_puzzles.dart --mode recycle` (see "Pruning the
+   corpus" §4); unlike ε-clustering it needs no threshold, so it works
+   uniformly on 1-easy **and** 6-mad.
+3. **Pruned 6-mad puzzles are recycled, not deleted.** The pruned
+   `count − target` lines are moved to a staging file
+   (`assets/6-mad-recycled.txt`) by `cluster_puzzles --mode recycle`
+   and fed to `Puzzle.simplify`
+   (`lib/getsomepuzzle/model/puzzle.dart`) — the same "add constraints
+   until the trace cascades into the target" routine the generator's
+   `--target-collection` easing loop uses. A mad puzzle with extra
+   constraints grafted on loses its force rounds and re-classifies into
+   3-advanced / 4-strong (or lower — any in-cascade level below mad is
+   salvageable). Uniqueness is preserved by construction: `simplify` only
+   adds constraints that verify against the unique solution.
+4. **Vector freshness via inline emission.** The prune step reads
+   `puzzle_vectors.csv`, which must cover newly generated puzzles. Instead
+   of re-running the 20-30 min `vectorize_puzzles` every loop iteration,
+   the generator appends one vector row per emitted puzzle during asset
+   routing (`GeneratorConfig.computeVector`, always on in the CLI; off for
+   the in-app/web generator). The vector logic lives in the shared
+   `lib/getsomepuzzle/vector.dart` (+ `lib/getsomepuzzle/solution_geometry.dart`,
+   re-exported by `bin/_solution_geometry.dart`), used by both
+   `bin/vectorize_puzzles.dart` and the generator's `_finalize`. The inline
+   vector uses the **post-sort** trace (a re-solve that replaces the hidden
+   solve inside `lineExport`'s `computeComplexity`, so the per-puzzle solve
+   count is unchanged) and is identical to what a batch `vectorize_puzzles`
+   run produces for the same line. One bootstrap `vectorize_puzzles` run
+   covers the existing corpus.
+5. **Orchestrator as one background command.** `bin/balance_collections.dart`
+   (built) loops: count the six files → generate a batch → FPS-prune + recycle
+   any over-target collection (`cluster_puzzles --mode recycle --apply`) → ease
+   the recycled feed into the deficient collections (`recycle_mad --apply`) →
+   full `maintain.dart` every `--maintain-every` iterations → repeat until all
+   *fillable* collections (1-easy, 2-player, 5-expert, 6-mad) ∈ [18 000, 22 000],
+   with `--dry-run` and `--max-iterations` guards. Because the generator emits
+   inline vectors, the cheap loop needs no full re-vectorize; `maintain.dart`
+   re-vectorizes authoritatively on a cadence. 3-advanced and 4-strong are
+   tracked best-effort (4-strong gets `--target-collection 4-strong` batches
+   every `--strong-every` iterations) but do not block convergence.
+6. **Pilot first.** `bin/pilot_recycle.dart` measures whether `simplify()`
+   can actually convert mad → advanced/strong and at what cost before the
+   orchestrator commits to recycling as a primary source.
+
+### Pilot: `bin/pilot_recycle.dart`
+
+Samples lines from a collection (default `assets/6-mad.txt`), runs
+`simplify(targetLevel)` on each, and reports:
+
+* success rate to `strong` (index ≤ 3) and `advanced` (index ≤ 2), overall
+  and restricted to initial-mad rows;
+* final-level distribution (how many plateaued at mad vs reached the
+  targets vs overshot below them);
+* cost: constraint additions (bloat) and wall time;
+* re-classification of the exported lines — the same sort +
+  `autoShrinkDomain` + `lineExport` tail the generator's `_finalize` uses —
+  with `--emit-out` writing the salvageable v2 lines for inspection.
+
+```bash
+dart run bin/pilot_recycle.dart --sample 200 --target strong
+dart run bin/pilot_recycle.dart --sample 200 --target advanced --emit-out /tmp/recycled.txt
+```
+
+### Readonly-cell easing (`bin/pilot_readonly.dart`)
+
+`simplify()` lowers a puzzle's level by grafting *constraints* onto it
+(decision 3 above). An alternative lever, implemented in
+`bin/pilot_readonly.dart`, is to pre-fill more cells as readonly givens
+instead: removing unknowns
+from the grid can shorten the deduction chain and drop force rounds, which
+would re-classify a mad puzzle into 3-advanced / 4-strong without adding a
+single constraint.
+
+Two caveats make this trickier than constraint-adding:
+
+* **Prefill routing.** `classifyTrace` routes any puzzle with
+  `prefillRatio > 0.30` into the per-level `*-overfilled` buckets regardless
+  of the trace. Adding readonly cells therefore *raises* the very ratio that
+  can eject a puzzle out of the playable cascade — this lever only works
+  while staying under ~30 % prefill. Constraint-adding has no such ceiling
+  (it never touches prefill).
+* **Correctness.** Every new readonly value must come from the puzzle's
+  unique solution, and the cache / solution field on the line must be
+  refreshed, or the result is unsolvable / the stored solution goes stale.
+
+The easing core lives in `lib/getsomepuzzle/recycle.dart` (`easePuzzle`),
+shared by `bin/pilot_readonly.dart` (a thin sampler/reporter exposing the
+`min-level` and `hit-band` objectives) and `bin/experiment_landing.dart`
+(which uses the generalised `target-level` objective to test whether easing
+can deliberately land in a specific collection — player/expert/strong — for
+the recycling step). Results are in "Pilot results" below.
+
+### Pilot results
+
+Run on a 200-puzzle sample of `assets/6-mad.txt` (all initial-mad), target
+`strong`, per-puzzle timeout 15 s.
+
+**Constraint-grafting (`bin/pilot_recycle.dart`).**
+
+| Metric | Value |
+|---|---|
+| leaves mad | 82.5 % (165/200) |
+| → strong / advanced | 19 / **1** |
+| → expert / player / beginner | 5 / 123 / 17 |
+| stays mad | 35 (19 immediate plateau) |
+| cost | +2.5 constraints (max 8), 5.2 s mean |
+| export mismatches | 5 / 165 |
+
+Overshoots: one indispensable constraint usually collapses `mad` all the way
+to `player`, because the added constraint also shortcuts the complicity
+deduction.
+
+**Readonly-easing (`bin/pilot_readonly.dart`).** Initial prefill 2.8 % →
+28.6 % (median 15 %), so the 30 % cap is not the blocker.
+
+| Metric | `min-level` | `hit-band` |
+|---|---|---|
+| leaves mad | 46 % | **69.5 %** |
+| → strong / advanced | 13 / 0 | 16 / 0 |
+| → expert / player / beginner | 5 / 54 / 20 | 19 / 98 / 25 |
+| stays mad | 108 | 37 |
+| readonly cells added | 0.59 mean | 2.13 mean (max 9) |
+| wall time | 1.3 s mean | ~3 s mean (1 outlier ≈ 180 s) |
+| export mismatches | 0 | 0 |
+
+`min-level` plateaus early (0.59 cells added on average): it only commits a
+fix that *lowers the level*, so a cell that merely reduces force 2 → 1 is
+skipped. `hit-band` commits any force-reducing fix and scores candidates by
+"kill force while keeping a complicity", more than doubling the salvage rate.
+
+**Conclusions.**
+
+1. **The recycling lever is settled: `hit-band` readonly-easing.** Highest
+   salvage, no early plateau, and it feeds real shares to `2-player` (bulk),
+   `5-expert` (19) and `4-strong` (16). Preferred over constraint-grafting
+   and over `min-level`.
+2. **`advanced` is unreachable by down-easing mad puzzles** — 0 in every
+   200-run (constraint-graft got 1). The `classifyTrace` band for
+   `advanced`/`strong` (`forceMoves == 0` **and** a surviving complicity) is
+   skipped past because eliminating force also shortcuts the complicity.
+3. So recycling can balance `1/2/5` (and partially `4`), but `3-advanced`
+   (and reaching 20 k for `4-strong`) needs either a generator feature that
+   produces complicity-without-force puzzles directly, or a recalibrated
+   target.
+
+**Notes found while running.**
+
+* `--target-collection`'s easing loop accepts `reachedTarget == finalLevel <=
+  target` and emits the result at that lower level (a too-hard puzzle eased
+  past the target is routed to the lower file), so it does not reliably fill
+  the target collection on its own.
+* A prefill-headroom bug (a `1e-9` epsilon in `pilot_readonly.dart`'s cap
+  check) let a few puzzles be mis-routed to overfilled buckets by a sub-percent
+  overshoot; fixed with exact integer arithmetic.
+
+### Landing experiment and the recycling step
+
+The recycling step needs to AIM the easing at a specific deficient collection.
+`bin/experiment_landing.dart` validated that with a generalised
+`target-level` objective. A pure level-distance score plateaued (~64 % of mad
+puzzles stuck: a fix that merely lowers force 2 → 1 keeps the same level, so
+it was never committed); adding a `forceMoves × 1000` reward fixed it. Final
+100-puzzle sample (seed 42, `assets/6-mad.txt`):
+
+| target | lands exactly | stays mad | notable fallout |
+|---|---|---|---|
+| `player` | 58 % | 20 % | beginner 11 %, expert 11 % |
+| `expert` | 54 % | 20 % | player 16 % |
+| `strong` | 4 % | 20 % | player 54 % (force-kill overshoot) |
+
+`player` and `expert` are therefore deliberately fillable (~55 % exact, 80 %
+salvage, ~4 s/puzzle); `strong`/`advanced` remain structurally hard, as
+before.
+
+`bin/recycle_mad.dart` is the production recycling step built on this: it
+reads a mad-overflow feed (default `assets/6-mad-recycled.txt`), eases each
+line with `EaseObjective.targetLevel` toward the first open target (by current
+collection count vs `--cap`, live-balanced as lines route), and routes the
+landed line into `assets/<level>.txt` by its actual final level
+(`--apply`; dry-run by default). Canonical-key duplicates are skipped against
+the destination file; stayed-mad lines can be dumped with `--emit-mad`.
+
+
+### Open questions
+
+* **advanced/strong path.** 3-advanced (and reaching 20 k for 4-strong)
+  cannot be filled by recycling: both down-easing levers produce ~0 advanced
+  (see "Pilot results"). The two routes are (a) a generator feature that
+  produces complicity-without-force puzzles directly, or (b) recalibrating
+  those collections' targets to their natural production rates. Not yet
+  decided.
+* **Per-level generation rates.** Reading the `level` column of
+  `generator_stats.csv` shows how starved advanced/strong really are under
+  free generation, and decides how much "mad-as-feeder" over-production is
+  needed to feed `2-player` / `5-expert` / `4-strong` via `bin/recycle_mad.dart`.
+* **Quality of eased puzzles.** A recycled puzzle carries more readonly cells
+  than a natively generated one. Whether that reads as "denser" or "bloated"
+  to a player needs human judgement before shipping recycled puzzles into the
+  main collections.
+* **Recycling feed.** `bin/recycle_mad.dart` consumes the FPS-pruned 6-mad
+  excess, produced by `cluster_puzzles --mode recycle` (writes
+  `assets/6-mad-recycled.txt`; append + canonical-key dedup, so re-running
+  after a partial consumption never loses or duplicates lines). After an
+  `--apply` run, `recycle_mad` removes the successfully-routed lines from the
+  feed, so it converges to just the not-yet-easable (stayed-mad / unparsable)
+  hard cases. Keeping it topped-up and drained is automated by
+  `bin/balance_collections.dart` (generate → recycle → recycle_mad per
+  iteration).
+* **Fate of un-simplifiable puzzles.** Mad puzzles that stay mad after easing
+  (~20 %): keep them in 6-mad, or discard?
+* **Overfilled buckets.** Eventually the `*-overfilled.txt` collections could
+  "help" the under-filled ones by raising their prefill cap — `classifyTrace`
+  routing already keeps them separated per level. Deferred.
 
 ## Open work: reject-on-near-duplicate at generation time
 

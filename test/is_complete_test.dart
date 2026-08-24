@@ -296,8 +296,7 @@ void main() {
   });
 
   group('IslandsConstraint.isCompleteFor', () {
-    test('free corners keep the constraint lit (conservative grayout)',
-        () {
+    test('free corners keep the constraint lit (conservative grayout)', () {
       // 6x6: single black island in the middle, white sea, only the four
       // corners are still free. Conservative grayout: any free cell still
       // holding the colour keeps IS active.

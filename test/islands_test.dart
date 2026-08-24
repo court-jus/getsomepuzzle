@@ -48,8 +48,7 @@ void main() {
       expect(IslandsConstraint('1').verify(p), isTrue);
     });
 
-    test('permanent contact with free cells left is still a violation',
-        () {
+    test('permanent contact with free cells left is still a violation', () {
       // Black islands {0} and {4} corner-touch; cells {2, 5} are free but
       // unreachable from island {0} (walled in by whites 1 and 3), so no
       // future move can merge the groups → violated despite open cells.
@@ -87,8 +86,7 @@ void main() {
       expect(c.apply(p), isNull);
     });
 
-    test('prunes across a wall: growth would permanently corner-contact',
-        () {
+    test('prunes across a wall: growth would permanently corner-contact', () {
       // Islands {0,1} and {8}; free cell 5 shares its capable component
       // with 8 but is walled off from {0,1} by whites. Colouring 5 black
       // grows island {5,8}, which corner-contacts island {0,1} at cells
@@ -102,20 +100,22 @@ void main() {
       expect(move.removeOption, CellValue.black);
     });
 
-    test('forces the unique merge cell between diagonally-connected islands',
-        () {
-      // Black islands {3} and {7} corner-touch; whites seal every other
-      // route, so the only capable path between them runs through cell 6.
-      // The merge is mandatory → cell 6 must be black. Cells 5 and 8 are
-      // not on every path and stay free.
-      final p = makePuzzle('222\n120\n010');
-      final c = IslandsConstraint('1');
-      p.addConstraint(c);
-      final move = c.apply(p);
-      expect(move, isNotNull);
-      expect(move!.idx, 6);
-      expect(move.value, CellValue.black);
-    });
+    test(
+      'forces the unique merge cell between diagonally-connected islands',
+      () {
+        // Black islands {3} and {7} corner-touch; whites seal every other
+        // route, so the only capable path between them runs through cell 6.
+        // The merge is mandatory → cell 6 must be black. Cells 5 and 8 are
+        // not on every path and stay free.
+        final p = makePuzzle('222\n120\n010');
+        final c = IslandsConstraint('1');
+        p.addConstraint(c);
+        final move = c.apply(p);
+        expect(move, isNotNull);
+        expect(move!.idx, 6);
+        expect(move.value, CellValue.black);
+      },
+    );
 
     test('no forced merge when two disjoint routes exist', () {
       // Islands {0} and {3} corner-touch; they can merge through cell 1 OR
@@ -149,8 +149,7 @@ void main() {
   });
 
   group('IslandsConstraint.isCompleteFor', () {
-    test('free corners keep the constraint lit (conservative grayout)',
-        () {
+    test('free corners keep the constraint lit (conservative grayout)', () {
       // 6x6: single black island in the middle, white sea, only the four
       // corners are still free. Even though no placement could ever
       // violate the rule, grayout is conservative (SH convention): any
@@ -168,8 +167,7 @@ void main() {
       expect(c.isCompleteFor(p), isFalse);
     });
 
-    test('two free diagonal cells without a capable bridge → not complete',
-        () {
+    test('two free diagonal cells without a capable bridge → not complete', () {
       // Free capable cells remain → not complete under the conservative
       // criterion.
       final p = makePuzzle('2220\n2102\n2222\n2222');
@@ -209,10 +207,9 @@ void main() {
         IslandsConstraint.generateAllParameters(4, 4, defaultDomain, null),
         [for (final v in defaultDomain) cellValueToString(v)],
       );
-      expect(
-        IslandsConstraint.generateAllParameters(6, 6, fullDomain, null),
-        [for (final v in fullDomain) cellValueToString(v)],
-      );
+      expect(IslandsConstraint.generateAllParameters(6, 6, fullDomain, null), [
+        for (final v in fullDomain) cellValueToString(v),
+      ]);
     });
   });
 

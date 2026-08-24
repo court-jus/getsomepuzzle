@@ -3,6 +3,13 @@
 // redundant puzzles so the cleanup can drop one of each near-duplicate
 // pair (instead of generating new ones via equilibrium).
 //
+// Recycle mode (--mode recycle): instead of ε-clustering, prune each
+// over-full collection down to a target count via farthest-point
+// sampling — keep the `--target-count` most-diverse puzzles in place and
+// MOVE the excess to `<file>-recycled.txt` (e.g. assets/6-mad-recycled.txt,
+// the default feed of bin/recycle_mad.dart). No ε threshold needed, so it
+// works uniformly on the easy tier AND on 6-mad.
+//
 // Distance model:
 //   - All numeric features are z-scored across the pool, std capped
 //     against zero, z-score clipped to ±5 so rare-slug outliers don't
@@ -50,6 +57,17 @@ const _collections = [
   'assets/6-mad-overfilled.txt',
 ];
 
+/// The six playable level files — default targets of recycle mode
+/// (`--mode recycle`). The overfilled buckets stay out of scope.
+const _playableLevels = [
+  'assets/1-easy.txt',
+  'assets/2-player.txt',
+  'assets/3-advanced.txt',
+  'assets/4-strong.txt',
+  'assets/5-expert.txt',
+  'assets/6-mad.txt',
+];
+
 const _slugs = [
   'CC',
   'CH',
@@ -90,6 +108,21 @@ void main(List<String> args) {
   int keepPerCluster = 1;
   String? protectFromPath;
 
+  // Recycle-mode (FPS prune-to-count) args. `--mode` selects the algorithm
+  // used by --apply: `cluster` (ε-threshold) or `recycle` (prune-to-count).
+  String mode = 'cluster';
+  int targetCount = 20000;
+  List<String> collections = List.of(_playableLevels);
+  int? sample;
+  // Track which args were explicitly passed, to warn when a flag does not
+  // apply to the selected mode (defaults are silently ignored).
+  bool maxDistanceSet = false;
+  bool keepPerClusterSet = false;
+  bool topKSet = false;
+  bool targetCountSet = false;
+  bool collectionsSet = false;
+  bool sampleSet = false;
+
   for (int i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--input':
@@ -98,6 +131,7 @@ void main(List<String> args) {
         outputPath = args[++i];
       case '--top-k':
         topK = int.parse(args[++i]);
+        topKSet = true;
       case '--per-bucket-limit':
         perBucketLimit = int.parse(args[++i]);
       case '--include-size':
@@ -110,12 +144,30 @@ void main(List<String> args) {
         includePrefill = true;
       case '--no-include-prefill':
         includePrefill = false;
+      case '--mode':
+        mode = args[++i];
+        if (mode != 'cluster' && mode != 'recycle') {
+          stderr.writeln('--mode accepts "cluster" or "recycle" (got "$mode")');
+          _printUsage();
+          exit(1);
+        }
+      case '--target-count':
+        targetCount = int.parse(args[++i]);
+        targetCountSet = true;
+      case '--collections':
+        collections = args[++i].split(',').map((s) => s.trim()).toList();
+        collectionsSet = true;
+      case '--sample':
+        sample = int.parse(args[++i]);
+        sampleSet = true;
       case '--apply':
         apply = true;
       case '--max-distance':
         maxDistance = double.parse(args[++i]);
+        maxDistanceSet = true;
       case '--keep-per-cluster':
         keepPerCluster = int.parse(args[++i]);
+        keepPerClusterSet = true;
       case '--protect-from':
         protectFromPath = args[++i];
       case '-v':
@@ -129,6 +181,29 @@ void main(List<String> args) {
         stderr.writeln('Unknown argument: ${args[i]}');
         _printUsage();
         exit(1);
+    }
+  }
+
+  // Warn about flags that don't apply to the selected mode (they are
+  // ignored rather than an error, so existing cluster invocations are
+  // untouched and recycle invocations are forgiving).
+  if (mode == 'recycle') {
+    final ignored = <String>[
+      if (maxDistanceSet) '--max-distance',
+      if (keepPerClusterSet) '--keep-per-cluster',
+      if (topKSet) '--top-k',
+    ];
+    if (ignored.isNotEmpty) {
+      stderr.writeln('warn: ${ignored.join(', ')} ignored in recycle mode');
+    }
+  } else {
+    final ignored = <String>[
+      if (targetCountSet) '--target-count',
+      if (collectionsSet) '--collections',
+      if (sampleSet) '--sample',
+    ];
+    if (ignored.isNotEmpty) {
+      stderr.writeln('warn: ${ignored.join(', ')} ignored in cluster mode');
     }
   }
 
@@ -263,40 +338,28 @@ void main(List<String> args) {
     exit(0);
   }
 
+  // --- Branch: recycle mode short-circuits before the global z-score and
+  // bucketing, which are cluster/report concerns. Recycle mode normalizes
+  // per collection (inside _runRecycleMode), so the global pass is skipped.
+  if (mode == 'recycle') {
+    _runRecycleMode(
+      rows: rows,
+      targetCount: targetCount,
+      collections: collections,
+      sample: sample,
+      protectFromPath: protectFromPath,
+      outputPath: outputPath,
+      apply: apply,
+      verbose: verbose,
+    );
+    return;
+  }
+
   // --- 3. Z-score normalize each feature column ---
   // Per-feature mean and std over the pool. Std=0 columns (constant)
-  // get zeroed out — they contribute nothing to distance.
-  final means = Float64List(featureCols.length);
-  final stds = Float64List(featureCols.length);
-  for (int k = 0; k < featureCols.length; k++) {
-    double sum = 0;
-    for (final r in rows) {
-      sum += r.rawVec[k];
-    }
-    means[k] = sum / rows.length;
-    double sumSq = 0;
-    for (final r in rows) {
-      final d = r.rawVec[k] - means[k];
-      sumSq += d * d;
-    }
-    stds[k] = sqrt(sumSq / rows.length);
-  }
-  // Clip z-scores to ±_zClip to keep rare-slug outliers from
-  // single-handedly dominating the distance metric.
-  const zClip = 5.0;
-  for (final r in rows) {
-    r.normVec = Float64List(featureCols.length);
-    for (int k = 0; k < featureCols.length; k++) {
-      if (stds[k] < 1e-12) {
-        r.normVec[k] = 0;
-      } else {
-        var z = (r.rawVec[k] - means[k]) / stds[k];
-        if (z > zClip) z = zClip;
-        if (z < -zClip) z = -zClip;
-        r.normVec[k] = z;
-      }
-    }
-  }
+  // get zeroed out — they contribute nothing to distance. z-scores are
+  // clipped to ±5 so rare-slug outliers can't dominate the metric.
+  _zscoreNormalize(rows);
 
   // --- 4. Bucket by (domain_size, dominant_slug-in-trace) ---
   // dominant_slug = argmax of summed shares over tiers for each slug.
@@ -429,36 +492,61 @@ void _printUsage() {
   stderr.writeln('''
 Usage: dart run bin/cluster_puzzles.dart [options]
 
-Two modes:
-  - REPORT (default): emit the Top-K closest pairs
-  - APPLY (--apply):  collect pairs ≤ --max-distance, cluster them,
-                      keep --keep-per-cluster representatives via
-                      farthest-point sampling (with --protect-from
-                      puzzles as forced seeds), write the rest to
-                      <file>.cleanup for the user to mv into place.
+Three modes:
+  - REPORT (default):          emit the Top-K closest pairs
+  - CLUSTER (--apply):         collect pairs ≤ --max-distance, cluster them,
+                               keep --keep-per-cluster representatives via
+                               farthest-point sampling (with --protect-from
+                               puzzles as forced seeds), write the rest to
+                               <file>.cleanup for the user to mv into place.
+  - RECYCLE (--mode recycle):  per-collection FPS prune-to-count. Any
+                               collection with more than --target-count
+                               puzzles keeps the N most-diverse (farthest-
+                               point sampling, --protect-from keys as forced
+                               seeds) and MOVES the excess to
+                               <file>-recycled.txt (e.g. assets/6-mad-
+                               recycled.txt, the default feed of
+                               bin/recycle_mad.dart). --apply writes the
+                               moves; without it, a dry-run report.
 
 Common options:
   --input PATH            CSV from vectorize_puzzles.dart
                           (default: puzzle_vectors.csv)
   --output PATH           Report file (default: stdout)
-  --per-bucket-limit M    Cap puzzles per bucket (default: 5000)
+  --per-bucket-limit M    Cap puzzles per bucket (default: 5000; cluster)
   --include-size          Include cells in distance (default: on)
   --no-include-size       Exclude cells from distance
   --include-level         Include `level` ordinal in distance
   --include-prefill       Include `prefill_ratio` in distance (default: on)
-  --no-include-prefill    Exclude prefill_ratio from distance
-  -v, --verbose           Per-bucket progress lines
+  -v, --verbose           Per-bucket / per-move progress lines
   -h, --help              Show this help
+
+Mode selector:
+  --mode cluster|recycle  Algorithm for --apply (default: cluster).
+                          Recycle mode ignores --max-distance /
+                          --keep-per-cluster / --top-k; cluster mode
+                          ignores --target-count / --collections / --sample.
 
 Report-mode options:
   --top-k N               Pairs to report (default: 100)
 
-Apply-mode options:
+Cluster apply-mode options:
   --apply                 Enable apply mode (rewrites <file>.cleanup)
   --max-distance X        Distance threshold for "redundant" (default: 0.15)
   --keep-per-cluster N    Representatives kept per cluster (default: 1)
-  --protect-from PATH     File of v2 lines that must never be removed
+  --protect-from PATH     File of v2 lines that must never be removed/moved
                           (e.g. assets/1-easy_onboarding.txt)
+
+Recycle-mode options:
+  --apply                 Enable apply mode (rewrites collections in place,
+                          appends excess to <file>-recycled.txt)
+  --target-count N        Keep N most-diverse puzzles per collection
+                          (default: 20000)
+  --collections LIST      Comma-separated collection files to prune
+                          (default: the six playable level files)
+  --sample N              Process at most N vectorized rows per collection
+                          (dev aid)
+  --protect-from PATH     File of v2 lines kept as forced FPS seeds
 ''');
 }
 
@@ -533,6 +621,43 @@ double _sqDist(Float64List a, Float64List b) {
     s += d * d;
   }
   return s;
+}
+
+/// Per-feature z-score normalization over [rows] (mean 0, std 1), z-scores
+/// clipped to ±5 so rare-slug outliers don't single-handedly dominate the
+/// distance metric. Std=0 columns (constant across the pool) are zeroed —
+/// they contribute nothing to distance. Writes each row's `normVec`.
+void _zscoreNormalize(List<_Row> rows) {
+  final dim = rows.first.rawVec.length;
+  final means = Float64List(dim);
+  final stds = Float64List(dim);
+  for (int k = 0; k < dim; k++) {
+    double sum = 0;
+    for (final r in rows) {
+      sum += r.rawVec[k];
+    }
+    means[k] = sum / rows.length;
+    double sumSq = 0;
+    for (final r in rows) {
+      final d = r.rawVec[k] - means[k];
+      sumSq += d * d;
+    }
+    stds[k] = sqrt(sumSq / rows.length);
+  }
+  const zClip = 5.0;
+  for (final r in rows) {
+    r.normVec = Float64List(dim);
+    for (int k = 0; k < dim; k++) {
+      if (stds[k] < 1e-12) {
+        r.normVec[k] = 0;
+      } else {
+        var z = (r.rawVec[k] - means[k]) / stds[k];
+        if (z > zClip) z = zClip;
+        if (z < -zClip) z = -zClip;
+        r.normVec[k] = z;
+      }
+    }
+  }
 }
 
 /// Greedy max-min sampling, identical in spirit to the one in
@@ -761,6 +886,253 @@ void _runApplyMode({
     stderr.writeln('');
     stderr.writeln('Writing .cleanup files...');
     _rewriteCollections(perFileRemoval.keys.toSet(), toRemove);
+  }
+}
+
+/// Per-collection result of recycle mode.
+typedef _RecycleOutcome = ({
+  String path,
+  int total,
+  int kept,
+  List<String> movedKeys,
+});
+
+/// `--mode recycle` implementation: per-collection FPS prune-to-count.
+///
+/// For each collection in [collections]: vectorized rows are filtered to
+/// live puzzles, z-scored *within that collection* (the population being
+/// pruned), and the `targetCount` most-diverse puzzles are selected by
+/// farthest-point sampling (`--protect-from` keys as forced seeds). The
+/// selected keepers stay in the collection file; the excess (`count −
+/// targetCount`) is appended to `&lt;file&gt;-recycled.txt` (deduped by
+/// canonical key), e.g. `assets/6-mad-recycled.txt` — the default feed of
+/// `bin/recycle_mad.dart`. `--apply` writes; without it this is a dry run.
+void _runRecycleMode({
+  required List<_Row> rows,
+  required int targetCount,
+  required List<String> collections,
+  required int? sample,
+  required String? protectFromPath,
+  required String? outputPath,
+  required bool apply,
+  required bool verbose,
+}) {
+  // 1. Load protected canonical keys (forced FPS seeds).
+  final protectedKeys = <String>{};
+  if (protectFromPath != null) {
+    final file = File(protectFromPath);
+    if (!file.existsSync()) {
+      stderr.writeln('Protect-from file not found: $protectFromPath');
+      exit(1);
+    }
+    for (final line in file.readAsLinesSync()) {
+      if (line.trim().isEmpty || line.startsWith('#')) continue;
+      try {
+        protectedKeys.add(canonicalPuzzleKey(line));
+      } catch (_) {
+        // Skip unparseable lines silently.
+      }
+    }
+    stderr.writeln('  ${protectedKeys.length} puzzles protected from moving');
+  }
+
+  // 2. Live keys: only puzzles currently in the collections are eligible —
+  // a puzzle already moved to a `-recycled.txt` feed is not re-picked.
+  final liveKeys = _loadLiveKeys();
+  stderr.writeln('  ${liveKeys.length} live canonical keys in collections');
+
+  // 3. Group rows by source collection file.
+  final byFile = <String, List<_Row>>{};
+  for (final r in rows) {
+    if (!liveKeys.contains(r.canonicalKey)) continue;
+    byFile.putIfAbsent(r.file, () => []).add(r);
+  }
+
+  // 4. Prune each requested collection.
+  final outcomes = <_RecycleOutcome>[];
+  final sw = Stopwatch()..start();
+  for (final path in collections) {
+    final file = File(path);
+    if (!file.existsSync()) {
+      stderr.writeln('  warn: $path not found, skipping');
+      continue;
+    }
+    final all = byFile[path] ?? const <_Row>[];
+    var pool = all;
+    if (sample != null && pool.length > sample) {
+      pool = pool.take(sample).toList();
+      stderr.writeln('  $path: sampled ${all.length} → $sample rows (dev aid)');
+    }
+    if (pool.isEmpty) {
+      stderr.writeln(
+        '  $path: 0 vectorized rows — run bin/vectorize_puzzles.dart first',
+      );
+      continue;
+    }
+
+    // Per-collection normalization: the collection is the population whose
+    // mutual distance FPS maximizes.
+    _zscoreNormalize(pool);
+
+    if (pool.length <= targetCount) {
+      stderr.writeln(
+        '  $path: ${pool.length} ≤ $targetCount — in range, nothing to move',
+      );
+      outcomes.add((
+        path: path,
+        total: pool.length,
+        kept: pool.length,
+        movedKeys: const [],
+      ));
+      continue;
+    }
+
+    final seeds = pool
+        .where((r) => protectedKeys.contains(r.canonicalKey))
+        .toSet();
+    final keepers = _farthestPointSampleWithSeeds(pool, seeds, targetCount);
+    final keeperKeys = keepers.map((r) => r.canonicalKey).toSet();
+    final movedKeys = [
+      for (final r in pool)
+        if (!keeperKeys.contains(r.canonicalKey)) r.canonicalKey,
+    ];
+
+    stderr.writeln(
+      '  $path: ${pool.length} → keep ${keepers.length}, move ${movedKeys.length}',
+    );
+    if (verbose) {
+      for (final key in movedKeys) {
+        stderr.writeln('    MOVE  $key');
+      }
+    }
+    outcomes.add((
+      path: path,
+      total: pool.length,
+      kept: keepers.length,
+      movedKeys: movedKeys,
+    ));
+
+    if (apply) {
+      // Rewrite the collection keeping only the FPS-selected puzzles and
+      // append the moved lines to `<file>-recycled.txt`.
+      final movedLines = _rewriteKeeping(path, keeperKeys);
+      _appendRecycled(path, movedLines);
+    }
+  }
+  stderr.writeln(
+    '  done in ${sw.elapsed.inSeconds}s (${apply ? 'applied' : 'dry-run'})',
+  );
+
+  // 5. Emit report.
+  if (outputPath == null) {
+    _writeRecycleReport(stdout, outcomes, targetCount, apply);
+  } else {
+    final sink = File(outputPath).openWrite();
+    _writeRecycleReport(sink, outcomes, targetCount, apply);
+    sink.flush().then((_) => sink.close());
+    stderr.writeln('  Wrote $outputPath');
+  }
+
+  if (!apply) {
+    stderr.writeln(
+      '(dry-run — pass --apply to move the excess into <file>-recycled.txt)',
+    );
+  }
+}
+
+/// Stream [path] keeping only lines whose canonical key is in [keeperKeys]
+/// (comments and blanks pass through verbatim), writing in-place via a
+/// `<file>.recycle` staging file renamed over the original. Returns the
+/// moved (non-kept) v2 lines in file order.
+List<String> _rewriteKeeping(String path, Set<String> keeperKeys) {
+  final kept = <String>[];
+  final movedLines = <String>[];
+  int keptPuzzles = 0;
+  for (final line in File(path).readAsLinesSync()) {
+    if (line.trim().isEmpty || line.startsWith('#')) {
+      kept.add(line);
+      continue;
+    }
+    String key;
+    try {
+      key = canonicalPuzzleKey(line);
+    } catch (_) {
+      kept.add(line); // Unparseable — keep verbatim.
+      continue;
+    }
+    if (keeperKeys.contains(key)) {
+      kept.add(line);
+      keptPuzzles++;
+    } else {
+      movedLines.add(line);
+    }
+  }
+  final tmpPath = '$path.recycle';
+  File(tmpPath).writeAsStringSync('${kept.join('\n')}\n');
+  File(tmpPath).renameSync(path);
+  stderr.writeln(
+    '    $path: rewrote keeping $keptPuzzles (${movedLines.length} moved out)',
+  );
+  return movedLines;
+}
+
+/// Append [movedLines] to `<path>-recycled.txt` (e.g. `assets/6-mad.txt`
+/// → `assets/6-mad-recycled.txt`), deduped by canonical key against the
+/// existing content. Append + dedup keeps the feed idempotent across runs:
+/// re-pruning after a partial `recycle_mad` consumption never loses or
+/// duplicates lines.
+void _appendRecycled(String path, List<String> movedLines) {
+  final recycledPath = path.replaceFirst(RegExp(r'\.txt$'), '-recycled.txt');
+  final existing = File(recycledPath).existsSync()
+      ? File(recycledPath).readAsLinesSync()
+      : <String>[];
+  final existingKeys = <String>{};
+  for (final l in existing) {
+    if (l.trim().isEmpty || l.startsWith('#')) continue;
+    try {
+      existingKeys.add(canonicalPuzzleKey(l));
+    } catch (_) {}
+  }
+  final added = <String>[];
+  for (final l in movedLines) {
+    try {
+      if (existingKeys.add(canonicalPuzzleKey(l))) added.add(l);
+    } catch (_) {}
+  }
+  if (added.isEmpty) {
+    stderr.writeln('    $recycledPath: nothing new (all already present)');
+    return;
+  }
+  File(
+    recycledPath,
+  ).writeAsStringSync('${[...existing, ...added].join('\n')}\n');
+  stderr.writeln(
+    '    $recycledPath: +${added.length} '
+    '(${existing.length} → ${existing.length + added.length})',
+  );
+}
+
+/// Write the recycle-mode report: one section per collection with the
+/// kept/moved counts and the canonical keys of the moved puzzles.
+void _writeRecycleReport(
+  StringSink sink,
+  List<_RecycleOutcome> outcomes,
+  int targetCount,
+  bool apply,
+) {
+  sink.writeln('# Recycle-mode report (FPS prune-to-count)');
+  sink.writeln(
+    '# target per collection: $targetCount (${apply ? 'applied' : 'dry-run'})',
+  );
+  sink.writeln('');
+  for (final o in outcomes) {
+    sink.writeln(
+      '## ${o.path}  ${o.total} → keep ${o.kept}, move ${o.movedKeys.length}',
+    );
+    for (final key in o.movedKeys) {
+      sink.writeln('  MOVE  $key');
+    }
+    sink.writeln('');
   }
 }
 

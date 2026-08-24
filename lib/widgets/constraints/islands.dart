@@ -106,7 +106,6 @@ class _IslandsMiniGridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _IslandsMiniGridPainter oldDelegate) {
-    return oldDelegate.color != color ||
-        oldDelegate.islandCells != islandCells;
+    return oldDelegate.color != color || oldDelegate.islandCells != islandCells;
   }
 }
