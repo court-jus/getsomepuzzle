@@ -704,6 +704,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintImplication => 'implication';
 
   @override
+  String get constraintIslands => 'islands';
+
+  @override
   String get constraintBoundingBox => 'bounding box';
 
   @override
@@ -854,6 +857,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get constraintExplainIM =>
       'An arrow from one cell to another means: if the source cell takes the arrow\'s colour, the target cell must also take that colour. The contrapositive also holds: if the target is a different colour, the source cannot take the arrow\'s colour.';
+
+  @override
+  String get constraintExplainIS =>
+      'An icon shows four islands of one colour separated by water. Groups of that colour must never touch, not even diagonally.';
 
   @override
   String get complicityOtherConstraint => 'another constraint';

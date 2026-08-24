@@ -607,3 +607,146 @@ Pre-colour cell 6 = 1 (row 2, col 0). The synthesized FM finds the
 window at column 0, rows 0–2: any (?, 2, 1) below the top cell.
 The middle of that window (cell 3, row 1) cannot be 2 → forced to 1.
 ```
+
+## Observed, not implemented: Line count + Different From (CC/RC + DF)
+
+Spotted during the 2026-08 IS findAMove audit; deliberately left
+unimplemented for now. Source puzzle:
+
+```
+v2_12_3x6_000000020001200001_CC:0.2.5;DF:13.down;NC:10.1.2;NC:5.2.0;
+RC:4.2.2;CC:1.2.2;IS:1_1:211211221111221211_67_scenario:classic
+```
+
+### Reasoning
+
+A `LineCount` (`RC`/`CC`) fixes the exact number of colour-`c` cells on a
+line. A `DF` linking two cells **of that same line** guarantees — on a
+2-colour domain — that *exactly one* of the pair holds `c`. If the line's
+remaining `c`-quota is exactly 1 and the only still-free `c`-candidates on
+the line are the DF pair plus other cells, then the DF pair consumes the
+quota and **every other free cell of the line takes the opposite colour**.
+
+### Concrete example (the audit puzzle)
+
+```
+3×6 grid, CC:1.2.2 (column 1 holds exactly 2 whites),
+DF:13.down pairs cells (4,1) and (5,1).
+Column 1 already shows one white at (2,1) and a black at (1,1);
+(0,1) and (3,1) are still free.
+
+DF ⇒ exactly one of {(4,1), (5,1)} is white ⇒ the second white
+quota of column 1 is consumed by the pair ⇒ (0,1) = black and
+(3,1) = black.
+```
+
+### Notes
+
+- Shape of the deduction is close to `PABalancedSideComplicity`: enumerate
+  the configurations consistent with the pairing constraint, observe that
+  the quota is exhausted outside the pair, force the rest.
+- Generalises beyond DF: any constraint guaranteeing a lower bound of `k`
+  colour-`c` cells within a subset of a line interacts the same way with
+  the line's exact count (e.g. NC-saturated clusters, IM chains).
+- Only worth wiring up if corpus audits show this pattern blocking
+  propagation often enough to justify a new complicity class.
+
+## Observed, not implemented: Islands + Line count (IS + RC/CC)
+
+Spotted during the same 2026-08 audit (puzzle #3 of `findamove.txt`),
+measured, and parked.
+
+### Reasoning
+
+A colour group watched by an `IS` constraint corner-touches a free cell
+`f`. Colouring `f` with the IS colour creates a diagonal contact that must
+be resolved by merging. If **every** capable merge path between `f` and
+the group crosses cells that would push a constrained row/column past its
+`RC`/`CC` quota (e.g. the only bridge cell sits in a row whose colour
+quota is already full), the hypothesis is refuted → prune the IS colour
+from `f`.
+
+### Variant: bridge forced away
+
+Source puzzles:
+
+```
+#4 v2_12_3x3_010000000_CC:0.2.2;DF:4.down;EY:0.2.0;NC:1.1.2;CC:2.1.2;
+   IS:2_1:211111222_19_scenario:classic
+#5 v2_12_3x5_000001000000100_CC:1.2.4;DF:3.right;NC:14.2.1;NC:7.1.1;
+   CT:2.0;RC:3.1.1;IS:1_1:111121221221121_29_scenario:classic
+#6 v2_12_3x4_020100000020_IM:10.0.2;NC:2.1.1;NC:7.2.2;RC:2.1.2;
+   RC:3.2.1;IS:2;NC:5.1.2_1:221121121121_46_scenario:classic
+```
+
+#9 v2_12_5x3_001000000000001_CC:1.1.1;DF:7.down;DF:8.right;NC:0.2.2;
+   NC:9.2.2;CC:0.2.1;IS:1;RT:2.2_1:121222222111121_24_scenario:classic
+   (partner constraint here is `DF`, not a line count: `DF:7.down`
+   XORs `(1,2)`/`(2,2)`; the black branch isolates a white island
+   corner-touching `{(0,1), (1,0), (1,1)}` with every bridge sealed by
+   committed cells → `(1,2)` must be white, `(2,2)` black)
+
+The refutation need not come from quota saturation. In a 3×3 grid with
+`IS:2` and `CC:2.1.2` (column 2 holds exactly 2 blacks, one already placed
+at `(0,2)`):
+
+```
+    0  1  2
+ 0  o  #  #
+ 1  #  #  .
+ 2  o  o  .
+```
+
+Hypothesis `(1,2)` = white: the CC disjunction then pins `(2,2)` = black,
+and `(1,2)` becomes a white island corner-touching `{(2,0), (2,1)}` whose
+only potential bridge is the now-committed-black `(2,2)` → permanent
+violation → `(1,2)` ≠ white.
+
+Equivalent implementation view: simulate the hypothesis, let the LineCount
+collapse its disjunctive consequence, then `IS.verify` rejects the state
+(the white capable-components split permanently). Two refutation families
+thus share one skeleton — *merge-path feasibility under the other
+constraints*: quota saturation along the path, or mandatory path cells
+forced to the opposite colour by a counting disjunction.
+
+The last source puzzle above adds a **cascade flavour**: hypothesising
+black at `(2,1)`
+(the bridge between two white regions) seals its two lateral neighbours
+`(2,0)` / `(2,2)` into isolated potential white islands (their only merge
+escape ran through `(2,1)`); IS then forces them to black, which overflows
+`RC:2.1.2`'s row quota → hypothesis refuted.
+
+
+### Concrete example (the audit puzzle)
+
+```
+3×4 grid, IS:2, RC:2.2.1 (row 2 holds exactly 1 white).
+White group {(0,1), (0,2), (1,1)}; f = (2,2) corner-touches it.
+Every white path from (2,2) to the group passes through (2,1);
+(2,1) + (2,2) = 2 whites in row 2 > quota 1 → (2,2) ≠ white.
+```
+
+### Measurement (2026-08-24, findamove.txt batch)
+
+Instrumented detection over the 18-puzzle findAMove batch: **3 / 18**
+first-force steps would be replaced by this complicity — the three source
+puzzles being the section's opening example plus variants #4/#6 above, and:
+
+```
+v2_12_5x3_001000000000001_CC:1.1.1;DF:7.down;DF:8.right;NC:0.2.2;
+NC:9.2.2;CC:0.2.1;IS:1;RT:2.2_1:121222222111121_24_scenario:classic
+```
+
+Caveats: first force step only; merge-path enumeration capped at length
+6; heavy selection bias (batch is 100% IS-bearing puzzles). Global corpus
+rate is far lower.
+
+### Decision
+
+Parked: sound and house-shaped (hypothesis test like SY+FM), but the
+machinery (quota-aware reachability per diagonal candidate on every apply,
+or as a level-2 complicity) outweighs a ~17% hit rate on the friendliest
+possible sample. Revisit if IS-dominated collections grow or hint-gap
+feedback accumulates. Note: as a level-2 complicity, not inside
+`IslandsConstraint.apply` — the obligation is IS's but the refutation is
+another constraint's knowledge.

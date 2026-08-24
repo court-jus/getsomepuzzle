@@ -1360,6 +1360,12 @@ abstract class AppLocalizations {
   /// **'implication'**
   String get constraintImplication;
 
+  /// Name of the islands constraint
+  ///
+  /// In en, this message translates to:
+  /// **'islands'**
+  String get constraintIslands;
+
   /// Name of the bounding box constraint
   ///
   /// In en, this message translates to:
@@ -1581,6 +1587,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An arrow from one cell to another means: if the source cell takes the arrow\'s colour, the target cell must also take that colour. The contrapositive also holds: if the target is a different colour, the source cannot take the arrow\'s colour.'**
   String get constraintExplainIM;
+
+  /// Body of the new-constraint explanation modal for the Islands (IS) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'An icon shows four islands of one colour separated by water. Groups of that colour must never touch, not even diagonally.'**
+  String get constraintExplainIS;
 
   /// Fallback name used when a complicity's secondary slug is the wildcard '*' (kept as a safety fallback; the dedicated 'hintComplicityWithAny' template is preferred for the wildcard case)
   ///

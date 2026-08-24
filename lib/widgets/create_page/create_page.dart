@@ -40,6 +40,7 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/constraint_type_picker
 import 'package:getsomepuzzle/widgets/create_page/dialogs/different_from_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/group_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/group_size_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/islands_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/neighbor_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/letter_group_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/motif_dialog.dart';
@@ -643,6 +644,8 @@ class _CreatePageState extends State<CreatePage> {
           height: _height,
           domain: _domain,
         );
+      case 'IS':
+        added = await showIslandsDialog(context, domain: _domain);
       case 'IM':
         final loc2 = AppLocalizations.of(context)!;
         CellValue imColor = _domain.first;

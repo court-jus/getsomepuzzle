@@ -147,6 +147,7 @@
     "constraintEyes": "ojos",
     "constraintChain": "cadena",
     "constraintImplication": "implicación",
+    "constraintIslands": "islas",
     "constraintBoundingBox": "caja delimitadora",
     "newConstraintModalTitle": "¡Regla nueva!",
     "newConstraintModalSkip": "Saltar aprendizaje",
@@ -223,6 +224,10 @@
     "constraintExplainIM": "Una flecha de una celda a otra significa: si la celda fuente toma el color de la flecha, la celda destino también debe tomar ese color. También se aplica la contrapuesta: si el destino es de un color diferente, la fuente no puede tomar el color de la flecha.",
     "@constraintExplainIM": {
         "description": "Body of the new-constraint explanation modal for the Implication (IM) constraint"
+    },
+    "constraintExplainIS": "Un icono muestra cuatro islas de un color separadas por el agua. Los grupos de ese color nunca deben tocarse, ni siquiera en diagonal.",
+    "@constraintExplainIS": {
+        "description": "Body of the new-constraint explanation modal for the Islands (IS) constraint"
     },
     "createLetterGroupDone": "Listo",
     "createAddNew": "Agregar restricción",

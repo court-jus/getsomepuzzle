@@ -4,6 +4,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/islands.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
@@ -25,6 +26,7 @@ import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_majority.dart';
 import 'package:getsomepuzzle/widgets/constraints/different_from.dart';
 import 'package:getsomepuzzle/widgets/constraints/implication.dart';
+import 'package:getsomepuzzle/widgets/constraints/islands.dart';
 import 'package:getsomepuzzle/widgets/constraints/eyes.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_size.dart';
@@ -191,6 +193,14 @@ final constraintUIRegistry =
             ImplicationWidget(fgcolor: fg, cellSize: size),
       ),
       (
+        slug: 'IS',
+        buildPreview: (fg, size) => IslandsWidget(
+          constraint: IslandsConstraint('1'),
+          fgcolor: fg,
+          cellSize: size,
+        ),
+      ),
+      (
         slug: 'JR',
         buildPreview: (fg, size) => MajorityIndicatorWidget(
           constraint: RowMajorityConstraint('0.21'),
@@ -300,6 +310,8 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintEyes;
     case 'IM':
       return l.constraintImplication;
+    case 'IS':
+      return l.constraintIslands;
     case 'BB':
       return l.constraintBoundingBox;
     case 'RT':
@@ -354,6 +366,8 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainEY;
     case 'IM':
       return l.constraintExplainIM;
+    case 'IS':
+      return l.constraintExplainIS;
     case 'BB':
       return l.constraintExplainBB;
     case 'RT':

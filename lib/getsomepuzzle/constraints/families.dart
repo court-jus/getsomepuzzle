@@ -34,6 +34,7 @@ const Map<String, String> kConstraintFamily = {
   // plus symmetry and rectangular-zone majority.
   'GS': 'group-topology',
   'GC': 'group-topology',
+  'IS': 'group-topology',
   'SH': 'group-topology',
   'SY': 'group-topology',
   'MJ': 'group-topology',

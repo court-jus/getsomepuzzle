@@ -2,6 +2,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/bounding_box.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/islands.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
@@ -132,6 +133,11 @@ final constraintRegistry =
         slug: 'IM',
         fromParams: ImplicationConstraint.new,
         generateAllParameters: ImplicationConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'IS',
+        fromParams: IslandsConstraint.new,
+        generateAllParameters: IslandsConstraint.generateAllParameters,
       ),
       (
         slug: 'JR',

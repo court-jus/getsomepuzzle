@@ -14,6 +14,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/islands.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
@@ -26,6 +27,7 @@ import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_majority.dart';
 import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
+import 'package:getsomepuzzle/widgets/constraints/islands.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/puzzle_grid_stack.dart';
 import 'package:getsomepuzzle/widgets/constraints/motif.dart';
@@ -471,6 +473,12 @@ class PuzzleWidgetState extends State<PuzzleWidget> {
                         )
                       else if (constraint is ChainConstraint)
                         ChainWidget(
+                          key: _keyForConstraint(constraint),
+                          constraint: constraint,
+                          cellSize: topBarConstraintsSize,
+                        )
+                      else if (constraint is IslandsConstraint)
+                        IslandsWidget(
                           key: _keyForConstraint(constraint),
                           constraint: constraint,
                           cellSize: topBarConstraintsSize,

@@ -709,6 +709,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintImplication => 'implicación';
 
   @override
+  String get constraintIslands => 'islas';
+
+  @override
   String get constraintBoundingBox => 'caja delimitadora';
 
   @override
@@ -860,6 +863,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get constraintExplainIM =>
       'Una flecha de una celda a otra significa: si la celda fuente toma el color de la flecha, la celda destino también debe tomar ese color. También se aplica la contrapuesta: si el destino es de un color diferente, la fuente no puede tomar el color de la flecha.';
+
+  @override
+  String get constraintExplainIS =>
+      'Un icono muestra cuatro islas de un color separadas por el agua. Los grupos de ese color nunca deben tocarse, ni siquiera en diagonal.';
 
   @override
   String get complicityOtherConstraint => 'otra restricción';

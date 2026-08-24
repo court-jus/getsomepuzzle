@@ -10,8 +10,8 @@ must be pairwise separated, 8-connectivity-wise.
 This is the classic Nurikabe island-separation rule adapted as a global
 constraint. It complements `GC` (which counts groups) and `BB`/`SH` (which
 constrain their extent/shape) by constraining their **mutual spacing** — a
-dimension nothing else touches, since all existing rules reason over
-4-connectivity only and diagonals are currently unconstrained.
+dimension no other rule touches, since all other constraints reason over
+4-connectivity only.
 
 ## Syntax
 
@@ -21,44 +21,80 @@ dimension nothing else touches, since all existing rules reason over
 
 **Orthogonal contact is not expressible** — two 4-adjacent cells of the same
 color are by definition the same group. The operative content of the rule is
-therefore exclusively **diagonal contact**: two cells of the color that are
-8-adjacent (share a corner) but not 4-adjacent can never belong to the same
-group.
+therefore exclusively **diagonal contact** between *final* distinct groups.
 
 ### Formal violation
 
-The puzzle state is *violated* iff there exist two cells `a`, `b` such that:
+The rule constrains the **final** grid: in the solved puzzle, no two cells of
+`color` belonging to different connected groups may share a corner.
+
+Judging *open* states relies on **capable cells**: a cell is capable if it
+can still host `color` in some future state — it is already coloured, or free
+with `color` among its remaining options. Two colour groups end up merged in
+some completion iff they are connected through a path of capable cells
+(4-connectivity). The capable-component partition only ever **refines** under
+forward play: a cell leaves the set when coloured another colour or when an
+option is pruned, and nothing ever joins it — so "different component today"
+proves permanent separation, while "same component" leaves the state
+undecided.
+
+The state is *violated* iff two coloured cells `a`, `b` exist such that:
 
 - `value[a] == value[b] == color`;
 - `a` and `b` are diagonal neighbours (`|Δrow| == 1 && |Δcol| == 1`);
-- `a` and `b` are in different 4-connected components of `color`.
+- `a` and `b` are in different **capable components** — the contact can
+  never be merged away.
 
-Since 4-adjacent same-color cells are always the same component, the third
-clause is implied by the first two; it is kept explicit because the
-implementation checks per *group pair*, not per cell pair (see `verify`).
+Examples bounding the definition (colour = black):
 
-## Semantics
+- `_1_ / 1__` — two islands corner-touch but every cell around them is
+  free: one capable component, colouring the corner merges everything →
+  **not violated**;
+- `21_ / 12_` — the corner-touching blacks are walled in by committed
+  whites; no future move can merge them → **violated**, even though free
+  cells remain elsewhere.
+
+## Implementation
+
+**Location**: `lib/getsomepuzzle/constraints/islands.dart`
+
+`IslandsConstraint extends Constraint`. Field: `color` (CellValue).
+
+- **`slug`** → `'IS'`; **`referencedColors`** → `{color}`;
+- **`serialize()`** → `'IS:${cellValueToString(color)}'`;
+- **`toString()`** → `'<color> islands'`; **`toHuman(Puzzle)`** → human
+  description used by hint messages;
+- **`rotated(...)`** → identity clone, like `QA` (colour and rule are
+  position-independent);
+- no `conflictsWith` override.
+
+Shared helpers: `diagonalNeighbors(puzzle, idx)` lives in
+`lib/getsomepuzzle/utils/groups.dart` next to the connectivity utilities;
+the capable-set machinery is private to the class.
 
 ### verify(Puzzle)
 
 ```
-groups = getColorGroups(puzzle, color)
-for each ordered pair (G, H) of distinct groups:
-  if any cell of G is 8-adjacent to any cell of H:
-    return false
+comps = capable components (flood over value==color ∪ free-with-color-option)
+for each cell a with value == color:
+  for each diagonal neighbour b of a:
+    if value[b] == color && comps[b] != comps[a]:
+      return false
 return true
 ```
 
-No reachability analysis is needed, unlike `CH` or `BB`: a violation is
-*created* only when a cell is actually coloured, and coloured cells never
-change. Any violation-free state is trivially extendable (the player can
-always paint the remaining free cells with another colour — the domain has at
-least two colours), so `verify` collapses to the single pairwise scan above.
-Complexity is `O(groups² × groupSize²)` worst case, tiny in practice.
+Only *permanent* diagonal contact counts — corner-touching coloured cells
+whose groups share no capable component can never merge, so the state is
+already condemned. Contact between still-connectable groups is legal: the
+player can colour the bridge and fuse them into one island.
 
-Reachable-incomplete states → `true`; violated states → `false`; there is no
-"unreachable-incomplete" category for this constraint (a state either already
-violates the rule or can still be completed by painting everything else).
+On a complete puzzle there are no free cells, so the components collapse to
+the actual colour groups and this degenerates to the exact final check.
+Complexity is `O(cells)` per call (one flood + one scan).
+
+There is no "unreachable-incomplete" category: a state either already
+violates the rule or can still be completed by painting the remaining free
+cells another colour.
 
 ### apply(Puzzle)
 
@@ -66,57 +102,50 @@ Three deduction branches, checked in order:
 
 1. **Impossible** — `!verify(puzzle)` → `Move(..., isImpossible: this)`.
 
-2. **Diagonal-contact prune** (`complexity 1`) — for every free cell `f`
-   with `color` still in its options: compute the *hypothetical group*
-   `H(f)` = `{f}` fused with every existing `color` group 4-adjacent to `f`
-   (transitively — `getMyColorGroup(puzzle-with-f-colored, f)` gives exactly
-   this). If any cell of `H(f)` is 8-adjacent to a cell of a **different**
-   existing `color` group, prune `color` from `f` (`RemoveOption`).
+2. **Diagonal-contact prune** (`complexity 1`) — compute the capable
+   components once. For every free cell `f` with `color` still in its
+   options: if some coloured diagonal neighbour `d` of `f` satisfies
+   `comps[d] != comps[f]`, prune `color` from `f` (`RemoveOption`).
 
-   This is sound because the violation `H(f)` ↔ other-group is decided by
-   currently coloured cells plus `f` itself: other free cells play no role,
-   and groups only ever grow/merge. The prune covers both the direct case
-   (`f` sits diagonally between two islands) and the bridged case (`f` is
-   4-adjacent to island X, which is diagonal to island Y — colouring `f`
-   grows X into Y's corner).
+   Soundness needs no simulation. Colouring `f` makes `(f, d)` a coloured
+   diagonal pair; since components only refine over time, cross-component
+   today means cross-component forever, i.e. a permanent violation exactly
+   matching `verify`'s criterion. Note `f` itself is always capable, so its
+   component is well-defined, and colouring `f` automatically drags every
+   group it touches 4-adjacently into one merged region — bridged cases are
+   subsumed.
 
-   Guard against the 3-colour no-op livelock: only emit the `RemoveOption`
-   when `color` is still present in `f`'s options (same convention as `DF`,
-   `GS`).
+   Guard against the 3-colour no-op livelock: the prune is emitted only when
+   `color` is still present in `f`'s options (same convention as `DF`, `GS`).
 
-3. **Pair-starvation prune** (`complexity 2`) — two free cells `f`, `g` that
-   are 8-adjacent **to each other**, where colouring either one alone is safe
-   (branch 2 passes) but colouring both puts them in different groups (no
-   4-path of capable cells joins them), is a latent violation: at least one
-   of the two must lose `color`. Emitting a prune requires choosing *which*
-   one — unsound in general, so branch 3 is **not implemented initially**
-   (documented candidate). The backtracking solver catches these states
-   naturally.
+3. **Mandatory-merge articulation** (`complexity 3`) — list every pair of
+   distinct `color` groups that share a corner. Such a pair *must* end up
+   merged (branch 1 condemns it otherwise); the rule says the groups must
+   merge, not how. If a single free capable cell lies on **every** capable
+   path between the pair — detected with `blockingDisconnectsMembers`, the
+   same articulation test LT uses — that cell is unavoidable and is forced
+   to `color` (`SetValue`). Cells with two disjoint merge routes stay free.
 
-**IS never emits `SetValue`.** It is a pure avoidance constraint, like `FM`
-and `CH`: it forbids placements and lets counting constraints (`QA`, `GC`,
-`RC`) do the positive forcing. This asymmetry is intentional and keeps
-`apply` simple; the interplay is where the gameplay lives (see Complicities).
+   Reachability precondition: reaching branch 3 means `verify` passed, so
+   every touching pair is already same-component and the helper's
+   vacuously-true trap cannot fire.
+
+Beyond branch 3's forced merge, IS never guesses placements: it is an
+avoidance constraint, like `FM` and `CH` — it forbids placements and lets
+counting constraints (`QA`, `GC`, `RC`) do the remaining positive forcing.
+The interplay is where the gameplay lives (see Complicities).
 
 ### isCompleteFor(Puzzle)
 
-Let `P` be the *capable set*: cells with `value == color` or (free and
-`color ∈ options`). Grayout iff:
+Conservative grayout, same convention as `SH`: `verify(puzzle)` holds **and**
+no free cell has `color` among its remaining options.
 
-1. `verify(puzzle)` holds, **and**
-2. every 8-adjacent pair `(a, b)` with both in `P` has `a` and `b` in the
-   same current 4-connected component of `value == color` cells.
-
-Intuition: two capable cells sharing a corner across different islands (or
-across a not-yet-bridged gap) can still collide once both are coloured;
-when no such pair remains, no future move can ever create a violation.
-Monotone: `P` only shrinks under forward play, and same-component pairs stay
-same-component (components only merge).
-
-A simpler conservative fallback (`verify` holds ∧ no free cell has `color`
-in options, i.e. grayout only near grid completion) is acceptable for a
-first implementation — it matches the `SH` convention — but greys out much
-later than necessary on island-heavy puzzles where IS is the star rule.
+While free capable cells remain, the capable-component partition keeps
+refining — a bridge cell painted the opposite colour splits two components
+that used to be one, which can legitimately revive branch-2 prunes or even
+create a branch-1 impossibility later. Only a fully resolved capable set
+guarantees `apply` can never fire again. The cost is that IS stays lit
+longer than strictly necessary on sparse-island boards; correctness wins.
 
 ## Parameter generation
 
@@ -131,15 +160,14 @@ vacuous IS are dropped like any other degenerate candidate.
 
 ## Rotation
 
-Identity: returns a fresh clone of self, like `QA`. Colour and the rule
-itself are position-independent. Four rotations round-trip trivially —
-covered automatically by `test/rotation_test.dart`.
+Identity: returns a fresh clone of self, like `QA`. Four rotations round-trip
+trivially — covered by `test/rotation_test.dart`.
 
 ## Family
 
 `families.dart` maps `'IS' → 'group-topology'` (alongside `GS`, `GC`, `SH`,
-`SY`, `MJ`, `BB`). The map must stay total over every registered slug — a
-guard test enforces adding the entry.
+`SY`, `MJ`, `BB`). A guard test enforces that the map stays total over every
+registered slug.
 
 ## Conflicts
 
@@ -148,26 +176,25 @@ rule: `GC` bounds how many islands fit, `BB`/`SH` constrain their extent,
 `QA` their total mass, `NC:0` locally reinforces isolation. Two IS
 constraints on different colours are independent.
 
-Generator diversity consideration (mirroring the RC+CC note in
-[row_count](row_count.md)): `IS` and `GC` on the same colour form a natural
-pair (spacing + count = "fit N islands"); treat them as siblings in the
-diversity score to avoid over-awarding rule_diversity.
-
 ## Display
 
 **File**: `lib/widgets/constraints/islands.dart`
 
 Top-bar widget, global scope (no anchor), same slot as `QA`, `GC`, `CH`,
 `FM`, `BB`. Renders a square containing a fixed **6×6 virtual mini-grid**
-(same device as `ChainWidget`): three islands drawn in the constraint colour
+(same device as `ChainWidget`): four islands drawn in the constraint colour
 over neutral-grey unfilled cells, visually separated including diagonally —
-the icon itself demonstrates the rule.
+the icon itself demonstrates the rule. Single fixed pattern: the island
+layout never changes; only the tint follows the constraint colour (same
+approach as `ChainWidget`'s fixed path).
 
-Illustrative index set (row-major, 0–35):
+Index set (row-major, 0–35):
 
 - Island A: `{0, 1, 6}` — top-left L-triomino;
 - Island B: `{4, 5, 11}` — top-right L-triomino;
-- Island C: `{14, 15}` — centre domino.
+- Island C: `{14, 15}` — centre domino;
+- Island D: `{25, 28, 31, 32, 33, 34}` — snaking hexomino along the bottom
+  edge (rows `010010` / `011110`).
 
 Every pair of islands is separated by at least one full row/column of grey
 (no diagonal corner-touch in the icon — an icon violating its own rule would
@@ -176,49 +203,46 @@ be actively misleading).
 State colours follow the shared convention: neutral grey background,
 green border (valid), deepOrange (invalid), highlightColor (highlighted),
 semi-transparent grey on grayout. Hint arrows originate from the widget
-toward the pruned cell when an IS prune is highlighted.
+toward the pruned or forced cell when an IS move is highlighted.
 
-Since IS renders in the top bar (not inside grid cells), **no
-`to_flutter.dart` mapping is needed** (same as `QA`, `GC`, `FM`, `BB`).
+Since IS renders in the top bar (not inside grid cells), no
+`to_flutter.dart` mapping exists (same as `QA`, `GC`, `FM`, `BB`).
 
 ## Editor
 
-- `showIslandsDialog`
-  (`lib/widgets/create_page/dialogs/islands_dialog.dart`) — a colour picker
-  only (no numeric fields); reuses the picker half of the shared
-  `showColorCountDialog` body.
-- `create_page.dart`: add `case 'IS':` to the
-  `_pickConstraintParameters` switch.
+`showIslandsDialog`
+(`lib/widgets/create_page/dialogs/islands_dialog.dart`) offers a colour
+picker only — no numeric fields; it reuses the picker half of the shared
+`showColorCountDialog` body. `create_page.dart` routes `'IS'` through its
+`_pickConstraintParameters` switch.
 
 ## UI registry
 
-`lib/widgets/constraints/registry.dart`:
-
-- import the widget, add a `constraintUIRegistry` entry for `'IS'` with a
-  `buildPreview` callback;
-- add `case 'IS':` to `constraintNameForSlug()` (returns
-  `AppLocalizations` `constraintIslands`);
-- add `case 'IS':` to `constraintExplanationForSlug()` (returns
-  `constraintExplainIS`).
-
-The onboarding dialog, Learning page, help-page catalogue and generated
-icons pick the new slug up automatically from these two functions.
+`lib/widgets/constraints/registry.dart` carries a `constraintUIRegistry`
+entry for `'IS'` (with a `buildPreview` callback placed after `IM`),
+plus `case 'IS':` arms in `constraintNameForSlug()` (returning
+`constraintIslands`) and `constraintExplanationForSlug()` (returning
+`constraintExplainIS`). The onboarding dialog, Learning page, help-page
+catalogue and generated icons pick the slug up automatically from these
+two functions.
 
 ## Icons
 
-Regenerate the website PNGs after the widget exists:
-`bin/build_constraint_icons.sh` (see [constraint_icons.md](../constraint_icons.md)).
+Website PNGs are exported by `bin/build_constraint_icons.sh`
+(see [constraint_icons.md](../constraint_icons.md)); the light and dark
+variants live under `assets/constraint_icons/`.
 
 ## Localization
 
 ARB keys in `app_en.arb`, `app_fr.arb`, `app_es.arb`:
 
 - `constraintIslands` — EN `"islands"`, FR `"îles"`, ES `"islas"`;
-- `constraintExplainIS` — first-contact help text.
+- `constraintExplainIS` — first-contact help text (four-island icon,
+  theme-neutral wording).
 
-Run `flutter gen-l10n` afterwards.
+## Complicities
 
-## Complicities (natural candidates, none initially implemented)
+None implemented. Natural candidates:
 
 - **IS + QA**: quota pressure against barred placements — the count forces
   cells exactly where IS forbids them, pinning islands.
@@ -227,83 +251,82 @@ Run `flutter gen-l10n` afterwards.
   removed candidate cells.
 - **IS + CH**: a border-to-border chain cuts the grid; islands cannot sit
   diagonally along both banks in the same corner regions.
-- **PABalancedSide-style partial filtering**: PA sides intersected with
-  IS-pruned cells.
+
+Observed-but-parked hypotheses (merge-path feasibility against line quotas)
+are recorded in
+[constraint_complicity.md](../constraint_complicity.md).
 
 ## Generator integration
 
-Enumerated via the registry like every type — no manual integration. A
-dedicated pre-fill (`preFillIs`, Nurikabe-style: sample island seeds, grow
-bounded shapes with mandatory 8-halos, flood the sea with the opposite
-colour, attach `IS`, then disambiguate via strategic reveals and `GC`/`QA`
-guard rails) is a natural follow-up — **not part of the initial
-implementation**. Until then, IS puzzles come from the regular
-generate-and-filter loop, which suffices because random fills frequently
-satisfy separation on small grids.
+Enumerated via the registry like every other type — no manual integration.
+IS puzzles come from the regular generate-and-filter loop.
 
-## Implementation checklist
+### Corpus caveat: pre-fix lines
 
-Mirror of the "Adding a new constraint" checklist in
-[`docs/dev/index.md`](../index.md):
+Lines generated before the mergeability fix of `verify` were validated by a
+stricter predicate (any diagonal contact between current groups counted as
+violated). That made the generator's uniqueness/solvability filter
+over-restrictive during solving: valid alternative completions were rejected
+as contradictions, so puzzles whose intended solution was merely one of
+several could pass as unique. Concrete example (3×3,
+`DF:0.down;NC:8.1.0;CC:1.2.2;IS:2`, prefill cell 4 = white): NC + CC force
+cells 5 and 7 white and cell 1 black, DF picks the 0/3 split — but cells 2
+and 6 remain genuinely free; all four black/white combinations satisfy every
+constraint.
 
-1. **Constraint class** → `lib/getsomepuzzle/constraints/islands.dart`;
-   `IslandsConstraint extends Constraint`; field: `color` (CellValue).
-   - `slug` → `'IS'`; `referencedColors` → `{color}`;
-   - `serialize()` → `'IS:${cellValueToString(color)}'`;
-   - `toString()` → `'${cellValueToString(color)} islands'`;
-   - `toHuman(Puzzle)` → `'Islands of colour <c>: groups never touch, even
-     diagonally'` (or localized equivalent);
-   - `rotated(...)` → identity clone; no `conflictsWith` override.
-2. **Engine registry** → `registry.dart` entry, alphabetical order
-   (between `IM` and `JC`).
-3. **Family mapping** → `families.dart`: `'IS': 'group-topology'`.
-4. **Rotation coverage** → auto via `test/rotation_test.dart`.
-5. **Constraint widget** → `lib/widgets/constraints/islands.dart`.
-6. **UI registry** → `buildPreview` + `constraintNameForSlug` +
-   `constraintExplanationForSlug` cases (see UI registry section).
-7. **Flutter bridge** → not needed (top-bar rendering).
-8. **Grid widget** → `puzzle.dart`: ensure `'IS'` is treated as a
-   top-bar/global constraint in the `Wrap` of global constraints (same
-   list as `GC`/`QA`/`FM`/`BB`).
-9. **Editor switch** → `case 'IS':` in `_pickConstraintParameters`.
-10. **Icon regeneration** → `bin/build_constraint_icons.sh`.
-11. **Localization** → three ARBs + `flutter gen-l10n`.
-12. **Generator** → auto via registry.
-13. **Tests** → `test/islands_test.dart` (see below).
-14. **Analyze** → `flutter analyze`, fix all issues.
+Any IS line generated before the fix is therefore suspect. An audit pass (in
+the spirit of the `bin/cleanup_collections.dart` passes) — re-solving every
+IS-containing line with the current engine and dropping or regenerating
+those without a unique propagation-plus-force solution — closes the gap.
+
+## Not yet implemented
+
+- **Dedicated pre-fill** (`preFillIs`): Nurikabe-style sampling of island
+  seeds, bounded growth with mandatory 8-halos, sea flooding, strategic
+  reveals and `GC`/`QA` guard rails. The regular loop suffices today because
+  random fills frequently satisfy separation on small grids.
+- **Diversity sibling treatment**: `IS` and `GC` on the same colour form a
+  natural pair (spacing + count = "fit N islands") and could share a
+  diversity bucket in the generator's scoring, mirroring the RC+CC note in
+  [row_count](row_count.md).
+- **Early grayout**: a precise capable-pair criterion was evaluated and
+  rejected as unsound (see `isCompleteFor`); a sound cheaper variant than
+  the conservative one is unknown.
 
 ## Tests
 
-Primary: `test/islands_test.dart`, following the canonical contract list:
+`test/islands_test.dart` follows the canonical contract list:
 
 - Reachable-incomplete state → `verify == true` (multi-island clean grid,
   single snaking group, wrong-colour diagonal contact ignored);
-- Violated state → `verify == false` (two islands touching at a corner);
-- `apply` impossible on contradiction (existing diagonal contact);
-- `apply` prunes the direct diagonal-between-islands cell;
-- `apply` prunes the bridged case (cell 4-adjacent to island X diagonal
-  to island Y);
+- Mergeability: growable corner contact between two islands →
+  `verify == true` (`_1_ / 1__` case); permanent contact across a wall with
+  free cells elsewhere → `verify == false` (`21_ / 12_` and the walled
+  `120 / 210 / 222` variant);
+- Complete-grid violation → `verify == false` (two committed islands
+  touching at a corner, both colours);
+- `apply` impossible on permanent contradiction;
+- `apply` returns `null` when the touched groups are still mergeable —
+  centre-diagonal case (`100/000/001`) and the bridged case (`100/000/010`);
+- `apply` prunes across a wall: colouring `f` would grow its island into a
+  permanent corner-contact (`112/220/221`, prune cell 5);
+- `apply` forces the unique merge cell between diagonally-connected
+  islands (`222/120/010` → SetValue black on cell 6); no forcing when two
+  disjoint merge routes exist (`100/010/000`);
 - `apply` returns `null` on safe free cells;
 - `apply` no-op guard on already-pruned colour (3-colour livelock
   regression);
-- `isCompleteFor` true/false per the grayout criteria;
-- `serialize` round-trip;
+- `isCompleteFor` conservative grayout: any free cell still holding the
+  colour keeps IS lit;
+- serialize round-trip;
 - `generateAllParameters` cardinality == `domain.length`;
 - rotation identity over four turns.
 
-Secondary additions:
+Secondary coverage:
 
-- `test/is_complete_test.dart` — grayout criteria cases (capable pair
-  across corners in different components → not complete; same-component
-  diagonal pair → complete);
+- `test/is_complete_test.dart` — mirrored grayout group: fixed sea + one
+  island + far-apart free corners → **not complete** (conservative rule);
+  empty grid → not complete; all free cells stripped of `color` → complete;
 - `test/families_test.dart` / `test/equilibrium_test.dart` — family
-  mapping totality; composition counts updated for the new slug.
-
-## Open points
-
-1. **Branch 3 (pair starvation)** — deferred; revisit if generated puzzles
-   show backtracking-heavy IS instances.
-2. **Grayout precision** — ship the precise capable-pair criterion (more
-   code, better UX) or the SH-style conservative one first?
-3. **Widget icon** — single fixed pattern vs. per-colour tint only; the
-   6×6 three-island icon above assumes one pattern fits all colours.
+  mapping totality; IS joins the existing `group-topology` family so the
+  composition counts are unchanged.

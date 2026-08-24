@@ -147,6 +147,7 @@
     "constraintEyes": "yeux",
     "constraintChain": "chaîne",
     "constraintImplication": "implication",
+    "constraintIslands": "îles",
     "constraintBoundingBox": "boîte englobante",
     "newConstraintModalTitle": "Nouvelle règle !",
     "newConstraintModalSkip": "Ignorer l'apprentissage",
@@ -223,6 +224,10 @@
     "constraintExplainIM": "Une flèche d'une case à une autre signifie : si la case source prend la couleur de la flèche, la case cible doit aussi prendre cette couleur. La contraposée s'applique aussi : si la cible est d'une couleur différente, la source ne peut pas prendre la couleur de la flèche.",
     "@constraintExplainIM": {
         "description": "Body of the new-constraint explanation modal for the Implication (IM) constraint"
+    },
+    "constraintExplainIS": "Une icône montre quatre îles d'une couleur séparées par de l'eau. Les groupes de cette couleur ne doivent jamais se toucher, même en diagonale.",
+    "@constraintExplainIS": {
+        "description": "Body of the new-constraint explanation modal for the Islands (IS) constraint"
     },
     "createLetterGroupDone": "Terminer",
     "createAddNew": "Ajouter une contrainte",

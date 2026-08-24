@@ -709,6 +709,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintImplication => 'implication';
 
   @override
+  String get constraintIslands => 'îles';
+
+  @override
   String get constraintBoundingBox => 'boîte englobante';
 
   @override
@@ -858,6 +861,10 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get constraintExplainIM =>
       'Une flèche d\'une case à une autre signifie : si la case source prend la couleur de la flèche, la case cible doit aussi prendre cette couleur. La contraposée s\'applique aussi : si la cible est d\'une couleur différente, la source ne peut pas prendre la couleur de la flèche.';
+
+  @override
+  String get constraintExplainIS =>
+      'Une icône montre quatre îles d\'une couleur séparées par de l\'eau. Les groupes de cette couleur ne doivent jamais se toucher, même en diagonale.';
 
   @override
   String get complicityOtherConstraint => 'une autre contrainte';

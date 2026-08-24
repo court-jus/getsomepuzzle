@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
@@ -8,6 +9,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/islands.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 
 import 'helpers/make_puzzle.dart';
@@ -290,6 +292,44 @@ void main() {
         isFalse,
         reason: 'findAMove on a clone must not mutate the original',
       );
+    });
+  });
+
+  group('IslandsConstraint.isCompleteFor', () {
+    test('free corners keep the constraint lit (conservative grayout)',
+        () {
+      // 6x6: single black island in the middle, white sea, only the four
+      // corners are still free. Conservative grayout: any free cell still
+      // holding the colour keeps IS active.
+      final p = makePuzzle('022220\n222222\n221122\n221122\n222222\n022220');
+      final c = IslandsConstraint('1');
+      expect(c.isCompleteFor(p), isFalse);
+    });
+
+    test('empty grid stays lit', () {
+      final p = makePuzzle('000\n000\n000');
+      final c = IslandsConstraint('1');
+      expect(c.isCompleteFor(p), isFalse);
+    });
+
+    test('two free diagonal cells → not complete', () {
+      final p = makePuzzle('2220\n2102\n2222\n2222');
+      final c = IslandsConstraint('1');
+      expect(c.isCompleteFor(p), isFalse);
+    });
+
+    test('all free cells stripped of colour → complete', () {
+      // With black pruned from every free cell the capable set holds only
+      // coloured cells: components are the actual groups and verify is the
+      // exact final check → complete.
+      final p = makePuzzle3('100\n000\n000');
+      for (var i = 0; i < p.cells.length; i++) {
+        if (p.cellValues[i] == CellValue.free) {
+          p.cells[i].removeOptionForSolver(CellValue.black);
+        }
+      }
+      final c = IslandsConstraint('1');
+      expect(c.isCompleteFor(p), isTrue);
     });
   });
 

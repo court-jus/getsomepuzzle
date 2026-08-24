@@ -82,14 +82,14 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        // 18 display slugs: onboarding introducers first (FM, NC, PA,
+        // 19 display slugs: onboarding introducers first (FM, NC, PA,
         // CC, GS, EY, DF, LT, QA), then the rest in registry order;
         // row/column pairs (RC/CC, JC/JR, RT/CT) are collapsed.
         expect(
           find.byType(ConstraintIcon),
           findsNWidgets(constraintCatalogueSlugs.length),
         );
-        expect(constraintCatalogueSlugs.length, 18);
+        expect(constraintCatalogueSlugs.length, 19);
         expect(constraintCatalogueSlugs.first, 'FM');
         // Teaching order: onboarding introducers (FM, NC, PA, CC, GS,
         // EY, DF, LT, QA) then remaining display slugs in registry order.
@@ -111,6 +111,7 @@ void main() {
           'GC',
           'MJ',
           'IM',
+          'IS',
           'BB',
         ]);
         // First catalogue row is FM (Forbidden pattern), teaching order.

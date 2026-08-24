@@ -52,6 +52,28 @@ bool canReach(
   return false;
 }
 
+/// Diagonal (corner-sharing) neighbours of [idx]: the cells that share only
+/// a corner with it — 8-adjacency minus the 4-adjacency exposed by
+/// `Puzzle.getNeighbors`. Used by the Islands (IS) constraint to detect
+/// diagonal contact between distinct groups (its only operative rule:
+/// two 4-adjacent cells of a colour are by definition the same group).
+List<int> diagonalNeighbors(Puzzle puzzle, int idx) {
+  final width = puzzle.width;
+  final height = puzzle.height;
+  final ridx = idx ~/ width;
+  final cidx = idx % width;
+  final List<int> result = [];
+  for (final dr in const [-1, 1]) {
+    for (final dc in const [-1, 1]) {
+      final r = ridx + dr;
+      final c = cidx + dc;
+      if (r < 0 || r >= height || c < 0 || c >= width) continue;
+      result.add(r * width + c);
+    }
+  }
+  return result;
+}
+
 Set<int> getMyColorGroup(Puzzle puzzle, int idx) {
   final myValue = puzzle.cellValues[idx];
   if (myValue == CellValue.free) return {};

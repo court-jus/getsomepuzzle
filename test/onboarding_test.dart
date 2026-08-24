@@ -92,6 +92,7 @@ void main() {
         'GC',
         'MJ',
         'IM',
+        'IS',
         'JR',
         'BB',
       ]);
