@@ -23,4 +23,5 @@ Flutter app "Get Some Puzzle": fill a grid black/white (or 3-color) satisfying c
 - Conventions for code style/l10n: `mem:conventions`.
 - Commands: `mem:suggested_commands`.
 - Done criteria: `mem:task_completion`.
+- omp model roles + usage-cap fallback rule: `mem:omp/model_config`.
 - See also `docs/dev/index.md` (entry point to the dev docs) and `AGENTS.md` (RTK command prefix rule).
