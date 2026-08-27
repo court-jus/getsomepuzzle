@@ -416,7 +416,6 @@ class Database {
   /// Load every built-in collection file and build a map from
   /// [canonicalPuzzleKey] to the collection key (e.g. `'1-easy'`).
   /// Used by the stats dashboard to group plays by collection.
-  /// Calling this from the UI thread is safe because
   /// [rootBundle.loadString] is non-blocking.
   Future<Map<String, String>> getCollectionLookup() async {
     if (_puzzleCollectionCache != null) return _puzzleCollectionCache!;
@@ -428,7 +427,7 @@ class Database {
         for (final line in content.split('\n')) {
           final trimmed = line.trim();
           if (trimmed.isEmpty) continue;
-          _puzzleCollectionCache![canonicalPuzzleKey(trimmed)] = key;
+          _puzzleCollectionCache![identityKey(trimmed)] = key;
         }
       } catch (_) {}
     }
@@ -1390,9 +1389,8 @@ class Database {
     }
     await _refreshSoftDiscoveryPool();
     preparePlaylist();
-    // Pre-warm the collection-lookup cache in the background so the
-    // stats page doesn't block on loading 6 asset files.
-    getCollectionLookup();
+    // Pre-warm the collection-lookup cache (now fast with identityKey).
+    await getCollectionLookup();
   }
 
   /// SharedPreferences key gating the one-shot application of

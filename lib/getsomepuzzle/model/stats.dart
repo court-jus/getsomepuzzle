@@ -178,7 +178,7 @@ List<String> _extractSlugs(String puzzleLine) {
 
 /// Aggregated stats dashboard computed from raw [StatEntry] list.
 class StatsDashboard {
-  /// [collectionLookup] maps a [canonicalPuzzleKey] to a collection label.
+  /// [collectionLookup] maps an [identityKey] to a collection label.
   StatsDashboard(List<StatEntry> raw, {Map<String, String>? collectionLookup}) {
     for (final entry in raw) {
       _totalPlays++;
@@ -210,7 +210,7 @@ class StatsDashboard {
 
       // By collection
       if (collectionLookup != null) {
-        final key = canonicalPuzzleKey(entry.puzzleLine);
+        final key = identityKey(entry.puzzleLine);
         final col = collectionLookup[key] ?? 'other';
         _collectionBuckets.putIfAbsent(col, () => _BucketAccumulator());
         _collectionBuckets[col]!.add(entry);
