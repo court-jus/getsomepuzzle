@@ -19,30 +19,37 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/families.dart';
 // Collections (mirrors the filenames in `assets/`)
 // ---------------------------------------------------------------------------
 
-const _publishedFiles = [
-  'assets/1-easy.txt',
-  'assets/2-player.txt',
-  'assets/3-advanced.txt',
-  'assets/4-strong.txt',
-  'assets/5-expert.txt',
-  'assets/6-mad.txt',
+const _publishedNames = [
+  '1-easy.txt',
+  '2-player.txt',
+  '3-advanced.txt',
+  '4-strong.txt',
+  '5-expert.txt',
+  '6-mad.txt',
 ];
 
-const _rejectFiles = [
-  'assets/cancelled.txt',
-  'assets/noCandidates.txt',
-  'assets/notUnique.txt',
-  'assets/1-easy-overfilled.txt',
-  'assets/overfilled.txt',
-  'assets/2-player-overfilled.txt',
-  'assets/3-advanced-overfilled.txt',
-  'assets/4-strong-overfilled.txt',
-  'assets/5-expert-overfilled.txt',
-  'assets/6-mad-overfilled.txt',
-  'assets/ratioTooHigh.txt',
+const _rejectNames = [
+  'cancelled.txt',
+  'noCandidates.txt',
+  'notUnique.txt',
+  '1-easy-overfilled.txt',
+  'overfilled.txt',
+  '2-player-overfilled.txt',
+  '3-advanced-overfilled.txt',
+  '4-strong-overfilled.txt',
+  '5-expert-overfilled.txt',
+  '6-mad-overfilled.txt',
+  'ratioTooHigh.txt',
 ];
 
-const _allFiles = [..._publishedFiles, ..._rejectFiles];
+/// Resolve the keyword file sets under [dir] (the `--assets-dir` corpus
+/// root). Reject buckets tolerate missing files (skipped with a warning).
+List<String> _filesUnder(String dir, {bool rejects = false}) {
+  final names = rejects
+      ? [..._publishedNames, ..._rejectNames]
+      : _publishedNames;
+  return [for (final n in names) '$dir/$n'];
+}
 
 // ---------------------------------------------------------------------------
 // Data model
@@ -111,6 +118,11 @@ class _Args {
   /// When non-null, output a random playlist of this many puzzles instead of
   /// a summary table. Mutually exclusive with --group-by/--cross/--buckets.
   final int? playlist;
+
+  /// Corpus root directory used to expand the "published" / "all" /
+  /// "rejects" `--in` keywords and the default selection. Explicit `--in`
+  /// paths are never rewritten.
+  final String assetsDir;
   _Args(
     this.files,
     this.filters,
@@ -121,8 +133,10 @@ class _Args {
     this.sort,
     this.reverse,
     this.playlist,
+    this.assetsDir,
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Parsing
@@ -290,8 +304,12 @@ void _printUsage(IOSink out) {
     '  --in FILE         Scan FILE. Repeatable. Keywords: "published"',
   );
   out.writeln('                    (default, six difficulty files), "all"');
-  out.writeln('                    (every assets/*.txt incl. rejects).');
-  out.writeln('  --ntypes N        Exact distinct-slug count.');
+  out.writeln('                    (every corpus .txt incl. rejects),');
+  out.writeln('                    "rejects".');
+  out.writeln(
+    '  --assets-dir DIR  Corpus root for the keywords above and the',
+  );
+  out.writeln('                    default selection (default "assets").');
   out.writeln('  --min-ntypes N    Lower bound (inclusive).');
   out.writeln('  --max-ntypes N    Upper bound (inclusive).');
   out.writeln('  --include-slug X  Must contain X. Repeatable (AND).');
@@ -368,6 +386,7 @@ _Args _parseArgs(List<String> args) {
   var sort = 'count';
   var reverse = false;
   int? playlist;
+  var assetsDir = 'assets';
 
   const validAxes = {
     'slug',
@@ -387,6 +406,7 @@ _Args _parseArgs(List<String> args) {
     'domain',
   };
   const defaultBucketDims = ['size', 'slugs', 'scenario'];
+  final fileTokens = <String>[];
 
   String need(int i) {
     if (i + 1 >= args.length) {
@@ -403,18 +423,15 @@ _Args _parseArgs(List<String> args) {
         _printUsage(stdout);
         exit(0);
       case '--in':
-        final v = need(i);
+        // Keywords ("published"/"all"/"rejects") are expanded after the
+        // loop so that --assets-dir may appear in any order.
+        fileTokens.add(need(i));
         i++;
-        if (v == 'published') {
-          files.addAll(_publishedFiles);
-        } else if (v == 'all') {
-          files.addAll(_allFiles);
-        } else if (v == 'rejects') {
-          files.addAll(_rejectFiles);
-        } else {
-          files.add(v);
-        }
         pickedFiles = true;
+        break;
+      case '--assets-dir':
+        assetsDir = need(i);
+        i++;
         break;
       case '--ntypes':
         filters.exactNtypes = int.parse(need(i));
@@ -534,6 +551,20 @@ _Args _parseArgs(List<String> args) {
         throw ArgumentError('Unknown option: $a (use --help).');
     }
   }
+  if (pickedFiles) {
+    for (final v in fileTokens) {
+      switch (v) {
+        case 'published':
+          files.addAll(_filesUnder(assetsDir));
+        case 'rejects':
+          files.addAll(_filesUnder(assetsDir, rejects: true));
+        case 'all':
+          files.addAll(_filesUnder(assetsDir, rejects: true));
+        default:
+          files.add(v);
+      }
+    }
+  }
   final modes = [
     if (groupBySet) '--group-by',
     if (cross != null) '--cross',
@@ -545,7 +576,7 @@ _Args _parseArgs(List<String> args) {
       '${modes.join(', ')} are mutually exclusive; pick one output mode.',
     );
   }
-  if (!pickedFiles) files = List<String>.from(_publishedFiles);
+  if (!pickedFiles) files = _filesUnder(assetsDir);
   return _Args(
     files,
     filters,
@@ -556,6 +587,7 @@ _Args _parseArgs(List<String> args) {
     sort,
     reverse,
     playlist,
+    assetsDir,
   );
 }
 
