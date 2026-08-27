@@ -69,8 +69,10 @@ const _levelNames = [
 /// convergence.
 const _fillable = {'1-easy', '2-player', '5-expert', '6-mad'};
 
+const _logPath = '/tmp/balance_collections.log';
+
 class _Args {
-  int batch = 3000;
+  int batch = 500;
   int target = 20000;
   int maintainEvery = 5;
   int maxIterations = 100;
@@ -100,6 +102,25 @@ Map<String, int> _counts() {
 
 int _floor(int target) => (target * 0.9).round();
 int _ceiling(int target) => (target * 1.1).round();
+
+/// Append one timestamped step line to the global log file and echo it
+/// to the console.
+void _log(String msg) {
+  final line = '[${DateTime.now().toIso8601String()}] $msg';
+  stdout.writeln(line);
+  File(_logPath).writeAsStringSync('$line\n', mode: FileMode.append);
+}
+
+/// Total number of puzzles each collection is above [target] — what
+/// `cluster_puzzles --mode recycle` would move to the recycled feeds.
+int _recyclable(Map<String, int> counts, int target) {
+  var total = 0;
+  for (final name in _levelNames) {
+    final c = counts[name] ?? 0;
+    if (c > target) total += c - target;
+  }
+  return total;
+}
 
 bool _fillableInRange(Map<String, int> counts, int target) {
   final floor = _floor(target);
@@ -154,7 +175,7 @@ iterations. Stops when the *fillable* collections (1-easy, 2-player, 5-expert,
 (4-strong gets --target-collection batches every --strong-every iterations).
 
 Options:
-  --batch N             Puzzles generated per iteration (default: 3000)
+  --batch N             Puzzles generated per iteration (default: 500)
   --target N            Per-collection balance target (default: 20000)
   --maintain-every N    Run full bin/maintain.dart every N iterations
                         (default: 5; 0 = never)
@@ -230,8 +251,9 @@ Future<void> main(List<String> args) async {
       break;
     }
 
-    // 1. Generate a batch. Every --strong-every iterations, when 4-strong is
-    //    under target, target it directly (best-effort squeeze).
+    // 1. Generate a batch (--quiet). Every --strong-every iterations,
+    //    when 4-strong is under target, target it directly (best-effort
+    //    squeeze).
     final strongUnder = (before['4-strong'] ?? 0) < a.target;
     final targeted = strongUnder && (iter % a.strongEvery == 0);
     final genArgs = <String>['-n', '${a.batch}'];
@@ -243,14 +265,30 @@ Future<void> main(List<String> args) async {
         '${a.easingBudget}',
       ]);
       stdout.writeln('\n  generate $a.batch (targeting 4-strong)…');
+      _log('Will generate $a.batch new puzzles (targeting 4-strong)');
     } else {
       stdout.writeln('\n  generate $a.batch (equilibrium)…');
+      _log('Will generate $a.batch new puzzles');
     }
-    if (await _runScript(['bin/generate.dart', ...genArgs]) != 0) {
+    if (await _runScript(['bin/generate.dart', ...genArgs, '--quiet']) != 0) {
       stderr.writeln('generate failed — aborting.');
       exit(1);
     }
 
+    final afterGen = _counts();
+    final newByLevel = <String, int>{
+      for (final name in _levelNames)
+        name: (afterGen[name] ?? 0) - (before[name] ?? 0),
+    };
+    final totalNew = newByLevel.values.fold(0, (s, v) => s + v);
+    _log('$totalNew puzzles generated');
+    _log(
+      'New puzzles: ${newByLevel.entries.map((e) => '${e.key.split('-').last}=${e.value}').join(', ')}',
+    );
+
+    _log('${_recyclable(afterGen, a.target)} puzzles can be recycled');
+    _log('recycling puzzles');
+    final feedBefore = _countLines('assets/6-mad-recycled.txt');
     // 2. Recycle: prune over-target collections, feed the excess.
     stdout.writeln('\n  recycle (prune over-target)…');
     if (await _runScript([
@@ -276,11 +314,16 @@ Future<void> main(List<String> args) async {
       stdout.writeln(
         '\n  ⟳ full maintain (every $a.maintainEvery iterations)…',
       );
+      _log('running full maintain');
       if (await _runScript(['bin/maintain.dart']) != 0) {
         stderr.writeln('maintain failed — aborting.');
         exit(1);
       }
     }
+    _log(
+      '${feedBefore - _countLines('assets/6-mad-recycled.txt')} '
+      'recycled puzzles eased into collections',
+    );
 
     final after = _counts();
     stdout.writeln('\n  after iteration $iter:');

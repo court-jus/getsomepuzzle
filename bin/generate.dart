@@ -38,6 +38,7 @@ Future<void> main(List<String> args) async {
 
 Future<void> _runGenerate(Map<String, dynamic> parsed) async {
   final debug = parsed['debug'] as bool;
+  final quiet = parsed['quiet'] as bool;
   final showTimingBreakdown = parsed['timingBreakdown'] as bool;
   final showCompositions = parsed['showCompositions'] as bool;
   final count = parsed['count'] as int;
@@ -274,7 +275,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
       ?.key;
 
   void render() {
-    if (debug) return;
+    if (debug || quiet) return;
     final liveCount = currentLines.where((l) => l.trim().isNotEmpty).length;
     _renderDashboard(
       generated: generated,
@@ -328,7 +329,7 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     stderr.writeln(
       'Done: $generated puzzles in ${_fmt(totalSw.elapsed)} (jobs=$jobs)',
     );
-    if (durations.isNotEmpty) {
+    if (!quiet && durations.isNotEmpty) {
       stderr.writeln(
         '  avg: ${_avgMs(durations)}ms, median: ${_medianMs(durations)}ms, '
         'min: ${durations.reduce(min)}ms, max: ${durations.reduce(max)}ms',
@@ -562,9 +563,24 @@ Future<void> _runGenerate(Map<String, dynamic> parsed) async {
     }());
   }
 
-  dashboardTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-    render();
-  });
+  if (quiet) {
+    // Quiet mode: a single progress line every 30s instead of the
+    // full dashboard — count so far plus an ETA once the rate is
+    // known.
+    dashboardTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      final eta = generated > 0
+          ? totalSw.elapsed * ((count - generated) / generated)
+          : null;
+      stderr.writeln(
+        '$generated/$count puzzles'
+        '${eta != null ? ', ETA ${_fmt(eta)}' : ''}',
+      );
+    });
+  } else {
+    dashboardTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      render();
+    });
+  }
 
   await Future.wait(consumers);
   // Drain any pending CSV writes before letting `finish()` call exit(0).
@@ -1832,6 +1848,7 @@ Map<String, dynamic> _parseArgs(List<String> args) {
     'blacklistAdaptiveK': 20,
     'blacklistSkipSafety': 100,
     'debug': false,
+    'quiet': false,
     'timingBreakdown': false,
     'showCompositions': false,
     // null = no --domain flag → the domain axis is active on {2, 3} (the
@@ -1935,6 +1952,8 @@ Map<String, dynamic> _parseArgs(List<String> args) {
         result['winding'] = double.parse(args[++i]);
       case '--debug':
         result['debug'] = true;
+      case '--quiet':
+        result['quiet'] = true;
       case '--timing-breakdown':
         result['timingBreakdown'] = true;
       case '--compositions':
@@ -2156,6 +2175,8 @@ General:
                           dashboard (hidden by default).
       --compositions      Show composition deficits in the dashboard
                           (hidden by default).
+      --quiet             No dashboard: print only a periodic progress
+                          line (count + ETA) and the final total.
   -h, --help              Show this help
 
 Rule slugs: $rules
