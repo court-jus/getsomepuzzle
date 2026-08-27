@@ -18,6 +18,8 @@
 //     `docs/dev/collection_management.md` "Vector freshness via inline
 //     emission").
 
+import 'dart:math';
+
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/solution_geometry.dart';
@@ -85,8 +87,21 @@ class PuzzleVector {
   final int distinctConstraintsUsed;
   final int maxCascade;
   final double avgMoveComplexity;
-  // (slug, tier) -> share. Keyed `FM_t0`, `CX_t2`, … in fixed column order.
-  final Map<String, double> shares;
+
+  /// Declared constraint slugs (post-sort puzzle) that never fired in the
+  /// solving trace. A present-but-unused constraint still shows its icon and
+  /// can mislead the player, so two puzzles with identical traces but
+  /// different dead constraints are *not* interchangeable.
+  final int unusedSlugs;
+
+  /// Normalized Shannon entropy of the trace slug distribution
+  /// (1.0 = every used slug fires equally often, near 0 = one slug
+  /// dominates). Summarizes mix *evenness* that [distinctConstraintsUsed]
+  /// ignores and the per-slug share block only encodes redundantly.
+  final double traceSlugEntropy;
+
+   // (slug, tier) -> share. Keyed `FM_t0`, `CX_t2`, … in fixed column order.
+   final Map<String, double> shares;
   // Solution-geometry (power-spectrum) descriptors.
   final double specPeakFrac;
   final double specXbarsFrac;
@@ -120,7 +135,9 @@ class PuzzleVector {
     required this.distinctConstraintsUsed,
     required this.maxCascade,
     required this.avgMoveComplexity,
-    required this.shares,
+    required this.unusedSlugs,
+    required this.traceSlugEntropy,
+     required this.shares,
     required this.specPeakFrac,
     required this.specXbarsFrac,
     required this.specYbarsFrac,
@@ -181,6 +198,7 @@ PuzzleVector computePuzzleVector({
   String? prev;
   int complexitySum = 0;
   final distinctInTrace = <String>{};
+  final slugCounts = <String, int>{};
 
   for (final step in steps) {
     if (step.method == SolveMethod.force) {
@@ -195,6 +213,7 @@ PuzzleVector computePuzzleVector({
     distinctInTrace.add(step.constraint);
 
     final slug = step.isComplicity ? 'CX' : _slugOf(step.constraint);
+    slugCounts.update(slug, (n) => n + 1, ifAbsent: () => 1);
     final tier = step.complexity.clamp(0, puzzleTiers.last);
     final bySlug = counts[slug];
     if (bySlug != null) {
@@ -231,6 +250,28 @@ PuzzleVector computePuzzleVector({
       shares['${s}_t$t'] = nProp > 0 ? c / nProp : 0.0;
     }
   }
+  // Constraint-mix extras: dead declared slugs and mix evenness. Declared
+  // slugs are read off the post-sort constraint list; anything that doesn't
+  // map to a known puzzle slug (e.g. synthetic complicity serializations)
+  // is ignored.
+  final declaredSlugs = <String>{
+    for (final c in pu.constraints) _slugOf(c.serialize()),
+  }..retainWhere(puzzleSlugs.contains);
+  final usedSlugs = slugCounts.keys.toSet();
+  final unusedSlugs = declaredSlugs.difference(usedSlugs).length;
+  // Normalized Shannon entropy over the used-slug distribution; k > 1
+  // implies nProp >= 2, so the division is safe.
+  final k = usedSlugs.length;
+  var traceSlugEntropy = 0.0;
+  if (k > 1) {
+    var h = 0.0;
+    for (final n in slugCounts.values) {
+      final p = n / nProp;
+      h -= p * log(p);
+    }
+    traceSlugEntropy = h / log(k);
+  }
+
 
   return PuzzleVector(
     width: width,
@@ -249,6 +290,8 @@ PuzzleVector computePuzzleVector({
     maxCascade: maxCascade,
     avgMoveComplexity: nProp > 0 ? complexitySum / nProp : 0.0,
     shares: shares,
+    unusedSlugs: unusedSlugs,
+    traceSlugEntropy: traceSlugEntropy,
     specPeakFrac: spec.peak,
     specXbarsFrac: spec.xbars,
     specYbarsFrac: spec.ybars,
@@ -296,6 +339,8 @@ List<String> vectorCsvColumns() {
     'distinct_constraints_used',
     'max_cascade',
     'avg_move_complexity',
+    'unused_slugs',
+    'trace_slug_entropy',
   ];
   for (final s in puzzleSlugs) {
     for (final t in puzzleTiers) {
@@ -348,6 +393,8 @@ List<String> vectorCsvFields(PuzzleVector v) {
     '${v.distinctConstraintsUsed}',
     '${v.maxCascade}',
     v.avgMoveComplexity.toStringAsFixed(4),
+    '${v.unusedSlugs}',
+    v.traceSlugEntropy.toStringAsFixed(4),
   ];
   for (final s in puzzleSlugs) {
     for (final t in puzzleTiers) {

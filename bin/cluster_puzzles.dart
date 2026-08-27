@@ -259,6 +259,11 @@ void main(List<String> args) {
   addFeature('avg_move_complexity');
   addFeature('distinct_constraints_used');
   addFeature('n_constraints');
+  // Constraint-mix extras: dead declared slugs (presence vs usage) and mix
+  // evenness — separate puzzles that use the same slug *set* with very
+  // different balance, or that only differ by constraints that never fire.
+  addFeature('unused_slugs');
+  addFeature('trace_slug_entropy');
   // Solution-geometry power-spectrum signals (translation- and colour-swap-
   // invariant) — let the clusterer separate globally-regular solutions
   // (damier, colour bars) that the trace shares alone cannot distinguish.
