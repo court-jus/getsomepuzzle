@@ -21,9 +21,17 @@
 // over the original (existing lines preserved verbatim; canonical-key
 // duplicates skipped), so `git diff` shows exactly what moved. It also
 // *consumes* the feed: lines that were successfully routed are removed from
-// the feed file (staged + renamed), so the feed converges to just the
-// not-yet-easable (stayed-mad / unparsable) lines instead of being re-read in
-// full every run. `--sample` skips consumption (it only processes a subset).
+// the feed file, and lines that stayed mad are parked in
+// `assets/6-mad-stuck.txt` (or `--emit-mad PATH`) and also removed, so the
+// feed converges to just the unparsable lines instead of being re-read in full
+// every run. `--sample` skips consumption (it only processes a subset).
+//
+// Under `--apply`, progress is flushed to disk every `--checkpoint` lines
+// (default 200): routed lines are appended to their destination files and
+// stayed-mad lines to the stuck file, then both are consumed from the feed —
+// all idempotently. An interrupted run therefore resumes on the next launch
+// (the feed is exactly the remaining work) and the destination dedup skips
+// lines already written.
 //
 // Usage:
 //   dart run bin/recycle_mad.dart --feed assets/6-mad-recycled.txt
@@ -59,6 +67,11 @@ const _targetNames = {
   'strong': PuzzleLevel.strong,
   'expert': PuzzleLevel.expert,
 };
+/// Default sink for lines that stay mad under --apply (unless --emit-mad
+/// overrides it). Keeps the feed shrinking instead of re-reading them.
+const String _defaultStuckPath = 'assets/6-mad-stuck.txt';
+
+String _stuckPath(_Args a) => a.emitMad ?? _defaultStuckPath;
 
 class _Args {
   String feed = 'assets/6-mad-recycled.txt';
@@ -71,6 +84,7 @@ class _Args {
   int maxAdditions = 20;
   int candidateCap = 8;
   int timeoutMs = 15000;
+  int checkpoint = 200;
   int? sample;
   int seed = 42;
   bool apply = false;
@@ -112,6 +126,8 @@ void main(List<String> args) {
         a.candidateCap = int.parse(args[++i]);
       case '--timeout-ms':
         a.timeoutMs = int.parse(args[++i]);
+      case '--checkpoint':
+        a.checkpoint = int.parse(args[++i]);
       case '--sample':
         a.sample = int.parse(args[++i]);
       case '--seed':
@@ -169,9 +185,10 @@ void main(List<String> args) {
   final aimCounts = <PuzzleLevel, int>{};
   final madLines = <String>[];
   // Canonical keys of the *original feed lines* that were successfully routed
-  // (and therefore consumed from the feed). Stayed-mad / unparsable lines are
-  // kept so they can be re-tried next run.
+  // or stayed mad — both consumed from the feed under --apply. Only unparsable
+  // lines are re-read next run.
   final routedKeys = <String>{};
+  final madKeys = <String>{};
   int unparsable = 0;
   final sw = Stopwatch()..start();
 
@@ -193,6 +210,9 @@ void main(List<String> args) {
       } catch (_) {}
     } else {
       madLines.add(line);
+      try {
+        madKeys.add(canonicalPuzzleKey(line));
+      } catch (_) {}
     }
     if (a.verbose) {
       stderr.writeln(
@@ -202,6 +222,20 @@ void main(List<String> args) {
     } else if ((k + 1) % 25 == 0) {
       stderr.write('\r  ${k + 1}/${feedLines.length} done...   ');
     }
+    if (a.apply && a.checkpoint > 0 && (k + 1) % a.checkpoint == 0) {
+      final addedNow = _apply(landed, quiet: true);
+      final stuckNow = _writeStayedMad(_stuckPath(a), madLines);
+      _consumeFeed(a, routedKeys, madKeys);
+      if (addedNow == 0 && stuckNow == 0) {
+        stderr.writeln(
+          '  [checkpoint @ ${k + 1}/${feedLines.length}] nothing new to flush',
+        );
+      } else {
+        stderr.writeln(
+          '  [checkpoint @ ${k + 1}/${feedLines.length}] +$addedNow routed, +$stuckNow stayed-mad (resumable)',
+        );
+      }
+    }
   }
   stderr.writeln(
     '\r  ${feedLines.length} lines processed in ${sw.elapsed.inSeconds}s',
@@ -209,29 +243,29 @@ void main(List<String> args) {
 
   _report(a, aimCounts, landed, madLines.length, unparsable);
 
-  if (a.emitMad != null && madLines.isNotEmpty) {
+  if (!a.apply && a.emitMad != null && madLines.isNotEmpty) {
     File(a.emitMad!).writeAsStringSync('${madLines.join('\n')}\n');
     stderr.writeln('Wrote ${madLines.length} stayed-mad lines to ${a.emitMad}');
   }
 
   if (a.apply) {
-    _apply(landed);
-    // Consume the feed: drop the lines that were successfully routed so it
-    // converges to just the not-yet-easable (stayed-mad / unparsable) lines
-    // instead of re-reading everything each run. Skipped under --sample, which
-    // only processes a subset of the feed.
-    _consumeFeed(a, routedKeys);
+    _apply(landed, quiet: true);
+    _writeStayedMad(_stuckPath(a), madLines);
+    // Consume the feed: drop routed and stayed-mad lines so it converges to
+    // just the unparsable lines (re-tried next run). Skipped under --sample.
+    _consumeFeed(a, routedKeys, madKeys);
   } else {
     stderr.writeln('(dry-run — pass --apply to write the routed lines)');
   }
 }
 
-/// Rewrite the feed to remove the [routedKeys] (lines that landed in a
-/// collection this run), preserving comments/blanks and every non-routed line.
-/// Staged + renamed so an interrupted run never corrupts the feed.
-void _consumeFeed(_Args a, Set<String> routedKeys) {
+/// Rewrite the feed to remove the [routedKeys] and [madKeys] (lines that
+/// landed in a collection or stayed mad this run), preserving comments/blanks
+/// and every other line. Staged + renamed so an interrupted run never corrupts
+/// the feed.
+void _consumeFeed(_Args a, Set<String> routedKeys, Set<String> madKeys) {
   if (a.sample != null) return; // partial processing — do not rewrite
-  if (routedKeys.isEmpty) return;
+  if (routedKeys.isEmpty && madKeys.isEmpty) return;
   final file = File(a.feed);
   if (!file.existsSync()) return;
   final remaining = <String>[];
@@ -242,7 +276,8 @@ void _consumeFeed(_Args a, Set<String> routedKeys) {
       continue;
     }
     try {
-      if (routedKeys.contains(canonicalPuzzleKey(line))) {
+      final key = canonicalPuzzleKey(line);
+      if (routedKeys.contains(key) || madKeys.contains(key)) {
         removed++;
         continue;
       }
@@ -254,7 +289,7 @@ void _consumeFeed(_Args a, Set<String> routedKeys) {
   File(tmpPath).writeAsStringSync('${remaining.join('\n')}\n');
   File(tmpPath).renameSync(a.feed);
   stderr.writeln(
-    '  ${a.feed}: consumed $removed routed lines '
+    '  ${a.feed}: consumed $removed lines '
     '(${remaining.where((l) => l.trim().isNotEmpty && !l.startsWith('#')).length} remain)',
   );
 }
@@ -333,9 +368,12 @@ void _report(
 /// Append the routed lines to their destination files, deduped against the
 /// existing content by canonical key, via a `<file>.recycle` staging file
 /// renamed over the original.
-void _apply(Map<PuzzleLevel, List<String>> landed) {
-  stderr.writeln('');
-  stderr.writeln('Writing routed lines...');
+int _apply(Map<PuzzleLevel, List<String>> landed, {bool quiet = false}) {
+  if (!quiet) {
+    stderr.writeln('');
+    stderr.writeln('Writing routed lines...');
+  }
+  var totalAdded = 0;
   for (final entry in landed.entries) {
     final path = _levelToFile[entry.key]!;
     final existing = File(path).existsSync()
@@ -355,16 +393,49 @@ void _apply(Map<PuzzleLevel, List<String>> landed) {
       } catch (_) {}
     }
     if (added.isEmpty) {
-      stderr.writeln('  $path: nothing new (all duplicates)');
+      if (!quiet) stderr.writeln('  $path: nothing new (all duplicates)');
       continue;
     }
     final tmpPath = '$path.recycle';
     File(tmpPath).writeAsStringSync('${[...existing, ...added].join('\n')}\n');
     File(tmpPath).renameSync(path);
+    totalAdded += added.length;
     stderr.writeln(
       '  $path: +${added.length} (${existing.length} -> ${existing.length + added.length})',
     );
   }
+  return totalAdded;
+}
+
+/// Append the stayed-mad lines to [path], deduped by canonical key, via a
+/// `<path>.stuck` staging file renamed over the original. Returns the number
+/// of new lines actually written (0 when all were already parked).
+int _writeStayedMad(String path, List<String> lines) {
+  final existing = File(path).existsSync()
+      ? File(path).readAsLinesSync()
+      : <String>[];
+  final existingKeys = <String>{};
+  for (final l in existing) {
+    if (l.trim().isEmpty || l.startsWith('#')) continue;
+    try {
+      existingKeys.add(canonicalPuzzleKey(l));
+    } catch (_) {}
+  }
+  final added = <String>[];
+  for (final l in lines) {
+    try {
+      if (existingKeys.add(canonicalPuzzleKey(l))) added.add(l);
+    } catch (_) {}
+  }
+  if (added.isEmpty) return 0;
+  final tmpPath = '$path.stuck';
+  File(tmpPath).writeAsStringSync('${[...existing, ...added].join('\n')}\n');
+  File(tmpPath).renameSync(path);
+  stderr.writeln(
+    '  $path: +${added.length} stayed-mad '
+    '(${existing.length} -> ${existing.length + added.length})',
+  );
+  return added.length;
 }
 
 int _countLines(String path) {
@@ -397,12 +468,16 @@ Options:
   --max-additions N    Readonly-cell cap per puzzle (default: 20)
   --candidate-cap N    Free cells to try per step (default: 8)
   --timeout-ms MS      Per-solve budget (default: 15000)
+  --checkpoint N       Flush routed lines to disk every N lines under
+                       --apply (default: 200); 0 disables mid-run flush
   --sample N           Process at most N feed lines (seeded shuffle)
   --seed N             Sampling seed (default: 42)
-  --apply              Write routed lines into assets/<level>.txt and
-                       consume (remove) them from the feed
-                       (default: dry-run report only)
-  --emit-mad PATH      Write stayed-mad lines to PATH
+  --apply              Write routed lines into assets/<level>.txt, park
+                       stayed-mad lines in the stuck file, and consume both
+                       from the feed, flushing every --checkpoint lines so an
+                       interrupted run resumes on relaunch (default: dry-run)
+  --emit-mad PATH      Park stayed-mad lines in PATH instead of the default
+                       assets/6-mad-stuck.txt (dry-run: dump only)
   -v, --verbose        Per-line progress
   -h, --help           Show this help
 ''');

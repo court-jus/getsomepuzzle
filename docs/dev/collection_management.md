@@ -44,7 +44,7 @@ declared slugs. See `levels.md` for the cascade.
 | `bin/analyze_stats.dart`              | OLS regression on log(duration), per-bucket stats            |
 | `bin/remark_scenarios.dart`           | Tag legacy v2 lines with `_scenario:<name>` (reads `solve_traces.tsv`) |
 | `bin/trace_score.dart`                | Score puzzles by trace quality (reads `solve_traces.tsv`)    |
-| `bin/query_corpus.dart`               | Ad-hoc filtered queries over `assets/*.txt` (read-only)      |
+| `bin/query_corpus.dart`               | Ad-hoc filtered queries over an assets-style corpus dir (`--assets-dir`, default `assets/*.txt`) |
 | `bin/plot_vectors.py`                 | 2-D PCA projection + supervised separability of the vectors (matplotlib + numpy) |
 | `bin/detect_regular_solutions.dart`   | Diagnose globally-regular solutions (damier / colour bars) over-rated by the trace (read-only report + optional CSV) |
 | `bin/find_single_path_puzzles.dart`   | Filter puzzles that have a unique deduction path (exactly one move at every step) — no branching, no backtracking needed |
@@ -1001,7 +1001,9 @@ line with `EaseObjective.targetLevel` toward the first open target (by current
 collection count vs `--cap`, live-balanced as lines route), and routes the
 landed line into `assets/<level>.txt` by its actual final level
 (`--apply`; dry-run by default). Canonical-key duplicates are skipped against
-the destination file; stayed-mad lines can be dumped with `--emit-mad`.
+the destination file. Lines that stay mad are parked in
+`assets/6-mad-stuck.txt` (override with `--emit-mad PATH`) and consumed from
+the feed, so the feed shrinks even for unrecyclable puzzles.
 
 
 ### Open questions
@@ -1024,9 +1026,10 @@ the destination file; stayed-mad lines can be dumped with `--emit-mad`.
   excess, produced by `cluster_puzzles --mode recycle` (writes
   `assets/6-mad-recycled.txt`; append + canonical-key dedup, so re-running
   after a partial consumption never loses or duplicates lines). After an
-  `--apply` run, `recycle_mad` removes the successfully-routed lines from the
-  feed, so it converges to just the not-yet-easable (stayed-mad / unparsable)
-  hard cases. Keeping it topped-up and drained is automated by
+  `--apply` run, `recycle_mad` removes the routed lines from the feed and
+  parks the stayed-mad lines in `assets/6-mad-stuck.txt`, so the feed
+  converges to just the unparsable lines. Keeping it topped-up and drained is
+  automated by
   `bin/balance_collections.dart` (generate → recycle → recycle_mad per
   iteration).
 * **Fate of un-simplifiable puzzles.** Mad puzzles that stay mad after easing
