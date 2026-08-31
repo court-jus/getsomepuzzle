@@ -136,14 +136,14 @@ Future<void> main(List<String> args) async {
   // ─── Sinks ───────────────────────────────────────────────────────────
   final sinks = <String, IOSink>{};
   IOSink sinkFor(String path) => sinks.putIfAbsent(path, () {
-        final f = File(path);
-        final isNew = !f.existsSync() || f.lengthSync() == 0;
-        final s = f.openWrite(mode: FileMode.append);
-        if (isNew && path.endsWith('puzzle_vectors.csv')) {
-          s.writeln(vectorCsvHeader());
-        }
-        return s;
-      });
+    final f = File(path);
+    final isNew = !f.existsSync() || f.lengthSync() == 0;
+    final s = f.openWrite(mode: FileMode.append);
+    if (isNew && path.endsWith('puzzle_vectors.csv')) {
+      s.writeln(vectorCsvHeader());
+    }
+    return s;
+  });
 
   // ─── Stats ───────────────────────────────────────────────────────────
   final destCounts = <String, int>{};
@@ -196,9 +196,11 @@ Future<void> main(List<String> args) async {
         // Conflict pre-check, same as `generate --check`.
         var conflicted = false;
         for (var ai = 0; ai < pu.constraints.length && !conflicted; ai++) {
-          for (var bi = ai + 1;
-              bi < pu.constraints.length && !conflicted;
-              bi++) {
+          for (
+            var bi = ai + 1;
+            bi < pu.constraints.length && !conflicted;
+            bi++
+          ) {
             if (pu.constraints[ai].conflictsWith(pu.constraints[bi]) ||
                 pu.constraints[bi].conflictsWith(pu.constraints[ai])) {
               conflicted = true;
@@ -328,8 +330,10 @@ Future<void> main(List<String> args) async {
   );
   stderr.writeln('Skipped (already in out-dir): $skippedKnown');
   stderr.writeln('Trace-cache hits: $cacheHits');
-  stderr.writeln('Constraint-order drift: $orderDrift '
-      '(listed in $outDir/order-drift.txt)');
+  stderr.writeln(
+    'Constraint-order drift: $orderDrift '
+    '(listed in $outDir/order-drift.txt)',
+  );
   if (invalidReasons.isNotEmpty) {
     stderr.writeln('Invalid breakdown:');
     final entries = invalidReasons.entries.toList()

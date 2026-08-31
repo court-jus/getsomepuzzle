@@ -100,8 +100,8 @@ class PuzzleVector {
   /// ignores and the per-slug share block only encodes redundantly.
   final double traceSlugEntropy;
 
-   // (slug, tier) -> share. Keyed `FM_t0`, `CX_t2`, … in fixed column order.
-   final Map<String, double> shares;
+  // (slug, tier) -> share. Keyed `FM_t0`, `CX_t2`, … in fixed column order.
+  final Map<String, double> shares;
   // Solution-geometry (power-spectrum) descriptors.
   final double specPeakFrac;
   final double specXbarsFrac;
@@ -137,7 +137,7 @@ class PuzzleVector {
     required this.avgMoveComplexity,
     required this.unusedSlugs,
     required this.traceSlugEntropy,
-     required this.shares,
+    required this.shares,
     required this.specPeakFrac,
     required this.specXbarsFrac,
     required this.specYbarsFrac,
@@ -271,7 +271,6 @@ PuzzleVector computePuzzleVector({
     }
     traceSlugEntropy = h / log(k);
   }
-
 
   return PuzzleVector(
     width: width,

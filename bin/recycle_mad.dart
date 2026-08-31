@@ -67,6 +67,7 @@ const _targetNames = {
   'strong': PuzzleLevel.strong,
   'expert': PuzzleLevel.expert,
 };
+
 /// Default sink for lines that stay mad under --apply (unless --emit-mad
 /// overrides it). Keeps the feed shrinking instead of re-reading them.
 const String _defaultStuckPath = 'assets/6-mad-stuck.txt';

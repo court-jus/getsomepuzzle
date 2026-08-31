@@ -175,13 +175,16 @@ void main(List<String> args) {
   _printSorted(reachableByLevel);
   stdout.writeln('');
   stdout.writeln('Of the removals that landed advanced/strong:');
-  stdout.writeln('  -> advanced, unique: $okAdvanced   (ambiguous: $ambiguousAdvanced)');
-  stdout.writeln('  -> strong,   unique: $okStrong   (ambiguous: $ambiguousStrong)');
+  stdout.writeln(
+    '  -> advanced, unique: $okAdvanced   (ambiguous: $ambiguousAdvanced)',
+  );
+  stdout.writeln(
+    '  -> strong,   unique: $okStrong   (ambiguous: $ambiguousStrong)',
+  );
 }
 
 void _printSorted(Map<String, int> m) {
-  final entries = m.entries.toList()
-    ..sort((a, b) => a.key.compareTo(b.key));
+  final entries = m.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
   for (final e in entries) {
     stdout.writeln('  ${e.key.padRight(14)} ${e.value}');
   }

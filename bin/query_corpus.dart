@@ -137,7 +137,6 @@ class _Args {
   );
 }
 
-
 // ---------------------------------------------------------------------------
 // Parsing
 // ---------------------------------------------------------------------------
@@ -306,9 +305,7 @@ void _printUsage(IOSink out) {
   out.writeln('                    (default, six difficulty files), "all"');
   out.writeln('                    (every corpus .txt incl. rejects),');
   out.writeln('                    "rejects".');
-  out.writeln(
-    '  --assets-dir DIR  Corpus root for the keywords above and the',
-  );
+  out.writeln('  --assets-dir DIR  Corpus root for the keywords above and the');
   out.writeln('                    default selection (default "assets").');
   out.writeln('  --min-ntypes N    Lower bound (inclusive).');
   out.writeln('  --max-ntypes N    Upper bound (inclusive).');
