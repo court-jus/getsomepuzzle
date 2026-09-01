@@ -372,10 +372,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintGroupSize => 'group size';
 
   @override
+  String get constraintSameSize => 'same size';
+
+  @override
   String get constraintLetterGroup => 'letter group';
 
   @override
   String get constraintMajority => 'majority color';
+
+  @override
+  String get constraintMirror => 'mirror';
 
   @override
   String get constraintParity => 'parity';
@@ -385,6 +391,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get constraintSymmetry => 'symmetry';
+
+  @override
+  String get mirrorHorizontal => 'horizontal';
+
+  @override
+  String get mirrorVertical => 'vertical';
 
   @override
   String get generate => 'Generate';
@@ -544,6 +556,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createChooseLetter => 'Letter';
 
   @override
+  String get createChooseSymbol => 'Symbol';
+
+  @override
   String get createChooseValue => 'Value';
 
   @override
@@ -586,6 +601,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String createLetterGroupMode(String letter) {
     return 'Tap cells to add to group $letter, then press Done';
+  }
+
+  @override
+  String createSameSizeMode(String symbol) {
+    return 'Tap cells to mark with $symbol, then press Done';
   }
 
   @override
@@ -710,6 +730,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constraintBoundingBox => 'bounding box';
 
   @override
+  String get constraintRectangularGroups => 'non-square rectangular groups';
+
+  @override
   String get newConstraintModalTitle => 'New rule!';
 
   @override
@@ -799,12 +822,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'A cell carrying a number must belong to a group of orthogonally adjacent same-color cells whose size matches that number.';
 
   @override
+  String get constraintExplainSZ =>
+      'Cells marked with the same suit symbol must belong to different groups that all have the same size.';
+
+  @override
   String get constraintExplainPA =>
       'A cell with an arrow demands the same number of black and white cells in front of the arrow. A double-headed arrow extends the rule to both sides.';
 
   @override
   String get constraintExplainLT =>
       'Cells marked with the same letter must belong to the same group. A group must not contain two different letters.';
+
+  @override
+  String get constraintExplainMI =>
+      'A mirror line splits the grid in two. Each side must contain the same number of cells of the chosen colour.';
 
   @override
   String get constraintExplainMJ =>
@@ -833,6 +864,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get constraintExplainTransition =>
       'A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.';
+
+  @override
+  String get constraintExplainRE =>
+      'A cell marked with a small blue rectangle must belong to a rectangular group that is not square.';
 
   @override
   String get constraintExplainGC =>

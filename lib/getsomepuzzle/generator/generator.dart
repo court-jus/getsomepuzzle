@@ -1139,9 +1139,16 @@ class PuzzleGenerator {
     if (config.strategy != GenerationStrategy.singleTier) {
       // Preserve the constructive LT backbone: those LTs are the puzzle's
       // structural identity and must survive even when made redundant by
-      // greedy-added garde-fous.
+      // greedy-added garde-fous. The user-required slugs (`--require`) are
+      // preserved for the same reason: a constraint the user explicitly
+      // asked for must not be pruned just because a later candidate
+      // subsumed it — the required-check above would have already passed,
+      // and stripping the slug post-check silently violates `--require`.
       pu.removeUselessRules(
-        preserveSlugs: config.pathBasedScenario ? const {'LT'} : const {},
+        preserveSlugs: {
+          if (config.pathBasedScenario) 'LT',
+          ...config.requiredRules,
+        },
         shouldStop: shouldStop,
       );
     }

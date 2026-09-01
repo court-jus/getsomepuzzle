@@ -84,6 +84,7 @@ void main() {
       expect(OnboardingPhase.postStrictDiscoveryOrder, [
         'RC',
         'RT',
+        'MI',
         'SY',
         'SH',
         'JC',
@@ -95,6 +96,8 @@ void main() {
         'IS',
         'JR',
         'BB',
+        'RE',
+        'SZ',
       ]);
     });
   });

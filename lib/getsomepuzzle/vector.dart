@@ -40,7 +40,9 @@ const List<String> puzzleSlugs = [
   'NC',
   'PA',
   'QA',
+  'RE',
   'SH',
+  'SZ',
   'SY',
 ];
 

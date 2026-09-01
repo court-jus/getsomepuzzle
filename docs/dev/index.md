@@ -73,8 +73,12 @@ directly in the code):
   appear in the grid (wildcards, rotation, FM+FM synthesis).
 - [`group_size.md`](constraints/group_size.md) — `GS`: the group containing the
   anchor cell must have exactly N cells (colour-agnostic).
+- [`same_size.md`](constraints/same_size.md) — `SZ`: marked groups must have
+  equal sizes (heart, diamond, spade or club symbols).
 - [`quantity.md`](constraints/quantity.md) — `QA`: exactly N cells of one colour
   across the whole grid (global).
+- [`mirror.md`](constraints/mirror.md) — `MI`: both halves of the grid must
+  contain the same number of cells of one colour (global, even-dimension).
 - [`different_from.md`](constraints/different_from.md) — `DF`: two adjacent cells
   must hold different values (colour-agnostic, `≠` painter).
 

@@ -306,4 +306,34 @@ void main() {
     expect(p.generationScenario, isNotNull);
     expect(['classic', 'sh'], contains(p.generationScenario));
   });
+
+  test('requiredRules survive removeUselessRules cleanup', () {
+    // Regression: `--require` violates. The strict required-slug gate in
+    // `generateOne` runs before the post-loop `removeUselessRules` cleanup,
+    // which used to prune required constraints once a later candidate
+    // subsumed them — the puzzle then shipped without the required slug.
+    // Verified pre-fix: across 320 attempts, FM/PA/GS/DF/GC each lost the
+    // required slug while being emitted. Required slugs must now be passed
+    // through as `preserveSlugs`, so every emitted puzzle keeps them.
+    const slugs = ['FM', 'PA', 'GS', 'NC', 'DF', 'QA', 'EY', 'GC'];
+    for (final slug in slugs) {
+      for (int i = 0; i < 40; i++) {
+        final result = PuzzleGenerator.generateOne(
+          GeneratorConfig(
+            width: 4,
+            height: 4,
+            requiredRules: {slug},
+            maxAttemptTime: const Duration(seconds: 20),
+          ),
+        );
+        if (result == null) continue;
+        final p = Puzzle(result.line);
+        expect(
+          p.constraints.map((c) => c.slug),
+          contains(slug),
+          reason: 'emitted puzzle lost required slug $slug',
+        );
+      }
+    }
+  });
 }

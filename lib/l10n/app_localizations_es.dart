@@ -375,10 +375,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintGroupSize => 'tamaño de grupo';
 
   @override
+  String get constraintSameSize => 'mismo tamaño';
+
+  @override
   String get constraintLetterGroup => 'grupo de letras';
 
   @override
   String get constraintMajority => 'color mayoritario';
+
+  @override
+  String get constraintMirror => 'espejo';
 
   @override
   String get constraintParity => 'paridad';
@@ -388,6 +394,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get constraintSymmetry => 'simetría';
+
+  @override
+  String get mirrorHorizontal => 'horizontal';
+
+  @override
+  String get mirrorVertical => 'vertical';
 
   @override
   String get generate => 'Generar';
@@ -548,6 +560,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get createChooseLetter => 'Letra';
 
   @override
+  String get createChooseSymbol => 'Símbolo';
+
+  @override
   String get createChooseValue => 'Valor';
 
   @override
@@ -590,6 +605,11 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String createLetterGroupMode(String letter) {
     return 'Toca las celdas para añadirlas al grupo $letter, luego pulsa Listo';
+  }
+
+  @override
+  String createSameSizeMode(String symbol) {
+    return 'Toca las celdas para marcarlas con $symbol, luego pulsa Listo';
   }
 
   @override
@@ -715,6 +735,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get constraintBoundingBox => 'caja delimitadora';
 
   @override
+  String get constraintRectangularGroups => 'grupos rectangulares no cuadrados';
+
+  @override
   String get newConstraintModalTitle => '¡Regla nueva!';
 
   @override
@@ -805,12 +828,20 @@ class AppLocalizationsEs extends AppLocalizations {
       'Cuando una casilla contiene un número, debe pertenecer a un grupo de casillas del mismo color, adyacentes ortogonalmente, cuyo tamaño coincida con ese número.';
 
   @override
+  String get constraintExplainSZ =>
+      'Las casillas marcadas con el mismo símbolo de naipe deben pertenecer a grupos distintos que tengan todos el mismo tamaño.';
+
+  @override
   String get constraintExplainPA =>
       'Cuando una casilla contiene una flecha, debe haber el mismo número de casillas negras y blancas delante de la flecha. Una flecha doble extiende la regla a ambos lados.';
 
   @override
   String get constraintExplainLT =>
       'Las casillas marcadas con la misma letra deben pertenecer al mismo grupo. Un grupo no puede contener dos letras diferentes.';
+
+  @override
+  String get constraintExplainMI =>
+      'Una línea de espejo divide la cuadrícula en dos. Cada mitad debe contener el mismo número de celdas del color elegido.';
 
   @override
   String get constraintExplainMJ =>
@@ -839,6 +870,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get constraintExplainTransition =>
       'Una onda cuadrada con un número al lado de una fila o columna indica cuántos cambios de color deben aparecer en esa línea. Cada escalón de la onda es un cambio; una onda plana con 0 significa que toda la línea es de un solo color.';
+
+  @override
+  String get constraintExplainRE =>
+      'Una casilla marcada con un pequeño rectángulo azul debe pertenecer a un grupo rectangular no cuadrado.';
 
   @override
   String get constraintExplainGC =>

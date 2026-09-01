@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/complicities/registry.da
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/same_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/equilibrium.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
@@ -394,14 +395,11 @@ class Puzzle {
   /// Add a constraint to the puzzle. Goes through the central helper so
   /// every code path benefits from LetterGroup aggregation (`LT:<letter>`
   /// pairs sharing the same letter merge into a single N-cell group),
-  /// from ParityConstraint same-axis merging (`PA:i.top` + `PA:i.bottom`
-  /// collapse into `PA:i.vertical`; a side subsumed by an existing
-  /// axis-wide constraint is dropped) and from the complicity-cache
-  /// invalidation. The aggregation must happen on every add — not just
-  /// at parse time — otherwise the generator can validate two `LT:D`
-  /// pairs against their local connectivity and miss the combined
-  /// "all four cells in one group" invariant that the constructor
-  /// enforces after deserialisation.
+  /// SameSize aggregation (`SZ:<symbol>` pairs sharing the same symbol
+  /// merge into a single marked-cell constraint), and ParityConstraint
+  /// same-axis merging (`PA:i.top` + `PA:i.bottom` collapse into
+  /// `PA:i.vertical`; a side subsumed by an existing axis-wide constraint is
+  /// dropped). The complicity cache is invalidated on every mutation.
   void addConstraint(Constraint c) {
     if (c is LetterGroup) {
       final existing = _constraints.firstWhereOrNull(
@@ -409,6 +407,19 @@ class Puzzle {
       );
       if (existing != null) {
         final group = existing as LetterGroup;
+        for (final idx in c.indices) {
+          if (!group.indices.contains(idx)) group.indices.add(idx);
+        }
+        _complicitiesCache = null;
+        return;
+      }
+    }
+    if (c is SameSize) {
+      final existing = _constraints.firstWhereOrNull(
+        (other) => other is SameSize && other.symbol == c.symbol,
+      );
+      if (existing != null) {
+        final group = existing as SameSize;
         for (final idx in c.indices) {
           if (!group.indices.contains(idx)) group.indices.add(idx);
         }
@@ -454,12 +465,11 @@ class Puzzle {
   /// high-cplx constraint already in the puzzle (e.g. a required SH).
   ///
   /// Honours the same aggregation contracts as [addConstraint]:
-  /// prepending a `LetterGroup` whose letter already has a constraint
-  /// in the list merges their indices, and prepending a
-  /// `ParityConstraint` sharing an existing entry's anchor and axis
-  /// merges their sides; in both cases the (now combined) entry moves
-  /// to the front. This keeps the "one LT per letter" / "one PA per
-  /// (anchor, axis)" invariants, even under the front-insertion path.
+  /// prepending a `LetterGroup` or `SameSize` whose key already has a
+  /// constraint in the list merges their indices, and prepending a
+  /// `ParityConstraint` sharing an existing entry's anchor and axis merges
+  /// its sides; in each case the combined entry moves to the front. This
+  /// keeps the one-entry-per-key invariants, even under front insertion.
   void prependConstraint(Constraint c) {
     if (c is LetterGroup) {
       final existingIdx = _constraints.indexWhere(
@@ -473,6 +483,21 @@ class Puzzle {
         // Move the merged entry to position 0. `removeAt` shifts the
         // remaining entries left so the subsequent `insert(0, …)`
         // lands in the same slot regardless of `existingIdx`.
+        _constraints.removeAt(existingIdx);
+        _constraints.insert(0, existing);
+        _complicitiesCache = null;
+        return;
+      }
+    }
+    if (c is SameSize) {
+      final existingIdx = _constraints.indexWhere(
+        (other) => other is SameSize && other.symbol == c.symbol,
+      );
+      if (existingIdx >= 0) {
+        final existing = _constraints[existingIdx] as SameSize;
+        for (final idx in c.indices) {
+          if (!existing.indices.contains(idx)) existing.indices.add(idx);
+        }
         _constraints.removeAt(existingIdx);
         _constraints.insert(0, existing);
         _complicitiesCache = null;

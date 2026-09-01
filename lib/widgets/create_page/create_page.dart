@@ -9,13 +9,16 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/chain.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/same_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/mirror.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/rectangular_groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/widgets/cell.dart';
 import 'package:getsomepuzzle/widgets/constraints/bounding_box.dart';
@@ -27,6 +30,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/motif.dart';
 import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
+import 'package:getsomepuzzle/widgets/constraints/mirror.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_count.dart';
 import 'package:getsomepuzzle/widgets/create_page/editor_state.dart';
@@ -41,8 +45,10 @@ import 'package:getsomepuzzle/widgets/create_page/dialogs/different_from_dialog.
 import 'package:getsomepuzzle/widgets/create_page/dialogs/group_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/group_size_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/islands_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/mirror_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/neighbor_count_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/letter_group_dialog.dart';
+import 'package:getsomepuzzle/widgets/create_page/dialogs/same_size_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/motif_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/parity_dialog.dart';
 import 'package:getsomepuzzle/widgets/create_page/dialogs/playlist_name_dialog.dart';
@@ -169,6 +175,9 @@ class _CreatePageState extends State<CreatePage> {
   bool _letterGroupMode = false;
   String _letterGroupLetter = 'A';
   List<int> _letterGroupIndices = [];
+  bool _sameSizeMode = false;
+  String _sameSizeSymbol = 'H';
+  List<int> _sameSizeIndices = [];
 
   bool _majorityZoneMode = false;
   CellValue _majorityZoneColor = CellValue.black;
@@ -391,6 +400,17 @@ class _CreatePageState extends State<CreatePage> {
       return;
     }
 
+    if (_sameSizeMode) {
+      setState(() {
+        if (_sameSizeIndices.contains(cellIdx)) {
+          _sameSizeIndices.remove(cellIdx);
+        } else {
+          _sameSizeIndices.add(cellIdx);
+        }
+      });
+      return;
+    }
+
     final cellConstraints = _constraints
         .whereType<CellsCentricConstraint>()
         .where((c) => c.indices.contains(cellIdx))
@@ -521,6 +541,11 @@ class _CreatePageState extends State<CreatePage> {
       disabled.add('DF');
     }
 
+    // MI: needs at least one even dimension (H requires even height, V even
+    // width); on an odd×odd grid no mirror direction is available.
+    final hasEvenDim = _width.isEven || _height.isEven;
+    if (!hasEvenDim) disabled.add('MI');
+
     return disabled;
   }
 
@@ -553,6 +578,16 @@ class _CreatePageState extends State<CreatePage> {
         );
       case 'LT':
         await _startLetterGroup(cellIdx);
+        return;
+      case 'MI':
+        added = await showMirrorDialog(
+          context,
+          width: _width,
+          height: _height,
+          domain: _domain,
+        );
+      case 'SZ':
+        await _startSameSize(cellIdx);
         return;
       case 'MJ':
         await _startMajorityZone(cellIdx);
@@ -698,6 +733,8 @@ class _CreatePageState extends State<CreatePage> {
           height: _height,
           domain: _domain,
         );
+      case 'RE':
+        added = RectangularGroupsConstraint('$cellIdx');
       case 'fixBlack':
         _setFixedCell(cellIdx, CellValue.black);
         return;
@@ -737,6 +774,32 @@ class _CreatePageState extends State<CreatePage> {
     setState(() {
       _letterGroupMode = false;
       _letterGroupIndices = [];
+    });
+  }
+
+  Future<void> _startSameSize(int cellIdx) async {
+    final usedSymbols = _constraints
+        .whereType<SameSize>()
+        .map((c) => c.symbol)
+        .toSet();
+    final symbol = await showSameSizeDialog(context, usedSymbols: usedSymbols);
+    if (symbol == null) return;
+    if (!mounted) return;
+    setState(() {
+      _sameSizeMode = true;
+      _sameSizeSymbol = symbol;
+      _sameSizeIndices = [cellIdx];
+    });
+  }
+
+  void _finishSameSize() {
+    if (_sameSizeIndices.length >= 2) {
+      final indices = _sameSizeIndices.join('.');
+      _addConstraint(SameSize('$_sameSizeSymbol.$indices'));
+    }
+    setState(() {
+      _sameSizeMode = false;
+      _sameSizeIndices = [];
     });
   }
 
@@ -836,6 +899,8 @@ class _CreatePageState extends State<CreatePage> {
       _forceCells.clear();
       _implicationMode = false;
       _implicationSourceIdx = null;
+      _sameSizeMode = false;
+      _sameSizeIndices = [];
       _editing = false;
     });
   }
@@ -886,9 +951,11 @@ class _CreatePageState extends State<CreatePage> {
               ? loc.createSecondCorner
               : (_letterGroupMode
                     ? loc.createLetterGroupMode(_letterGroupLetter)
-                    : (_implicationMode
-                          ? loc.constraintImplication
-                          : loc.createTitle)),
+                    : (_sameSizeMode
+                          ? loc.createSameSizeMode(_sameSizeSymbol)
+                          : (_implicationMode
+                                ? loc.constraintImplication
+                                : loc.createTitle))),
         ),
         actions: [
           if (_majorityZoneMode)
@@ -907,11 +974,28 @@ class _CreatePageState extends State<CreatePage> {
                 _implicationSourceIdx = null;
               }),
             ),
+          if (_sameSizeMode)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => setState(() {
+                _sameSizeMode = false;
+                _sameSizeIndices = [];
+              }),
+            ),
           if (_letterGroupMode)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: FilledButton.icon(
                 onPressed: _finishLetterGroup,
+                icon: const Icon(Icons.check),
+                label: Text(loc.createLetterGroupDone),
+              ),
+            ),
+          if (_sameSizeMode)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton.icon(
+                onPressed: _finishSameSize,
                 icon: const Icon(Icons.check),
                 label: Text(loc.createLetterGroupDone),
               ),
@@ -1157,6 +1241,14 @@ class _CreatePageState extends State<CreatePage> {
                     cellSize: topBarSize,
                   ),
                 )
+              else if (constraint is MirrorConstraint)
+                GestureDetector(
+                  onTap: () => _confirmDeleteTopBar(constraint),
+                  child: MirrorWidget(
+                    constraint: constraint,
+                    cellSize: topBarSize,
+                  ),
+                )
               else if (constraint is QuantityConstraint)
                 GestureDetector(
                   onTap: () => _confirmDeleteTopBar(constraint),
@@ -1339,12 +1431,13 @@ class _CreatePageState extends State<CreatePage> {
     final constraints = cellConstraintsMap[cellIdx];
     final isLetterGroupSelected =
         _letterGroupMode && _letterGroupIndices.contains(cellIdx);
+    final isSameSizeSelected =
+        _sameSizeMode && _sameSizeIndices.contains(cellIdx);
     final isImplicationSource =
         _implicationMode && _implicationSourceIdx == cellIdx;
     final isMjZoneFirst = _majorityZoneMode && _majorityZoneFirstIdx == cellIdx;
     final fixedValue = _fixedCells[cellIdx];
     final isFixed = fixedValue != null;
-
     final cellValue = isFixed ? fixedValue : CellValue.free;
 
     Color? borderColor;
@@ -1352,7 +1445,7 @@ class _CreatePageState extends State<CreatePage> {
     if (isMjZoneFirst) {
       borderColor = Colors.amber;
       borderWidth = 3;
-    } else if (isLetterGroupSelected) {
+    } else if (isLetterGroupSelected || isSameSizeSelected) {
       borderColor = Colors.amber;
       borderWidth = 3;
     } else if (isImplicationSource) {
@@ -1374,7 +1467,7 @@ class _CreatePageState extends State<CreatePage> {
       value: cellValue,
       idx: cellIdx,
       readonly: isFixed,
-      isHighlighted: isLetterGroupSelected,
+      isHighlighted: isLetterGroupSelected || isSameSizeSelected,
       cellSize: cellSize,
       onTap: () => _onCellTap(cellIdx),
       onSecondaryTap: () {},
