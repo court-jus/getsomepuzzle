@@ -28,19 +28,31 @@ import 'package:getsomepuzzle/getsomepuzzle/solution_geometry.dart';
 /// runs produce diff-able files. `CX` is the synthetic slug used for
 /// complicity moves (multi-constraint deductions).
 const List<String> puzzleSlugs = [
+  'BB',
   'CC',
   'CH',
+  'CT',
   'CX',
   'DF',
   'EY',
   'FM',
   'GC',
   'GS',
+  'IM',
+  'IS',
+  'JC',
+  'JR',
   'LT',
+  'MI',
+  'MJ',
   'NC',
   'PA',
   'QA',
+  'RC',
+  'RE',
+  'RT',
   'SH',
+  'SZ',
   'SY',
 ];
 

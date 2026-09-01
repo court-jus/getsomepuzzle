@@ -125,11 +125,10 @@ handles the edge case where the app is closed at a phase boundary.
 
 ### Soft-filter mode (post-P9)
 
-The corpus doesn't easily sustain strict phases for the remaining
-slugs (the seven in `OnboardingPhase.postStrictDiscoveryOrder` —
-currently `RT, SY, SH, CH, CT, GC, MJ`, derived from
-`constraintRegistry`): too few puzzles whose declared rules sit
-cleanly inside a narrow envelope.
+The corpus doesn't easily sustain strict phases for the remaining slugs in
+`OnboardingPhase.postStrictDiscoveryOrder` (currently `RT, MI, SY, SH, JC, CH,
+CT, GC, MJ, IM, IS, JR, BB, RE, SZ`, derived from `constraintRegistry`): too
+few puzzles whose declared rules sit cleanly inside a narrow envelope.
 
 The post-P9 model is also expressed as a filter preset, via
 `_softFilterRecommendation()`:

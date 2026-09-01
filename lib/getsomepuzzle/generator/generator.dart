@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/same_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/bb.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/path.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/regular.dart';
@@ -896,6 +897,12 @@ class PuzzleGenerator {
           );
           if (!merged.verify(solved)) continue;
         }
+        if (constraint is SameSize) {
+          final merged = cloned.constraints.whereType<SameSize>().firstWhere(
+            (mi) => mi.symbol == constraint.symbol,
+          );
+          if (!merged.verify(solved)) continue;
+        }
 
         bool accepted = false;
         if (phase == 1) {
@@ -1139,9 +1146,16 @@ class PuzzleGenerator {
     if (config.strategy != GenerationStrategy.singleTier) {
       // Preserve the constructive LT backbone: those LTs are the puzzle's
       // structural identity and must survive even when made redundant by
-      // greedy-added garde-fous.
+      // greedy-added garde-fous. The user-required slugs (`--require`) are
+      // preserved for the same reason: a constraint the user explicitly
+      // asked for must not be pruned just because a later candidate
+      // subsumed it — the required-check above would have already passed,
+      // and stripping the slug post-check silently violates `--require`.
       pu.removeUselessRules(
-        preserveSlugs: config.pathBasedScenario ? const {'LT'} : const {},
+        preserveSlugs: {
+          if (config.pathBasedScenario) 'LT',
+          ...config.requiredRules,
+        },
         shouldStop: shouldStop,
       );
     }

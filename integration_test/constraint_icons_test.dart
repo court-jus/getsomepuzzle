@@ -7,7 +7,7 @@
 // or, with a display available:
 //   flutter test integration_test/constraint_icons_test.dart -d linux
 //
-// Output, for each slug in `constraintUIRegistry` (n = 21):
+// Output, for each slug in `constraintUIRegistry` (n = 24):
 //   assets/constraint_icons/<slug>.png        64dp rendered at 2x = 128px
 //   assets/constraint_icons/<slug>-dark.png   same, dark-theme foreground
 //

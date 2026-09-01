@@ -492,6 +492,10 @@
     "@constraintGroupSize": {
         "description": "Name of the group size constraint"
     },
+    "constraintSameSize": "same size",
+    "@constraintSameSize": {
+        "description": "Name of the same size constraint"
+    },
     "constraintLetterGroup": "letter group",
     "@constraintLetterGroup": {
         "description": "Name of the letter group constraint"
@@ -499,6 +503,10 @@
     "constraintMajority": "majority color",
     "@constraintMajority": {
         "description": "Name of the majority zone constraint"
+    },
+    "constraintMirror": "mirror",
+    "@constraintMirror": {
+        "description": "Name of the mirror constraint"
     },
     "constraintParity": "parity",
     "@constraintParity": {
@@ -511,6 +519,14 @@
     "constraintSymmetry": "symmetry",
     "@constraintSymmetry": {
         "description": "Name of the symmetry constraint"
+    },
+    "mirrorHorizontal": "horizontal",
+    "@mirrorHorizontal": {
+        "description": "Label of the horizontal mirror direction selector"
+    },
+    "mirrorVertical": "vertical",
+    "@mirrorVertical": {
+        "description": "Label of the vertical mirror direction selector"
     },
     "generate": "Generate",
     "@generate": {
@@ -662,6 +678,7 @@
     "createChooseAxis": "Symmetry axis",
     "createChooseSize": "Group size",
     "createChooseLetter": "Letter",
+    "createChooseSymbol": "Symbol",
     "createChooseValue": "Value",
     "createImplicationSource": "Source cell ({total} cells, 0-based)",
     "@createImplicationSource": {
@@ -692,6 +709,14 @@
     "@createLetterGroupMode": {
         "placeholders": {
             "letter": {
+                "type": "String"
+            }
+        }
+    },
+    "createSameSizeMode": "Tap cells to mark with {symbol}, then press Done",
+    "@createSameSizeMode": {
+        "placeholders": {
+            "symbol": {
                 "type": "String"
             }
         }
@@ -793,6 +818,10 @@
     "@constraintBoundingBox": {
         "description": "Name of the bounding box constraint"
     },
+    "constraintRectangularGroups": "non-square rectangular groups",
+    "@constraintRectangularGroups": {
+        "description": "Name of the rectangular groups constraint"
+    },
     "newConstraintModalTitle": "New rule!",
     "@newConstraintModalTitle": {
         "description": "Title of the dialog shown the first time a player encounters a new constraint"
@@ -893,6 +922,10 @@
     "@constraintExplainGS": {
         "description": "Body of the new-constraint explanation modal for the Group Size (GS) constraint"
     },
+    "constraintExplainSZ": "Cells marked with the same suit symbol must belong to different groups that all have the same size.",
+    "@constraintExplainSZ": {
+        "description": "Body of the new-constraint explanation modal for the Same Size (SZ) constraint"
+    },
     "constraintExplainPA": "A cell with an arrow demands the same number of black and white cells in front of the arrow. A double-headed arrow extends the rule to both sides.",
     "@constraintExplainPA": {
         "description": "Body of the new-constraint explanation modal for the Parity (PA) constraint"
@@ -900,6 +933,10 @@
     "constraintExplainLT": "Cells marked with the same letter must belong to the same group. A group must not contain two different letters.",
     "@constraintExplainLT": {
         "description": "Body of the new-constraint explanation modal for the Letter Group (LT) constraint"
+    },
+    "constraintExplainMI": "A mirror line splits the grid in two. Each side must contain the same number of cells of the chosen colour.",
+    "@constraintExplainMI": {
+        "description": "Body of the new-constraint explanation modal for the Mirror (MI) constraint"
     },
     "constraintExplainMJ": "A dotted rectangle border in a specific color indicates that most cells inside the zone must be of that color (more than half). The border itself tells you which color must dominate.",
     "@constraintExplainMJ": {
@@ -928,6 +965,10 @@
     "constraintExplainTransition": "A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.",
     "@constraintExplainTransition": {
         "description": "Body of the new-constraint explanation modal for the merged transition constraint (CT/RT)"
+    },
+    "constraintExplainRE": "A cell marked with a small blue rectangle must belong to a rectangular group that is not square.",
+    "@constraintExplainRE": {
+        "description": "Body of the new-constraint explanation modal for the Rectangular Groups (RE) constraint"
     },
     "constraintExplainGC": "A boxed number with a chain icon tells how many separate groups (connected components) of that color the solution must contain.",
     "constraintExplainBB": "Every connected group of this color must occupy a bounding box of exactly this width and height — the smallest rectangle enclosing the group spans exactly that many columns and rows (the group need not fill it).",

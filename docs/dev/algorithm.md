@@ -28,20 +28,25 @@ v2_12_3x3_100000000_FM:11;PA:8.top;GS:0.1_0:0_5
 | RT | Row Transition | A given row must contain exactly N adjacent colour changes (transitions between differently-coloured cells) |
 | GS | Group Size | Connected same-color group must have exact size |
 | LT | Letter Group | Cells with same letter must be in one connected group |
+| MI | Mirror | Both halves of the grid must contain the same number of cells of a colour |
 | QA | Quantity | Total count of a color in the entire grid |
 | SY | Symmetry | Group must be symmetric along a specified axis |
 | DF | Different From | Two adjacent cells must have different colors |
 | SH | Shape | One color's group(s) must match a mandatory 2D shape |
 | CC | Column Count | A given column must contain exactly N cells of a color |
+| JC | Column Majority | A rectangular column zone must contain a strict majority of a colour |
 | CH | Chain | A continuous orthogonal path of one colour must connect two specified grid sides |
 | CT | Column Transition | A given column must contain exactly N adjacent colour changes |
 | GC | Group Count | The grid must contain exactly N connected groups of a color |
+| JR | Row Majority | A rectangular row zone must contain a strict majority of a colour |
 | MJ | Majority | A rectangular zone must contain a strict majority of a given colour |
 | NC | Neighbor Count | A given cell must have exactly N orthogonal neighbors of a color |
 | EY | Eyes | A given cell must "see" exactly N cells of a colour through straight lines of same-colour cells |
 | IM | Implication | If the source cell is a given colour, the target cell must be that colour too (directional; contrapositive also fires) |
+| IS | Islands | Marked same-colour islands must satisfy the island connectivity rule |
 | BB | Bounding Box | Every connected group of a colour must occupy a bounding box of exactly W×H (extent, not fill; global) |
-
+| RE | Rectangular Groups | The marked group must be a solid non-square rectangle |
+| SZ | Same Size | Marked groups with the same suit symbol must have equal sizes |
 ## Solving Algorithm
 
 The solver uses two levels of deduction. **Backtracking is intentionally not
@@ -98,7 +103,7 @@ Select a random subset of cells (controlled by a ratio parameter, randomly drawn
 
 ### Step 3: Enumerate Valid Constraints
 
-For each constraint type (FM, PA, RC, RT, GS, LT, QA, SY, DF, SH, CC, CH, CT, GC, MJ, NC, EY, IM, BB), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
+For each constraint type (FM, PA, RC, RT, GS, LT, MI, QA, SY, DF, SH, CC, CH, CT, GC, MJ, NC, EY, IM, IS, JR, BB, RE, SZ), generate all possible parameter combinations for the grid dimensions. Filter to keep only constraints that are satisfied by the target solution.
 
 ### Step 4: Iterative Constraint Selection
 

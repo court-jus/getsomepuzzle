@@ -375,10 +375,16 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintGroupSize => 'taille de groupe';
 
   @override
+  String get constraintSameSize => 'même taille';
+
+  @override
   String get constraintLetterGroup => 'groupe de lettres';
 
   @override
   String get constraintMajority => 'couleur majoritaire';
+
+  @override
+  String get constraintMirror => 'miroir';
 
   @override
   String get constraintParity => 'parité';
@@ -388,6 +394,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get constraintSymmetry => 'symétrie';
+
+  @override
+  String get mirrorHorizontal => 'horizontal';
+
+  @override
+  String get mirrorVertical => 'vertical';
 
   @override
   String get generate => 'Générer';
@@ -548,6 +560,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get createChooseLetter => 'Lettre';
 
   @override
+  String get createChooseSymbol => 'Symbole';
+
+  @override
   String get createChooseValue => 'Valeur';
 
   @override
@@ -590,6 +605,11 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String createLetterGroupMode(String letter) {
     return 'Touche les cases pour les ajouter au groupe $letter, puis appuie sur Terminer';
+  }
+
+  @override
+  String createSameSizeMode(String symbol) {
+    return 'Touchez les cases à marquer avec $symbol, puis appuyez sur Terminer';
   }
 
   @override
@@ -715,6 +735,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get constraintBoundingBox => 'boîte englobante';
 
   @override
+  String get constraintRectangularGroups => 'groupes rectangulaires non carrés';
+
+  @override
   String get newConstraintModalTitle => 'Nouvelle règle !';
 
   @override
@@ -803,12 +826,20 @@ class AppLocalizationsFr extends AppLocalizations {
       'Lorsqu\'une case contient un nombre, elle doit faire partie d\'un groupe de cases de la même couleur, adjacentes orthogonalement, et la taille de ce groupe doit correspondre au nombre.';
 
   @override
+  String get constraintExplainSZ =>
+      'Les cases marquées du même symbole de carte doivent appartenir à des groupes distincts ayant tous la même taille.';
+
+  @override
   String get constraintExplainPA =>
       'Lorsqu\'une case contient une flèche, il doit y avoir le même nombre de cases noires et de cases blanches devant la flèche. Une double flèche étend la règle aux deux côtés.';
 
   @override
   String get constraintExplainLT =>
       'Les cases marquées de la même lettre doivent appartenir au même groupe. Un groupe ne peut pas contenir deux lettres différentes.';
+
+  @override
+  String get constraintExplainMI =>
+      'Une ligne de miroir coupe la grille en deux. Chaque moitié doit contenir le même nombre de cases de la couleur choisie.';
 
   @override
   String get constraintExplainMJ =>
@@ -837,6 +868,10 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get constraintExplainTransition =>
       'Une onde carrée avec un nombre à côté d\'une ligne ou d\'une colonne indique combien de changements de couleur doivent apparaître dans cette ligne. Chaque marche de l\'onde est un changement ; une onde plate avec 0 signifie que toute la ligne est d\'une seule couleur.';
+
+  @override
+  String get constraintExplainRE =>
+      'Une case marquée d\'un petit rectangle bleu doit appartenir à un groupe rectangulaire non carré.';
 
   @override
   String get constraintExplainGC =>

@@ -7,9 +7,12 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/islands.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/same_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/mirror.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/rectangular_groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
@@ -30,13 +33,16 @@ import 'package:getsomepuzzle/widgets/constraints/islands.dart';
 import 'package:getsomepuzzle/widgets/constraints/eyes.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_size.dart';
+import 'package:getsomepuzzle/widgets/constraints/same_size.dart';
 import 'package:getsomepuzzle/widgets/constraints/majority.dart';
+import 'package:getsomepuzzle/widgets/constraints/mirror.dart';
 import 'package:getsomepuzzle/widgets/constraints/motif.dart';
 import 'package:getsomepuzzle/widgets/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
 import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/symmetry.dart';
 import 'package:getsomepuzzle/widgets/constraints/transition.dart';
+import 'package:getsomepuzzle/widgets/constraints/rectangular_groups.dart';
 
 final constraintUIRegistry =
     <({String slug, Widget Function(Color fgcolor, double size) buildPreview})>[
@@ -91,6 +97,14 @@ final constraintUIRegistry =
             'A',
             style: TextStyle(fontSize: size * 0.7, color: fg),
           ),
+        ),
+      ),
+      (
+        slug: 'MI',
+        buildPreview: (fg, size) => MirrorWidget(
+          constraint: MirrorConstraint('1.H'),
+          fgcolor: fg,
+          cellSize: size,
         ),
       ),
       (
@@ -214,17 +228,45 @@ final constraintUIRegistry =
           cellSize: size,
         ),
       ),
+      (
+        slug: 'RE',
+        buildPreview: (fg, size) => _CellBorder(
+          size: size,
+          mandatory: true,
+          child: RectangularGroupsWidget(
+            constraint: RectangularGroupsConstraint('0'),
+            cellSize: size,
+          ),
+        ),
+      ),
+      (
+        slug: 'SZ',
+        buildPreview: (fg, size) => _CellBorder(
+          size: size,
+          child: SameSizeWidget(
+            constraint: SameSize('H.0.1'),
+            fgcolor: fg,
+            cellSize: size,
+          ),
+        ),
+      ),
     ];
 
-/// Frames an in-cell constraint glyph with a cell border in the readonly
-/// cell's border color, so the picker / onboarding / catalogue previews and
-/// the exported website icons read as "a glyph inside a cell" — the way
-/// these constraints appear on the board.
+/// Frames an in-cell constraint glyph with a cell border. By default the
+/// border uses the readonly cell color; set [mandatory] for a mandatory
+/// constraint marker. This makes picker / onboarding / catalogue previews and
+/// exported website icons read as "a glyph inside a cell" — the way these
+/// constraints appear on the board.
 class _CellBorder extends StatelessWidget {
-  const _CellBorder({required this.size, required this.child});
+  const _CellBorder({
+    required this.size,
+    required this.child,
+    this.mandatory = false,
+  });
 
   final double size;
   final Widget child;
+  final bool mandatory;
 
   @override
   Widget build(BuildContext context) {
@@ -233,7 +275,10 @@ class _CellBorder extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        border: Border.all(color: pc.cellFgReadonly, width: 2.0),
+        border: Border.all(
+          color: mandatory ? pc.mandatory : pc.cellFgReadonly,
+          width: 2.0,
+        ),
       ),
       child: Center(child: child),
     );
@@ -287,6 +332,8 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintGroupSize;
     case 'LT':
       return l.constraintLetterGroup;
+    case 'MI':
+      return l.constraintMirror;
     case 'MJ':
       return l.constraintMajority;
     case 'JC':
@@ -314,6 +361,10 @@ String constraintNameForSlug(AppLocalizations l, String slug) {
       return l.constraintIslands;
     case 'BB':
       return l.constraintBoundingBox;
+    case 'RE':
+      return l.constraintRectangularGroups;
+    case 'SZ':
+      return l.constraintSameSize;
     case 'RT':
     case 'CT':
       return l.constraintTransition;
@@ -343,6 +394,8 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainGS;
     case 'LT':
       return l.constraintExplainLT;
+    case 'MI':
+      return l.constraintExplainMI;
     case 'MJ':
       return l.constraintExplainMJ;
     case 'JC':
@@ -370,6 +423,10 @@ String constraintExplanationForSlug(AppLocalizations l, String slug) {
       return l.constraintExplainIS;
     case 'BB':
       return l.constraintExplainBB;
+    case 'RE':
+      return l.constraintExplainRE;
+    case 'SZ':
+      return l.constraintExplainSZ;
     case 'RT':
     case 'CT':
       return l.constraintExplainTransition;

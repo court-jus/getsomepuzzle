@@ -83,7 +83,7 @@ class Constraint extends CanApply {
   /// The auto-shrink pass uses this to decide whether a colour absent from
   /// the solution can also be dropped from the puzzle's declared domain
   /// without orphaning a constraint. Colour-agnostic constraints (`PA`,
-  /// `GS`, `LT`, `DF`, `SY`) return the empty set.
+  /// `GS`, `LT`, `SZ`, `DF`, `SY`) return the empty set.
   ///
   /// No generic fallback: like [apply] and [rotated], every subclass must
   /// declare its own colours so a new constraint can't silently drop a

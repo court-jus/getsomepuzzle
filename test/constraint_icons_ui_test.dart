@@ -57,6 +57,30 @@ void main() {
         expect(find.byType(ConstraintIcon), findsNWidgets(2));
       });
 
+      testWidgets('RE preview uses the mandatory border color', (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            const ConstraintIcon(slug: 'RE', size: 64),
+            brightness: brightness,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final expectedColor = brightness == Brightness.dark
+            ? puzzleColorsDark.mandatory
+            : puzzleColorsLight.mandatory;
+        final mandatoryBorders = tester
+            .widgetList<Container>(find.byType(Container))
+            .where((container) {
+              final decoration = container.decoration;
+              final border = decoration is BoxDecoration
+                  ? decoration.border
+                  : null;
+              return border is Border && border.top.color == expectedColor;
+            });
+        expect(mandatoryBorders, hasLength(1));
+      });
+
       testWidgets('learning page renders every constraint row', (tester) async {
         await tester.pumpWidget(
           _wrap(
@@ -82,14 +106,14 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        // 19 display slugs: onboarding introducers first (FM, NC, PA,
+        // 22 display slugs: onboarding introducers first (FM, NC, PA,
         // CC, GS, EY, DF, LT, QA), then the rest in registry order;
         // row/column pairs (RC/CC, JC/JR, RT/CT) are collapsed.
         expect(
           find.byType(ConstraintIcon),
           findsNWidgets(constraintCatalogueSlugs.length),
         );
-        expect(constraintCatalogueSlugs.length, 19);
+        expect(constraintCatalogueSlugs.length, 22);
         expect(constraintCatalogueSlugs.first, 'FM');
         // Teaching order: onboarding introducers (FM, NC, PA, CC, GS,
         // EY, DF, LT, QA) then remaining display slugs in registry order.
@@ -104,6 +128,7 @@ void main() {
           'LT',
           'QA',
           'RT',
+          'MI',
           'SY',
           'SH',
           'JC',
@@ -113,6 +138,8 @@ void main() {
           'IM',
           'IS',
           'BB',
+          'RE',
+          'SZ',
         ]);
         // First catalogue row is FM (Forbidden pattern), teaching order.
         final firstIcon = tester.widget<ConstraintIcon>(

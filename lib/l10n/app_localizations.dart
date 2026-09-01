@@ -742,6 +742,12 @@ abstract class AppLocalizations {
   /// **'group size'**
   String get constraintGroupSize;
 
+  /// Name of the same size constraint
+  ///
+  /// In en, this message translates to:
+  /// **'same size'**
+  String get constraintSameSize;
+
   /// Name of the letter group constraint
   ///
   /// In en, this message translates to:
@@ -753,6 +759,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'majority color'**
   String get constraintMajority;
+
+  /// Name of the mirror constraint
+  ///
+  /// In en, this message translates to:
+  /// **'mirror'**
+  String get constraintMirror;
 
   /// Name of the parity constraint
   ///
@@ -771,6 +783,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'symmetry'**
   String get constraintSymmetry;
+
+  /// Label of the horizontal mirror direction selector
+  ///
+  /// In en, this message translates to:
+  /// **'horizontal'**
+  String get mirrorHorizontal;
+
+  /// Label of the vertical mirror direction selector
+  ///
+  /// In en, this message translates to:
+  /// **'vertical'**
+  String get mirrorVertical;
 
   /// Menu label for the puzzle generator
   ///
@@ -1054,6 +1078,12 @@ abstract class AppLocalizations {
   /// **'Letter'**
   String get createChooseLetter;
 
+  /// No description provided for @createChooseSymbol.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbol'**
+  String get createChooseSymbol;
+
   /// No description provided for @createChooseValue.
   ///
   /// In en, this message translates to:
@@ -1131,6 +1161,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap cells to add to group {letter}, then press Done'**
   String createLetterGroupMode(String letter);
+
+  /// No description provided for @createSameSizeMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap cells to mark with {symbol}, then press Done'**
+  String createSameSizeMode(String symbol);
 
   /// No description provided for @createLetterGroupDone.
   ///
@@ -1372,6 +1408,12 @@ abstract class AppLocalizations {
   /// **'bounding box'**
   String get constraintBoundingBox;
 
+  /// Name of the rectangular groups constraint
+  ///
+  /// In en, this message translates to:
+  /// **'non-square rectangular groups'**
+  String get constraintRectangularGroups;
+
   /// Title of the dialog shown the first time a player encounters a new constraint
   ///
   /// In en, this message translates to:
@@ -1498,6 +1540,12 @@ abstract class AppLocalizations {
   /// **'A cell carrying a number must belong to a group of orthogonally adjacent same-color cells whose size matches that number.'**
   String get constraintExplainGS;
 
+  /// Body of the new-constraint explanation modal for the Same Size (SZ) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'Cells marked with the same suit symbol must belong to different groups that all have the same size.'**
+  String get constraintExplainSZ;
+
   /// Body of the new-constraint explanation modal for the Parity (PA) constraint
   ///
   /// In en, this message translates to:
@@ -1509,6 +1557,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cells marked with the same letter must belong to the same group. A group must not contain two different letters.'**
   String get constraintExplainLT;
+
+  /// Body of the new-constraint explanation modal for the Mirror (MI) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A mirror line splits the grid in two. Each side must contain the same number of cells of the chosen colour.'**
+  String get constraintExplainMI;
 
   /// Body of the new-constraint explanation modal for the Majority (MJ) constraint
   ///
@@ -1551,6 +1605,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A square wave with a number beside a row or column tells how many color changes (transitions) must appear in that line. Each step of the wave is one change; a flat wave with 0 means the whole line is a single color.'**
   String get constraintExplainTransition;
+
+  /// Body of the new-constraint explanation modal for the Rectangular Groups (RE) constraint
+  ///
+  /// In en, this message translates to:
+  /// **'A cell marked with a small blue rectangle must belong to a rectangular group that is not square.'**
+  String get constraintExplainRE;
 
   /// Body of the new-constraint explanation modal for the Group Count (GC) constraint
   ///

@@ -138,7 +138,12 @@
     "constraintForbiddenPattern": "patrón prohibido",
     "constraintGroupSize": "tamaño de grupo",
     "constraintLetterGroup": "grupo de letras",
+    "constraintSameSize": "mismo tamaño",
     "constraintMajority": "color mayoritario",
+    "constraintMirror": "espejo",
+    "@constraintMirror": {
+        "description": "Nombre de la restricción espejo"
+    },
     "constraintParity": "paridad",
     "constraintQuantity": "cantidad",
     "constraintGroupCount": "número de grupos",
@@ -149,6 +154,7 @@
     "constraintImplication": "implicación",
     "constraintIslands": "islas",
     "constraintBoundingBox": "caja delimitadora",
+    "constraintRectangularGroups": "grupos rectangulares no cuadrados",
     "newConstraintModalTitle": "¡Regla nueva!",
     "newConstraintModalSkip": "Saltar aprendizaje",
     "tooltipPuzzleHelp": "Ayuda del puzzle",
@@ -191,8 +197,13 @@
     "constraintExplainFM": "Cuando se muestra un motivo sobre la cuadrícula con fondo violeta, ese motivo nunca debe aparecer en la cuadrícula.",
     "constraintExplainSH": "Cuando se muestra un motivo sobre la cuadrícula con fondo azul claro inclinado 45°, todos los grupos de ese color deben tener exactamente esa forma (se permiten rotaciones y simetrías).",
     "constraintExplainGS": "Cuando una casilla contiene un número, debe pertenecer a un grupo de casillas del mismo color, adyacentes ortogonalmente, cuyo tamaño coincida con ese número.",
+    "constraintExplainSZ": "Las casillas marcadas con el mismo símbolo de naipe deben pertenecer a grupos distintos que tengan todos el mismo tamaño.",
     "constraintExplainPA": "Cuando una casilla contiene una flecha, debe haber el mismo número de casillas negras y blancas delante de la flecha. Una flecha doble extiende la regla a ambos lados.",
     "constraintExplainLT": "Las casillas marcadas con la misma letra deben pertenecer al mismo grupo. Un grupo no puede contener dos letras diferentes.",
+    "constraintExplainMI": "Una línea de espejo divide la cuadrícula en dos. Cada mitad debe contener el mismo número de celdas del color elegido.",
+    "@constraintExplainMI": {
+        "description": "Texto del modal de explicación de la restricción Espejo (MI)"
+    },
     "constraintExplainMJ": "Un borde punteado de un color específico indica que la mayoría de las celdas dentro de la zona deben ser de ese color (más de la mitad). El color del borde te indica qué color debe dominar.",
     "constraintExplainQA": "Un indicador numérico sobre fondo azul encima del puzzle señala cuántas casillas de ese color debe contener la solución en total.",
     "constraintExplainSY": "Cuando una casilla contiene uno de estos símbolos (⟍, |, ⟋, ―, 🞋), el grupo del que forma parte debe respetar la simetría asociada. La simetría central (🞋) equivale a un giro de media vuelta.",
@@ -316,8 +327,17 @@
     "browse": "Explorar",
 
     "constraintSymmetry": "simetría",
+    "mirrorHorizontal": "horizontal",
+    "@mirrorHorizontal": {
+        "description": "Etiqueta del selector de dirección del espejo horizontal"
+    },
+    "mirrorVertical": "vertical",
+    "@mirrorVertical": {
+        "description": "Etiqueta del selector de dirección del espejo vertical"
+    },
     "constraintExplainGC": "Un número enmarcado con un icono de cadena indica cuántos grupos separados (componentes conexos) de ese color debe contener la solución.",
     "constraintExplainBB": "Cada grupo conexo de este color debe ocupar una caja delimitadora de exactamente este ancho y alto: el rectángulo más pequeño que encierra el grupo abarca exactamente esas columnas y filas (el grupo no tiene que llenarla).",
+    "constraintExplainRE": "Una casilla marcada con un pequeño rectángulo azul debe pertenecer a un grupo rectangular no cuadrado.",
 
     "create": "Crear",
     "createTitle": "Crear un puzzle",
@@ -393,6 +413,7 @@
     "createChooseAxis": "Eje de simetría",
     "createChooseSize": "Tamaño del grupo",
     "createChooseLetter": "Letra",
+    "createChooseSymbol": "Símbolo",
     "createChooseValue": "Valor",
     "createImplicationSource": "Celda origen ({total} celdas, base 0)",
     "createImplicationTarget": "Celda destino ({total} celdas, base 0)",
@@ -406,6 +427,7 @@
     "createSecondCorner": "Toca la segunda esquina de la zona MJ",
     "createZoneTooSmall": "La zona debe tener al menos 3 celdas",
     "createLetterGroupMode": "Toca las celdas para añadirlas al grupo {letter}, luego pulsa Listo",
+    "createSameSizeMode": "Toca las celdas para marcarlas con {symbol}, luego pulsa Listo",
 
     "generate": "Generar",
     "generateTitle": "Generar puzzles",

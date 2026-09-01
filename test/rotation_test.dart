@@ -6,6 +6,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/eyes_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/mirror.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
@@ -211,6 +212,13 @@ void main() {
         final r = c.rotated(w, h).rotated(h, w).rotated(w, h).rotated(h, w);
         expect(r.serialize(), c.serialize(), reason: 'axis=$axis');
       }
+    });
+    test('MI (mirror) flips axis and is a 2-cycle', () {
+      const w = 4, h = 6;
+      final c = MirrorConstraint('1.H');
+      expect(c.rotated(w, h).serialize(), 'MI:1.V');
+      final r = c.rotated(w, h).rotated(h, w).rotated(w, h).rotated(h, w);
+      expect(r.serialize(), c.serialize());
     });
 
     test('ForbiddenMotif (FM) — 2D pattern rotates back after 4 rotations', () {

@@ -12,15 +12,18 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/different_from.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/mirror.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/motif.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/quantity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/rectangular_groups.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/shape.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/same_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 
 /// Registry of all player-facing constraint types.
@@ -68,6 +71,11 @@ final constraintRegistry =
         slug: 'LT',
         fromParams: LetterGroup.new,
         generateAllParameters: LetterGroup.generateAllParameters,
+      ),
+      (
+        slug: 'MI',
+        fromParams: MirrorConstraint.new,
+        generateAllParameters: MirrorConstraint.generateAllParameters,
       ),
       (
         slug: 'QA',
@@ -148,6 +156,17 @@ final constraintRegistry =
         slug: 'BB',
         fromParams: BoundingBoxConstraint.new,
         generateAllParameters: BoundingBoxConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'RE',
+        fromParams: RectangularGroupsConstraint.new,
+        generateAllParameters:
+            RectangularGroupsConstraint.generateAllParameters,
+      ),
+      (
+        slug: 'SZ',
+        fromParams: SameSize.new,
+        generateAllParameters: SameSize.generateAllParameters,
       ),
     ];
 

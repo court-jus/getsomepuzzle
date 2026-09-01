@@ -1,6 +1,6 @@
 # Constraint families & the equilibrium "composition" axis
 
-The 19 player-facing constraint slugs are partitioned into six families by
+The 25 player-facing constraint slugs are partitioned into six families by
 **deduction strategy** — i.e. *how* a constraint narrows the grid, orthogonal
 to the `Constraint` class hierarchy in `constraints/`. The taxonomy feeds the
 equilibrium engine's **composition** axis, which balances the blend of families
@@ -11,11 +11,11 @@ a puzzle is built from rather than individual slugs.
 | Family (key)     | Slugs                | Common deduction strategy                              |
 |------------------|----------------------|--------------------------------------------------------|
 | `implication`    | IM                   | directional colour link: if the source is the colour, the target must be too (contrapositive also fires) |
-| `line-centric`   | RC, RT, CC, CT, PA   | reasons about a whole row/column line (count / transition / parity) |
+| `line-centric`   | RC, RT, CC, CT, PA, JC, JR | reasons about a whole row/column line (count / transition / parity / majority) |
 | `local`          | FM, DF, NC, EY       | forbidden motif / adjacency / immediate-neighbourhood count |
 | `path`           | LT, CH               | connectivity: shared connected group / border-to-border chain |
-| `group-topology` | GS, GC, SH, SY, MJ, BB | connected-component size/count/shape, symmetry, rectangular-zone majority, bounding-box extent (width × height) |
-| `global`         | QA                   | whole-grid quantity                                    |
+| `group-topology` | GS, GC, IS, SH, SY, MJ, BB, RE, SZ | connected-component size/count/shape, symmetry, rectangular-zone majority, bounding-box extent (width × height), solid non-square rectangles, equal marked-group sizes |
+| `global`         | QA, MI                   | whole-grid quantity and half-grid balance                  |
 
 It is a strict partition: every slug belongs to exactly one family, and a
 guard test fails if a registry slug is left unmapped.
@@ -51,8 +51,7 @@ Pure Dart, no Flutter imports — usable by both the generator and `bin/` tools:
 
 | Export | Purpose |
 |--------|---------|
-| `kConstraintFamily` | slug → family mapping (19 entries) |
-| `kConstraintFamilies` | fixed display/tie-break order (`implication, line-centric, local, path, group-topology, global`) |
+| `kConstraintFamily` | slug → family mapping (25 entries) |
 | `kEmptyFamily` | virtual `'none'` family for padding |
 | `familyOf(String slug)` | lookup a single slug's family |
 | `familiesOf(Iterable<String> slugs)` | distinct families spanned by a set of slugs |

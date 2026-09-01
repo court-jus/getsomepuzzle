@@ -12,9 +12,11 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/implication.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/group_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/parity.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/same_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/symmetry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/rectangular_groups.dart';
 import 'package:getsomepuzzle/widgets/constraints/chain.dart';
 import 'package:getsomepuzzle/widgets/constraints/column_majority.dart';
 import 'package:getsomepuzzle/widgets/constraints/eyes.dart';
@@ -22,6 +24,8 @@ import 'package:getsomepuzzle/widgets/constraints/neighbor_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/row_count.dart';
 import 'package:getsomepuzzle/widgets/constraints/symmetry.dart';
 import 'package:getsomepuzzle/widgets/constraints/group_size.dart';
+import 'package:getsomepuzzle/widgets/constraints/same_size.dart';
+import 'package:getsomepuzzle/widgets/constraints/rectangular_groups.dart';
 import 'package:getsomepuzzle/widgets/constraints/transition.dart';
 
 // Arrows for the parity constraint appear smaller so we add a zoom factor
@@ -60,6 +64,9 @@ Widget constraintToFlutter(
   if (constraint is LetterGroup) {
     return _textWidget(constraint.letter, fgcolor, cellSize, count);
   }
+  if (constraint is SameSize) {
+    return _sameSizeWidget(constraint, fgcolor, cellSize, count);
+  }
   if (constraint is DifferentFromConstraint) {
     return _textWidget('≠', fgcolor, cellSize, count);
   }
@@ -94,6 +101,9 @@ Widget constraintToFlutter(
   }
   if (constraint is ImplicationConstraint) {
     return const SizedBox.shrink();
+  }
+  if (constraint is RectangularGroupsConstraint) {
+    return _rectangularGroupsWidget(constraint, cellSize / count);
   }
 
   // Default: use toString()
@@ -181,6 +191,35 @@ Widget _groupSizeWidget(
       actualGroupSize: actualGroupSize,
       cellSize: widgetSize,
     ),
+  );
+}
+
+Widget _sameSizeWidget(
+  SameSize constraint,
+  Color fgcolor,
+  double cellSize,
+  int count,
+) {
+  final double widgetSize = cellSize / count;
+  return SizedBox(
+    width: widgetSize,
+    height: widgetSize,
+    child: SameSizeWidget(
+      constraint: constraint,
+      fgcolor: fgcolor,
+      cellSize: widgetSize,
+    ),
+  );
+}
+
+Widget _rectangularGroupsWidget(
+  RectangularGroupsConstraint constraint,
+  double size,
+) {
+  return SizedBox(
+    width: size,
+    height: size,
+    child: RectangularGroupsWidget(constraint: constraint, cellSize: size),
   );
 }
 

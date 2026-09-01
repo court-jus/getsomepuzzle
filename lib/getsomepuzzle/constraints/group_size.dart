@@ -20,7 +20,20 @@ class GroupSize extends CellsCentricConstraint {
 
   int size = 0;
 
-  GroupSize(String strParams) {
+  /// When true, [size] is a *floor*: the group must reach AT LEAST [size]
+  /// cells and may legitimately exceed it. The exact-size prunes (group
+  /// finished -> forbid neighbours, overshoot -> impossible, merge over the
+  /// remaining margin -> rejected) are then skipped, because growing past
+  /// [size] is allowed. Only the forced-growth deductions remain: a single
+  /// exit or articulation cell must take the group's colour, and a group
+  /// that cannot reach the floor is impossible.
+  ///
+  /// Used by `SameSize`, whose common target is the current largest marked
+  /// group: that group can still grow, so equal sizes may be reached at any
+  /// size >= the floor.
+  final bool atLeast;
+
+  GroupSize(String strParams, {this.atLeast = false}) {
     indices.add(int.parse(strParams.split(".")[0]));
     size = int.parse(strParams.split(".")[1]);
   }
@@ -104,6 +117,9 @@ class GroupSize extends CellsCentricConstraint {
     final myColor = puzzle.cellValues[idx];
     final myGroup = groups.firstWhereOrNull((grp) => grp.contains(idx));
     if (myColor == CellValue.free) {
+      // Floor mode is only used by `SameSize`, whose growth anchors are
+      // already-coloured marked cells — a free anchor has no group to grow.
+      if (atLeast) return null;
       final neighbors = puzzle.getNeighbors(idx);
       for (var neighbor in neighbors) {
         final neighborGroup = groups.firstWhereOrNull(
@@ -185,6 +201,10 @@ class GroupSize extends CellsCentricConstraint {
       }
     }
     if (myGroup == null) return null;
+    // Floor already met (or surpassed): the group may still grow beyond
+    // [size] to equalise with other marked groups, so the exact-size prunes
+    // below do not apply.
+    if (atLeast && myGroup.length >= size) return null;
     if (myGroup.length == size) {
       // My group is finished, we can remove my color from the neighbors' option
       for (var member in myGroup) {
@@ -220,18 +240,24 @@ class GroupSize extends CellsCentricConstraint {
         // Single-exit overshoot: if extending into the lone exit forces a
         // merge with same-colour groups whose total addition exceeds the
         // remaining margin, the group cannot grow at all → impossible.
+        // (Exact mode only — under a floor an overshoot is allowed and the
+        // exit still must be taken, since the group has to grow.)
         final boundary = groupFreeNeighbors.first;
         final margin = size - myGroup.length;
-        int mergedSize = 0;
-        for (final grp in groups) {
-          if (!grp.any((cell) => puzzle.cellValues[cell] == myColor)) continue;
-          if (grp.any((cell) => myGroup.contains(cell))) continue;
-          if (puzzle.getNeighbors(boundary).any((nei) => grp.contains(nei))) {
-            mergedSize += grp.length;
+        if (!atLeast) {
+          int mergedSize = 0;
+          for (final grp in groups) {
+            if (!grp.any((cell) => puzzle.cellValues[cell] == myColor)) {
+              continue;
+            }
+            if (grp.any((cell) => myGroup.contains(cell))) continue;
+            if (puzzle.getNeighbors(boundary).any((nei) => grp.contains(nei))) {
+              mergedSize += grp.length;
+            }
           }
-        }
-        if (1 + mergedSize > margin) {
-          return Impossible(this);
+          if (1 + mergedSize > margin) {
+            return Impossible(this);
+          }
         }
         // The single exit must take myColor. If options have already
         // excluded myColor (3-colour puzzles), the group can't grow.
@@ -242,29 +268,33 @@ class GroupSize extends CellsCentricConstraint {
       } else if (myGroup.length < size && groupFreeNeighbors.isEmpty) {
         return Impossible(this);
       }
-      // If extending in a direction would merge me with other groups and create a "too big group",
-      // then add a boundary in that direction, it is forbidden to grow there.
-      // We sum the sizes of ALL same-color groups touching the free neighbor,
-      // because coloring it would merge them all into one group.
-      final margin = size - myGroup.length;
-      final sameColorGroups = groups
-          .where(
-            (grp) =>
-                grp.any((cell) => puzzle.cellValues[cell] == myColor) &&
-                !grp.any((cell) => myGroup.contains(cell)),
-          )
-          .toList();
-      for (final boundary in groupFreeNeighbors) {
-        final boundaryNeighbors = puzzle.getNeighbors(boundary);
-        int mergedSize = 0;
-        for (final grp in sameColorGroups) {
-          if (boundaryNeighbors.any((nei) => grp.contains(nei))) {
-            mergedSize += grp.length;
+      // Exact mode: if extending in a direction would merge with other
+      // groups and create a "too big group", it is forbidden to grow there.
+      // We sum the sizes of ALL same-color groups touching the free
+      // neighbor, because coloring it would merge them all into one group.
+      // (Skipped under a floor: growing past [size] is legitimate — the
+      // groups may equalise at any size >= the floor.)
+      if (!atLeast) {
+        final margin = size - myGroup.length;
+        final sameColorGroups = groups
+            .where(
+              (grp) =>
+                  grp.any((cell) => puzzle.cellValues[cell] == myColor) &&
+                  !grp.any((cell) => myGroup.contains(cell)),
+            )
+            .toList();
+        for (final boundary in groupFreeNeighbors) {
+          final boundaryNeighbors = puzzle.getNeighbors(boundary);
+          int mergedSize = 0;
+          for (final grp in sameColorGroups) {
+            if (boundaryNeighbors.any((nei) => grp.contains(nei))) {
+              mergedSize += grp.length;
+            }
           }
-        }
-        if (mergedSize >= margin &&
-            puzzle.cells[boundary].options.contains(myColor)) {
-          return RemoveOption(boundary, myColor, this, complexity: 2);
+          if (mergedSize >= margin &&
+              puzzle.cells[boundary].options.contains(myColor)) {
+            return RemoveOption(boundary, myColor, this, complexity: 2);
+          }
         }
       }
       // Path-based articulation: any empty cell whose blocking would shrink
