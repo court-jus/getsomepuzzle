@@ -29,6 +29,9 @@ assets/played
 assets/cancelled.txt
 assets/notUnique.txt
 assets/ratioTooHigh.txt
+assets/1-easy-recycled.txt
+assets/2-player-recycled.txt
+assets/6-mad-stuck.txt
 /stats/
 generator_stats.csv
 stats_*/
