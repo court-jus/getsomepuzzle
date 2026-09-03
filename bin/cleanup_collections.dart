@@ -1,5 +1,5 @@
 // Identify and (optionally) remove low-value puzzles from the playable
-// collections. Four independent passes, each gated by its own flag:
+// collections. Six independent passes, each gated by its own flag:
 //
 //   --disliked   Drop puzzles that appear with a `disliked` timestamp
 //                in stats_aggregated/*.txt. Cross-reference is done
@@ -24,6 +24,14 @@
 //                Checkerboard: perfect k×k monochrome blocks alternating.
 //                Stripes: one axis entirely constant (period = 1).
 //
+//   --overfilled-extreme Drop puzzles in *-overfilled.txt whose prefill
+//                ratio exceeds --max-prefill-ratio (default 0.80).
+//
+//   --slug-cap   Flag puzzles carrying more than the per-slug occurrence
+//                cap — FM (max 4) and IM (max the grid's average
+//                dimension) — and move them to assets/too_many_im_fm.txt
+//                instead of dropping them.
+//
 // Without --apply the script just prints what *would* be removed. With
 // --apply each modified collection is rewritten in-place (via a
 // `<path>.cleanup` staging file that is immediately renamed over the
@@ -32,6 +40,7 @@
 // Usage:
 //   dart run bin/cleanup_collections.dart [--disliked] [--boring]
 //                                          [--mj-conflict] [--regular-patterns]
+//                                          [--overfilled-extreme] [--slug-cap]
 //                                          [--apply]
 //                                          [--min-dislikes N]
 //                                          [--boring-threshold X]
@@ -44,14 +53,15 @@
 //                                          [--stats-dir DIR]
 //                                          [--verbose]
 //
-// If none of --disliked / --boring / --mj-conflict / --regular-patterns
-// is passed, all run.
+// If none of --disliked / --boring / --mj-conflict / --regular-patterns /
+// --overfilled-extreme / --slug-cap is passed, all run.
 
 import 'dart:io';
 import 'dart:math';
 
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
@@ -73,6 +83,8 @@ const _collections = [
   'assets/5-expert-overfilled.txt',
   'assets/6-mad-overfilled.txt',
 ];
+
+const _relocatedFile = 'assets/too_many_im_fm.txt';
 
 // Collections exempt from the "boring" pass by default: beginners are
 // the audience these trivial-FM puzzles are written for, removing them
@@ -114,6 +126,7 @@ class _Args {
   bool runMJConflict = false;
   bool runRegularPatterns = false;
   bool runOverfilledExtreme = false;
+  bool runSlugCaps = false;
   bool apply = false;
   bool verbose = false;
   bool exemptEasiest = true;
@@ -144,6 +157,8 @@ void main(List<String> args) {
         a.runRegularPatterns = true;
       case '--overfilled-extreme':
         a.runOverfilledExtreme = true;
+      case '--slug-cap':
+        a.runSlugCaps = true;
       case '--max-prefill-ratio':
         a.maxPrefillRatio = double.parse(args[++i]);
       case '--apply':
@@ -187,7 +202,8 @@ void main(List<String> args) {
       !a.runBoring &&
       !a.runMJConflict &&
       !a.runRegularPatterns &&
-      !a.runOverfilledExtreme) {
+      !a.runOverfilledExtreme &&
+      !a.runSlugCaps) {
     a.runDisliked = true;
     a.runBoring = true;
     a.runMJConflict = true;
@@ -217,6 +233,7 @@ void main(List<String> args) {
   // exactly once.
   final toRemove = <String>{};
   final reasons = <String, String>{};
+  final relocated = <String, String>{};
 
   if (a.runDisliked) {
     stderr.writeln('');
@@ -252,6 +269,12 @@ void main(List<String> args) {
     _reportAndCollectOverfilledExtreme(byKey, a, toRemove, reasons);
   }
 
+  if (a.runSlugCaps) {
+    stderr.writeln('');
+    stderr.writeln('=== PASS 6: per-slug occurrence caps (FM/IM) ===');
+    _reportAndCollectSlugCaps(byKey, a, toRemove, reasons, relocated);
+  }
+
   stderr.writeln('');
   stderr.writeln('=== TOTAL ===');
   stderr.writeln(
@@ -277,6 +300,13 @@ void main(List<String> args) {
     }
   }
 
+  if (relocated.isNotEmpty) {
+    stderr.writeln(
+      '  ${relocated.length} puzzles would be MOVED to $_relocatedFile '
+      '(removed from collections, kept in quarantine)',
+    );
+  }
+
   if (!a.apply) {
     stderr.writeln('');
     stderr.writeln(
@@ -288,6 +318,7 @@ void main(List<String> args) {
   stderr.writeln('');
   stderr.writeln('Writing .cleanup files...');
   _writeCleanupFiles(byFile, toRemove, reasons, verbose: a.verbose);
+  _writeRelocated(relocated);
 }
 
 Map<String, _PuzzleLoc> _loadCollections() {
@@ -488,6 +519,42 @@ void _reportAndCollectMJConflict(
   }
 }
 
+void _reportAndCollectSlugCaps(
+  Map<String, _PuzzleLoc> byKey,
+  _Args args,
+  Set<String> toRemove,
+  Map<String, String> reasons,
+  Map<String, String> relocated,
+) {
+  int flagged = 0;
+  final perFile = <String, int>{};
+  for (final entry in byKey.entries) {
+    final over = _slugOverages(entry.value.line);
+    if (over.isEmpty) continue;
+    toRemove.add(entry.key);
+    relocated[entry.key] = entry.value.line;
+    final detail = over.entries
+        .map(
+          (e) =>
+              '${e.key} x${e.value} > cap ${maxSlugOccurrences(e.key, _lineWidth(entry.value.line), _lineHeight(entry.value.line))}',
+        )
+        .join(', ');
+    reasons[entry.key] = 'slug cap ($detail)';
+    perFile.update(entry.value.file, (v) => v + 1, ifAbsent: () => 1);
+    flagged++;
+    if (args.verbose) {
+      stderr.writeln(
+        '    ${entry.value.file}: slug cap  ${_preview(entry.value.line)}',
+      );
+    }
+  }
+  stderr.writeln('  $flagged puzzles above a per-slug occurrence cap');
+  for (final path in _collections) {
+    final n = perFile[path] ?? 0;
+    if (n > 0) stderr.writeln('    $path: $n');
+  }
+}
+
 /// Cheap check: does the constraints field carry at least two `MJ` slugs?
 /// Avoids a full Puzzle parse on lines that can't have an MJ-MJ conflict.
 bool _hasTwoMJ(String line) {
@@ -517,6 +584,51 @@ bool _hasMJConflict(String line) {
     return false;
   }
   return false;
+}
+
+/// Width parsed from the v2 line's dimensions field (`WxH`); 0 on garbage.
+int _lineWidth(String line) {
+  final dims = line.split('_');
+  if (dims.length < 3) return 0;
+  final parts = dims[2].split('x');
+  if (parts.length != 2) return 0;
+  return int.tryParse(parts[0]) ?? 0;
+}
+
+/// Height parsed from the v2 line's dimensions field (`WxH`); 0 on garbage.
+int _lineHeight(String line) {
+  final dims = line.split('_');
+  if (dims.length < 3) return 0;
+  final parts = dims[2].split('x');
+  if (parts.length != 2) return 0;
+  return int.tryParse(parts[1]) ?? 0;
+}
+
+/// Counts of capped slugs whose occurrence in [line] exceeds the
+/// per-puzzle cap (see maxSlugOccurrences). Empty when the line is
+/// fine or unparsable. Text scan only — FM/IM never merge, so token
+/// counts equal instance counts.
+Map<String, int> _slugOverages(String line) {
+  final parts = line.split('_');
+  if (parts.length < 5) return {};
+  final w = _lineWidth(line);
+  final h = _lineHeight(line);
+  if (w == 0 || h == 0) return {};
+  final counts = <String, int>{};
+  for (final c in parts[4].split(';')) {
+    final colon = c.indexOf(':');
+    if (colon <= 0) continue;
+    final slug = c.substring(0, colon);
+    if (cappedSlugsPerPuzzle.contains(slug)) {
+      counts.update(slug, (v) => v + 1, ifAbsent: () => 1);
+    }
+  }
+  final over = <String, int>{};
+  for (final entry in counts.entries) {
+    final cap = maxSlugOccurrences(entry.key, w, h);
+    if (cap != null && entry.value > cap) over[entry.key] = entry.value;
+  }
+  return over;
 }
 
 /// Cheap check: does the constraints field carry any trivial-FM slug?
@@ -774,6 +886,39 @@ void _writeCleanupFiles(
   }
 }
 
+/// Append the quarantined puzzles to [_relocatedFile], deduped by
+/// canonical key against the file's existing content. Creates the file
+/// (raw lines, no header) when absent.
+void _writeRelocated(Map<String, String> relocated) {
+  if (relocated.isEmpty) return;
+  final file = File(_relocatedFile);
+  final lines = <String>[];
+  final seen = <String>{};
+  if (file.existsSync()) {
+    for (final l in file.readAsLinesSync()) {
+      lines.add(l);
+      if (l.trim().isEmpty || l.startsWith('#')) continue;
+      try {
+        seen.add(canonicalPuzzleKey(l));
+      } catch (_) {}
+    }
+  }
+  int added = 0;
+  for (final entry in relocated.entries) {
+    if (seen.contains(entry.key)) continue;
+    seen.add(entry.key);
+    lines.add(entry.value);
+    added++;
+  }
+  if (added == 0) return;
+  final tmpPath = '$_relocatedFile.cleanup';
+  File(tmpPath).writeAsStringSync('${lines.join('\n')}\n');
+  File(tmpPath).renameSync(_relocatedFile);
+  stderr.writeln(
+    '  $_relocatedFile: $added moved (${lines.length} total lines)',
+  );
+}
+
 String _preview(String line) {
   return line.length > 90 ? '${line.substring(0, 87)}...' : line;
 }
@@ -794,6 +939,10 @@ Passes (all run by default):
                           keep a small fraction (--keep-ratio, default 0.1)
   --overfilled-extreme    Flag puzzles in *-overfilled.txt whose prefill ratio
                           exceeds --max-prefill-ratio
+  --slug-cap              Flag puzzles with more than the per-slug occurrence
+                          cap — FM (max 4) and IM (max the grid's average
+                          dimension) — and move them to
+                          assets/too_many_im_fm.txt instead of dropping them
 
 Options:
   --apply                 Overwrite each modified collection in-place.

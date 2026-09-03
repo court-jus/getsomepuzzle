@@ -874,11 +874,13 @@ class PuzzleGenerator {
         }
 
         final constraint = allConstraints.removeAt(0);
-        // Reject candidates that visually conflict with an already-placed
-        // constraint (e.g. two MJ zones with overlapping borders). Placed
-        // constraints never leave this loop, so the conflict is monotone and
-        // the candidate can be dropped permanently.
-        if (pu.constraints.any((c) => constraint.conflictsWith(c))) {
+        // Reject candidates that cannot join the placed set: pairwise
+        // visual conflicts (e.g. two MJ zones with overlapping borders) or
+        // a per-slug occurrence cap (see maxSlugOccurrences — FM and IM
+        // are capped). Placed constraints never leave this loop, so both
+        // signals are monotone and the candidate can be dropped
+        // permanently (never requeued in `secondChance`).
+        if (!constraint.canBeAddedTo(pu)) {
           continue;
         }
         final cloned = pu.clone();

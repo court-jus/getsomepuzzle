@@ -1862,9 +1862,10 @@ class Puzzle {
         if (c == null) continue;
         if (existing.contains(c.serialize())) continue;
         if (!c.verify(solved)) continue;
-        // Don't reintroduce a constraint that visually conflicts with one
-        // already on the puzzle (mirrors the generator's rejection rule).
-        if (constraints.any((x) => c.conflictsWith(x))) continue;
+        // Don't reintroduce a constraint that conflicts with one already
+        // on the puzzle or exceeds its per-slug occurrence cap (mirrors
+        // the generator's rejection rule; see Constraint.canBeAddedTo).
+        if (!c.canBeAddedTo(this)) continue;
         candidates.add(c);
       }
     }
@@ -1931,6 +1932,17 @@ class Puzzle {
         // Even adding every remaining candidate fails to move the
         // cascade — true plateau, no point trying further iterations.
         break;
+      }
+
+      // Cap/conflict guard at graft time: the pool filter above ran once
+      // against the pre-loop constraint set, but every graft grows
+      // `constraints`. Re-check the indispensable before it lands so eased
+      // puzzles obey the same per-slug caps as generated ones. Both
+      // signals are monotone — discard the candidate permanently and
+      // re-explore the remaining pool.
+      if (!indispensable.canBeAddedTo(this)) {
+        candidates.removeAt(indispensableIdx);
+        continue;
       }
 
       // Graft only the indispensable onto the original, same

@@ -28,3 +28,38 @@ const kDocBaseUrl = '$kSiteBaseUrl/doc';
 /// into `build/web/` by `flutter build web`, and deployed to gh-pages —
 /// hence the different domain.
 const kPrivacyBaseUrl = 'https://court-jus.github.io/getsomepuzzle';
+
+// ── Per-puzzle constraint occurrence caps ──────────────────────────
+//
+// Generation-time limits on how many instances of a single constraint
+// slug one puzzle may carry. Enforced by `Constraint.canBeAddedTo`
+// (the generator's iterative loop and the easing pass) and by
+// `bin/cleanup_collections.dart --slug-cap`, which quarantines legacy
+// corpus puzzles that exceed them into `assets/too_many_im_fm.txt`.
+
+/// Max FM (ForbiddenMotif) instances per puzzle, any grid size.
+const int kMaxFmPerPuzzle = 4;
+
+/// Max IM (Implication) instances per puzzle: the grid's average
+/// dimension rounded down, `(width + height) ~/ 2`. Tunable: change
+/// the divisor or rounding here.
+int maxImPerPuzzle(int width, int height) => (width + height) ~/ 2;
+
+/// Slugs subject to a per-puzzle occurrence cap. Iterated by
+/// `bin/cleanup_collections.dart` and tests; keep in sync with
+/// [maxSlugOccurrences].
+const Set<String> cappedSlugsPerPuzzle = {'FM', 'IM'};
+
+/// Max occurrences of [slug] in one puzzle of `width x height`;
+/// `null` = unlimited. Single source of truth shared by the
+/// generator/easing gate and the cleanup pass.
+int? maxSlugOccurrences(String slug, int width, int height) {
+  switch (slug) {
+    case 'FM':
+      return kMaxFmPerPuzzle;
+    case 'IM':
+      return maxImPerPuzzle(width, height);
+    default:
+      return null;
+  }
+}

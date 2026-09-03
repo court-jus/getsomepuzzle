@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 /// Common contract for any object that can drive deductions on a Puzzle.
@@ -49,6 +50,32 @@ class Constraint extends CanApply {
   /// conflict, e.g. visually overlapping borders). Default: no conflict.
   /// Only [MajorityConstraint] overrides this.
   bool conflictsWith(Constraint other) => false;
+
+  /// True when this constraint can be added to [puzzle], which already
+  /// holds a constraint set: it must not pairwise-conflict with any
+  /// member (see [conflictsWith], same direction — the candidate is
+  /// `this`) and it must not exceed its per-slug occurrence cap
+  /// ([maxSlugOccurrences]: FM capped at a constant count, IM at the
+  /// grid's average dimension, other slugs unlimited). A count of
+  /// `cap` existing same-slug members is the maximum allowed — the
+  /// `cap`-th placement is the last one accepted.
+  ///
+  /// Both signals are monotone in the placed set, so a candidate that
+  /// returns false can never become addable while [puzzle]'s
+  /// constraints only grow: callers (the generator's iterative loop,
+  /// the easing pass) may drop it permanently.
+  bool canBeAddedTo(Puzzle puzzle) {
+    final cap = maxSlugOccurrences(slug, puzzle.width, puzzle.height);
+    var sameSlug = 0;
+    for (final other in puzzle.constraints) {
+      if (conflictsWith(other)) return false;
+      if (cap != null && other.slug == slug) {
+        sameSlug++;
+        if (sameSlug >= cap) return false;
+      }
+    }
+    return true;
+  }
 
   /// Return a fresh constraint instance equivalent to this one applied to a
   /// puzzle rotated 90° clockwise. The arguments are the dimensions of the
