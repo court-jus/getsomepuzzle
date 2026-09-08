@@ -444,7 +444,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get generateFailed =>
-      'Aucun puzzle n\'a pu être généré avec ces paramètres. Essaie d\'autres réglages.';
+      'Aucun puzzle n\'a pu être généré avec ces paramètres. Essayez d\'autres réglages.';
 
   @override
   String get generatePlay => 'Jouer';
@@ -454,7 +454,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get noCustomPuzzles =>
-      'Pas encore de puzzles personnalisés. Utilise la page Générer pour en créer !';
+      'Pas encore de puzzles personnalisés. Utilisez la page Générer pour en créer !';
 
   @override
   String get create => 'Créer';
@@ -539,7 +539,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get createNoConstraints =>
-      'Touche une case pour ajouter une contrainte';
+      'Touchez une case pour ajouter une contrainte';
 
   @override
   String get createAddConstraint => 'Ajouter une contrainte';
@@ -604,7 +604,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String createLetterGroupMode(String letter) {
-    return 'Touche les cases pour les ajouter au groupe $letter, puis appuie sur Terminer';
+    return 'Touchez les cases pour les ajouter au groupe $letter, puis appuyez sur Terminer';
   }
 
   @override
@@ -926,7 +926,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get collectionMad => 'Fou furieux';
 
   @override
-  String get tooltipRecommendedCollection => 'Recommandé pour toi';
+  String get tooltipRecommendedCollection => 'Recommandé pour vous';
 
   @override
   String endOfPlaylistContinueIn(String collection) {
@@ -940,7 +940,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get endOfPlaylistSuggestedHint =>
-      'D\'après ton niveau, vous pourriez aimer cette collection.';
+      'D\'après votre niveau, vous pourriez aimer cette collection.';
 
   @override
   String get endOfPlaylistOnboardingNote =>
@@ -960,7 +960,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingReplayOnboardingConfirmBody =>
-      'Les explications de chaque règle réapparaîtront au fur et à mesure de tes parties. Tes statistiques de jeu sont conservées.';
+      'Les explications de chaque règle réapparaîtront au fur et à mesure de vos parties. Vos statistiques de jeu sont conservées.';
 
   @override
   String get settingOnboardingReplayed => 'Onboarding réinitialisé.';
@@ -1002,11 +1002,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get emptyPlaylistUserEmpty =>
-      'Cette playlist est vide. Ajoute des puzzles avant d\'appuyer sur Jouer.';
+      'Cette playlist est vide. Ajoutez des puzzles avant d\'appuyer sur Jouer.';
 
   @override
   String get emptyPlaylistUserAllPlayed =>
-      'Tous les puzzles de cette playlist ont été joués. Choisis une autre collection ou crée une nouvelle playlist.';
+      'Tous les puzzles de cette playlist ont été joués. Choisissez une autre collection ou créez une nouvelle playlist.';
 
   @override
   String get emptyPlaylistNoPuzzlesLoaded =>
@@ -1014,7 +1014,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get emptyPlaylistFiltersTooStrict =>
-      'Tes filtres excluent tous les puzzles de cette collection. Essaie d\'élargir les dimensions, les règles ou les marqueurs.';
+      'Vos filtres excluent tous les puzzles de cette collection. Essayez d\'élargir les dimensions, les règles ou les marqueurs.';
 
   @override
   String get emptyPlaylistGeneric =>
@@ -1022,7 +1022,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get bannerOnboardingFiltersDefault =>
-      'Ces filtres correspondent à ta progression d\'apprentissage. Vous pouvez les modifier — appuyez sur l\'icône reset pour revenir aux recommandations.';
+      'Ces filtres correspondent à votre progression d\'apprentissage. Vous pouvez les modifier — appuyez sur l\'icône reset pour revenir aux recommandations.';
 
   @override
   String get bannerOnboardingFiltersOverridden =>
@@ -1070,7 +1070,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get scenarioExplainPathBased =>
-      'Des groupes de lettres se connectent dans la grille — trouve le chemin.';
+      'Des groupes de lettres se connectent dans la grille — trouvez le chemin.';
 
   @override
   String get scenarioSyBased => 'Symétrie';
@@ -1084,7 +1084,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get scenarioExplainMinesweeper =>
-      'Comptages de voisins et yeux — joue comme au Démineur.';
+      'Comptages de voisins et yeux — jouez comme au Démineur.';
 
   @override
   String get scenarioNonogram => 'Nonogramme';

@@ -276,7 +276,7 @@
     "collectionStrong": "Balaise",
     "collectionExpert": "Expert",
     "collectionMad": "Fou furieux",
-    "tooltipRecommendedCollection": "Recommandé pour toi",
+    "tooltipRecommendedCollection": "Recommandé pour vous",
     "endOfPlaylistContinueIn": "Continuer dans {collection}",
     "@endOfPlaylistContinueIn": {
         "placeholders": {
@@ -293,7 +293,7 @@
             }
         }
     },
-    "endOfPlaylistSuggestedHint": "D'après ton niveau, vous pourriez aimer cette collection.",
+    "endOfPlaylistSuggestedHint": "D'après votre niveau, vous pourriez aimer cette collection.",
     "endOfPlaylistOnboardingNote": "Vous n'avez pas encore croisé toutes les règles — continuez à jouer pour les découvrir une par une.",
     "endOfPlaylistPickAnother": "Choisir une autre collection",
     "constraintLineCount": "cellules par ligne",
@@ -311,7 +311,7 @@
     "complicityOtherConstraint": "une autre contrainte",
     "settingReplayOnboarding": "Rejouer l'onboarding",
     "settingReplayOnboardingConfirmTitle": "Rejouer l'onboarding ?",
-    "settingReplayOnboardingConfirmBody": "Les explications de chaque règle réapparaîtront au fur et à mesure de tes parties. Tes statistiques de jeu sont conservées.",
+    "settingReplayOnboardingConfirmBody": "Les explications de chaque règle réapparaîtront au fur et à mesure de vos parties. Vos statistiques de jeu sont conservées.",
     "settingOnboardingReplayed": "Onboarding réinitialisé.",
     "settingClearStats": "Effacer toutes les statistiques",
     "settingClearStatsConfirmTitle": "Effacer toutes les statistiques ?",
@@ -406,7 +406,7 @@
     "createMultipleSolutions": "Plusieurs solutions",
     "createNoSolution": "Aucune solution",
     "createComplexity": "Complexité",
-    "createNoConstraints": "Touche une case pour ajouter une contrainte",
+    "createNoConstraints": "Touchez une case pour ajouter une contrainte",
     "createAddConstraint": "Ajouter une contrainte",
     "createChooseType": "Type de contrainte",
     "createChooseSide": "Côté",
@@ -426,7 +426,7 @@
     "createMotifHeight": "Hauteur du motif",
     "createSecondCorner": "Tapez le second coin de la zone MJ",
     "createZoneTooSmall": "La zone doit contenir au moins 3 cellules",
-    "createLetterGroupMode": "Touche les cases pour les ajouter au groupe {letter}, puis appuie sur Terminer",
+    "createLetterGroupMode": "Touchez les cases pour les ajouter au groupe {letter}, puis appuyez sur Terminer",
     "createSameSizeMode": "Touchez les cases à marquer avec {symbol}, puis appuyez sur Terminer",
 
     "generate": "Générer",
@@ -442,16 +442,16 @@
     "generateProgress": "{current} / {total} puzzles générés",
     "generateComplete": "Génération terminée !",
     "generateConstraints": "Contraintes",
-    "generateFailed": "Aucun puzzle n'a pu être généré avec ces paramètres. Essaie d'autres réglages.",
+    "generateFailed": "Aucun puzzle n'a pu être généré avec ces paramètres. Essayez d'autres réglages.",
     "generatePlay": "Jouer",
     "generateMore": "Plus",
-    "noCustomPuzzles": "Pas encore de puzzles personnalisés. Utilise la page Générer pour en créer !",
-    "emptyPlaylistUserEmpty": "Cette playlist est vide. Ajoute des puzzles avant d'appuyer sur Jouer.",
-    "emptyPlaylistUserAllPlayed": "Tous les puzzles de cette playlist ont été joués. Choisis une autre collection ou crée une nouvelle playlist.",
+    "noCustomPuzzles": "Pas encore de puzzles personnalisés. Utilisez la page Générer pour en créer !",
+    "emptyPlaylistUserEmpty": "Cette playlist est vide. Ajoutez des puzzles avant d'appuyer sur Jouer.",
+    "emptyPlaylistUserAllPlayed": "Tous les puzzles de cette playlist ont été joués. Choisissez une autre collection ou créez une nouvelle playlist.",
     "emptyPlaylistNoPuzzlesLoaded": "Aucun puzzle chargé pour cette collection.",
-    "emptyPlaylistFiltersTooStrict": "Tes filtres excluent tous les puzzles de cette collection. Essaie d'élargir les dimensions, les règles ou les marqueurs.",
+    "emptyPlaylistFiltersTooStrict": "Vos filtres excluent tous les puzzles de cette collection. Essayez d'élargir les dimensions, les règles ou les marqueurs.",
     "emptyPlaylistGeneric": "Aucun puzzle n'est actuellement disponible.",
-    "bannerOnboardingFiltersDefault": "Ces filtres correspondent à ta progression d'apprentissage. Vous pouvez les modifier — appuyez sur l'icône reset pour revenir aux recommandations.",
+    "bannerOnboardingFiltersDefault": "Ces filtres correspondent à votre progression d'apprentissage. Vous pouvez les modifier — appuyez sur l'icône reset pour revenir aux recommandations.",
     "bannerOnboardingFiltersOverridden": "Vous utilisez vos propres filtres. Appuyez sur reset pour revenir aux filtres recommandés par l'apprentissage.",
     "onboardingCompleteTitle": "Apprentissage terminé !",
     "@onboardingCompleteTitle": {
@@ -497,7 +497,7 @@
     "@scenarioPathBased": {
         "description": "Label for the Path-based (LT) user scenario."
     },
-    "scenarioExplainPathBased": "Des groupes de lettres se connectent dans la grille — trouve le chemin.",
+    "scenarioExplainPathBased": "Des groupes de lettres se connectent dans la grille — trouvez le chemin.",
     "@scenarioExplainPathBased": {
         "description": "Description of the Path-based user scenario."
     },
@@ -513,7 +513,7 @@
     "@scenarioMinesweeper": {
         "description": "Label for the Minesweeper-like user scenario."
     },
-    "scenarioExplainMinesweeper": "Comptages de voisins et yeux — joue comme au Démineur.",
+    "scenarioExplainMinesweeper": "Comptages de voisins et yeux — jouez comme au Démineur.",
     "@scenarioExplainMinesweeper": {
         "description": "Description of the Minesweeper user scenario."
     },

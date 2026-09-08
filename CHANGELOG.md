@@ -26,6 +26,7 @@ localised under
 - **Open page visual rework**: the filter selector uses a centered `Wrap` to adapt to all screen widths.
 - **Gradual collection progression**: the suggested collection moves one level at a time, no more jumps straight to "mad".
 - **Slugs in the in-app generator**: constraints are listed by code (NC, GS…) instead of localized names.
+- **French copy now consistently vouvoie** the player (previously mixed "tu"/"vous").
 - ~10K new puzzles (BB, IM, paths, more variety across levels).
 
 ## [1.6.22] - 2026-06-04
