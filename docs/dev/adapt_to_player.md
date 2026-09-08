@@ -282,6 +282,10 @@ Both buttons are surfaced together when both apply; the player can
 keep going in the current palier or graduate. A `Pick another
 collection` text link routes back to `OpenPage` for full agency.
 
+The headline keeps the running tally; the numeric `Current level: N`
+caption and the generic "based on your level" hint were removed — the
+suggestion is now captioned by direction (see below).
+
 ## Cross-collection suggestion
 
 `Database.recommendedCollectionKey` returns the slug of a *different*
@@ -341,6 +345,16 @@ The recommendation surfaces in two places:
 - **`EndOfPlaylist`** — at every batch boundary, the *Try `<X>`*
   button switches to the recommended collection if it differs from
   the active one.
+
+The caption above the suggestion buttons is directional:
+`Database.recommendedCollectionDirection` is `up` when the suggested
+tier sits one step above the active collection (the modal
+congratulates — "Good job, do you want to try the next collection?"),
+`down` when it sits one step below. When the active collection has no
+ladder tier (`custom` / `user_*` / tutorial) the getter returns null
+and the modal falls back to the softer invite — "Are you having fun?
+Do you want to try this other collection?" — which stays accurate as a
+plain alternative-offer.
 
 ## Data model
 

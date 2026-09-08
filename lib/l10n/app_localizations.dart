@@ -616,12 +616,6 @@ abstract class AppLocalizations {
   /// **'There are still puzzles available, but your current filters exclude them.'**
   String get endOfPlaylistFiltersBlocking;
 
-  /// Caption displaying the player's current level
-  ///
-  /// In en, this message translates to:
-  /// **'Current level: {level}'**
-  String endOfPlaylistCurrentLevel(int level);
-
   /// Hint message shown when the player clicks the lightbulb to get a clue
   ///
   /// In en, this message translates to:
@@ -1720,11 +1714,17 @@ abstract class AppLocalizations {
   /// **'Try {collection}'**
   String endOfPlaylistTrySuggested(String collection);
 
-  /// Subtle hint below the 'Try X' button explaining why this collection is suggested
+  /// End-of-playlist suggestion caption when the recommended collection is one tier harder than the current one — congratulates the player and invites them to move up
   ///
   /// In en, this message translates to:
-  /// **'Based on your level, you might enjoy this collection.'**
-  String get endOfPlaylistSuggestedHint;
+  /// **'Good job, do you want to try the next collection?'**
+  String get endOfPlaylistSuggestionUp;
+
+  /// End-of-playlist suggestion caption when the recommended collection is one tier easier than the current one (or when the current collection has no difficulty tier) — soft, non-judgmental invite to switch
+  ///
+  /// In en, this message translates to:
+  /// **'Are you having fun? Do you want to try this other collection?'**
+  String get endOfPlaylistSuggestionDown;
 
   /// Note displayed at end-of-batch while onboarding is still active (strict phase or post-strict soft filter)
   ///

@@ -27,6 +27,7 @@ localised under
 - **Gradual collection progression**: the suggested collection moves one level at a time, no more jumps straight to "mad".
 - **Slugs in the in-app generator**: constraints are listed by code (NC, GS…) instead of localized names.
 - **French copy now consistently vouvoie** the player (previously mixed "tu"/"vous").
+- **End-of-batch dialog reworked**: the numeric level caption and the "based on your level" hint are gone; the suggestion now congratulates when pointing one tier up ("Good job, do you want to try the next collection?") or softly invites when pointing down/off-ladder ("Are you having fun? Do you want to try this other collection?").
 - ~10K new puzzles (BB, IM, paths, more variety across levels).
 
 ## [1.6.22] - 2026-06-04

@@ -283,11 +283,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Quedan puzzles disponibles, pero tus filtros actuales los excluyen.';
 
   @override
-  String endOfPlaylistCurrentLevel(int level) {
-    return 'Nivel actual: $level';
-  }
-
-  @override
   String hintDeducedFrom(String constraintName) {
     return 'Esta celda se puede deducir gracias a la restricción: $constraintName';
   }
@@ -941,8 +936,12 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get endOfPlaylistSuggestedHint =>
-      'Según tu nivel, podría gustarte esta colección.';
+  String get endOfPlaylistSuggestionUp =>
+      '¡Buen trabajo! ¿Quieres probar la siguiente colección?';
+
+  @override
+  String get endOfPlaylistSuggestionDown =>
+      '¿Te lo estás pasando bien? ¿Quieres probar esta otra colección?';
 
   @override
   String get endOfPlaylistOnboardingNote =>

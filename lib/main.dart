@@ -2187,8 +2187,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                               final recommendedKey = database
                                                   ?.recommendedCollectionKey;
                                               return EndOfPlaylist(
-                                                currentLevel:
-                                                    settings.playerLevel,
+                                                suggestionDirection: database
+                                                    ?.recommendedCollectionDirection,
                                                 filtersBlocking:
                                                     database
                                                         ?.areFiltersBlocking ??

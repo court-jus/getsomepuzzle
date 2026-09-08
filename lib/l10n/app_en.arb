@@ -355,15 +355,6 @@
     "@endOfPlaylistFiltersBlocking": {
         "description": "Message shown when puzzles remain in the catalog but are hidden by user filters"
     },
-    "endOfPlaylistCurrentLevel": "Current level: {level}",
-    "@endOfPlaylistCurrentLevel": {
-        "description": "Caption displaying the player's current level",
-        "placeholders": {
-            "level": {
-                "type": "int"
-            }
-        }
-    },
     "hintDeducedFrom": "This cell can be deduced from the {constraintName} constraint",
     "@hintDeducedFrom": {
         "description": "Hint message shown when the player clicks the lightbulb to get a clue",
@@ -1049,9 +1040,13 @@
             }
         }
     },
-    "endOfPlaylistSuggestedHint": "Based on your level, you might enjoy this collection.",
-    "@endOfPlaylistSuggestedHint": {
-        "description": "Subtle hint below the 'Try X' button explaining why this collection is suggested"
+    "endOfPlaylistSuggestionUp": "Good job, do you want to try the next collection?",
+    "@endOfPlaylistSuggestionUp": {
+        "description": "End-of-playlist suggestion caption when the recommended collection is one tier harder than the current one — congratulates the player and invites them to move up"
+    },
+    "endOfPlaylistSuggestionDown": "Are you having fun? Do you want to try this other collection?",
+    "@endOfPlaylistSuggestionDown": {
+        "description": "End-of-playlist suggestion caption when the recommended collection is one tier easier than the current one (or when the current collection has no difficulty tier) — soft, non-judgmental invite to switch"
     },
     "endOfPlaylistOnboardingNote": "You haven't met every rule yet — keep playing to discover them one at a time.",
     "@endOfPlaylistOnboardingNote": {

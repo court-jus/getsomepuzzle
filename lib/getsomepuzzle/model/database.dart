@@ -37,6 +37,19 @@ enum EmptyPlaylistReason {
   generic,
 }
 
+/// Where [Database.recommendedCollectionKey] points relative to the
+/// active collection's difficulty tier, used by `EndOfPlaylist` to pick
+/// the suggestion caption.
+enum CollectionSuggestionDirection {
+  /// The recommended collection is one tier *harder* than the active
+  /// one (e.g. 2-player suggested after finishing a 1-easy batch).
+  up,
+
+  /// The recommended collection is one tier *easier* than the active
+  /// one (e.g. 5-expert suggested after a 6-mad batch).
+  down,
+}
+
 class PuzzleData {
   String lineRepresentation = "";
   List<int> domain = [];
@@ -1852,6 +1865,29 @@ class Database {
 
     final key = levelToPlayableCollectionKey[level];
     return (key == null || key == collection) ? null : key;
+  }
+
+  /// Direction of the current cross-collection suggestion relative to
+  /// the active collection's difficulty tier, or null when there is no
+  /// recommendation or no tier reference to compare against.
+  ///
+  /// `up` when the suggested collection is one tier harder than the
+  /// active one, `down` when it is one tier easier. When the active
+  /// collection is not a playable level (`custom` / `user_*` /
+  /// tutorial) there is no ladder position to compare with, so the
+  /// result is null — `EndOfPlaylist` then falls back to the softer
+  /// "try this other collection?" caption, which stays accurate for an
+  /// undirected invite.
+  CollectionSuggestionDirection? get recommendedCollectionDirection {
+    final currentTier = playableCollectionKeyToLevel[collection];
+    if (currentTier == null) return null;
+    final key = recommendedCollectionKey;
+    if (key == null) return null;
+    final suggestedTier = playableCollectionKeyToLevel[key];
+    if (suggestedTier == null) return null;
+    return suggestedTier.index > currentTier.index
+        ? CollectionSuggestionDirection.up
+        : CollectionSuggestionDirection.down;
   }
 
   /// Wipe **every** persisted stat (every collection + the

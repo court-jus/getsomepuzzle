@@ -766,5 +766,62 @@ void main() {
       down.loadStats(nFinishedStatLines(enough));
       expect(down.recommendedCollectionKey, '5-expert');
     });
+
+    test(
+      'recommendedCollectionDirection is up when nudged one tier harder',
+      () {
+        // playerLevel 80 → mad, clamped one tier above '1-easy' → '2-player'.
+        // The modal should congratulate the player for moving up.
+        final db = Database(playerLevel: 80);
+        db.collection = '1-easy';
+        db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+        db.loadStats(nFinishedStatLines(enough));
+        expect(db.recommendedCollectionKey, '2-player');
+        expect(
+          db.recommendedCollectionDirection,
+          CollectionSuggestionDirection.up,
+        );
+      },
+    );
+
+    test(
+      'recommendedCollectionDirection is down when stepped one tier easier',
+      () {
+        // playerLevel 0 → beginner, clamped one tier below '6-mad' →
+        // '5-expert'. The modal should use the softer invitation.
+        final db = Database(playerLevel: 0);
+        db.collection = '6-mad';
+        db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+        db.loadStats(nFinishedStatLines(enough));
+        expect(db.recommendedCollectionKey, '5-expert');
+        expect(
+          db.recommendedCollectionDirection,
+          CollectionSuggestionDirection.down,
+        );
+      },
+    );
+
+    test('recommendedCollectionDirection is null without a recommendation', () {
+      // playerLevel 50 → strong ('4-strong') matches the active
+      // collection: no suggestion, hence no direction.
+      final db = Database(playerLevel: 50);
+      db.collection = '4-strong';
+      db.loadStats(nFinishedStatLines(enough));
+      expect(db.recommendedCollectionKey, isNull);
+      expect(db.recommendedCollectionDirection, isNull);
+    });
+
+    test('recommendedCollectionDirection is null for tierless collections', () {
+      // custom / user_* playlists sit outside the difficulty ladder — no
+      // reference tier — so there is no direction even though a
+      // suggestion exists (kept unclamped, straight to the natural
+      // level). The widget falls back to the soft caption.
+      final db = Database(playerLevel: 80);
+      db.collection = 'custom';
+      db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+      db.loadStats(nFinishedStatLines(enough));
+      expect(db.recommendedCollectionKey, '6-mad');
+      expect(db.recommendedCollectionDirection, isNull);
+    });
   });
 }

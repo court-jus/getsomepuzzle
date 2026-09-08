@@ -109,14 +109,6 @@
         }
     },
     "endOfPlaylistFiltersBlocking": "Quedan puzzles disponibles, pero tus filtros actuales los excluyen.",
-    "endOfPlaylistCurrentLevel": "Nivel actual: {level}",
-    "@endOfPlaylistCurrentLevel": {
-        "placeholders": {
-            "level": {
-                "type": "int"
-            }
-        }
-    },
     "hintDeducedFrom": "Esta celda se puede deducir gracias a la restricción: {constraintName}",
     "hintComplicity": "Esta celda se puede deducir combinando las restricciones {c1} y {c2}",
     "hintComplicityTwin": "Esta celda se puede deducir combinando dos restricciones {c}",
@@ -293,7 +285,8 @@
             }
         }
     },
-    "endOfPlaylistSuggestedHint": "Según tu nivel, podría gustarte esta colección.",
+    "endOfPlaylistSuggestionUp": "¡Buen trabajo! ¿Quieres probar la siguiente colección?",
+    "endOfPlaylistSuggestionDown": "¿Te lo estás pasando bien? ¿Quieres probar esta otra colección?",
     "endOfPlaylistOnboardingNote": "Aún no has visto todas las reglas — sigue jugando para descubrirlas una a una.",
     "endOfPlaylistPickAnother": "Elegir otra colección",
     "constraintLineCount": "células por línea",

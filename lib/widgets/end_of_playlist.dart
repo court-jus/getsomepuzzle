@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 
 class EndOfPlaylist extends StatelessWidget {
-  final int currentLevel;
   final bool filtersBlocking;
 
   /// True when the current collection still has unplayed candidates that
@@ -17,6 +17,12 @@ class EndOfPlaylist extends StatelessWidget {
   /// Localised label of the suggested collection (e.g. "Avancé"). Pass
   /// null when no suggestion is available.
   final String? recommendedCollectionLabel;
+
+  /// Direction of the suggestion relative to the active collection's
+  /// difficulty tier (see [CollectionSuggestionDirection]). Drives the
+  /// caption above the suggestion buttons: congratulatory when moving
+  /// up, a softer invite otherwise. Null when no suggestion is shown.
+  final CollectionSuggestionDirection? suggestionDirection;
 
   /// Action: load another batch from the current collection.
   final VoidCallback? onContinueCurrent;
@@ -44,11 +50,11 @@ class EndOfPlaylist extends StatelessWidget {
 
   const EndOfPlaylist({
     super.key,
-    required this.currentLevel,
     required this.filtersBlocking,
     this.hasMoreInCurrent = false,
     this.currentCollectionLabel,
     this.recommendedCollectionLabel,
+    this.suggestionDirection,
     this.onContinueCurrent,
     this.onSwitchToRecommended,
     this.onPickAnother,
@@ -85,7 +91,6 @@ class EndOfPlaylist extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyLarge,
         ),
         const SizedBox(height: 8),
-        Text(l.endOfPlaylistCurrentLevel(currentLevel)),
         if (onboardingActive) ...[
           const SizedBox(height: 8),
           Padding(
@@ -102,7 +107,9 @@ class EndOfPlaylist extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Text(
-              l.endOfPlaylistSuggestedHint,
+              suggestionDirection == CollectionSuggestionDirection.up
+                  ? l.endOfPlaylistSuggestionUp
+                  : l.endOfPlaylistSuggestionDown,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
