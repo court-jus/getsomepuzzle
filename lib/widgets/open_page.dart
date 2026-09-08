@@ -284,12 +284,11 @@ class _OpenPageState extends State<OpenPage> {
 
   Future<void> _importPlaylistFromFile() async {
     final loc = AppLocalizations.of(context)!;
-    final result = await FilePicker.pickFiles(
+    final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['txt'],
     );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
+    if (file == null) return;
     final bytes = await file.readAsBytes();
     final content = utf8.decode(bytes, allowMalformed: true);
     final lines = content

@@ -86,12 +86,11 @@ class _StatsPageState extends State<StatsPage> {
   }
 
   Future<void> _importData() async {
-    final result = await FilePicker.pickFiles(
+    final picked = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['txt'],
     );
-    if (result == null || result.files.isEmpty) return;
-    final picked = result.files.first;
+    if (picked == null) return;
     final bytes = await picked.readAsBytes();
     final content = utf8.decode(bytes, allowMalformed: true);
     final added = await widget.database.importStats(content);
