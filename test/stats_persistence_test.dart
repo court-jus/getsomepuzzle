@@ -237,5 +237,79 @@ void main() {
       expect(lines.any((l) => l.contains('99s 9f')), isTrue);
       expect(lines.any((l) => l.contains('17s 0f')), isTrue);
     });
+
+    test(
+      'rows outside the loaded collection keep their metadata across a flush',
+      () async {
+        // Regression for the upgrade data-loss vector: stored rows used to be
+        // re-serialized through StatEntry.toString() (minimal 4 fields), so a
+        // flush stripped skip/like/dislike markers, pleasure, hints and click
+        // analytics from every play whose puzzle is not in the currently
+        // loaded collection. The merge must round-trip the raw line verbatim.
+        const entry =
+            '2026-05-01T10:00:00 120s 2f '
+            'v2_12_3x3_000020020_FM:1.1;GS:0.1;PA:3.right;PA:8.left_1:122221122_8'
+            ' - SLD - 2026-05-01T10:00:05 - 2026-05-02T10:00:00'
+            ' - 2026-05-03T10:00:00 - 4 7h 300e 1200fc 45000lg';
+        statsFile.writeAsStringSync(entry);
+
+        // Database sitting on a different collection: none of its puzzles
+        // match the entry, so getStats() re-emits nothing.
+        final db = Database(playerLevel: 50);
+        db.collection = '2-player';
+        db.puzzles = [PuzzleData('v2_12_4x4_0000000000000000_FM:1_0:0_0')];
+        db.loadStats([StatEntry.parse(entry)!]);
+
+        await db.writeStats();
+
+        final persisted = statsFile.readAsStringSync().trim();
+        expect(
+          persisted,
+          entry,
+          reason: 'metadata must survive the flush byte-for-byte',
+        );
+        expect(persisted, contains('SLD'));
+        expect(persisted, contains('7h'));
+        expect(persisted, contains('300e'));
+        expect(persisted, contains('1200fc'));
+        expect(persisted, contains('45000lg'));
+      },
+    );
+
+    test(
+      'the loaded collection latest play keeps click analytics across a flush',
+      () async {
+        // loadStats must hydrate cellEdits/firstClickMs/longestGapMs onto the
+        // in-memory puzzle; otherwise the flush overlay (getStats) re-emits
+        // the latest play of the loaded collection with those fields zeroed.
+        const puzzleLine =
+            'v2_12_3x3_000020020_FM:1.1;GS:0.1;PA:3.right;PA:8.left_1:122221122_8';
+        const entry =
+            '2026-05-01T10:00:00 120s 2f $puzzleLine'
+            ' - SLD - 2026-05-01T10:00:05 - 2026-05-02T10:00:00'
+            ' - 2026-05-03T10:00:00 - 4 7h 300e 1200fc 45000lg';
+        statsFile.writeAsStringSync(entry);
+
+        final db = Database(playerLevel: 50);
+        db.collection = '1-easy';
+        final puz = PuzzleData(puzzleLine);
+        db.puzzles = [puz];
+        db.loadStats([StatEntry.parse(entry)!]);
+
+        // The hydrated puzzle carries the click analytics…
+        expect(puz.cellEdits, 300);
+        expect(puz.firstClickMs, 1200);
+        expect(puz.longestGapMs, 45000);
+
+        // …and a flush keeps them on disk instead of zeroing them.
+        await db.writeStats();
+        final persisted = statsFile.readAsStringSync().trim();
+        expect(persisted, contains('300e'));
+        expect(persisted, contains('1200fc'));
+        expect(persisted, contains('45000lg'));
+        expect(persisted, contains('SLD'));
+        expect(persisted, contains('7h'));
+      },
+    );
   });
 }

@@ -867,6 +867,14 @@
     "@welcomeModalBody": {
         "description": "Body of the welcome modal — short pitch of the game's core principle."
     },
+    "releaseNotesTitle": "What's new",
+    "@releaseNotesTitle": {
+        "description": "Title of the release-notes intro dialog (intro dialog #1)."
+    },
+    "releaseNotesBody": "• A third colour: purple puzzles. You will be invited to try them after a while, and you can enable them any time from the puzzle filters.\n• New rules to discover: Implication arrows, Bounding Boxes and more — each is explained the first time you meet it.\n• Pick your look: light, beige or dark theme, or follow your system.\n• New settings: the delay before the next puzzle, and the gray-out of completed constraints can now be turned off.",
+    "@releaseNotesBody": {
+        "description": "Body of the release-notes intro dialog shown once to returning players in 2.0.0."
+    },
     "learning": "Learning",
     "@learning": {
         "description": "Menu label for the Apprentissage page (constraint reference + memory refresh)"

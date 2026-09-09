@@ -21,6 +21,13 @@ class StatEntry {
   final String? disliked;
   final int? pleasure;
 
+  /// The original line this entry was parsed from, when it came out of
+  /// [parse]. Persistence must round-trip through this verbatim rather
+  /// than through [toString], which is the minimal 4-field form and
+  /// drops every trailing metadata field (ratings, hints, click
+  /// analytics, skip markers).
+  final String? raw;
+
   @override
   String toString() =>
       '${finished ?? "unfinished"} ${duration}s ${failures}f $puzzleLine';
@@ -38,7 +45,33 @@ class StatEntry {
     this.liked,
     this.disliked,
     this.pleasure,
+    this.raw,
   });
+
+  /// The full persisted line: the verbatim [raw] line when this entry
+  /// was parsed, otherwise a reconstruction in the same grammar
+  /// `PuzzleData.getStat()` emits (`- SLD -` block + suffix-tagged
+  /// extras). Keeps ratings/hints/skip markers on disk across flushes.
+  String fullLine() {
+    if (raw != null) return raw!;
+    final sld = [
+      skipped != null ? "S" : "_",
+      liked != null ? "L" : "_",
+      disliked != null ? "D" : "_",
+    ].join("");
+    final extraFields = [
+      skipped ?? "",
+      liked ?? "",
+      disliked ?? "",
+      pleasure?.toString() ?? "",
+      "${hints}h",
+      "${cellEdits}e",
+      "${firstClickMs}fc",
+      "${longestGapMs}lg",
+    ].join(" - ");
+    return '${finished ?? "unfinished"} ${duration}s ${failures}f '
+        '$puzzleLine - $sld - $extraFields';
+  }
 
   /// Parse a stat line. Returns null if the line is invalid.
   static StatEntry? parse(String line) {
@@ -73,6 +106,7 @@ class StatEntry {
       liked: fields.length > 9 && fields[9].isNotEmpty ? fields[9] : null,
       disliked: fields.length > 11 && fields[11].isNotEmpty ? fields[11] : null,
       pleasure: fields.length > 13 ? int.tryParse(fields[13]) : null,
+      raw: line,
     );
   }
 }

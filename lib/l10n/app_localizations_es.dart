@@ -782,6 +782,13 @@ class AppLocalizationsEs extends AppLocalizations {
       '¡Bienvenido a Get Some Puzzle! Tu objetivo es colorear cada casilla en negro o blanco respetando un conjunto de restricciones. Las reglas de cada restricción se explicarán a medida que las encuentres por primera vez.';
 
   @override
+  String get releaseNotesTitle => 'Novedades';
+
+  @override
+  String get releaseNotesBody =>
+      '• Un tercer color: puzzles morados. El juego te invitará a probarlos al cabo de un tiempo, y puedes activarlos en cualquier momento desde los filtros de puzzle.\n• Nuevas reglas por descubrir: flechas de implicación, cajas delimitadoras y más — cada una se explica al encontrarla por primera vez.\n• Elige tu aspecto: tema claro, beige u oscuro, o sigue el del sistema.\n• Nuevos ajustes: el retardo antes del siguiente puzzle y la posibilidad de desactivar el atenuado de las restricciones completadas.';
+
+  @override
   String get learning => 'Aprendizaje';
 
   @override

@@ -46,6 +46,7 @@ import 'package:getsomepuzzle/widgets/constraint_help_dialog.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/save_progress_dialog.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
+import 'package:getsomepuzzle/widgets/release_notes_dialog.dart';
 import 'package:getsomepuzzle/widgets/stats_page.dart';
 import 'package:getsomepuzzle/widgets/welcome_dialog.dart';
 import 'package:getsomepuzzle/widgets/timer_bottom_bar.dart';
@@ -298,6 +299,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // tapped). It pauses the game and turns the pause overlay into a two-button
   // confirm screen, guarding against accidental restarts (issue 21).
   bool _confirmingRestart = false;
+  // Intro-dialog numbering: the #0 "welcome" dialog predates this counter
+  // (it still fires on an empty `firstSeen`, i.e. fresh installs and
+  // onboarding replays); each release may append a numbered dialog for
+  // returning players. `_introDialogSeen` stores the highest number shown
+  // (absent on a pre-2.0.0 install, meaning "has seen up to #0").
+  static const int _latestIntroDialogNumber = 1; // #1 = 2.0.0 release notes
+  int? _introDialogSeen;
+  // One intro dialog per session at most: a player who skipped several
+  // releases catches up one dialog per launch, in order.
+  bool _introDialogShownThisSession = false;
+  static const String _introDialogSeenKey = 'introDialogSeen';
   // Lets the keyboard shortcut handler open/close the navigation drawer
   // (ESC = Menu) without a separate Scaffold.of(context) lookup.
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -431,6 +443,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
 
     await progress.load();
+
+    // Highest-numbered intro dialog this player has seen (absent on a
+    // pre-2.0.0 install). Read before the first puzzle load so the
+    // release-notes dialog can fire on the first openPuzzle.
+    final prefs = await SharedPreferences.getInstance();
+    _introDialogSeen = prefs.getInt(_introDialogSeenKey);
 
     // Apply forced locale before the database / locale futures so the
     // language chooser never appears and toggleLocale is not called
@@ -1098,8 +1116,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           slug,
     };
     if (newSlugs.isEmpty) {
-      // No new rule to surface — but the 3-colour suggestion has its
-      // own independent trigger, so we still give it a chance to fire.
+      // No new rule to surface — but the intro-dialog and 3-colour
+      // suggestion triggers are independent, so they still get a chance
+      // to fire.
+      _maybeShowNextIntroDialog();
       _maybeSuggestThirdColor();
       return;
     }
@@ -1114,8 +1134,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       // the per-rule modal. `firstSeen.isEmpty` is the cleanest signal:
       // true on a fresh install AND after "Rejouer l'onboarding"
       // (which clears firstSeen post-loadStats).
+      final isFreshIntro = progress.firstSeen.isEmpty;
       bool skipped = false;
-      if (progress.firstSeen.isEmpty) {
+      if (isFreshIntro) {
         skipped = await WelcomeDialog.show(context);
         if (!mounted) {
           _modalInFlight = false;
@@ -1180,6 +1201,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       // here only means the player will see the modal again next
       // launch (no game-state corruption).
       await progress.save();
+      // A brand-new player (or an onboarding replay) just got the #0
+      // welcome: record that they are up to date, so the release-notes
+      // dialogs of this and future versions never fire for them.
+      if (isFreshIntro && (_introDialogSeen ?? 0) < _latestIntroDialogNumber) {
+        await _persistIntroDialogSeen(_latestIntroDialogNumber);
+      }
       // Just left onboarding (skipped, or noted the final unseen slug):
       // the open-page rule filters still carry the last onboarding
       // recommendation. Reset them to default so the player isn't stuck
@@ -1198,10 +1225,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       }
       _modalInFlight = false;
       if (skipped && mounted) setState(() {});
-      // Chain the 3-colour suggestion check once the new-rule flow is
-      // fully resolved. It self-guards on `shouldSuggestThirdColor` so
-      // the common case (modal already shown, or threshold not met)
-      // returns immediately without any UI side effect.
+      // Chain the next intro dialog (release notes for returning players),
+      // then the 3-colour suggestion check, once the new-rule flow is fully
+      // resolved. Both self-guard, so the common case returns immediately
+      // without any UI side effect.
+      _maybeShowNextIntroDialog();
       _maybeSuggestThirdColor();
     });
   }
@@ -1268,6 +1296,63 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// same puzzle, or if the post-frame callback re-enters via the
   /// locale-chooser fallback.
   bool _modalInFlight = false;
+
+  /// Show the next numbered intro dialog (the release-notes family) if
+  /// one is pending for this player, then record it as seen. Chained
+  /// after every puzzle open, like the 3-colour suggestion.
+  ///
+  /// Numbering: #0 is the first-run welcome (handled separately — it
+  /// fires on an empty `firstSeen`, see `_surfaceNewConstraintsIfAny`);
+  /// each release may append one dialog for returning players (#1 is
+  /// the 2.0.0 release notes). A player whose `introDialogSeen` pref is
+  /// absent is a pre-2.0.0 upgrade: they are assumed to have seen #0
+  /// and are offered #1. Fresh installs are bumped straight to the
+  /// latest number after the welcome, so release dialogs never fire for
+  /// them. Only one dialog per session, so a player who skipped several
+  /// releases catches up one dialog per launch, in order.
+  Future<void> _maybeShowNextIntroDialog() async {
+    if (!mounted || _autopilotMode || widget.noOnboarding) return;
+    if (_modalInFlight || _introDialogShownThisSession) return;
+    // Returning players only: an empty firstSeen means a fresh install
+    // that has not gone through the welcome yet (or an onboarding
+    // replay in progress).
+    if (progress.firstSeen.isEmpty) return;
+    final seen = _introDialogSeen;
+    final next = seen == null ? 1 : seen + 1;
+    if (next > _latestIntroDialogNumber) return;
+    log.info('_maybeShowNextIntroDialog: showing dialog #$next');
+    _introDialogShownThisSession = true;
+    _modalInFlight = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _modalInFlight = false;
+        return;
+      }
+      await _showIntroDialog(next);
+      _modalInFlight = false;
+      if (!mounted) return;
+      await _persistIntroDialogSeen(next);
+    });
+  }
+
+  /// Record the highest-numbered intro dialog this player has seen.
+  Future<void> _persistIntroDialogSeen(int number) async {
+    _introDialogSeen = number;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_introDialogSeenKey, number);
+  }
+
+  /// Route an intro-dialog number to its widget. #0 (the welcome) is
+  /// not routed here — it is shown from `_surfaceNewConstraintsIfAny`.
+  Future<void> _showIntroDialog(int number) async {
+    switch (number) {
+      case 1:
+        await ReleaseNotesDialog.show(context);
+        break;
+      default:
+        assert(false, 'Unknown intro dialog #$number');
+    }
+  }
 
   /// Build a share URL for the current puzzle (carrying the player's
   /// current play state) and hand it off to share_plus on mobile, or copy
@@ -1378,6 +1463,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (completedMeta != null) {
       database?.notePuzzleCompleted(completedMeta);
     }
+    // Persist the finished play now, not at the next puzzle hand-out
+    // (`Database.next` no longer flushes). Every finish path converges
+    // on this callback — automatic check, manual-next FAB, rating
+    // advance, mid-solve settings change — and it runs *before* the
+    // EndOfPlaylist or rating screen is shown, so a play completed on
+    // the last puzzle of a batch is already on disk even if the player
+    // quits at that screen without pressing Continue.
+    database?.writeStats();
     // Auto-level recompute is deferred to the end of the batch (when
     // the playlist becomes empty). Recomputing after every puzzle would
     // shift `playerLevel` continuously, which then re-runs

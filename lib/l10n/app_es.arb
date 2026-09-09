@@ -166,6 +166,14 @@
     "thirdColorSuggestionFiltersReminder": "No olvides que siempre puedes elegir el tipo de puzles que quieres en los filtros avanzados de la biblioteca.",
     "welcomeModalTitle": "Bienvenido",
     "welcomeModalBody": "¡Bienvenido a Get Some Puzzle! Tu objetivo es colorear cada casilla en negro o blanco respetando un conjunto de restricciones. Las reglas de cada restricción se explicarán a medida que las encuentres por primera vez.",
+    "releaseNotesTitle": "Novedades",
+    "@releaseNotesTitle": {
+        "description": "Title of the release-notes intro dialog (intro dialog #1)."
+    },
+    "releaseNotesBody": "• Un tercer color: puzzles morados. El juego te invitará a probarlos al cabo de un tiempo, y puedes activarlos en cualquier momento desde los filtros de puzzle.\n• Nuevas reglas por descubrir: flechas de implicación, cajas delimitadoras y más — cada una se explica al encontrarla por primera vez.\n• Elige tu aspecto: tema claro, beige u oscuro, o sigue el del sistema.\n• Nuevos ajustes: el retardo antes del siguiente puzzle y la posibilidad de desactivar el atenuado de las restricciones completadas.",
+    "@releaseNotesBody": {
+        "description": "Body of the release-notes intro dialog shown once to returning players in 2.0.0."
+    },
     "learning": "Aprendizaje",
     "learningPageTitle": "Aprendizaje",
     "learningSeenOn": "Vista por primera vez el {date}",

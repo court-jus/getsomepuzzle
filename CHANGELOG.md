@@ -12,6 +12,11 @@ localised under
 
 ## [Unreleased]
 
+- **Release-notes dialog**: returning players see a one-time "What's new"
+  dialog on their first 2.0.0 launch. Intro dialogs are now tracked by a
+  persistent counter (the first-run welcome is #0, the 2.0.0 release
+  notes are #1), so each future release can append its own dialog and
+  only the last-seen number is stored.
 - **Third color (purple)**: puzzles can now be played with three colors (black, white, purple). Free cells show colored option dots for remaining possibilities. Right-click cycles to the last domain color.
 - **New constraint: Implication** (IM) — a directional link between two cells: if the source is of a given color, the target must be too.
 - **New constraint: Bounding Box** (BB) — every group of a color must fit within a fixed-size bounding box (e.g. 3×3).

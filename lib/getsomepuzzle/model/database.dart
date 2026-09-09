@@ -1229,6 +1229,12 @@ class Database {
       puz.duration = entry.duration;
       puz.failures = entry.failures;
       puz.hints = entry.hints;
+      // Mirror every field PuzzleData.getStat() emits, so a flush that
+      // re-emits this puzzle from memory (getStats) reproduces the same
+      // row instead of zeroing the click analytics of the latest play.
+      puz.cellEdits = entry.cellEdits;
+      puz.firstClickMs = entry.firstClickMs;
+      puz.longestGapMs = entry.longestGapMs;
     }
   }
 
@@ -1505,8 +1511,8 @@ class Database {
   ///
   /// Keying on the completion timestamp (not the canonical key alone) is
   /// what preserves replays: two plays of the same puzzle have different
-  /// `finished` stamps → two rows, while the periodic 60 s flush re-emits
-  /// the in-progress play with the *same* stamp → a single row. Unfinished
+  /// `finished` stamps → two rows, while the flush right after a completed
+  /// play re-emits it with the *same* stamp → a single row. Unfinished
   /// plays (skips, abandoned attempts) collapse to one row per puzzle and
   /// are dropped once a finished play exists for that puzzle, mirroring the
   /// old "completion replaces the attempt" behaviour and keeping the file
@@ -1527,7 +1533,11 @@ class Database {
 
     final Map<String, String> byKey = {};
     for (final entry in _allStats) {
-      byKey[historyKey(entry)] = entry.toString();
+      // fullLine() (raw line when parsed) preserves the trailing metadata
+      // fields — ratings, hints, click analytics, skip markers — instead of
+      // re-serializing through the minimal toString(), which would drop
+      // them from stats.txt on the next flush.
+      byKey[historyKey(entry)] = entry.fullLine();
     }
     final fromSession = getStats();
     for (final line in fromSession) {
@@ -1957,7 +1967,6 @@ class Database {
     }
     final selection = playlist.removeAt(0);
     log.finer("${playlist.length} puzzles remaining in playlist");
-    writeStats();
     return selection;
   }
 
@@ -2068,11 +2077,11 @@ class Database {
   /// Global play history for the level computation: the cached full history
   /// ([_allStats], which preserves replays as separate rows) plus the
   /// current session's plays that have not been flushed into [_allStats]
-  /// yet (they land there on the next `writeStats`, e.g. when the following
-  /// puzzle is handed out). Deduplicated by `(canonical key, completion
-  /// stamp)` — the same key [_mergedStatHistory] uses — so a play folded in
-  /// from the session supersedes its older on-disk snapshot instead of
-  /// double-counting it.
+  /// yet (they land there on the [writeStats] call that follows every
+  /// completed puzzle — see `main.dart` `_onPuzzleCompleted`).
+  /// Deduplicated by `(canonical key, completion stamp)` — the same key
+  /// [_mergedStatHistory] uses — so a play folded in from the session
+  /// supersedes its older on-disk snapshot instead of double-counting it.
   List<StatEntry> _levelHistory() {
     String key(StatEntry e) =>
         '${e.finished ?? "unfinished"}|${canonicalPuzzleKey(e.puzzleLine)}';

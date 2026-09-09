@@ -776,6 +776,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Welcome to Get Some Puzzle! Your goal is to color each cell black or white while satisfying a set of constraints. The rule of each constraint will be explained as you encounter it for the first time.';
 
   @override
+  String get releaseNotesTitle => 'What\'s new';
+
+  @override
+  String get releaseNotesBody =>
+      '• A third colour: purple puzzles. You will be invited to try them after a while, and you can enable them any time from the puzzle filters.\n• New rules to discover: Implication arrows, Bounding Boxes and more — each is explained the first time you meet it.\n• Pick your look: light, beige or dark theme, or follow your system.\n• New settings: the delay before the next puzzle, and the gray-out of completed constraints can now be turned off.';
+
+  @override
   String get learning => 'Learning';
 
   @override

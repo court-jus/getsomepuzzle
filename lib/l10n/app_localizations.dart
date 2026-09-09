@@ -1480,6 +1480,18 @@ abstract class AppLocalizations {
   /// **'Welcome to Get Some Puzzle! Your goal is to color each cell black or white while satisfying a set of constraints. The rule of each constraint will be explained as you encounter it for the first time.'**
   String get welcomeModalBody;
 
+  /// Title of the release-notes intro dialog (intro dialog #1).
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new'**
+  String get releaseNotesTitle;
+
+  /// Body of the release-notes intro dialog shown once to returning players in 2.0.0.
+  ///
+  /// In en, this message translates to:
+  /// **'• A third colour: purple puzzles. You will be invited to try them after a while, and you can enable them any time from the puzzle filters.\n• New rules to discover: Implication arrows, Bounding Boxes and more — each is explained the first time you meet it.\n• Pick your look: light, beige or dark theme, or follow your system.\n• New settings: the delay before the next puzzle, and the gray-out of completed constraints can now be turned off.'**
+  String get releaseNotesBody;
+
   /// Menu label for the Apprentissage page (constraint reference + memory refresh)
   ///
   /// In en, this message translates to:

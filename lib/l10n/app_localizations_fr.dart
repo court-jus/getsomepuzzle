@@ -780,6 +780,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Bienvenue dans Get Some Puzzle ! Votre objectif est de colorer chaque case en noir ou en blanc en respectant un ensemble de contraintes. Les règles de chaque contrainte vous seront expliquées au fur et à mesure que vous les rencontrerez.';
 
   @override
+  String get releaseNotesTitle => 'Nouveautés';
+
+  @override
+  String get releaseNotesBody =>
+      '• Une troisième couleur : les puzzles violets. Le jeu vous les proposera après un certain temps, et vous pouvez les activer à tout moment depuis les filtres de puzzle.\n• De nouvelles règles à découvrir : les flèches d\'implication, les boîtes englobantes et d\'autres encore — chacune est expliquée à sa première rencontre.\n• Choisissez votre apparence : thème clair, beige ou sombre, ou suivez le thème du système.\n• Nouveaux réglages : le délai avant le puzzle suivant, et la possibilité de désactiver l\'estompage des contraintes terminées.';
+
+  @override
   String get learning => 'Apprentissage';
 
   @override

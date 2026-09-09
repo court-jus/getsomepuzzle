@@ -204,5 +204,8 @@ constraint introduces a novel `verify` contract pattern.
 
 - [`ready_to_publish.md`](ready_to_publish.md) — Pre-submission
   checklist for Play Store / App Store.
+- [`migration.md`](migration.md) — 1.6.22 → 2.0.0 upgrade analysis:
+  what happens to player stats, settings and onboarding, plus the
+  pre-release risks found (stats flush wiring, history metadata).
 - [`todo.md`](todo.md) — Short list of ongoing tasks.
 

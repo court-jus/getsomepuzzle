@@ -136,8 +136,11 @@ construction and on every settings change:
 db.statsDirectory = settings.statsDirectory;
 ```
 
-The periodic `writeStats` timer and all other callers hold a reference
-to `Database` and use this field directly.
+`writeStats()` is invoked after every completed puzzle from
+`main.dart`'s `_onPuzzleCompleted` (it used to run on every puzzle
+hand-out in `Database.next()` plus a periodic 60 s timer, both
+removed). Callers hold a reference to `Database` and use this field
+directly.
 
 ## Behaviour matrix
 
