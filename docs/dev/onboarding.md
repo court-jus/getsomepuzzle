@@ -48,6 +48,41 @@ playlist, an overlooked constraint, a race between `loadStats` and
 puzzle open), the modal still fires on opening. No `tutorialCompleted`
 flag is stored: stats remain the source of truth.
 
+### Cross-device stats merge (sync directory / stats import)
+
+`firstSeen` converges on **every** load, but the phase counter
+(`onboardingCompletions`) and the filters pinned from it are
+prefs-only state — and they must stay that way: "Rejouer
+l'onboarding" clears the counter while the full history stays on disk,
+so deriving the phase from the stats at boot would end a replay at the
+next launch. Instead, the *explicit* merge entry points — the player
+activates / changes / clears the stats sync directory in Settings
+(`main.dart`'s `onStatsDirectoryChanged` → `_reloadStatsAndLevel`) or
+imports a stats file (`Database.importStats`) — follow the reload with
+`Database.reconcileOnboardingWithStats()`:
+
+- per-slug completion counts are adopted from the merged history with
+  `max` semantics (per-puzzle collapsed, like `loadStats`, so replays
+  of one puzzle don't inflate the counter) — a younger history never
+  regresses a graduated device;
+- graduation bookkeeping mirrors the in-session path: `currentPhase`
+  crossing to null stamps `onboardingCompletedAt` and warms the
+  soft-discovery pool when slugs are still unseen;
+- `currentFilters` is re-pinned to the (possibly advanced)
+  recommendation while onboarding continues, and released via
+  `resetRuleFilters()` when this merge is what ended the onboarding —
+  so a device whose folder history proves the onboarding over is not
+  left stuck on the "learning track" preset and its OpenPage banner
+  (which only renders while `isInOnboarding`).
+
+On the folder path the playlist is rebuilt right away and the
+in-progress puzzle replaced when the Settings route closes
+(`_playlistDirty`). The stats-file import path (`StatsPage` →
+`importStats`) marks the same dirty flag through the
+`onStatsImported` callback, so the rebuilt playlist is applied and a
+fresh puzzle handed out once the Stats page closes — the current
+onboarding-era puzzle is not carried past the graduation.
+
 ## Onboarding sequence
 
 Two modes run back to back:
@@ -162,6 +197,13 @@ without ever meeting them. Two mechanisms in `Database` fix this:
   batch. With the 5-puzzle batch granularity this surfaces a new rule
   roughly every 10–15 plays: not every batch (too rushed), not never
   (the stall).
+- **Session-start force** (same injection, armed by `loadPuzzlesFile`):
+  when the app opens while the soft-filter phase is active, the first
+  batch prepared after the restart always carries the elected rule —
+  a player who closed the app during a long refresh stretch (the
+  per-session cadence counter would otherwise restart at zero) meets
+  a new rule on their next launch. One-shot: once the first batch is
+  prepared, the regular cadence above resumes.
 - **Bounded widening** (`_refreshSoftDiscoveryPool`, Axe B). The entry
   collection alone is too thin for the scarcest slugs (`RT`, `CT`), so
   the pool is pre-loaded — when soft mode becomes active — with
@@ -357,6 +399,12 @@ In the player settings:
     edge case where the previous session exited at a phase boundary and
     the fire-and-forget filter-save from `notePuzzleCompleted` may not
     have completed.
+  - `reconcileOnboardingWithStats({wasInOnboarding})` folds the
+    onboarding progress proved by an *explicitly imported* history
+    (sync-directory change / stats-file import) into the phase counter
+    and re-pins or releases `currentFilters` accordingly — see the
+    "Cross-device stats merge" section. Not called from
+    `loadStats`/`loadPuzzlesFile` so onboarding replays survive boots.
 - **`firstSeen`** map in `SharedPreferences` under
   `constraintFirstSeen` (`slug → ISO date` serialisation) drives the
   explanation modal.

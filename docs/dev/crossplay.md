@@ -46,6 +46,32 @@ Duplicates between the two sources are removed downstream by
 `(canonicalPuzzleKey, finishedTimestamp)`. The merge is idempotent —
 a line present in both sources appears once.
 
+### Onboarding state follows the merged history
+
+`loadStats` rebuilds `progress.firstSeen` from the merged history on
+every read, so a device pointed at a folder holding a further-advanced
+(or completed) history stops firing new-rule dialogs the player has
+already seen. The **phase counter** (`onboardingCompletions`, prefs-only)
+and the rule filters pinned from it are local state — when the merge is
+an *explicit* import (the player activates / changes / clears the sync
+directory in Settings, or imports a stats file), `main.dart` runs
+`Database.reconcileOnboardingWithStats()` right after the reload:
+
+- per-slug completion counts are adopted from the history with `max`
+  semantics (per-puzzle collapsed, like `loadStats` — replays don't
+  inflate), so a younger history never regresses a graduated device;
+- if the adopted progress advances the strict phase, `currentFilters`
+  is re-pinned to the new recommendation (same as a boot);
+- if the merge is what ends the onboarding (last strict phase crossed
+  *and* `firstSeen` complete), the onboarding-imposed rule envelope is
+  released via `resetRuleFilters()` and the OpenPage "learning track"
+  banner disappears.
+
+The reconciliation is deliberately **not** part of `loadStats` /
+`loadPuzzlesFile`: the boot path stays prefs-authoritative so
+"Rejouer l'onboarding" — which clears the counter while the full
+history stays on disk — survives the next launch.
+
 ### Write path
 
 `Database.writeStats()` writes the merged history to

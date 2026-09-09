@@ -283,11 +283,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final ConstraintProgress progress = ConstraintProgress();
   bool initialized = false;
   bool shouldChooseLocale = true;
-  // Set when a settings change (player level / auto-level) invalidates the
-  // playlist while the Settings page is open. The costly recompute +
-  // puzzle reload is deferred until the menu closes (see `onSettings`),
-  // so it runs once instead of on every slider tick — and the new-rule
-  // modal never fires on top of the Settings route.
+  // Set when a settings / stats change (player level / auto-level,
+  // stats sync directory, stats import) invalidates the playlist while
+  // the Settings or Stats page is open. The costly recompute + puzzle
+  // reload is deferred until the menu closes (see
+  // [_applyPendingPlaylistRebuild]), so it runs once instead of on every
+  // slider tick — and the new-rule modal never fires on top of the
+  // route.
   bool _playlistDirty = false;
   bool _testingFromEditor = false;
   // True when taps on free cells should prune one option from the
@@ -1075,7 +1077,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// manual level changes (see `onSettingsChange` → `_playlistDirty`).
   Future<void> _reloadStatsAndLevel() async {
     if (database == null) return;
+    // Snapshot before the reload: reloadStatsFromStorage may already
+    // end the soft-filter phase (firstSeen grows with the newly merged
+    // history). reconcileOnboardingWithStats then folds the onboarding
+    // progress the merged stats prove into the local phase counter and
+    // realigns the open-page rule filters with it — without this, a
+    // player who points the app at a sync folder holding a
+    // further-advanced (or completed) history stays pinned on their
+    // local onboarding preset and its "learning track" banner.
+    final wasInOnboarding = database!.isInOnboarding;
     await database!.reloadStatsFromStorage();
+    await database!.reconcileOnboardingWithStats(
+      wasInOnboarding: wasInOnboarding,
+    );
     if (settings.autoLevel) {
       final newLevel = database!.computePlayerLevel(
         fallback: settings.playerLevel,
@@ -1088,6 +1102,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     database!.setPlayerLevel(settings.playerLevel);
     _playlistDirty = true;
     game.refresh();
+  }
+
+  /// Rebuild the playlist and hand out the next puzzle when a stats /
+  /// level change marked [_playlistDirty]. Runs once the originating
+  /// route (Settings, Stats) is closed — recomputing inline while the
+  /// route is still on top would surface onboarding modals over the
+  /// menu.
+  void _applyPendingPlaylistRebuild() {
+    if (!_playlistDirty || database == null) return;
+    _playlistDirty = false;
+    database!.preparePlaylist();
+    loadPuzzle();
   }
 
   /// If the puzzle declares constraint slugs the player has never
@@ -1975,12 +2001,21 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             ),
           ),
           onCreate: _openCreatePage,
-          onStats: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(
-              builder: (context) => StatsPage(database: database!),
-            ),
-          ),
+          onStats: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (context) => StatsPage(
+                  database: database!,
+                  onStatsImported: () => _playlistDirty = true,
+                ),
+              ),
+            );
+            // A successful stats import rebuilds the playlist inside
+            // importStats; recompute once the page is closed and hand
+            // out a fresh puzzle, like the Settings routes do.
+            _applyPendingPlaylistRebuild();
+          },
           onLearning: () => Navigator.push(
             context,
             MaterialPageRoute<void>(
@@ -2162,15 +2197,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 ),
               ),
             );
-            // Recompute the playlist (and hand out the next puzzle) once, now
-            // that the menu is closed — a level change inside Settings only
-            // marked it dirty. Running it here also lets the new-rule modal
-            // fire on the puzzle screen rather than over the Settings route.
-            if (_playlistDirty && database != null) {
-              _playlistDirty = false;
-              database!.preparePlaylist();
-              loadPuzzle();
-            }
+            // Recompute the playlist (and hand out the next puzzle) once,
+            // now that the menu is closed — a level change inside Settings
+            // only marked it dirty. Running it here also lets the new-rule
+            // modal fire on the puzzle screen rather than over the Settings
+            // route.
+            _applyPendingPlaylistRebuild();
           },
           onHelp: () => Navigator.push(
             context,

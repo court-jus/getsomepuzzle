@@ -12,6 +12,19 @@ localised under
 
 ## [Unreleased]
 
+- **Soft-phase onboarding now resumes with a new rule**: when the app
+  restarts while the post-strict discovery phase is active, the first
+  playlist batch always contains the rule being introduced — closing
+  the app during a long "refresh" stretch no longer restarts the
+  10–15 play wait from zero.
+- **Stats sync folder now re-aligns onboarding**: activating, changing or
+  clearing the sync directory (and importing a stats file) folds the
+  onboarding progress the merged history proves into the local phase
+  counter and re-pins or releases the rule filters accordingly — a
+  player whose other device finished onboarding is no longer stuck on
+  the "learning track" preset and its banner, and the stale onboarding
+  batch is swapped for a fresh post-graduation puzzle once the Stats or
+  Settings page closes.
 - **Release-notes dialog**: returning players see a one-time "What's new"
   dialog on their first 2.0.0 launch. Intro dialogs are now tracked by a
   persistent counter (the first-run welcome is #0, the 2.0.0 release

@@ -36,9 +36,17 @@ int _extractCplx(String puzzleLine) {
 }
 
 class StatsPage extends StatefulWidget {
-  const StatsPage({super.key, required this.database});
+  const StatsPage({super.key, required this.database, this.onStatsImported});
 
   final Database database;
+
+  /// Invoked after a stats import persisted at least one new line.
+  /// The owner marks its playlist dirty so the rebuilt playlist (and a
+  /// fresh puzzle) is applied once this route closes — mirroring the
+  /// stats-directory change path, so an import that graduates the
+  /// player (or reshuffles play flags) does not leave the old batch
+  /// current.
+  final VoidCallback? onStatsImported;
 
   @override
   State<StatsPage> createState() => _StatsPageState();
@@ -106,6 +114,9 @@ class _StatsPageState extends State<StatsPage> {
       ),
     );
     if (added > 0) {
+      // The import already rebuilt the playlist inside importStats; let
+      // the owner defer the puzzle reload until this route closes.
+      widget.onStatsImported?.call();
       await _loadStats();
     }
   }

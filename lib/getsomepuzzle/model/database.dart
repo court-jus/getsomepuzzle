@@ -1252,6 +1252,103 @@ class Database {
     loadStats(_allStats);
   }
 
+  /// Fold the onboarding progress the currently-loaded stats prove into
+  /// the prefs-backed phase counter, then realign [currentFilters] with
+  /// the recomputed recommendation.
+  ///
+  /// Why this exists: [reloadStatsFromStorage] already rebuilds
+  /// `progress.firstSeen` from the history — so a player who merges
+  /// another device's stats (activating / changing the stats sync
+  /// directory, or importing a stats file) stops seeing new-rule
+  /// dialogs for constraints they have already met — but the *phase*
+  /// counter and the rule filters pinned from it are prefs-only state
+  /// that nothing reconciles. A device that had only reached, say,
+  /// phase 2 would stay pinned on the phase-2 rule preset (with its
+  /// OpenPage "learning track" banner) even though the merged history
+  /// proves the onboarding is over.
+  ///
+  /// Semantics:
+  /// - One-directional (`max`) merge: the history can only prove
+  ///   *more* onboarding progress, never less — a graduated device
+  ///   that syncs a younger history keeps its state.
+  /// - Counts mirror [loadStats]'s per-puzzle collapse (a puzzle played
+  ///   on several distinct dates counts once), so replays do not
+  ///   inflate the phase counter.
+  /// - After the merge the filters are realigned exactly like the
+  ///   regular progression paths: pinned to the (possibly advanced)
+  ///   recommendation while onboarding continues, released via
+  ///   [resetRuleFilters] when this merge is what ended the onboarding.
+  ///
+  /// Deliberately **not** called from [loadStats] / [loadPuzzlesFile]:
+  /// the boot path must stay prefs-authoritative so "Rejouer
+  /// l'onboarding" (which clears the counter while the full history
+  /// stays on disk) survives the next launch. Call it only from the
+  /// explicit stats-merge entry points: [importStats] and the
+  /// stats-directory change handler in `main.dart`.
+  ///
+  /// [wasInOnboarding] must be the onboarding state **before** the
+  /// reload/merge that preceded this call — the reload itself may
+  /// already have flipped the soft filter off (`firstSeen` grows with
+  /// the merged history), and the filter release below must trigger
+  /// exactly when this merge is what ended the onboarding, not on a
+  /// later call for a player who graduated long ago.
+  Future<void> reconcileOnboardingWithStats({
+    required bool wasInOnboarding,
+  }) async {
+    final oldPhase = currentPhase;
+    // Count finished, non-skipped plays per declared slug over the
+    // loaded history, collapsing per-puzzle exactly like loadStats does
+    // (we only need distinct identity keys — the most-recent-play
+    // choice of _isMoreRecentPlay is irrelevant for counting).
+    final counts = <String, int>{};
+    final seenPuzzles = <String>{};
+    for (final entry in _allStats) {
+      if (entry.finished == null || entry.skipped != null) continue;
+      if (!seenPuzzles.add(identityKey(entry.puzzleLine))) continue;
+      for (final slug in ConstraintProgress.slugsFromLine(entry.puzzleLine)) {
+        if (slug.isEmpty || slug == 'TX') continue;
+        counts.update(slug, (v) => v + 1, ifAbsent: () => 1);
+      }
+    }
+    var adopted = false;
+    for (final entry in counts.entries) {
+      final slug = entry.key;
+      if (entry.value > (onboardingCompletions[slug] ?? 0)) {
+        onboardingCompletions[slug] = entry.value;
+        adopted = true;
+      }
+    }
+    if (adopted) await _persistOnboardingCompletions();
+    if (adopted && oldPhase != null && currentPhase == null) {
+      // The merge graduated the strict phases: stamp the graduation
+      // (mirrors notePuzzleCompleted) and warm the soft-discovery pool
+      // when the merged history still leaves slugs unseen.
+      if (onboardingCompletedAt == null) {
+        onboardingCompletedAt = DateTime.now();
+        await _persistOnboardingCompletedAt();
+      }
+      if (_softFilterActive) await _refreshSoftDiscoveryPool();
+    }
+    final reco = recommendedOnboardingFilters;
+    if (reco != null) {
+      // Still (or newly) in onboarding: re-pin the preset, mirroring
+      // the boot cross-session guard and notePuzzleCompleted.
+      if (!setEquals(currentFilters.wantedRules, reco.wantedRules) ||
+          !setEquals(currentFilters.bannedRules, reco.bannedRules)) {
+        currentFilters.wantedRules = reco.wantedRules;
+        currentFilters.bannedRules = reco.bannedRules;
+        await currentFilters.save();
+        preparePlaylist();
+      }
+    } else if (wasInOnboarding) {
+      // The merged history proves the onboarding is over: release the
+      // onboarding-imposed slug envelope exactly like the in-session
+      // graduation path does, so the player is not left stuck
+      // wanting/banning their closing onboarding slug.
+      await resetRuleFilters();
+    }
+  }
+
   Iterable<PuzzleData> filter() => puzzles.where(_matchesFilters);
 
   /// Per-puzzle predicate behind [filter]. Extracted so the soft-discovery
@@ -1406,6 +1503,12 @@ class Database {
       currentFilters.bannedRules = reco.bannedRules;
       await currentFilters.save();
     }
+    // Session-start force: when the app opens while soft discovery is
+    // active, the first prepared batch must carry the elected rule (see
+    // _forceElectedNextBatch / _injectElectedSoftRule) — otherwise a
+    // player who quit during a refresh stretch would restart the whole
+    // softElectedInjectPeriod cadence before meeting anything new.
+    _forceElectedNextBatch = _softFilterActive;
     await _refreshSoftDiscoveryPool();
     preparePlaylist();
     // Pre-warm the collection-lookup cache (now fast with identityKey).
@@ -1735,12 +1838,26 @@ class Database {
 
   /// Plays served since the elected soft-discovery slug last changed (i.e.
   /// since the player last met a new rule). In-session only; a relaunch
-  /// restarts the count, at worst delaying one injection by a few plays.
+  /// restarts the count — offset by the session-start force below, which
+  /// guarantees the first batch of a fresh launch carries the elected rule.
   int _softPlaysSinceElectedChange = 0;
 
   /// The elected slug observed on the previous sampling pass, used to reset
   /// [_softPlaysSinceElectedChange] the moment discovery advances.
   String? _lastElectedSlug;
+
+  /// One-shot session-start force for the soft-discovery injection. Armed by
+  /// [loadPuzzlesFile] when the app opens while the soft-filter phase is
+  /// active, so the first batch prepared after a restart always carries the
+  /// elected rule — a player who closed the app during a long refresh
+  /// stretch meets a new rule on the next launch instead of re-waiting the
+  /// whole [softElectedInjectPeriod]. Cleared by [_injectElectedSoftRule] on
+  /// the first pass, whether or not the elected puzzle was spliced.
+  bool _forceElectedNextBatch = false;
+
+  @visibleForTesting
+  set forceElectedNextBatchForTest(bool value) =>
+      _forceElectedNextBatch = value;
 
   /// Soft-discovery candidates pulled from the level collections *above* the
   /// current one (Axe B): puzzles carrying a post-strict slug, so a rule too
@@ -2304,12 +2421,20 @@ class Database {
   /// Post-strict soft-discovery injection (Axe A + B). The elected new rule
   /// is rare in the entry catalog and gets drowned by refresh draws, so left
   /// to the weighted sampler it almost never surfaces — the stall this
-  /// reproduces. Instead, once the player has gone [softElectedInjectPeriod]
-  /// plays without meeting a new rule (or the filtered batch is empty, as in
-  /// the terminal single-slug case), we splice one elected-rule puzzle into
-  /// the upcoming batch. Candidates come from the current collection first
-  /// and, when it is too thin ([softElectedMinInCollection]), from the
-  /// widened [_softDiscoveryPool] (Axe B). No-op outside the soft phase.
+  /// reproduces. Instead, we splice one elected-rule puzzle into the
+  /// upcoming batch when any of these holds:
+  /// - the player has gone [softElectedInjectPeriod] plays without meeting a
+  ///   new rule (the regular cadence);
+  /// - the filtered batch is empty (terminal single-slug case);
+  /// - a fresh session just opened in the soft phase
+  ///   ([_forceElectedNextBatch], armed by [loadPuzzlesFile]) — the first
+  ///   batch of a launch always carries the elected rule, so a player who
+  ///   closed the app during a refresh stretch meets something new on the
+  ///   next open instead of re-waiting the cadence.
+  ///
+  /// Candidates come from the current collection first and, when it is too
+  /// thin ([softElectedMinInCollection]), from the widened
+  /// [_softDiscoveryPool] (Axe B). No-op outside the soft phase.
   void _injectElectedSoftRule(
     List<PuzzleData> result,
     double mu,
@@ -2322,7 +2447,19 @@ class Database {
       _lastElectedSlug = elected;
       _softPlaysSinceElectedChange = 0;
     }
-    final due = _softPlaysSinceElectedChange >= softElectedInjectPeriod;
+    // Session-start force: one-shot, armed by loadPuzzlesFile. The first
+    // batch prepared after a restart in the soft phase must carry the
+    // elected rule; if the weighted draw already put it in the upcoming
+    // batch, the guarantee is met without splicing a second copy.
+    final forceForSessionStart = _forceElectedNextBatch;
+    _forceElectedNextBatch = false;
+    if (forceForSessionStart &&
+        result.take(playlistBatchSize).any((p) => p.rules.contains(elected))) {
+      return;
+    }
+    final due =
+        forceForSessionStart ||
+        _softPlaysSinceElectedChange >= softElectedInjectPeriod;
     if (!due && result.isNotEmpty) return;
 
     final inCollection = result
@@ -2522,6 +2659,11 @@ class Database {
   /// stats file, and [loadStats] dedupes by canonical key so duplicates
   /// between the import and the existing store collapse harmlessly.
   Future<int> importStats(String content) async {
+    // Snapshot before the merge below: loadStats may already end the
+    // soft-filter phase (firstSeen grows with the imported history),
+    // and reconcileOnboardingWithStats releases the onboarding filter
+    // preset exactly when this import is what ended the onboarding.
+    final wasInOnboarding = isInOnboarding;
     final List<String> validLines = [];
     for (final raw in content.split('\n')) {
       final line = raw.trim();
@@ -2558,6 +2700,11 @@ class Database {
       validLines.map((line) => StatEntry.parse(line)).whereType<StatEntry>(),
     );
     loadStats(_allStats);
+    // The import folded foreign history into the load: fold the
+    // onboarding progress it proves into the phase counter and realign
+    // the filters, the same way stats-directory changes do (see
+    // reconcileOnboardingWithStats).
+    await reconcileOnboardingWithStats(wasInOnboarding: wasInOnboarding);
     preparePlaylist();
     return validLines.length;
   }

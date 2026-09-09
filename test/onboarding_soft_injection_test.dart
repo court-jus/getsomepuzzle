@@ -91,4 +91,60 @@ void main() {
           'upcoming batch from the widened pool',
     );
   });
+
+  test('a fresh session in the soft phase forces the elected rule into the '
+      'very first batch (no cadence wait)', () {
+    final db = _softDb();
+    expect(db.electedSoftSlug, 'RT');
+    // Current collection holds only already-known "refresh" puzzles; the
+    // only RT candidate lives in the widened pool (Axe B).
+    db.puzzles = List.generate(20, (_) => PuzzleData(_line('FM')));
+    db.softDiscoveryPoolForTest = [PuzzleData(_line('RT'))];
+
+    bool batchHasRt() => db
+        .getPuzzlesByLevel(50)
+        .take(Database.playlistBatchSize)
+        .any((p) => p.rules.contains('RT'));
+
+    // Simulate the boot path: loadPuzzlesFile arms the one-shot force
+    // because the soft-filter phase is active at launch.
+    db.forceElectedNextBatchForTest = true;
+
+    expect(
+      batchHasRt(),
+      isTrue,
+      reason:
+          'the first batch after a restart must carry the elected rule, '
+          'without waiting out the cadence period',
+    );
+  });
+
+  test('after the forced session-start batch the regular cadence resumes', () {
+    final db = _softDb();
+    db.puzzles = List.generate(20, (_) => PuzzleData(_line('FM')));
+    db.softDiscoveryPoolForTest = [PuzzleData(_line('RT'))];
+
+    bool batchHasRt() => db
+        .getPuzzlesByLevel(50)
+        .take(Database.playlistBatchSize)
+        .any((p) => p.rules.contains('RT'));
+
+    db.forceElectedNextBatchForTest = true;
+    expect(batchHasRt(), isTrue, reason: 'session-start force fires');
+
+    // The force is one-shot and does not pollute the cadence: below the
+    // injection period the elected rule stays out again, exactly like a
+    // non-forced session ("no new rule" batches resume).
+    final refresh = PuzzleData(_line('FM'));
+    for (var i = 0; i < Database.softElectedInjectPeriod - 1; i++) {
+      db.notePuzzleCompleted(refresh);
+    }
+    expect(
+      batchHasRt(),
+      isFalse,
+      reason: 'cadence restarted at zero after the forced batch',
+    );
+    db.notePuzzleCompleted(refresh); // reach the injection period
+    expect(batchHasRt(), isTrue, reason: 'regular cadence injection');
+  });
 }
