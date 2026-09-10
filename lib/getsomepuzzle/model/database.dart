@@ -59,6 +59,11 @@ class PuzzleData {
   int cplx = 0;
   List<String> rules = [];
 
+  /// [rules] as a Set, materialised once on first use. The filter predicate
+  /// and the variety-gap sampler consult it per candidate per pass;
+  /// allocating a fresh Set each time was pure garbage.
+  late final Set<String> rulesSet = rules.toSet();
+
   /// User-facing scenario derived from the constraint slugs. Never
   /// serialised — recomputed on every construction via
   /// [equilibrium.detectPuzzleProfile].
@@ -1349,80 +1354,85 @@ class Database {
     }
   }
 
-  Iterable<PuzzleData> filter() => puzzles.where(_matchesFilters);
+  Iterable<PuzzleData> filter() {
+    final effectiveWanted = expandMergedRules(currentFilters.wantedRules);
+    final effectiveBanned = expandMergedRules(currentFilters.bannedRules);
+    return puzzles.where(
+      (p) => _matchesFilters(p, effectiveWanted, effectiveBanned),
+    );
+  }
 
   /// Per-puzzle predicate behind [filter]. Extracted so the soft-discovery
   /// injection in [getPuzzlesByLevel] can apply the *same* flag / size /
   /// rule / domain gates to puzzles drawn from the widened pool (which are
-  /// not in [puzzles]).
-  bool _matchesFilters(PuzzleData puz) {
-    {
-      if (puz.played && currentFilters.bannedFlags.contains("played")) {
-        return false;
-      }
-      if (puz.skipped != null &&
-          currentFilters.bannedFlags.contains("skipped")) {
-        return false;
-      }
-      if (puz.liked != null && currentFilters.bannedFlags.contains("liked")) {
-        return false;
-      }
-      if (puz.disliked != null &&
-          currentFilters.bannedFlags.contains("disliked")) {
-        return false;
-      }
-
-      if (!puz.played && currentFilters.wantedFlags.contains("played")) {
-        return false;
-      }
-      if (puz.skipped == null &&
-          currentFilters.wantedFlags.contains("skipped")) {
-        return false;
-      }
-      if (puz.liked == null && currentFilters.wantedFlags.contains("liked")) {
-        return false;
-      }
-      if (puz.disliked == null &&
-          currentFilters.wantedFlags.contains("disliked")) {
-        return false;
-      }
-
-      if (puz.filled > currentFilters.maxFilled) return false;
-      if (puz.filled < currentFilters.minFilled) return false;
-      final w = puz.width;
-      final h = puz.height;
-      final minW = currentFilters.minWidth;
-      final maxW = currentFilters.maxWidth;
-      final minH = currentFilters.minHeight;
-      final maxH = currentFilters.maxHeight;
-      final fitsNormal = w >= minW && w <= maxW && h >= minH && h <= maxH;
-      final fitsRotated = h >= minW && h <= maxW && w >= minH && w <= maxH;
-      if (!fitsNormal && !fitsRotated) return false;
-      // Expand merged rule pairs (CC/RC, JC/JR, RT/CT) so that
-      // selecting the column variant covers both axis variants.
-      final effectiveWanted = expandMergedRules(currentFilters.wantedRules);
-      final effectiveBanned = expandMergedRules(currentFilters.bannedRules);
-      if (effectiveWanted.isNotEmpty &&
-          effectiveWanted.intersection(puz.rules.toSet()).length !=
-              effectiveWanted.length) {
-        return false;
-      }
-      if (effectiveBanned.isNotEmpty &&
-          effectiveBanned.intersection(puz.rules.toSet()).isNotEmpty) {
-        return false;
-      }
-      if (currentFilters.wantedScenario != null &&
-          puz.userScenario != currentFilters.wantedScenario) {
-        return false;
-      }
-      final domainKey = domainFilterKey(puz.domain.length);
-      if (currentFilters.bannedDomains.contains(domainKey)) return false;
-      if (currentFilters.wantedDomains.isNotEmpty &&
-          !currentFilters.wantedDomains.contains(domainKey)) {
-        return false;
-      }
-      return true;
+  /// not in [puzzles]). The two merged-rule sets are hoisted by the caller
+  /// — computed once per pass, not per puzzle.
+  bool _matchesFilters(
+    PuzzleData puz,
+    Set<String> effectiveWanted,
+    Set<String> effectiveBanned,
+  ) {
+    if (puz.played && currentFilters.bannedFlags.contains("played")) {
+      return false;
     }
+    if (puz.skipped != null &&
+        currentFilters.bannedFlags.contains("skipped")) {
+      return false;
+    }
+    if (puz.liked != null && currentFilters.bannedFlags.contains("liked")) {
+      return false;
+    }
+    if (puz.disliked != null &&
+        currentFilters.bannedFlags.contains("disliked")) {
+      return false;
+    }
+
+    if (!puz.played && currentFilters.wantedFlags.contains("played")) {
+      return false;
+    }
+    if (puz.skipped == null &&
+        currentFilters.wantedFlags.contains("skipped")) {
+      return false;
+    }
+    if (puz.liked == null && currentFilters.wantedFlags.contains("liked")) {
+      return false;
+    }
+    if (puz.disliked == null &&
+        currentFilters.wantedFlags.contains("disliked")) {
+      return false;
+    }
+
+    if (puz.filled > currentFilters.maxFilled) return false;
+    if (puz.filled < currentFilters.minFilled) return false;
+    final w = puz.width;
+    final h = puz.height;
+    final minW = currentFilters.minWidth;
+    final maxW = currentFilters.maxWidth;
+    final minH = currentFilters.minHeight;
+    final maxH = currentFilters.maxHeight;
+    final fitsNormal = w >= minW && w <= maxW && h >= minH && h <= maxH;
+    final fitsRotated = h >= minW && h <= maxW && w >= minH && w <= maxH;
+    if (!fitsNormal && !fitsRotated) return false;
+    if (effectiveWanted.isNotEmpty &&
+        effectiveWanted.intersection(puz.rulesSet).length !=
+            effectiveWanted.length) {
+      return false;
+    }
+    if (effectiveBanned.isNotEmpty &&
+        effectiveBanned.intersection(puz.rulesSet).isNotEmpty) {
+      return false;
+    }
+    if (currentFilters.wantedScenario != null &&
+        puz.userScenario != currentFilters.wantedScenario) {
+      return false;
+    }
+    final domainKey = domainFilterKey(puz.domain.length);
+    if (currentFilters.bannedDomains.contains(domainKey)) return false;
+    if (currentFilters.wantedDomains.isNotEmpty &&
+        !currentFilters.wantedDomains.contains(domainKey)) {
+      return false;
+    }
+    return true;
   }
 
   Future<void> loadPuzzlesFile([String? fileToLoad]) async {
@@ -1511,8 +1521,6 @@ class Database {
     _forceElectedNextBatch = _softFilterActive;
     await _refreshSoftDiscoveryPool();
     preparePlaylist();
-    // Pre-warm the collection-lookup cache (now fast with identityKey).
-    await getCollectionLookup();
   }
 
   /// SharedPreferences key gating the one-shot application of
@@ -2389,7 +2397,11 @@ class Database {
     // filtered out), draw from the overfilled mirror — same filters apply so
     // user preferences (rule bans, dimensions, etc.) are still honoured.
     if (filtered.isEmpty && _overfilledPuzzles.isNotEmpty) {
-      filtered = _overfilledPuzzles.where(_matchesFilters).toList();
+      final effectiveWanted = expandMergedRules(currentFilters.wantedRules);
+      final effectiveBanned = expandMergedRules(currentFilters.bannedRules);
+      filtered = _overfilledPuzzles
+          .where((p) => _matchesFilters(p, effectiveWanted, effectiveBanned))
+          .toList();
     }
 
     if (filtered.isEmpty) return const [];
@@ -2467,9 +2479,13 @@ class Database {
         .toList();
     final pool = <PuzzleData>[...inCollection];
     if (inCollection.length < softElectedMinInCollection) {
+      final effectiveWanted = expandMergedRules(currentFilters.wantedRules);
+      final effectiveBanned = expandMergedRules(currentFilters.bannedRules);
       pool.addAll(
         _softDiscoveryPool.where(
-          (p) => p.rules.contains(elected) && _matchesFilters(p),
+          (p) =>
+              p.rules.contains(elected) &&
+              _matchesFilters(p, effectiveWanted, effectiveBanned),
         ),
       );
     }
@@ -2578,7 +2594,7 @@ class Database {
     if (stats.totalPuzzles <= 0) return 0.0;
 
     double slugGap = 0.0;
-    final distinct = p.rules.toSet();
+    final distinct = p.rulesSet;
     if (distinct.isNotEmpty && stats.nSlugs > 0) {
       final avgK = stats.totalSlugUses / stats.totalPuzzles;
       final expSlug = avgK / stats.nSlugs;
