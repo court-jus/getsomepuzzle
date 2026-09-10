@@ -471,10 +471,15 @@ class GameModel extends ChangeNotifier {
   /// 3+ colour puzzles — collapses to `incrValue` everywhere else).
   /// When the cell already has a value, both modes share the same
   /// behaviour so the player never gets "stuck" on a coloured cell.
-  bool handleTap(int idx, {bool removeOptionMode = false}) {
-    if (currentPuzzle == null) return false;
-    if (currentPuzzle!.cells[idx].readonly) return false;
-    _beforeMutation();
+  /// Apply the tap action selected by [removeOptionMode] to cell [idx], with
+  /// the bookkeeping shared by every cell-paint gesture (tap, long-press,
+  /// right-click): stats edit counter, constraint-validity reset, undo history
+  /// and a log line under [label].
+  void _applyTap(
+    int idx, {
+    required bool removeOptionMode,
+    required String label,
+  }) {
     if (removeOptionMode && currentPuzzle!.domain.length > 2) {
       currentPuzzle!.cycleRemoveOption(idx);
     } else {
@@ -483,7 +488,14 @@ class GameModel extends ChangeNotifier {
     currentMeta?.stats?.recordCellEdit();
     currentPuzzle!.clearConstraintsValidity();
     if (history.isEmpty || history.last != idx) history.add(idx);
-    _log.fine('tap cell $idx → ${currentPuzzle!.cellValues[idx]}');
+    _log.fine('$label cell $idx → ${currentPuzzle!.cellValues[idx]}');
+  }
+
+  bool handleTap(int idx, {bool removeOptionMode = false}) {
+    if (currentPuzzle == null) return false;
+    if (currentPuzzle!.cells[idx].readonly) return false;
+    _beforeMutation();
+    _applyTap(idx, removeOptionMode: removeOptionMode, label: 'tap');
     _afterMutation();
     return true;
   }
@@ -619,7 +631,10 @@ class GameModel extends ChangeNotifier {
     }
   }
 
-  void handleRightDragEnd() {
+  /// [removeOptionMode] selects the swapped tap action committed by a pure
+  /// right-click on a 3+ colour puzzle (see [handleLongPress]); it is ignored
+  /// on 2-colour puzzles and by a right-drag.
+  void handleRightDragEnd({bool removeOptionMode = false}) {
     // Skip when no right-drag was actually started: the cell widget's
     // `Listener.onPointerUp` fires for every pointer release on
     // desktop/web, including a regular left-click — without this
@@ -632,7 +647,15 @@ class GameModel extends ChangeNotifier {
     // left button live.
     if (_pendingRightClickIdx != null) {
       _beforeMutation();
-      _commitRightDecr(_pendingRightClickIdx!, isDrag: false);
+      if (currentPuzzle!.domain.length > 2) {
+        _applyTap(
+          _pendingRightClickIdx!,
+          removeOptionMode: !removeOptionMode,
+          label: 'right-click',
+        );
+      } else {
+        _commitRightDecr(_pendingRightClickIdx!, isDrag: false);
+      }
       _pendingRightClickIdx = null;
     }
     _log.fine('right-drag end');
@@ -641,15 +664,25 @@ class GameModel extends ChangeNotifier {
     _afterMutation();
   }
 
-  /// Long-press on a cell — mobile fallback for the right-click cycle.
-  /// On desktop the right-click reaches the same goal, but mobile has
-  /// no secondary mouse button so the player needs another way to step
-  /// backward through the cycle (most importantly: reach `domain.last`
-  /// in one tap instead of N). Mode-agnostic: it stays a "go to the
-  /// previous colour" shortcut even when [removeOptionMode] is on.
+  /// Long-press on a cell — mobile fallback for the right-click.
+  ///
+  /// On a 3+ colour puzzle the long-press applies the *other* tap mode's
+  /// action (see [_applyTap]): in normal mode it prunes one option dot
+  /// (`cycleRemoveOption`), in remove-option mode it cycles the colour
+  /// forward (`incrValue`). A coloured cell therefore falls back to
+  /// `incrValue` in normal mode, exactly like a tap in remove-option mode.
+  ///
+  /// On a 2-colour puzzle (no option dots) the long-press keeps the
+  /// historical backward colour cycle (`decrValue`).
   bool handleLongPress(int idx, {bool removeOptionMode = false}) {
     if (currentPuzzle == null) return false;
     if (currentPuzzle!.cells[idx].readonly) return false;
+    if (currentPuzzle!.domain.length > 2) {
+      _beforeMutation();
+      _applyTap(idx, removeOptionMode: !removeOptionMode, label: 'long-press');
+      _afterMutation();
+      return true;
+    }
     _beforeMutation();
     final before = currentPuzzle!.cellValues[idx];
     currentPuzzle!.decrValue(idx);
@@ -680,7 +713,7 @@ class GameModel extends ChangeNotifier {
     return domain[i + 1];
   }
 
-  /// Mirror of [_nextCycle] used by right-drag and long-press handlers.
+  /// Mirror of [_nextCycle] used by the right-drag handler.
   CellValue _prevCycle(CellValue v) {
     final domain = currentPuzzle!.domain;
     if (domain.isEmpty) return CellValue.free;

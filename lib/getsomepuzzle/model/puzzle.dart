@@ -762,8 +762,8 @@ class Puzzle {
   /// Mirror of [incrValue] that walks the domain backward. Steps through:
   ///   `free → domain[last] → domain[last-1] → … → domain[0] → free → …`
   ///
-  /// Wired to right-click (desktop) and long-press (mobile) so the player
-  /// can reach the last colour of the domain in one click instead of N.
+  /// Wired to the right-drag paint and to the right-click / long-press
+  /// backward cycle on 2-colour puzzles.
   /// Same `resetCell` + `updateConstraintStatus` dance as [incrValue] on
   /// the wrap-back-to-free step. `ignoreOptions: true` matches [incrValue]
   /// — manual cycling can always override constraint-driven pruning.
@@ -796,6 +796,10 @@ class Puzzle {
   /// useful intermediate state (any single removal collapses to a
   /// `setValue`), so this method is only meaningful on 3+ colour
   /// puzzles — the caller gates on `domain.length`.
+  ///
+  /// Also reached from a long-press or right-click in normal (paint)
+  /// mode on a 3+ colour puzzle: `GameModel._applyTap` invokes it with
+  /// the inverted mode for those alternate gestures.
   ///
   /// If the cell already has a value, falls back to [incrValue] so the
   /// tap still has the regular cycling effect.

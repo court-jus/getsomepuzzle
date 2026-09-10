@@ -1456,7 +1456,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   void handlePuzzleRightDragEnd() {
-    game.handleRightDragEnd();
+    game.handleRightDragEnd(removeOptionMode: _removeOptionMode);
     _handleCheck();
   }
 

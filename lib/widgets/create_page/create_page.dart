@@ -1470,7 +1470,6 @@ class _CreatePageState extends State<CreatePage> {
       isHighlighted: isLetterGroupSelected || isSameSizeSelected,
       cellSize: cellSize,
       onTap: () => _onCellTap(cellIdx),
-      onSecondaryTap: () {},
       onDrag: (_) {},
       onDragEnd: () {},
       constraints: constraints,

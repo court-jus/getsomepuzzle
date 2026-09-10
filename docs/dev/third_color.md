@@ -37,12 +37,16 @@ before the port.
   domain (`free → domain[0] → … → domain[last] → free`), so a 2-colour
   puzzle never surfaces purple. Wrapping back to free goes through
   `resetCell` so options are restored. `Puzzle.decrValue` is the exact
-  mirror (`free → domain[last] → … → domain[0] → free`) and powers the
-  right-click cycle and the mobile long-press: a single right-click
-  (or long-press) on a free cell jumps straight to the last domain
-  colour, so purple is reachable in one gesture on 3-colour puzzles
-  instead of three taps via `incrValue`.
-* Right-click and right-drag are uniform across domain sizes. The
+  mirror (`free → domain[last] → … → domain[0] → free`) and now powers
+  the 2-colour right-click / long-press and the right-drag paint colour
+  on every domain.
+* Right-click and long-press apply the **swapped-mode** tap on 3+
+  colour puzzles: in normal mode one option dot is dropped per gesture
+  (domain order, wrapping back to the full set), in remove-option mode
+  the colour cycles forward; on a coloured cell the option path falls
+  back to `incrValue`; on 2-colour puzzles both keep the `decrValue`
+  backward cycle.
+* Right-drag is unchanged and uniform across domain sizes. The
   initial cell of a right gesture goes through `decrValue` (deferred
   to `pointer-up`, like the left-click deferred-tap dance, so a click
   is committed at release and a drag is committed at the first move).
@@ -56,10 +60,6 @@ before the port.
   because `domain.whereNot(== initialCellValue).first` never produced
   purple on a 3-colour puzzle. Drag-painting a row in purple works by
   starting the drag on a white cell.
-* Long-press (mobile fallback for right-click) is wired through
-  `GameModel.handleLongPress` to `Puzzle.decrValue`, mode-agnostic
-  with respect to the paint / remove-option toggle (the long-press
-  always means "previous colour", regardless of the left-tap mode).
 * `CellWidget` renders one coloured dot per remaining option at the
   bottom of a free cell when `puzzle.domain.length > 2` (`_OptionDots`,
   ~10 % of the cell, with a thin grey outline so the white dot stays

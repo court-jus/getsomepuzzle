@@ -2,11 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
-// `decrValue` mirrors `incrValue` but walks the domain backward. The two
-// shipping consumers — right-click (desktop) and long-press (mobile) —
-// both go through this method, so the cycle's correctness is what unlocks
-// reaching the last domain colour in a single gesture on a 3-colour
-// puzzle.
+// `decrValue` mirrors `incrValue` but walks the domain backward. Its
+// shipping consumers are now the 2-colour right-click / long-press and
+// the right-drag flush; on 3-colour puzzles the long-press / right-click
+// no longer call `decrValue` (they apply the swapped tap mode instead).
 
 void main() {
   // 3-colour fixture (reused from auto_shrink_domain_test.dart /
@@ -90,11 +89,11 @@ void main() {
 
   group('decrValue on 2 colours', () {
     test('cycle walks white → black → free → white', () {
-      // 2-colour puzzles still see the backward cycle (uniformity
-      // between domains). The trade-off is that erasing a white cell
-      // takes two right-clicks (`white → black → free`) instead of the
-      // old one-step toggle; the test pins this regression so it
-      // doesn't drift accidentally.
+      // 2-colour puzzles still see the backward cycle: this is the
+      // remaining `decrValue` consumer alongside the right-drag flush.
+      // Erasing a white cell takes two right-clicks
+      // (`white → black → free`) instead of the old one-step toggle; the
+      // test pins this regression so it doesn't drift accidentally.
       final p = make2();
       p.decrValue(4);
       expect(p.cellValues[4], CellValue.white);

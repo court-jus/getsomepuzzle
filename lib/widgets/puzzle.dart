@@ -35,7 +35,6 @@ import 'package:getsomepuzzle/widgets/puzzle_grid_stack.dart';
 import 'package:getsomepuzzle/widgets/constraints/motif.dart';
 import 'package:getsomepuzzle/widgets/constraints/quantity.dart';
 import 'package:getsomepuzzle/widgets/constraints/transition.dart';
-import 'package:getsomepuzzle/utils/platform_utils.dart';
 
 class PuzzleWidget extends StatefulWidget {
   const PuzzleWidget({
@@ -64,8 +63,10 @@ class PuzzleWidget extends StatefulWidget {
   final ValueChanged<int>? onCellRightDrag;
   final VoidCallback? onCellRightDragEnd;
 
-  /// Long-press = cycle backward. Mobile equivalent of the right-click
-  /// on desktop — the host wires both to the same `GameModel` entry.
+  /// Long-press fallback for mobile (where there is no right-click). On a
+  /// 3+ colour puzzle it applies the alternate tap mode's action; on a
+  /// 2-colour puzzle it keeps the backward colour cycle (see
+  /// `GameModel.handleLongPress`).
   final ValueChanged<int>? onCellLongPress;
 
   /// When true, every constraint widget in the three bars gets a
@@ -179,9 +180,8 @@ class PuzzleWidgetState extends State<PuzzleWidget> {
         );
   }
 
-  void _handleCellTap(int idx, {bool secondary = false}) {
+  void _handleCellTap(int idx) {
     widget.onCellTap(idx);
-    if (secondary) widget.onCellTap(idx);
   }
 
   /// Convert a per-cell drag [offset] (in cell units, relative to the
@@ -706,9 +706,6 @@ class PuzzleWidgetState extends State<PuzzleWidget> {
       constraints: widget.currentPuzzle.cellConstraints[idx],
       cellSize: adjustedCellSize,
       onTap: () => _handleCellTap(idx),
-      onSecondaryTap: isDesktopOrWeb
-          ? () => _handleCellTap(idx, secondary: true)
-          : null,
       onLongPress: widget.onCellLongPress != null
           ? () => widget.onCellLongPress!(idx)
           : null,
