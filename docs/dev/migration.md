@@ -418,10 +418,17 @@ at most one dialog is shown per session, in order.
   new number in `_showIntroDialog`; a player who skips several
   releases catches up one dialog per launch.
 
+Ordering: the pending numbered dialog is shown **before** the
+new-rule explanation modal of the puzzle that triggered the open
+(`_surfaceNewConstraintsIfAny` reads `_pendingIntroDialogNumber()`
+first). A returning player must be greeted with "what's new" before
+being walked through a rule they have never met; the #0 welcome keeps
+its own precedence by firing only when `firstSeen` is empty, in which
+case no numbered dialog is ever pending.
+
 Upgrade experience: a 1.6.22 player's first 2.0.0 puzzle shows the
-release-notes dialog once (possibly after the first new-rule
-explanation modal, since both chain off puzzle open), never the
-welcome again.
+release-notes dialog once, before the first new-rule explanation
+modal, never the welcome again.
 
 ---
 

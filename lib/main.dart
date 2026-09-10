@@ -1156,6 +1156,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         _modalInFlight = false;
         return;
       }
+      // Numbered intro dialog first: a returning player opening their
+      // first puzzle after an update gets "what's new" before any newly
+      // introduced rule is explained. Self-guarded — null for a fresh
+      // install (which gets the #0 welcome just below), for a dialog
+      // already shown this session, and when the player is up to date.
+      final introNumber = _pendingIntroDialogNumber();
+      if (introNumber != null) {
+        _introDialogShownThisSession = true;
+        await _showIntroDialog(introNumber);
+        await _persistIntroDialogSeen(introNumber);
+      }
+      // Single unconditional guard for the context uses below — the
+      // analyzer cannot prove the branch above was mounted-guarded.
+      if (!mounted) {
+        _modalInFlight = false;
+        return;
+      }
       // First-ever rule encounter → show the game-intro screen before
       // the per-rule modal. `firstSeen.isEmpty` is the cleanest signal:
       // true on a fresh install AND after "Rejouer l'onboarding"
@@ -1323,9 +1340,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// locale-chooser fallback.
   bool _modalInFlight = false;
 
-  /// Show the next numbered intro dialog (the release-notes family) if
-  /// one is pending for this player, then record it as seen. Chained
-  /// after every puzzle open, like the 3-colour suggestion.
+  /// Show the next numbered intro dialog (the release-notes family) on
+  /// the next frame, then record it as seen. Entry point for the paths
+  /// that are not already inside the new-rule post-frame callback — the
+  /// `_surfaceNewConstraintsIfAny` callback calls
+  /// [_pendingIntroDialogNumber] and [_showIntroDialog] directly so the
+  /// intro dialog can precede the rule explanations.
   ///
   /// Numbering: #0 is the first-run welcome (handled separately — it
   /// fires on an empty `firstSeen`, see `_surfaceNewConstraintsIfAny`);
@@ -1339,14 +1359,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> _maybeShowNextIntroDialog() async {
     if (!mounted || _autopilotMode || widget.noOnboarding) return;
     if (_modalInFlight || _introDialogShownThisSession) return;
-    // Returning players only: an empty firstSeen means a fresh install
-    // that has not gone through the welcome yet (or an onboarding
-    // replay in progress).
-    if (progress.firstSeen.isEmpty) return;
-    final seen = _introDialogSeen;
-    final next = seen == null ? 1 : seen + 1;
-    if (next > _latestIntroDialogNumber) return;
-    log.info('_maybeShowNextIntroDialog: showing dialog #$next');
+    final number = _pendingIntroDialogNumber();
+    if (number == null) return;
+    log.info('_maybeShowNextIntroDialog: showing dialog #$number');
     _introDialogShownThisSession = true;
     _modalInFlight = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -1354,11 +1369,29 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         _modalInFlight = false;
         return;
       }
-      await _showIntroDialog(next);
+      await _showIntroDialog(number);
       _modalInFlight = false;
       if (!mounted) return;
-      await _persistIntroDialogSeen(next);
+      await _persistIntroDialogSeen(number);
     });
+  }
+
+  /// Number of the next numbered intro dialog this player must still be
+  /// shown, or `null` when none is pending.
+  ///
+  /// Returning players only: an empty `firstSeen` means a fresh install
+  /// that has not gone through the #0 welcome yet (or an onboarding
+  /// replay in progress). The `introDialogSeen` pref is absent on a
+  /// pre-2.0.0 install, i.e. "has seen up to #0", so the first release
+  /// dialog offered is #1. One dialog per session.
+  int? _pendingIntroDialogNumber() {
+    if (_autopilotMode || widget.noOnboarding) return null;
+    if (_introDialogShownThisSession) return null;
+    if (progress.firstSeen.isEmpty) return null;
+    final seen = _introDialogSeen;
+    final next = seen == null ? 1 : seen + 1;
+    if (next > _latestIntroDialogNumber) return null;
+    return next;
   }
 
   /// Record the highest-numbered intro dialog this player has seen.

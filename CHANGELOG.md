@@ -12,6 +12,9 @@ localised under
 
 ## [Unreleased]
 
+- **Intro dialogs now precede rule explanations**: on the first launch
+  after an update, the one-time "What's new" dialog is shown before the
+  explanation modal of any newly introduced rule, instead of after it.
 - **Soft-phase onboarding now resumes with a new rule**: when the app
   restarts while the post-strict discovery phase is active, the first
   playlist batch always contains the rule being introduced — closing
