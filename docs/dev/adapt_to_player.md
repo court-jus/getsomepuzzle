@@ -96,10 +96,11 @@ expectedDuration(cplx, cells, failures, n_constraints)
   the generator; it may survive in legacy corpus files but no longer
   biases the calibration once recomputed.
 
-This model sits inside `Database` as `_expectedDuration` and is not exposed:
-nothing outside the level computation needs it. The companion
-`_impliedCplx(dur, cells, failures, nConstraints)` is its algebraic
-inverse, used by the level computation below.
+The model lives in `lib/getsomepuzzle/model/play_model.dart` as the
+top-level `expectedDuration(...)` / `impliedCplx(...)`. It is Flutter-free
+so the offline tool `bin/analyze_stats.dart` imports it instead of
+mirroring the constants; `Database.computePlayerLevel` is the only
+runtime consumer.
 
 ### Level computation
 

@@ -7,11 +7,12 @@
 //      and the v1.6.1+ form that adds e·n_constraints (5 vars). Reports
 //      coefficients + R² + MAPE for each. Anchors the intercept so the
 //      mean per-play level on the kept corpus lands on 50 — and prints
-//      the resulting constants in a paste-ready block for `database.dart`.
-//   2. Replays the production skill inversion (`expectedProd` /
-//      `levelProd`, mirrors of `Database._expectedDuration` /
-//      `Database._impliedCplx`) on every play and reports the per-play
-//      level distribution, saturation rate, and within-bucket spread.
+//      the resulting constants in a paste-ready block for `play_model.dart`.
+//   2. Replays the production skill inversion (`playLevel` from
+//      `lib/getsomepuzzle/model/play_model.dart` — the same model
+//      `Database.computePlayerLevel` uses) on every play and reports the
+//      per-play level distribution, saturation rate, and within-bucket
+//      spread.
 //   3. Lists the eight plays the production model fits worst — useful
 //      for spotting a missing variable or a stale calibration.
 //
@@ -37,7 +38,9 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
 class Play {
   final String timestamp;
@@ -49,8 +52,6 @@ class Play {
   // section. Folded into the duration model in v1.6.1.
   final String puzzleLine;
   // Suffix-tagged fields appended over time. Default 0 for older lines.
-  final int cellEdits;
-  final int firstClickMs;
   final int longestGapMs;
   Play({
     required this.timestamp,
@@ -60,97 +61,25 @@ class Play {
     required this.cells,
     required this.nConstraints,
     required this.puzzleLine,
-    this.cellEdits = 0,
-    this.firstClickMs = 0,
     this.longestGapMs = 0,
   });
 }
 
-int _suffixedValue(List<String> fields, String suffix) {
-  for (final f in fields) {
-    if (f.endsWith(suffix)) {
-      return int.tryParse(f.substring(0, f.length - suffix.length)) ?? 0;
-    }
-  }
-  return 0;
-}
-
 Play? parsePlay(String line) {
-  final parts = line.split(' ');
-  if (parts.length < 4) return null;
-  final ts = parts[0];
-  final dur = int.tryParse(parts[1].replaceAll('s', ''));
-  final fails = int.tryParse(parts[2].replaceAll('f', ''));
-  final puzLine = parts[3];
-  if (dur == null || fails == null) return null;
-
-  // puzzle line: v2_12_WxH_cells_constraints_solution_cplx
-  final pp = puzLine.split('_');
-  if (pp.length < 4) return null;
-  final dim = pp[2].split('x');
-  if (dim.length != 2) return null;
-  final w = int.tryParse(dim[0]);
-  final h = int.tryParse(dim[1]);
-  final cplx = int.tryParse(pp.last);
-  if (w == null || h == null || cplx == null) return null;
-  // Constraints section sits at index 4 in the v2 layout. We just count
-  // the `;`-separated entries; semantic validation is not our concern.
-  final nCons = pp.length > 4
-      ? pp[4].split(';').where((s) => s.isNotEmpty).length
-      : 0;
-
+  final entry = StatEntry.parse(line);
+  if (entry == null) return null;
+  final fields = parsePuzzleLineFields(entry.puzzleLine);
+  if (fields == null) return null;
   return Play(
-    timestamp: ts,
-    duration: dur,
-    failures: fails,
-    cplx: cplx,
-    cells: w * h,
-    nConstraints: nCons,
-    puzzleLine: puzLine,
-    cellEdits: _suffixedValue(parts, 'e'),
-    firstClickMs: _suffixedValue(parts, 'fc'),
-    longestGapMs: _suffixedValue(parts, 'lg'),
+    timestamp: entry.finished ?? 'unfinished',
+    duration: entry.duration,
+    failures: entry.failures,
+    cplx: fields.cplx,
+    cells: fields.cells,
+    nConstraints: fields.nCons,
+    puzzleLine: entry.puzzleLine,
+    longestGapMs: entry.longestGapMs,
   );
-}
-
-// ---------------------------------------------------------------------------
-// Production duration model + skill inversion
-// ---------------------------------------------------------------------------
-
-// Must mirror `Database._expectedDuration` in
-// `lib/getsomepuzzle/model/database.dart`. Anchored so the calibration
-// corpus's mean `level_i` lands at 50.
-const double _kBase = 4.8834;
-const double _kCellsExp = 0.3437;
-const double _kCplxScale = 59.39;
-const double _kFailMul = 1.1943;
-const double _kNConsMul = 1.0614;
-
-double expectedProd(int cplx, int cells, int failures, int nConstraints) {
-  return _kBase *
-      math.pow(cells, _kCellsExp) *
-      math.exp(cplx / _kCplxScale) *
-      math.pow(_kFailMul, failures) *
-      math.pow(_kNConsMul, nConstraints);
-}
-
-// Mirror of `Database._impliedCplx`: the algebraic inverse of
-// `expectedProd`. Same constants as the production code.
-double impliedCplxProd(int dur, int cells, int failures, int nConstraints) {
-  return _kCplxScale *
-      (math.log(dur) -
-          math.log(_kBase) -
-          _kCellsExp * math.log(cells) -
-          failures * math.log(_kFailMul) -
-          nConstraints * math.log(_kNConsMul));
-}
-
-// Mirror of `Database.computePlayerLevel`'s per-play inversion: when a
-// play's duration matches the expected for its puzzle, level == cplx.
-// Faster ⇒ above; slower ⇒ below. The intercept anchor in `expectedProd`
-// shifts cohort plays up so their average lands at 50.
-double levelProd(int dur, int cells, int failures, int cplx, int nCons) {
-  return 2.0 * cplx - impliedCplxProd(dur, cells, failures, nCons);
 }
 
 // ---------------------------------------------------------------------------
@@ -570,12 +499,12 @@ void main(List<String> args) {
   final newCplxScale = 1 / bRaw;
   final newFailMul = math.exp(dc);
   final newNConsMul = math.exp(ec);
-  print('=== Anchored constants for `Database._expectedDuration` ===');
+  print('=== Anchored constants for `play_model.dart` expectedDuration ===');
   print(
     '  mean(cplx) on kept corpus = ${meanCplx.toStringAsFixed(2)}  '
     '⇒ intercept shift Δ = ${(bRaw * (50 - meanCplx)).toStringAsFixed(4)}',
   );
-  print('  // Paste into lib/getsomepuzzle/model/database.dart');
+  print('  // Paste into lib/getsomepuzzle/model/play_model.dart');
   print('  static const _kBase      = ${newBase.toStringAsFixed(4)};');
   print('  static const _kCellsExp  = ${cc.toStringAsFixed(4)};');
   print('  static const _kCplxScale = ${newCplxScale.toStringAsFixed(2)};');
@@ -639,7 +568,7 @@ void main(List<String> args) {
   final levels = filtered
       .map(
         (p) =>
-            levelProd(p.duration, p.cells, p.failures, p.cplx, p.nConstraints),
+            playLevel(p.duration, p.cplx, p.cells, p.failures, p.nConstraints),
       )
       .toList();
   final clamped = levels.map((x) => x.clamp(0.0, 100.0)).toList();
@@ -685,25 +614,25 @@ void main(List<String> args) {
   // plays the model fits worst, which are usually the most informative
   // for spotting a missing variable or a stale calibration.
   print(
-    '=== Sample plays (sorted by abs(dur − expectedProd), most surprising first) ===',
+    '=== Sample plays (sorted by abs(dur − expectedDuration), most surprising first) ===',
   );
   final indexed = List.generate(filtered.length, (i) => i);
   indexed.sort((i, j) {
     final pi = filtered[i], pj = filtered[j];
     final di =
         (pi.duration -
-                expectedProd(pi.cplx, pi.cells, pi.failures, pi.nConstraints))
+                expectedDuration(pi.cplx, pi.cells, pi.failures, pi.nConstraints))
             .abs();
     final dj =
         (pj.duration -
-                expectedProd(pj.cplx, pj.cells, pj.failures, pj.nConstraints))
+                expectedDuration(pj.cplx, pj.cells, pj.failures, pj.nConstraints))
             .abs();
     return dj.compareTo(di);
   });
   print('  cplx cells fail n_cons  dur  expected  level');
   for (final i in indexed.take(8)) {
     final p = filtered[i];
-    final exp = expectedProd(p.cplx, p.cells, p.failures, p.nConstraints);
+    final exp = expectedDuration(p.cplx, p.cells, p.failures, p.nConstraints);
     print(
       '  '
       '${p.cplx.toString().padLeft(4)} '

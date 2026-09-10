@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
 void main() {
@@ -97,6 +98,35 @@ void main() {
         'puzzle_medium',
         'puzzle_hard',
       ]);
+    });
+  });
+
+  group('parsePuzzleLineFields', () {
+    test('reads cplx, cells and nCons from their positional fields', () {
+      final fields = parsePuzzleLineFields(
+        'v2_12_3x3_000000000_FM:12_1:111111111_5',
+      );
+      expect(fields, isNotNull);
+      expect(fields!.cplx, 5);
+      expect(fields.cells, 9);
+      expect(fields.nCons, 1);
+    });
+
+    test('ignores trailing play-state / scenario fields after cplx', () {
+      // Regression: `cplx` used to be read from the *last* field, which the
+      // `_p:<state>` / `_scenario:<name>` tails silently broke (the play was
+      // dropped entirely).
+      for (final tail in ['_p:111111111', '_scenario:sh']) {
+        final fields = parsePuzzleLineFields(
+          'v2_12_3x3_000000000_FM:12_1:111111111_5$tail',
+        );
+        expect(fields?.cplx, 5, reason: 'tail=$tail');
+        expect(fields?.cells, 9, reason: 'tail=$tail');
+      }
+    });
+
+    test('returns null for lines without usable dimensions', () {
+      expect(parsePuzzleLineFields('garbage'), isNull);
     });
   });
 }

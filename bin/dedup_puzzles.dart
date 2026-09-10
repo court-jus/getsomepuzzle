@@ -64,7 +64,6 @@ void _processFile(String path, String? outputPath) {
   final seenKeys = <String>{};
   int kept = 0;
   int dropped = 0;
-  int errors = 0;
 
   for (int i = 0; i < lines.length; i++) {
     final line = lines[i];
@@ -78,20 +77,10 @@ void _processFile(String path, String? outputPath) {
       stderr.writeln('Line ${i + 1}: duplicate of an earlier puzzle, dropped');
       continue;
     }
-    try {
-      // Remove duplicate constraint entries within the constraint field —
-      // cheap string operation, no solve needed.
-      final fields = line.split('_');
-      fields[4] = dedupAndSortConstraints(fields[4]);
-      output.add(fields.join('_'));
-      kept++;
-      if (kept % 100 == 0) {
-        stderr.write('\r$path: $kept puzzles processed...');
-      }
-    } catch (e) {
-      stderr.writeln('\nLine ${i + 1}: error: $e — kept verbatim');
-      output.add(line);
-      errors++;
+    output.add(normalizeV2Line(line));
+    kept++;
+    if (kept % 100 == 0) {
+      stderr.write('\r$path: $kept puzzles processed...');
     }
   }
 
@@ -99,7 +88,7 @@ void _processFile(String path, String? outputPath) {
     File(outputPath).writeAsStringSync('${output.join('\n')}\n');
     stderr.writeln(
       '\r$path: ${lines.length} lines in, $kept kept, $dropped duplicates '
-      'dropped, $errors errors, ${sw.elapsed.inSeconds}s -> $outputPath',
+      'dropped, ${sw.elapsed.inSeconds}s -> $outputPath',
     );
   } else {
     final tmpPath = '$path.deduped';
@@ -107,7 +96,7 @@ void _processFile(String path, String? outputPath) {
     File(tmpPath).renameSync(path);
     stderr.writeln(
       '\r$path: ${lines.length} lines in, $kept kept, $dropped duplicates '
-      'dropped, $errors errors, ${sw.elapsed.inSeconds}s (in-place)',
+      'dropped, ${sw.elapsed.inSeconds}s (in-place)',
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
 import 'helpers/onboarding_completions.dart';
@@ -39,17 +40,12 @@ PuzzleData _puz({
   return PuzzleData('v2_12_${width}x${height}_${cellsStr}_${cons}_0:0_$cplx');
 }
 
-/// Mirror of the private `Database._expectedDuration`. Tests use it to craft
+/// Expected duration from the production model — tests use it to craft
 /// durations that satisfy the model's equilibrium so we can check the
-/// invariant `level ≈ cplx`. Must stay in sync with the constants in
-/// `database.dart` (anchored model: log(dur) = 1.586 + 0.01684·cplx
-/// + 0.3437·log(cells) + 0.1775·failures + 0.0596·n_cons).
+/// invariant `level ≈ cplx`. Delegates to the production model in
+/// `lib/getsomepuzzle/model/play_model.dart`.
 double _expectedFor(int cplx, int cells, int failures, int nCons) =>
-    4.8834 *
-    math.pow(cells, 0.3437) *
-    math.exp(cplx / 59.39) *
-    math.pow(1.1943, failures) *
-    math.pow(1.0614, nCons);
+    expectedDuration(cplx, cells, failures, nCons);
 
 /// `n` finished, non-skipped stat entries for a puzzle played at the
 /// expected duration of `cplx` (so each play's implicit level ≈ `cplx`).
@@ -100,7 +96,7 @@ void main() {
 
     test('yields ≈ cplx when every duration matches the expected model', () {
       // Invariant of the skill inversion: when a play's duration equals
-      // `_expectedDuration` for its puzzle, `level_i = cplx` exactly. So
+      // `expectedDuration` for its puzzle, `level_i = cplx` exactly. So
       // averaging 12 plays at cplx=40 must give ~40 (small rounding only).
       // The fixture pins `nCons=3` to match the duration the helper feeds
       // back into `_expectedFor`, since the model now depends on it.

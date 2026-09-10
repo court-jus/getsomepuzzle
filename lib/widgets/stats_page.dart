@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/constraints/registry.dart';
@@ -29,11 +30,6 @@ String _formatDuration(double seconds) {
 }
 
 double _toOneDec(double v) => (v * 10).roundToDouble() / 10;
-
-int _extractCplx(String puzzleLine) {
-  final parts = puzzleLine.split('_');
-  return parts.length > 6 ? (int.tryParse(parts[6]) ?? 0) : 0;
-}
 
 class StatsPage extends StatefulWidget {
   const StatsPage({super.key, required this.database, this.onStatsImported});
@@ -556,7 +552,7 @@ class _StatsPageState extends State<StatsPage> {
     final w = entry.puzzleLine.split('_').length > 2
         ? entry.puzzleLine.split('_')[2]
         : '?';
-    final cplx = _extractCplx(entry.puzzleLine).toString();
+    final cplx = cplxFromLine(entry.puzzleLine).toString();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),

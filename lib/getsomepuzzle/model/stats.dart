@@ -1,4 +1,5 @@
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 
 /// A parsed stat line from the stats files.
 /// Format: finishedTimestamp durationS failuresF puzzleLine - SLD - extras
@@ -199,11 +200,6 @@ class CollectionBucket {
   });
 }
 
-int _extractCplx(String puzzleLine) {
-  final parts = puzzleLine.split('_');
-  return parts.length > 6 ? (int.tryParse(parts[6]) ?? 0) : 0;
-}
-
 List<String> _extractSlugs(String puzzleLine) {
   final parts = puzzleLine.split('_');
   if (parts.length < 5) return [];
@@ -224,7 +220,7 @@ class StatsDashboard {
       _sumHints += entry.hints;
 
       // By difficulty
-      final cplx = _extractCplx(entry.puzzleLine);
+      final cplx = cplxFromLine(entry.puzzleLine);
       final bucket = _bucketLabel(cplx);
       _difficultyBuckets.putIfAbsent(bucket, () => _BucketAccumulator());
       _difficultyBuckets[bucket]!.add(entry);
