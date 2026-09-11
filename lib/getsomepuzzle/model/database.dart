@@ -201,8 +201,15 @@ class Filters {
   Set<String> bannedRules;
   Set<String> wantedFlags;
   Set<String> bannedFlags;
-  Set<String> wantedDomains;
-  Set<String> bannedDomains;
+
+  /// Desired share of 3-colour puzzles in the playlist, in [0, 1].
+  ///
+  /// 0 (slider fully left) serves only 2-colour puzzles; 1 (fully right)
+  /// only 3-colour ones. In between, both domains are admissible and
+  /// [Database.getPuzzlesByLevel] weights them so the drawn batch holds
+  /// ≈ this share of 3-colour puzzles. Replaces the old chip-based
+  /// `wantedDomains`/`bannedDomains` pair (migrated in [load]).
+  double threeColorShare;
 
   /// Scenario filter: null = any scenario. Persisted via `.name`.
   equilibrium.ProfileCategory? wantedScenario;
@@ -230,9 +237,17 @@ class Filters {
     this.bannedRules = const {},
     this.wantedFlags = const {},
     this.bannedFlags = defaultBannedFlags,
-    this.wantedDomains = const {},
-    this.bannedDomains = const {"d3"},
+    this.threeColorShare = 0,
   });
+
+  /// Whether a puzzle with [domainSize] colours may enter the filtered
+  /// catalog. At the slider extremes only one domain qualifies; in
+  /// between both do — the sampler applies the mix.
+  bool includesDomain(int domainSize) {
+    if (threeColorShare <= 0) return domainSize < 3;
+    if (threeColorShare >= 1) return domainSize >= 3;
+    return true;
+  }
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -250,10 +265,8 @@ class Filters {
           (prefs.getStringList("bannedFlagsFilter") ??
                   defaultBannedFlags.toList())
               .toSet();
-      wantedDomains = (prefs.getStringList("wantedDomainsFilter") ?? [])
-          .toSet();
-      bannedDomains = (prefs.getStringList("bannedDomainsFilter") ?? ["d3"])
-          .toSet();
+      threeColorShare =
+          prefs.getDouble("threeColorShareFilter") ?? _legacyDomainShare(prefs);
       final scenarioStr = prefs.getString("wantedScenarioFilter");
       equilibrium.ProfileCategory? wanted;
       if (scenarioStr != null) {
@@ -275,6 +288,23 @@ class Filters {
     }
   }
 
+  /// Translates the pre-slider `wantedDomainsFilter` /
+  /// `bannedDomainsFilter` chip pair into a [threeColorShare]. Only read
+  /// when `threeColorShareFilter` is absent (first launch on this
+  /// version); after the first [save] the new key wins.
+  static double _legacyDomainShare(SharedPreferences prefs) {
+    final banned = (prefs.getStringList("bannedDomainsFilter") ?? const ["d3"])
+        .toSet();
+    final wanted = (prefs.getStringList("wantedDomainsFilter") ?? const [])
+        .toSet();
+    final admitsTwo =
+        !banned.contains("d2") && (wanted.isEmpty || wanted.contains("d2"));
+    final admitsThree =
+        !banned.contains("d3") && (wanted.isEmpty || wanted.contains("d3"));
+    if (admitsTwo && admitsThree) return 0.5;
+    return admitsThree ? 1 : 0;
+  }
+
   Future<void> save() async {
     final prefs = await SharedPreferences.getInstance();
     prefs.setInt("minWidthFilter", minWidth);
@@ -287,8 +317,11 @@ class Filters {
     prefs.setStringList("bannedRulesFilter", bannedRules.toList());
     prefs.setStringList("wantedFlagsFilter", wantedFlags.toList());
     prefs.setStringList("bannedFlagsFilter", bannedFlags.toList());
-    prefs.setStringList("wantedDomainsFilter", wantedDomains.toList());
-    prefs.setStringList("bannedDomainsFilter", bannedDomains.toList());
+    prefs.setDouble("threeColorShareFilter", threeColorShare);
+    // The chip-pair keys are obsolete; drop them so a downgrade cannot
+    // re-migrate a stale value over the slider choice.
+    prefs.remove("wantedDomainsFilter");
+    prefs.remove("bannedDomainsFilter");
     if (wantedScenario != null) {
       prefs.setString("wantedScenarioFilter", wantedScenario!.name);
     } else {
@@ -297,9 +330,10 @@ class Filters {
   }
 }
 
-/// Filter key for a puzzle's domain size — matches the `"d<n>"` slugs
-/// stored in [Filters.wantedDomains] / [Filters.bannedDomains].
-String domainFilterKey(int domainSize) => 'd$domainSize';
+/// Domain mix applied when the player accepts the first 3-colour
+/// suggestion: ≈ one puzzle in five is 3-colour, the rest stay
+/// black-and-white.
+const double kThirdColorSuggestionShare = 0.2;
 
 /// Recency-weighted observed distribution over the size and slug axes,
 /// computed from the player's [Database.puzzles] history. Used by
@@ -1514,12 +1548,7 @@ class Database {
         puz.userScenario != currentFilters.wantedScenario) {
       return false;
     }
-    final domainKey = domainFilterKey(puz.domain.length);
-    if (currentFilters.bannedDomains.contains(domainKey)) return false;
-    if (currentFilters.wantedDomains.isNotEmpty &&
-        !currentFilters.wantedDomains.contains(domainKey)) {
-      return false;
-    }
+    if (!currentFilters.includesDomain(puz.domain.length)) return false;
     return true;
   }
 
@@ -2514,23 +2543,50 @@ class Database {
     final varietyStats = _buildRecencyWeightedStats(filtered);
     // Only demote trivial GS puzzles while GS is the rule being introduced.
     final demoteTrivialGs = currentPhase?.introducing == 'GS';
-    final keyed = filtered.map((p) {
+    // Skill/variety base weights, then the domain-mix factor on top.
+    // The factor normalises each domain's weight mass to its slider share
+    // (`share` for 3-colour, `1 − share` for 2-colour) so the drawn batch
+    // holds ≈ `threeColorShare` 3-colour puzzles whatever their relative
+    // abundance in the catalog. At the endpoints the filter() gate above
+    // already dropped the excluded domain, so its mass is zero here.
+    final share = currentFilters.threeColorShare.clamp(0.0, 1.0);
+    final base = <(PuzzleData, double)>[];
+    var weightMassTwo = 0.0;
+    var weightMassThree = 0.0;
+    for (final p in filtered) {
       final d = p.cplx - mu;
       // Clamp the exponent to avoid `exp` underflow producing key = +∞ for
       // every puzzle on the tail (which would then sort arbitrarily).
       final wCplx = math.exp(-math.min(d * d / twoSigmaSq, 700));
       final gap = _varietyGapForPuzzle(p, varietyStats);
-      final wVariety = 1 + selectionVarietyAlpha * gap;
-      var w = wCplx * wVariety;
+      var w = wCplx * (1 + selectionVarietyAlpha * gap);
       if (demoteTrivialGs && p.hasTrivialGroupSize) {
         w *= selectionTrivialGsPenalty;
       }
+      base.add((p, w));
+      if (p.domain.length >= 3) {
+        weightMassThree += w;
+      } else {
+        weightMassTwo += w;
+      }
+    }
+    double domainFactor(PuzzleData p) {
+      if (p.domain.length >= 3) {
+        return share > 0 && weightMassThree > 0 ? share / weightMassThree : 0;
+      }
+      return share < 1 && weightMassTwo > 0 ? (1 - share) / weightMassTwo : 0;
+    }
+
+    final keyed = <(PuzzleData, double)>[];
+    for (final (p, w) in base) {
+      final factor = domainFactor(p);
+      if (factor <= 0) continue;
       // The +1e-300 below guards against `nextDouble() == 0`, which would
       // make `−ln(u)` infinite and corrupt the sort.
       final u = _samplingRandom.nextDouble() + 1e-300;
-      final key = -math.log(u) / w;
-      return (p, key);
-    }).toList()..sort((a, b) => a.$2.compareTo(b.$2));
+      keyed.add((p, -math.log(u) / (w * factor)));
+    }
+    keyed.sort((a, b) => a.$2.compareTo(b.$2));
     final result = keyed.map((e) => e.$1).toList();
     _injectElectedSoftRule(result, mu.toDouble(), twoSigmaSq);
     return result;

@@ -280,22 +280,22 @@ abstract class AppLocalizations {
   /// **'Banned rules'**
   String get labelWidgetBannedrules;
 
-  /// Label of the open-page filter that picks the puzzle domain size (2- vs 3-color puzzles)
+  /// Label of the open-page slider that mixes two- and three-color puzzles
   ///
   /// In en, this message translates to:
   /// **'Number of colors'**
   String get labelWidgetDomain;
 
-  /// Chip label for two-color puzzles in the domain filter
+  /// Left end of the domain-mix slider: only two-color puzzles are served
   ///
   /// In en, this message translates to:
-  /// **'2 colors'**
+  /// **'Only 2 colors'**
   String get labelDomainTwoColors;
 
-  /// Chip label for three-color puzzles in the domain filter
+  /// Right end of the domain-mix slider: only three-color puzzles are served
   ///
   /// In en, this message translates to:
-  /// **'3 colors'**
+  /// **'Only 3 colors'**
   String get labelDomainThreeColors;
 
   /// Message displayed before the number of puzzles
@@ -1444,13 +1444,19 @@ abstract class AppLocalizations {
   /// **'Ready for 3 colors?'**
   String get thirdColorSuggestionTitle;
 
-  /// Body of the 3-color suggestion modal. Reassures the player by linking 3-color puzzles to the rules they already master.
+  /// Body of the 3-color suggestion modal. Reassures the player by linking 3-color puzzles to the rules they already master, then points at the mix slider below.
   ///
   /// In en, this message translates to:
-  /// **'You\'ve solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. It\'s a fresh kind of challenge built on what you already know.'**
+  /// **'You\'ve solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. Pick how many purple puzzles you want below.'**
   String get thirdColorSuggestionBody;
 
-  /// Button on the 3-color suggestion modal that opts the player into 3-color puzzles by enabling the d3 domain in their filters.
+  /// Label above the colour-mix slider in the 3-color suggestion modal. The slider goes from 'Only 2 colors' to 'Only 3 colors'.
+  ///
+  /// In en, this message translates to:
+  /// **'How many 3-color puzzles?'**
+  String get thirdColorSuggestionMixLabel;
+
+  /// Button on the 3-color suggestion modal that applies the chosen colour mix to the player's filters.
   ///
   /// In en, this message translates to:
   /// **'Try it'**
@@ -1462,10 +1468,10 @@ abstract class AppLocalizations {
   /// **'Maybe later'**
   String get thirdColorSuggestionLaterLabel;
 
-  /// Secondary paragraph on the 3-color suggestion modal, shown between the main body and the action buttons. Reassures the player that the opt-in is reversible via the Open page filters.
+  /// Secondary paragraph on the 3-color suggestion modal, below the slider. Tells the player the chosen mix is reversible from the Open-page advanced filters.
   ///
   /// In en, this message translates to:
-  /// **'Remember that you can always choose the type of puzzles you want from the advanced filters in the library.'**
+  /// **'You can change this mix at any time from the advanced filters in the library.'**
   String get thirdColorSuggestionFiltersReminder;
 
   /// Title of the modal explaining the 3-color puzzle UI (option dots and paintbrush tap-mode toggle), shown the first time the player opens a 3-color puzzle.

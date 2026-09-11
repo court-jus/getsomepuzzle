@@ -72,7 +72,7 @@ before the port.
   Gated by `Database.shouldShowDomain3Intro` (pref `domain3IntroShown`)
   and marked shown on dismissal; deliberately independent of onboarding
   state so it fires whichever route brought the player to purple (the
-  suggestion modal, the Open-page domain filters, or a shared link),
+  suggestion modal, the Open-page colour slider, or a shared link),
   but skipped when `hasPlayedThirdColor` already proves they have met
   the UI.
 * The hint UI handles `RemoveOption` end-to-end: tap 2 shows
@@ -85,12 +85,14 @@ before the port.
   "next puzzle" past tap 1: tap 1 still shows `hintAllCorrectSoFar`,
   the next tap fires the same `onPuzzleCompleted` callback used by
   automatic validation.
-* 3-colour puzzles are opt-in for the player: `Filters.wantedDomains` /
-  `bannedDomains` (`model/database.dart`, persisted in
-  SharedPreferences) default to `bannedDomains = {"d3"}`, and the
-  collection page (`widgets/open_page.dart`) exposes a domain
-  flag-selector. The corpus level files carry both 2- and 3-colour
-  lines (`v2_12_…` vs `v2_123_…`).
+* 3-colour puzzles are opt-in for the player: `Filters.threeColorShare`
+  (`model/database.dart`, persisted in SharedPreferences) defaults to
+  `0` — only 2-colour puzzles — and the collection page
+  (`widgets/open_page.dart`) exposes a colour-mix slider from "only 2
+  colors" to "only 3 colors". Intermediate positions keep both domains
+  admissible and weight the sampler so ≈ that share of the served batch
+  is 3-colour (`Database.getPuzzlesByLevel`). The corpus level files
+  carry both 2- and 3-colour lines (`v2_12_…` vs `v2_123_…`).
 
 ## Solver soundness invariants
 
@@ -622,9 +624,9 @@ receives the editor domain from `CreatePage`.
 
 * **Saved 3-colour puzzles and domain filters.** Saving a d3 puzzle into
   a user playlist works, but the collection picker applies the player's
-  domain filters (`bannedDomains` defaults to `{"d3"}`) to every
-  collection, user playlists included. An author who hasn't opted in to
-  d3 won't see their own saved puzzle in rotation — the *Test* button is
+  domain mix (`threeColorShare` defaults to `0`) to every collection,
+  user playlists included. An author who hasn't opted in to d3 won't
+  see their own saved puzzle in rotation — the *Test* button is
   unaffected since it loads the line directly. Same opt-in policy as the
   shipped corpus; no special-casing for user playlists in this
   iteration.

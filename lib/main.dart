@@ -1327,11 +1327,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// Show the 3-colour suggestion modal if all four gating conditions
   /// hold (cf. [Database.shouldSuggestThirdColor]). The modal is
   /// scheduled on the next frame so it stacks cleanly on top of any
-  /// modal that just finished, and the result is acted on: tapping
-  /// "Try it" removes the `d3` ban from the player's domain filter
-  /// and rebuilds the playlist immediately, so the next puzzle draws
-  /// from the wider pool. Either way the suggestion is marked as
-  /// shown so it never fires again.
+  /// modal that just finished, and the result is acted on: "Try it"
+  /// resolves to the mix the player picked with the dialog's slider
+  /// (seeded at one 3-colour puzzle in five,
+  /// [kThirdColorSuggestionShare]); it is written to the colour filter
+  /// and the playlist rebuilt immediately, so the next puzzle draws
+  /// from the wider pool. Either way the suggestion is marked as shown
+  /// so it never fires again.
   Future<void> _maybeSuggestThirdColor() async {
     if (!mounted || database == null || _autopilotMode) {
       log.fine(
@@ -1352,23 +1354,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         _modalInFlight = false;
         return;
       }
-      final wantsIt = await ThirdColorSuggestionDialog.show(context);
+      final mix = await ThirdColorSuggestionDialog.show(context);
       await database!.noteThirdColorSuggestionShown();
       _modalInFlight = false;
-      if (wantsIt && mounted) {
-        // Opt-in path: swap the domain ban so the next playlist
-        // surfaces 3-colour puzzles exclusively. Just removing d3
-        // would mix 2- and 3-colour puzzles and the player would
-        // routinely land back on a black-and-white grid — defeating
-        // the point of "Try it". Forcing d3 only is also discoverable
-        // from the Open page filters, where the player can flip back
-        // to mixed (or 2-only) any time.
-        final filters = database!.currentFilters;
-        final newBanned = Set<String>.from(filters.bannedDomains)
-          ..remove('d3')
-          ..add('d2');
-        filters.bannedDomains = newBanned;
-        await filters.save();
+      if (mix != null && mounted) {
+        // Opt-in path: write the mix the player picked in the dialog
+        // (seeded at one 3-colour puzzle in five) rather than switching
+        // to purple exclusively. The mix keeps 2-colour puzzles in the
+        // rotation while surfacing purple regularly; the same slider is
+        // available any time in the Open-page advanced filters.
+        database!.currentFilters.threeColorShare = mix;
+        await database!.currentFilters.save();
         database!.preparePlaylist();
         // Drop the in-progress 2-colour puzzle and pull a fresh one
         // from the just-rebuilt playlist — otherwise the player keeps

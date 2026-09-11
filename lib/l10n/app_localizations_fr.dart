@@ -104,10 +104,10 @@ class AppLocalizationsFr extends AppLocalizations {
   String get labelWidgetDomain => 'Nombre de couleurs';
 
   @override
-  String get labelDomainTwoColors => '2 couleurs';
+  String get labelDomainTwoColors => 'Seulement 2 couleurs';
 
   @override
-  String get labelDomainThreeColors => '3 couleurs';
+  String get labelDomainThreeColors => 'Seulement 3 couleurs';
 
   @override
   String get msgCountMatchingPuzzles => 'Nombre de puzzles correspondant';
@@ -760,7 +760,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get thirdColorSuggestionBody =>
-      'Vous avez résolu un bon nombre de puzzles en noir et blanc. Envie d\'essayer le mode 3 couleurs ? Une nouvelle couleur — le violet — rejoint le noir et le blanc, et les règles s\'appliquent à chaque couleur indépendamment. C\'est un nouveau type de défi qui s\'appuie sur ce que vous savez déjà.';
+      'Vous avez résolu un bon nombre de puzzles en noir et blanc. Envie d\'essayer le mode 3 couleurs ? Une nouvelle couleur — le violet — rejoint le noir et le blanc, et les règles s\'appliquent à chaque couleur indépendamment. Choisissez ci-dessous la proportion de puzzles violets.';
+
+  @override
+  String get thirdColorSuggestionMixLabel =>
+      'Combien de puzzles à 3 couleurs ?';
 
   @override
   String get thirdColorSuggestionTryLabel => 'J\'essaie';
@@ -770,7 +774,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get thirdColorSuggestionFiltersReminder =>
-      'N\'oubliez pas que vous pouvez toujours choisir le type de puzzles que vous voulez dans les filtres avancés de la bibliothèque.';
+      'Vous pouvez modifier ce dosage à tout moment dans les filtres avancés de la bibliothèque.';
 
   @override
   String get domain3IntroTitle => 'Trois couleurs !';

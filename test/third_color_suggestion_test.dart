@@ -1,8 +1,11 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
+import 'package:getsomepuzzle/l10n/app_localizations.dart';
+import 'package:getsomepuzzle/widgets/third_color_suggestion_dialog.dart';
 
 /// Smallest line representations that [PuzzleData] accepts: the
 /// constructor needs at least 7 underscore-separated segments to read
@@ -243,6 +246,64 @@ void main() {
       ];
       db.loadStats(replays.map((l) => StatEntry.parse(l)!).toList());
       expect(db.postOnboardingCompletions, 1);
+    });
+  });
+
+  group('ThirdColorSuggestionDialog', () {
+    Widget host(ValueChanged<double?> onResult) {
+      return MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () async {
+              onResult(await ThirdColorSuggestionDialog.show(context));
+            },
+            child: const Text('open'),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('shows the colour-mix slider and returns the seeded mix', (
+      tester,
+    ) async {
+      double? result;
+      await tester.pumpWidget(host((r) => result = r));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('How many 3-color puzzles?'), findsOneWidget);
+      expect(find.text('Only 2 colors'), findsOneWidget);
+      expect(find.text('Only 3 colors'), findsOneWidget);
+
+      await tester.tap(find.text('Try it'));
+      await tester.pumpAndSettle();
+      expect(result, closeTo(kThirdColorSuggestionShare, 1e-9));
+    });
+
+    testWidgets('returns the dragged mix; "Maybe later" returns null', (
+      tester,
+    ) async {
+      double? result;
+      await tester.pumpWidget(host((r) => result = r));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      final box = tester.getRect(find.byType(Slider));
+      // 80 % of the track → the five-step slider snaps to 0.8.
+      await tester.tapAt(Offset(box.left + box.width * 0.8, box.center.dy));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Try it'));
+      await tester.pumpAndSettle();
+      expect(result, closeTo(0.8, 1e-9));
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Maybe later'));
+      await tester.pumpAndSettle();
+      expect(result, isNull);
     });
   });
 }

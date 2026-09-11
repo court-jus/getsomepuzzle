@@ -300,4 +300,45 @@ void main() {
       expect(prefs.getBool('onboardingFiltersApplied'), isNull);
     });
   });
+
+  group('Filters.threeColorShare', () {
+    test('defaults to 0 (only 2-colour) on a fresh install', () async {
+      SharedPreferences.setMockInitialValues({});
+      final filters = Filters();
+      await filters.load();
+      expect(filters.threeColorShare, 0);
+    });
+
+    test('migrates a legacy d2 ban to the fully-3-colour end', () async {
+      // Old chips: banning d2 meant "3 colours only".
+      SharedPreferences.setMockInitialValues({
+        'bannedDomainsFilter': ['d2'],
+      });
+      final filters = Filters();
+      await filters.load();
+      expect(filters.threeColorShare, 1);
+    });
+
+    test('migrates a mixed legacy pool to the middle', () async {
+      SharedPreferences.setMockInitialValues({
+        'wantedDomainsFilter': ['d2', 'd3'],
+        'bannedDomainsFilter': <String>[],
+      });
+      final filters = Filters();
+      await filters.load();
+      expect(filters.threeColorShare, 0.5);
+    });
+
+    test('save round-trips the share and drops the chip keys', () async {
+      SharedPreferences.setMockInitialValues({});
+      final filters = Filters()..threeColorShare = 0.2;
+      await filters.save();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList('wantedDomainsFilter'), isNull);
+      expect(prefs.getStringList('bannedDomainsFilter'), isNull);
+      final reloaded = Filters();
+      await reloaded.load();
+      expect(reloaded.threeColorShare, 0.2);
+    });
+  });
 }

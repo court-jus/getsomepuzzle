@@ -104,10 +104,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get labelWidgetDomain => 'Number of colors';
 
   @override
-  String get labelDomainTwoColors => '2 colors';
+  String get labelDomainTwoColors => 'Only 2 colors';
 
   @override
-  String get labelDomainThreeColors => '3 colors';
+  String get labelDomainThreeColors => 'Only 3 colors';
 
   @override
   String get msgCountMatchingPuzzles => 'Puzzles matching filters';
@@ -756,7 +756,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get thirdColorSuggestionBody =>
-      'You\'ve solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. It\'s a fresh kind of challenge built on what you already know.';
+      'You\'ve solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. Pick how many purple puzzles you want below.';
+
+  @override
+  String get thirdColorSuggestionMixLabel => 'How many 3-color puzzles?';
 
   @override
   String get thirdColorSuggestionTryLabel => 'Try it';
@@ -766,7 +769,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get thirdColorSuggestionFiltersReminder =>
-      'Remember that you can always choose the type of puzzles you want from the advanced filters in the library.';
+      'You can change this mix at any time from the advanced filters in the library.';
 
   @override
   String get domain3IntroTitle => 'Three colors!';

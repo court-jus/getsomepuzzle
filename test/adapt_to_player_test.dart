@@ -521,6 +521,47 @@ void main() {
     });
   });
 
+  group('Database.getPuzzlesByLevel — domain mix', () {
+    /// Minimal valid line with the given colour count (2 or 3). Only the
+    /// domain prefix matters to the sampler; the rest mirrors `_puz`.
+    PuzzleData colorPuz(int colors, {required int cplx}) {
+      final domain = colors == 3 ? '123' : '12';
+      return PuzzleData('v2_${domain}_5x5_${'0' * 25}_FM:0_0:0_$cplx');
+    }
+
+    test('slider endpoints exclude the other domain', () {
+      final db = Database(playerLevel: 0);
+      final two = colorPuz(2, cplx: 16);
+      final three = colorPuz(3, cplx: 16);
+      db.puzzles = [two, three];
+      db.currentFilters.threeColorShare = 0;
+      expect(db.getPuzzlesByLevel(16), [same(two)]);
+      db.currentFilters.threeColorShare = 1;
+      expect(db.getPuzzlesByLevel(16), [same(three)]);
+    });
+
+    test('an intermediate position serves ≈ that share of 3-colour', () {
+      // Equal-size, equal-cplx pools so the domain factor is the only
+      // asymmetry: the normalised weights must make ~20% of every batch
+      // purple regardless of the 50/50 catalog.
+      final db = Database(playerLevel: 0)..samplingRandom = math.Random(7);
+      db.puzzles = [
+        for (var i = 0; i < 200; i++) colorPuz(2, cplx: 16),
+        for (var i = 0; i < 200; i++) colorPuz(3, cplx: 16),
+      ];
+      db.currentFilters.threeColorShare = 0.2;
+      var three = 0;
+      var total = 0;
+      for (var i = 0; i < 300; i++) {
+        for (final p in db.getPuzzlesByLevel(16).take(5)) {
+          total++;
+          if (p.domain.length == 3) three++;
+        }
+      }
+      expect(three / total, closeTo(0.2, 0.06));
+    });
+  });
+
   group('Database.hasUnplayedIgnoringFilters', () {
     test('returns true when user filters hide otherwise-eligible puzzles', () {
       // EndOfPlaylist uses this to distinguish "filters are hiding puzzles"

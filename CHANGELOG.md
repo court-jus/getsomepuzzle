@@ -12,6 +12,13 @@ localised under
 
 ## [Unreleased]
 
+- **Colour-mix slider**: the Open page's 2-/3-colour chips are now a
+  slider from "only 2 colors" to "only 3 colors". Intermediate
+  positions keep both domains and weight the playlist so ≈ that share
+  of the served puzzles uses the third colour. The post-onboarding
+  "try 3 colors" suggestion now shows the same slider, seeded at one
+  puzzle in five, so the player picks their own mix instead of
+  switching to 3-colour puzzles only.
 - **First 3-color puzzle explained**: the first time a purple grid opens,
   a one-shot modal explains the option dots under empty cells and the
   paintbrush button that toggles the "remove option" tap mode.

@@ -181,8 +181,7 @@ Diffing every `SharedPreferences` access between `v1.6.22` and HEAD,
 | `settingsGrayoutEnabled` | `true` | disable grayout of completed constraints |
 | `settingsStatsDirectory` | unset (`null`) | custom stats sync directory (removed from prefs when cleared) |
 | `settingsThemeMode` | `system` | `system|light|dark|beige` |
-| `wantedDomainsFilter` | `{}` | domain flags selector (`d2`/`d3`), see §2.3 |
-| `bannedDomainsFilter` | `{"d3"}` | see §2.3 |
+| `threeColorShareFilter` | `0` | share of 3-colour puzzles (`0` = only 2-colour, `1` = only 3-colour), see §2.3 |
 | `wantedScenarioFilter` | unset (`null`) | reasoning-style (scenario) filter |
 
 Loaders guard against unknown enum spellings with
@@ -202,8 +201,8 @@ Two visible consequences:
   colours; on dark-mode OSes the app now renders dark (new feature),
   and `beige` (the solarized palette) is manual-only. Nothing is
   reset; players who dislike the default can switch in Settings.
-- **Purple is hidden until opted in.** `bannedDomainsFilter` defaults
-  to `{"d3"}` on missing key, so a 1.6.22 player (who never had the
+- **Purple is hidden until opted in.** `threeColorShareFilter` defaults
+  to `0` on missing key, so a 1.6.22 player (who never had the
   key) and a fresh player both start with every 3-colour puzzle
   (`v2_123_…` lines — 8,083 of the 20,241 `1-easy` lines at HEAD)
   filtered out, exactly like the pre-upgrade two-colour catalogue.
@@ -372,15 +371,18 @@ the new rules take ≈ 10–15 plays each to surface) — it is independent
 of discovery state: only the graduation timestamp and the play
 threshold matter.
 
-The `ThirdColorSuggestionDialog`:
+The `ThirdColorSuggestionDialog` shows the same colour-mix slider as the
+Open-page advanced filters, seeded at `kThirdColorSuggestionShare`
+(`0.2`):
 
-- **"Try it"** → `bannedDomains` swaps `d3`→`d2` ban
-  (`bannedDomains = {d2}`), i.e. the next batch is 3-colour only —
-  not a mix — and the in-progress 2-colour puzzle is dropped for a
-  fresh one. Reversible anytime from the Open-page domain chips.
+- **"Try it"** → the chosen mix is written to
+  `Filters.threeColorShare`, so the next batch serves ≈ that share of
+  3-colour puzzles (default: one in five) with the rest
+  black-and-white, and the in-progress 2-colour puzzle is dropped for a
+  fresh one. Reversible anytime from the Open-page advanced filters.
 - **"Later"** → the modal is marked shown and **never fires again**
   (`noteThirdColorSuggestionShown` regardless of the button); the
-  player can still opt in via the domain filter.
+  player can still opt in via the colour slider.
 - Replaying onboarding re-arms the suggestion
   (`resetOnboardingProgress` clears `thirdColorSuggestionShown`) but
   never clears `hasPlayedThirdColor` (it is history-derived).
@@ -479,12 +481,14 @@ Kept unchanged (all of 1.6.22's set): `collectionToLoad`,
 `onboardingFiltersApplied`, `stats` (web) / `stats*.txt` files.
 
 Added by 2.0.0: `settingsNextPuzzleDelay`, `settingsGrayoutEnabled`,
-`settingsStatsDirectory`, `settingsThemeMode`, `wantedDomainsFilter`,
-`bannedDomainsFilter`, `wantedScenarioFilter`,
+`settingsStatsDirectory`, `settingsThemeMode`, `threeColorShareFilter`,
+`wantedScenarioFilter`,
 `onboardingCompletedAt`, `postOnboardingCompletions`,
 `hasPlayedThirdColor`, `thirdColorSuggestionShown`, `domain3IntroShown`
 (one-shot 3-colour UI explanation — §3.5),
 `introDialogSeen` (highest numbered intro dialog shown — §3.7).
 
 Obsolete keys cleaned at load (both versions): `minCplxFilter`,
-`maxCplxFilter`.
+`maxCplxFilter`; the chip-era `wantedDomainsFilter` /
+`bannedDomainsFilter` are migrated into `threeColorShareFilter` and
+removed on the next `Filters.save()`.

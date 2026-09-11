@@ -13,6 +13,7 @@ import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/plusminus.dart';
 import 'package:getsomepuzzle/widgets/flags_selector.dart';
 import 'package:getsomepuzzle/widgets/constraints/registry.dart';
+import 'package:getsomepuzzle/widgets/domain_mix_slider.dart';
 
 class OpenPage extends StatefulWidget {
   final Database database;
@@ -67,8 +68,7 @@ class _OpenPageState extends State<OpenPage> {
     List<String>? newBRules,
     List<String>? newWFlags,
     List<String>? newBFlags,
-    List<String>? newWDomains,
-    List<String>? newBDomains,
+    double? newDomainMix,
     Object? newScenario = _notPassed,
   }) {
     setState(() {
@@ -123,21 +123,11 @@ class _OpenPageState extends State<OpenPage> {
             .toSet();
         changed = true;
       }
-      if (newWDomains != null) {
-        widget.database.currentFilters.wantedDomains = newWDomains.toSet();
-        widget.database.currentFilters.bannedDomains.removeAll(
-          widget.database.currentFilters.wantedDomains,
+      if (newDomainMix != null) {
+        widget.database.currentFilters.threeColorShare = newDomainMix.clamp(
+          0.0,
+          1.0,
         );
-        changed = true;
-      }
-      if (newBDomains != null) {
-        widget.database.currentFilters.bannedDomains = newBDomains.toSet();
-        widget.database.currentFilters.wantedDomains = widget
-            .database
-            .currentFilters
-            .wantedDomains
-            .where((d) => !newBDomains.contains(d))
-            .toSet();
         changed = true;
       }
       if (newScenario != _notPassed) {
@@ -797,35 +787,13 @@ class _OpenPageState extends State<OpenPage> {
                                       context,
                                     )!.labelWidgetDomain,
                                   ),
-                                  FlagsSelector(
-                                    choices: [
-                                      (
-                                        "d2",
-                                        AppLocalizations.of(
-                                          context,
-                                        )!.labelDomainTwoColors,
-                                      ),
-                                      (
-                                        "d3",
-                                        AppLocalizations.of(
-                                          context,
-                                        )!.labelDomainThreeColors,
-                                      ),
-                                    ],
-                                    wanted: widget
+                                  DomainMixSlider(
+                                    value: widget
                                         .database
                                         .currentFilters
-                                        .wantedDomains,
-                                    banned: widget
-                                        .database
-                                        .currentFilters
-                                        .bannedDomains,
-                                    apply: (value) => {
-                                      applyFilter(
-                                        newWDomains: value.$1.toList(),
-                                        newBDomains: value.$2.toList(),
-                                      ),
-                                    },
+                                        .threeColorShare,
+                                    onChanged: (value) =>
+                                        applyFilter(newDomainMix: value),
                                   ),
                                   const Divider(),
                                   Text(

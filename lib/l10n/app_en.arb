@@ -122,15 +122,15 @@
     },
     "labelWidgetDomain": "Number of colors",
     "@labelWidgetDomain": {
-        "description": "Label of the open-page filter that picks the puzzle domain size (2- vs 3-color puzzles)"
+        "description": "Label of the open-page slider that mixes two- and three-color puzzles"
     },
-    "labelDomainTwoColors": "2 colors",
+    "labelDomainTwoColors": "Only 2 colors",
     "@labelDomainTwoColors": {
-        "description": "Chip label for two-color puzzles in the domain filter"
+        "description": "Left end of the domain-mix slider: only two-color puzzles are served"
     },
-    "labelDomainThreeColors": "3 colors",
+    "labelDomainThreeColors": "Only 3 colors",
     "@labelDomainThreeColors": {
-        "description": "Chip label for three-color puzzles in the domain filter"
+        "description": "Right end of the domain-mix slider: only three-color puzzles are served"
     },
     "msgCountMatchingPuzzles": "Puzzles matching filters",
     "@msgCountMatchingPuzzles": {
@@ -843,21 +843,25 @@
     "@thirdColorSuggestionTitle": {
         "description": "Title of the modal suggesting the player try 3-color puzzles. Shown once after onboarding plus 50 plays, only if the player has never played a 3-color puzzle."
     },
-    "thirdColorSuggestionBody": "You've solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. It's a fresh kind of challenge built on what you already know.",
+    "thirdColorSuggestionBody": "You've solved a good number of black-and-white puzzles. Want to try the 3-color mode? A new colour — purple — joins black and white, and the rules apply to each colour independently. Pick how many purple puzzles you want below.",
     "@thirdColorSuggestionBody": {
-        "description": "Body of the 3-color suggestion modal. Reassures the player by linking 3-color puzzles to the rules they already master."
+        "description": "Body of the 3-color suggestion modal. Reassures the player by linking 3-color puzzles to the rules they already master, then points at the mix slider below."
+    },
+    "thirdColorSuggestionMixLabel": "How many 3-color puzzles?",
+    "@thirdColorSuggestionMixLabel": {
+        "description": "Label above the colour-mix slider in the 3-color suggestion modal. The slider goes from 'Only 2 colors' to 'Only 3 colors'."
     },
     "thirdColorSuggestionTryLabel": "Try it",
     "@thirdColorSuggestionTryLabel": {
-        "description": "Button on the 3-color suggestion modal that opts the player into 3-color puzzles by enabling the d3 domain in their filters."
+        "description": "Button on the 3-color suggestion modal that applies the chosen colour mix to the player's filters."
     },
     "thirdColorSuggestionLaterLabel": "Maybe later",
     "@thirdColorSuggestionLaterLabel": {
         "description": "Button on the 3-color suggestion modal that dismisses the suggestion without changing filters."
     },
-    "thirdColorSuggestionFiltersReminder": "Remember that you can always choose the type of puzzles you want from the advanced filters in the library.",
+    "thirdColorSuggestionFiltersReminder": "You can change this mix at any time from the advanced filters in the library.",
     "@thirdColorSuggestionFiltersReminder": {
-        "description": "Secondary paragraph on the 3-color suggestion modal, shown between the main body and the action buttons. Reassures the player that the opt-in is reversible via the Open page filters."
+        "description": "Secondary paragraph on the 3-color suggestion modal, below the slider. Tells the player the chosen mix is reversible from the Open-page advanced filters."
     },
     "domain3IntroTitle": "Three colors!",
     "@domain3IntroTitle": {
