@@ -562,6 +562,50 @@ void main() {
     });
   });
 
+  group('Database.preparePlaylist — first 3-colour puzzle', () {
+    /// Minimal valid line with the given colour count (2 or 3).
+    PuzzleData colorPuz(int colors) {
+      final domain = colors == 3 ? '123' : '12';
+      return PuzzleData('v2_${domain}_5x5_${'0' * 25}_FM:0_0:0_16');
+    }
+
+    test('forces a 3-colour first when opted in and never played', () {
+      // The player just asked to try purple: the next opened puzzle must
+      // be the one carrying the domain-3 UI explanation, not an 80 %-likely
+      // black-and-white draw at the suggested ⅕ mix.
+      final db = Database(playerLevel: 0);
+      db.puzzles = [
+        for (var i = 0; i < 6; i++) colorPuz(2),
+        for (var i = 0; i < 6; i++) colorPuz(3),
+      ];
+      db.currentFilters.threeColorShare = 0.2;
+      db.preparePlaylist();
+      expect(db.playlist, isNotEmpty);
+      expect(db.playlist.first.domain.length, 3);
+    });
+
+    test('keeps the batch intact when the collection has no 3-colour', () {
+      final db = Database(playerLevel: 0);
+      db.puzzles = [for (var i = 0; i < 4; i++) colorPuz(2)];
+      db.currentFilters.threeColorShare = 0.2;
+      db.preparePlaylist();
+      expect(db.playlist, isNotEmpty);
+      expect(db.playlist.every((p) => p.domain.length == 2), isTrue);
+    });
+
+    test('only-2-colour filters never surface a 3-colour first', () {
+      final db = Database(playerLevel: 0);
+      db.puzzles = [
+        for (var i = 0; i < 4; i++) colorPuz(2),
+        for (var i = 0; i < 4; i++) colorPuz(3),
+      ];
+      db.currentFilters.threeColorShare = 0; // slider fully left
+      db.preparePlaylist();
+      expect(db.playlist, isNotEmpty);
+      expect(db.playlist.every((p) => p.domain.length == 2), isTrue);
+    });
+  });
+
   group('Database.hasUnplayedIgnoringFilters', () {
     test('returns true when user filters hide otherwise-eligible puzzles', () {
       // EndOfPlaylist uses this to distinguish "filters are hiding puzzles"

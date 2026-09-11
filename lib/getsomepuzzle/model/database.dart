@@ -964,7 +964,11 @@ class Database {
     return result;
   }
 
-  static const int _thirdColorSuggestionThreshold = 50;
+  // TEMP(testing): lowered from 50 to 1 so the 3-colour suggestion modal
+  // fires one puzzle after graduating with the fake onboarding stats
+  // fixture (`fake_stats_last_rule.txt`). REVERT TO 50 once the
+  // modal-review workflow has been tested.
+  static const int _thirdColorSuggestionThreshold = 1;
 
   /// Mark the suggestion as shown so it never fires again. Called by
   /// the modal regardless of which button the player tapped: dismissal
@@ -1894,11 +1898,39 @@ class Database {
       playlist = getPuzzlesByLevel(playerLevel).toList();
       _maybeCapBatch();
       if (shouldShuffle) playlist.shuffle();
+      _forceFirstThreeColorIfNeverPlayed();
     }
     log.fine(
       "Playlist prepared with ${playlist.length} puzzles "
       "(shuffled: $shouldShuffle, capped: ${_isPlayableLevel(collection)})",
     );
+  }
+
+  /// Put a 3-colour puzzle first when the player has opted into purple
+  /// (`threeColorShare > 0`) but has never actually played one.
+  ///
+  /// The first purple grid is where the one-shot domain-3 UI explanation
+  /// (`Domain3IntroDialog`) fires, so letting the weighted draw serve a
+  /// black-and-white puzzle first — 80 % likely at the suggested ⅕ mix —
+  /// would postpone both the explanation and the "try 3 colours" payoff
+  /// the player just asked for. The batch's own candidate is preferred;
+  /// when the capped slice holds none, one is pulled from the filtered
+  /// catalog. Re-capped so [playlistBatchSize] stays honoured.
+  void _forceFirstThreeColorIfNeverPlayed() {
+    if (hasPlayedThirdColor || currentFilters.threeColorShare <= 0) return;
+    final candidate =
+        _firstThreeColorPuzzle(playlist) ?? _firstThreeColorPuzzle(filter());
+    if (candidate == null) return;
+    playlist.remove(candidate);
+    playlist.insert(0, candidate);
+    _maybeCapBatch();
+  }
+
+  static PuzzleData? _firstThreeColorPuzzle(Iterable<PuzzleData> pool) {
+    for (final p in pool) {
+      if (p.domain.length >= 3) return p;
+    }
+    return null;
   }
 
   /// Whether the post-strict-phase soft filter should constrain the

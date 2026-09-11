@@ -1149,14 +1149,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     };
     if (newSlugs.isEmpty) {
       // No new rule to surface — but the intro-dialog, domain-3 UI
-      // explanation and 3-colour suggestion triggers are independent,
-      // so they still get a chance to fire. They are chained off the
-      // intro dialog's completion: while it is up, `_modalInFlight` is
-      // set, so calling them directly would make both no-op and the
-      // domain-3 explanation would be delayed past the very open it was
-      // meant to introduce.
-      _maybeShowNextIntroDialog().then((_) {
+      // explanation, onboarding-complete celebration and 3-colour
+      // suggestion triggers are independent, so they still get a chance
+      // to fire. They are chained off the intro dialog's completion:
+      // while it is up, `_modalInFlight` is set, so calling them directly
+      // would make both no-op and the domain-3 explanation would be
+      // delayed past the very open it was meant to introduce.
+      _maybeShowNextIntroDialog().then((_) async {
         if (!mounted) return;
+        // Onboarding finished on a previous open (its closing rule modal
+        // was dismissed there): the celebration is shown here — the first
+        // puzzle opened after the fact — so it never stacks on the rule
+        // explanation that closed the discovery.
+        if (_pendingOnboardingComplete && !_modalInFlight) {
+          _pendingOnboardingComplete = false;
+          _modalInFlight = true;
+          await OnboardingCompleteDialog.show(context);
+          _modalInFlight = false;
+          if (!mounted) return;
+        }
         _maybeShowDomain3Intro(puz);
         _maybeSuggestThirdColor();
       });
@@ -1270,14 +1281,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (wasInOnboarding && database != null && !database!.isInOnboarding) {
         await database!.resetRuleFilters();
       }
-      // The last unseen slug just got marked as seen. If the player is
-      // no longer in onboarding (both strict phases and soft filter
-      // satisfied), congratulate them once.
+      // The last unseen slug just got marked as seen and the player has
+      // left onboarding (both strict phases and soft filter satisfied).
+      // Don't congratulate here: defer it to the next puzzle open so the
+      // rule explanation that closed the discovery keeps the screen to
+      // itself. Consumed by `_surfaceNewConstraintsIfAny`.
       if (!skipped &&
           database != null &&
           !database!.isInOnboarding &&
           mounted) {
-        await OnboardingCompleteDialog.show(context);
+        _pendingOnboardingComplete = true;
       }
       _modalInFlight = false;
       if (skipped && mounted) setState(() {});
@@ -1382,6 +1395,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// same puzzle, or if the post-frame callback re-enters via the
   /// locale-chooser fallback.
   bool _modalInFlight = false;
+
+  /// True once the player has left onboarding, until the "onboarding
+  /// finished" celebration has been shown. The celebration is deferred
+  /// to the first puzzle opened after the transition, so it never stacks
+  /// on the rule explanation that closed the discovery.
+  bool _pendingOnboardingComplete = false;
 
   /// Show the next numbered intro dialog (the release-notes family) on
   /// the next frame, then record it as seen. Entry point for the paths

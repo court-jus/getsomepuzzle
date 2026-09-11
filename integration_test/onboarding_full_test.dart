@@ -8,6 +8,7 @@ import 'package:getsomepuzzle/widgets/initial_locale_chooser.dart';
 import 'package:getsomepuzzle/widgets/new_constraint_dialog.dart';
 import 'package:getsomepuzzle/widgets/onboarding_complete_dialog.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
+import 'package:getsomepuzzle/widgets/third_color_suggestion_dialog.dart';
 import 'package:getsomepuzzle/widgets/welcome_dialog.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -114,9 +115,16 @@ void main() {
               _present(OnboardingCompleteDialog) ||
               _present(WelcomeDialog) ||
               _present(NewConstraintDialog) ||
+              _present(ThirdColorSuggestionDialog) ||
               _present(EndOfPlaylist) ||
               _present(PuzzleWidget),
         );
+        // A modal can be scheduled one frame after the puzzle is laid out
+        // (the onboarding-complete celebration is deferred to the first
+        // open after graduation). Settle briefly so the checks below see
+        // it instead of mistaking the puzzle behind it for the thing to
+        // solve — a modal hit-tests over the grid and blocks cell taps.
+        await _pumpUntil(tester, () => false, maxSteps: 8);
         if (_present(OnboardingCompleteDialog)) {
           await _tapOk(tester);
           return true;
@@ -133,6 +141,14 @@ void main() {
             if (!introduced.contains(slug)) introduced.add(slug);
           }
           await _tapOk(tester);
+          continue;
+        }
+        if (_present(ThirdColorSuggestionDialog)) {
+          // Side modal that can fire once the player has graduated; the
+          // playthrough only cares about reaching onboarding completion, so
+          // decline it and keep playing in 2 colours.
+          await tester.tap(find.widgetWithText(TextButton, 'Maybe later'));
+          await _pumpUntil(tester, () => false, maxSteps: 8);
           continue;
         }
         if (_present(EndOfPlaylist)) {
