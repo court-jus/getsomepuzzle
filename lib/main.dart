@@ -43,6 +43,7 @@ import 'package:getsomepuzzle/widgets/pause_overlay.dart';
 import 'package:getsomepuzzle/widgets/autopilot_dialog.dart';
 import 'package:getsomepuzzle/widgets/between_puzzles.dart';
 import 'package:getsomepuzzle/widgets/constraint_help_dialog.dart';
+import 'package:getsomepuzzle/widgets/domain3_intro_dialog.dart';
 import 'package:getsomepuzzle/widgets/puzzle.dart';
 import 'package:getsomepuzzle/widgets/save_progress_dialog.dart';
 import 'package:getsomepuzzle/widgets/settings_page.dart';
@@ -936,6 +937,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> initializeDatabase(int playerLevel) async {
     final db = Database(playerLevel: playerLevel, progress: progress);
     db.statsDirectory = settings.statsDirectory;
+    db.autoLevel = settings.autoLevel;
     await db.loadPuzzlesFile();
     setState(() {
       database = db;
@@ -1044,6 +1046,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   void openPuzzle(PuzzleData puz) {
+    // Stamp the active collection on the play before it starts: readiness
+    // attributes each play to a tier from this token, and the collection
+    // can legitimately change before the play is flushed to disk.
+    puz.playedCollectionIndex = database!.activePlayableCollectionIndex;
     // Pass the current screen orientation so `GameModel.openPuzzle` can
     // apply the auto-rotation BEFORE the first build, avoiding a one-frame
     // flicker where the puzzle would otherwise appear in the wrong
@@ -1142,11 +1148,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           slug,
     };
     if (newSlugs.isEmpty) {
-      // No new rule to surface — but the intro-dialog and 3-colour
-      // suggestion triggers are independent, so they still get a chance
-      // to fire.
-      _maybeShowNextIntroDialog();
-      _maybeSuggestThirdColor();
+      // No new rule to surface — but the intro-dialog, domain-3 UI
+      // explanation and 3-colour suggestion triggers are independent,
+      // so they still get a chance to fire. They are chained off the
+      // intro dialog's completion: while it is up, `_modalInFlight` is
+      // set, so calling them directly would make both no-op and the
+      // domain-3 explanation would be delayed past the very open it was
+      // meant to introduce.
+      _maybeShowNextIntroDialog().then((_) {
+        if (!mounted) return;
+        _maybeShowDomain3Intro(puz);
+        _maybeSuggestThirdColor();
+      });
       return;
     }
     if (_modalInFlight) return;
@@ -1268,12 +1281,46 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       }
       _modalInFlight = false;
       if (skipped && mounted) setState(() {});
-      // Chain the next intro dialog (release notes for returning players),
-      // then the 3-colour suggestion check, once the new-rule flow is fully
-      // resolved. Both self-guard, so the common case returns immediately
-      // without any UI side effect.
+      // Chain the domain-3 UI explanation, then the next intro dialog
+      // (release notes for returning players), then the 3-colour
+      // suggestion check, once the new-rule flow is fully resolved. All
+      // self-guard, so the common case returns immediately without any
+      // UI side effect.
+      _maybeShowDomain3Intro(puz);
       _maybeShowNextIntroDialog();
       _maybeSuggestThirdColor();
+    });
+  }
+
+  /// One-shot explanation of the domain-3 play surface (option dots and
+  /// the paintbrush tap-mode toggle, cf. [Domain3IntroDialog]). Fires the
+  /// first time [puz] is a 3-colour puzzle the player has never actually
+  /// played (cf. [Database.shouldShowDomain3Intro]) — whatever route got
+  /// them to purple: the suggestion modal, the Open-page domain filters,
+  /// or a shared link.
+  ///
+  /// Scheduled on the next frame like the other one-shot modals so it
+  /// stacks cleanly on top of a modal that just resolved; marked shown on
+  /// dismissal so it never fires again.
+  Future<void> _maybeShowDomain3Intro(PuzzleData puz) async {
+    if (!mounted || database == null || _autopilotMode || widget.noOnboarding) {
+      return;
+    }
+    if (_modalInFlight) {
+      log.fine('_maybeShowDomain3Intro: skipped (modalInFlight)');
+      return;
+    }
+    if (!database!.shouldShowDomain3Intro(puz.domain.contains(3))) return;
+    log.info('_maybeShowDomain3Intro: showing modal');
+    _modalInFlight = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _modalInFlight = false;
+        return;
+      }
+      await Domain3IntroDialog.show(context);
+      await database!.noteDomain3IntroShown();
+      _modalInFlight = false;
     });
   }
 
@@ -1356,6 +1403,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// latest number after the welcome, so release dialogs never fire for
   /// them. Only one dialog per session, so a player who skipped several
   /// releases catches up one dialog per launch, in order.
+  ///
+  /// The returned future completes once the dialog has been dismissed
+  /// (or immediately when none is pending), so callers that need to
+  /// chain another one-shot modal behind it can `await` — the
+  /// `_surfaceNewConstraintsIfAny` early-return path uses this to keep
+  /// the domain-3 UI explanation from being starved by the
+  /// `_modalInFlight` guard while the release notes are up.
   Future<void> _maybeShowNextIntroDialog() async {
     if (!mounted || _autopilotMode || widget.noOnboarding) return;
     if (_modalInFlight || _introDialogShownThisSession) return;
@@ -1364,16 +1418,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     log.info('_maybeShowNextIntroDialog: showing dialog #$number');
     _introDialogShownThisSession = true;
     _modalInFlight = true;
+    final done = Completer<void>();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) {
         _modalInFlight = false;
+        done.complete();
         return;
       }
       await _showIntroDialog(number);
       _modalInFlight = false;
-      if (!mounted) return;
+      if (!mounted) {
+        done.complete();
+        return;
+      }
       await _persistIntroDialogSeen(number);
+      done.complete();
     });
+    await done.future;
   }
 
   /// Number of the next numbered intro dialog this player must still be
@@ -2129,6 +2190,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         (newValue.playerLevel != null &&
                         newValue.playerLevel != settings.playerLevel);
                     settings.change(newValue);
+                    if (newValue.autoLevel != null) {
+                      database?.autoLevel = settings.autoLevel;
+                    }
                     if (newValue.hintType != null) {
                       _onHintTypeChanged();
                     }

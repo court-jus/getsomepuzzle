@@ -773,6 +773,27 @@ class AppLocalizationsFr extends AppLocalizations {
       'N\'oubliez pas que vous pouvez toujours choisir le type de puzzles que vous voulez dans les filtres avancés de la bibliothèque.';
 
   @override
+  String get domain3IntroTitle => 'Trois couleurs !';
+
+  @override
+  String get domain3IntroBody =>
+      'Ce puzzle utilise trois couleurs : noir, blanc et violet. Deux petits repères vous aident à les manipuler.';
+
+  @override
+  String get domain3IntroDotsTitle => 'Les points au bas d\'une case';
+
+  @override
+  String get domain3IntroDotsBody =>
+      'Chaque case vide affiche un point pour chaque couleur qu\'elle peut encore prendre. Quand une couleur est éliminée, son point disparaît — les points vous indiquent donc toujours ce qui reste possible.';
+
+  @override
+  String get domain3IntroPaintbrushTitle => 'Le bouton pinceau';
+
+  @override
+  String get domain3IntroPaintbrushBody =>
+      'Touchez le pinceau dans la barre d\'outils pour changer l\'effet d\'un toucher. En mode « retirer une option », toucher une case vide élimine l\'une de ses couleurs (son point disparaît) au lieu de la colorer ; touchez à nouveau le pinceau pour revenir au coloriage.';
+
+  @override
   String get welcomeModalTitle => 'Bienvenue';
 
   @override

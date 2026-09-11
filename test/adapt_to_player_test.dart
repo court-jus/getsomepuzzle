@@ -820,4 +820,112 @@ void main() {
       expect(db.recommendedCollectionDirection, isNull);
     });
   });
+
+  group('Database.recommendedCollectionKey — readiness', () {
+    // Plays of one tier whose duration is `r` × the model's expectation.
+    // Distinct grid heights keep the canonical keys distinct, so `loadStats`
+    // does not collapse them into a single sample. `tier` stamps the `Ncol`
+    // token; null leaves the line untagged (pre-2.0.0 shape).
+    List<StatEntry> tierPlays(
+      double r, {
+      int? tier,
+      int count = 39,
+      int cplx = 16,
+      int nCons = 1,
+    }) {
+      final base = DateTime.now().subtract(Duration(minutes: count + 1));
+      final token = tier == null ? '' : ' - ${tier}col';
+      return List.generate(count, (i) {
+        final height = 4 + i;
+        final cells = 4 * height;
+        final prefill = '0' * cells;
+        final expected = expectedDuration(cplx, cells, 0, nCons);
+        final dur = (expected * r).round();
+        final stamp = base.add(Duration(minutes: i)).toIso8601String();
+        return StatEntry.parse(
+          '$stamp ${dur}s 0f '
+          'v2_12_4x${height}_${prefill}_FM:1_0:0_$cplx'
+          ' - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg$token',
+        )!;
+      });
+    }
+
+    Database dbOn(String collection, int playerLevel) {
+      final db = Database(playerLevel: playerLevel);
+      db.collection = collection;
+      db.autoLevel = true;
+      db.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+      return db;
+    }
+
+    test('promotes one tier when the level is pinned on the current one', () {
+      // playerLevel 20 → beginner ('1-easy') = the active collection, so the
+      // level-based suggestion is a no-op and readiness decides. A tier-1
+      // promotion projects 1.2 × 46.5 s ≈ 56 s, inside the effort cap.
+      final db = dbOn('1-easy', 20);
+      db.loadStats(tierPlays(1.2, tier: 0));
+      expect(db.recommendedCollectionKey, '2-player');
+      expect(
+        db.recommendedCollectionDirection,
+        CollectionSuggestionDirection.up,
+      );
+    });
+
+    test('demotes one tier on sustained struggle', () {
+      final db = dbOn('2-player', 30);
+      db.loadStats(tierPlays(3.5, tier: 1));
+      expect(db.recommendedCollectionKey, '1-easy');
+      expect(
+        db.recommendedCollectionDirection,
+        CollectionSuggestionDirection.down,
+      );
+    });
+
+    test('holds inside the hysteresis band', () {
+      final db = dbOn('1-easy', 20);
+      db.loadStats(tierPlays(1.65, tier: 0));
+      expect(db.recommendedCollectionKey, isNull);
+    });
+
+    test('a manually pinned level suppresses readiness', () {
+      // Same promoting history, but auto-level off: the feature is gated on
+      // an auto-computed level.
+      final db = dbOn('1-easy', 20)..autoLevel = false;
+      db.loadStats(tierPlays(1.2, tier: 0));
+      expect(db.recommendedCollectionKey, isNull);
+    });
+
+    test('plays of another tier never drive readiness', () {
+      final db = dbOn('1-easy', 20);
+      db.loadStats(tierPlays(1.2, tier: 3));
+      expect(db.recommendedCollectionKey, isNull);
+    });
+
+    test('untagged pre-2.0.0 plays never drive readiness', () {
+      final db = dbOn('1-easy', 20);
+      db.loadStats(tierPlays(1.2));
+      expect(db.recommendedCollectionKey, isNull);
+    });
+
+    test('a level-based suggestion is never overridden by readiness', () {
+      // playerLevel 80 on '2-player': the ±1 clamp already points up to
+      // '3-advanced'. A struggling tier-1 history must not pull the
+      // suggestion back down — readiness is only a fallback.
+      final db = dbOn('2-player', 80);
+      db.loadStats(tierPlays(3.5, tier: 1));
+      expect(db.recommendedCollectionKey, '3-advanced');
+    });
+
+    test('readiness leaves computePlayerLevel untouched', () {
+      // Separation guarantee: the collection token is metadata for the
+      // readiness model only — the level inference reads durations, cplx,
+      // cells, failures and nCons, nothing else.
+      final tagged = dbOn('1-easy', 0)..loadStats(tierPlays(1.2, tier: 0));
+      final untagged = dbOn('1-easy', 0)..loadStats(tierPlays(1.2));
+      expect(
+        tagged.computePlayerLevel(fallback: 0),
+        untagged.computePlayerLevel(fallback: 0),
+      );
+    });
+  });
 }

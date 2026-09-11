@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
+import '../bin/aggregate_player_stats.dart' as aggregator;
+
 void main() {
   group('StatEntry.parse', () {
     test('parses a valid stat line', () {
@@ -127,6 +129,28 @@ void main() {
 
     test('returns null for lines without usable dimensions', () {
       expect(parsePuzzleLineFields('garbage'), isNull);
+    });
+  });
+
+  group('aggregate_player_stats re-emit', () {
+    test('preserves unknown tokens and refreshes the derived lvl', () {
+      // The aggregator rewrites field [3] and strips only `*lvl`. Everything
+      // else must survive verbatim — that is what keeps the `Ncol` readiness
+      // tag (and any future suffix-tagged field) alive through the offline
+      // pipeline.
+      const raw =
+          '2026-05-01T10:00:00 120s 2f '
+          'v2_12_4x4_0000000000000000_FM:1_0:0_5'
+          ' - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg - 3col - 999lvl';
+      final entry = StatEntry.parse(raw)!;
+      expect(entry.collectionIndex, 3);
+
+      final out = aggregator.reemitStatLine(raw, entry.puzzleLine, entry);
+      expect(out, contains('3col'));
+      expect(out, contains('${120 + 30 * 2}lvl'));
+      expect(out, isNot(contains('999lvl')));
+      // Round-trips back through the app parser with the tag intact.
+      expect(StatEntry.parse(out)!.collectionIndex, 3);
     });
   });
 }

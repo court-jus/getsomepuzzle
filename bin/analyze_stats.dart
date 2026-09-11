@@ -38,8 +38,10 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:getsomepuzzle/getsomepuzzle/level.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/readiness.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 
 class Play {
@@ -53,6 +55,12 @@ class Play {
   final String puzzleLine;
   // Suffix-tagged fields appended over time. Default 0 for older lines.
   final int longestGapMs;
+  // `PuzzleLevel.index` of the collection active at play start, or null on
+  // pre-2.0.0 lines / non-playable collections. Drives the readiness report.
+  final int? collectionIndex;
+  // The `S` marker: a play the player skipped. Readiness excludes these —
+  // the duration is partial, not a pace signal.
+  final String? skipped;
   Play({
     required this.timestamp,
     required this.duration,
@@ -62,6 +70,8 @@ class Play {
     required this.nConstraints,
     required this.puzzleLine,
     this.longestGapMs = 0,
+    this.collectionIndex,
+    this.skipped,
   });
 }
 
@@ -79,6 +89,8 @@ Play? parsePlay(String line) {
     nConstraints: fields.nCons,
     puzzleLine: entry.puzzleLine,
     longestGapMs: entry.longestGapMs,
+    collectionIndex: entry.collectionIndex,
+    skipped: entry.skipped,
   );
 }
 
@@ -334,6 +346,9 @@ void main(List<String> args) {
               cells: p.cells,
               nConstraints: p.nConstraints,
               puzzleLine: p.puzzleLine,
+              longestGapMs: p.longestGapMs,
+              collectionIndex: p.collectionIndex,
+              skipped: p.skipped,
             ),
           );
           ok++;
@@ -621,11 +636,21 @@ void main(List<String> args) {
     final pi = filtered[i], pj = filtered[j];
     final di =
         (pi.duration -
-                expectedDuration(pi.cplx, pi.cells, pi.failures, pi.nConstraints))
+                expectedDuration(
+                  pi.cplx,
+                  pi.cells,
+                  pi.failures,
+                  pi.nConstraints,
+                ))
             .abs();
     final dj =
         (pj.duration -
-                expectedDuration(pj.cplx, pj.cells, pj.failures, pj.nConstraints))
+                expectedDuration(
+                  pj.cplx,
+                  pj.cells,
+                  pj.failures,
+                  pj.nConstraints,
+                ))
             .abs();
     return dj.compareTo(di);
   });
@@ -642,6 +667,85 @@ void main(List<String> args) {
       '${p.duration.toString().padLeft(4)} '
       '${exp.toStringAsFixed(0).padLeft(8)}  '
       '${clamped[i].toStringAsFixed(0).padLeft(5)}',
+    );
+  }
+
+  // ---------- 5. Readiness report (per collection tier) ----------
+  // Runs the production model (`lib/getsomepuzzle/model/readiness.dart`) so
+  // the offline calibration loop and the app agree by construction. The
+  // "as of" clock is the newest play in the corpus, so a historical export
+  // reproduces the verdict the app would have reached at the time rather
+  // than reporting every tier as stale.
+  print('');
+  print('=== Readiness (production model, per tier) ===');
+  final byTier = <int, List<Play>>{};
+  // `filtered` drops every `cplx >= 100` play (the legacy bucket guard), which
+  // would erase `6-mad` (median cplx ~115). Use the full corpus here, keeping
+  // only the legacy `cplx == 100` marker out.
+  for (final p in all) {
+    if (p.collectionIndex == null) continue;
+    if (p.skipped != null) continue;
+    if (p.cplx == 100 || p.duration < 2 || p.cells <= 0) continue;
+    byTier.putIfAbsent(p.collectionIndex!, () => []).add(p);
+  }
+  if (byTier.isEmpty) {
+    print('  no `Ncol`-tagged plays in this corpus (pre-2.0.0 export?)');
+    return;
+  }
+  var asOf = DateTime.fromMillisecondsSinceEpoch(0);
+  for (final ps in byTier.values) {
+    for (final p in ps) {
+      final t = DateTime.tryParse(p.timestamp);
+      if (t != null && t.isAfter(asOf)) asOf = t;
+    }
+  }
+  print('  as of ${asOf.toIso8601String()}');
+  print('  tier         n   win   medianR  hard   proj   verdict   suggested');
+  final tiers = byTier.keys.toList()..sort();
+  for (final tier in tiers) {
+    final samples = <ReadinessSample>[];
+    for (final p in byTier[tier]!) {
+      final t = DateTime.tryParse(p.timestamp);
+      if (t == null) continue;
+      samples.add(
+        ReadinessSample(
+          finished: t,
+          duration: p.duration,
+          failures: p.failures,
+          cplx: p.cplx,
+          cells: p.cells,
+          nCons: p.nConstraints,
+          longestGapMs: p.longestGapMs,
+        ),
+      );
+    }
+    final series = evaluateReadinessSeries(
+      samples,
+      tierReferenceSeconds(tier + 1) ?? double.infinity,
+      now: asOf,
+    );
+    final vote = sustainedVote(series);
+    final w = series.isEmpty ? null : series.first;
+    final label = tier < PuzzleLevel.values.length
+        ? (levelToPlayableCollectionKey[PuzzleLevel.values[tier]] ?? '?')
+        : '?';
+    var suggested = '-';
+    if (vote == ReadinessVote.promote &&
+        tier + 1 < kTierReferencePuzzles.length) {
+      suggested =
+          levelToPlayableCollectionKey[PuzzleLevel.values[tier + 1]] ?? '-';
+    } else if (vote == ReadinessVote.demote && tier > 0) {
+      suggested =
+          levelToPlayableCollectionKey[PuzzleLevel.values[tier - 1]] ?? '-';
+    }
+    print(
+      '  ${label.padRight(11)} '
+      '${samples.length.toString().padLeft(4)}  '
+      '${'${series.length}/$kSustainedPlays'.padLeft(5)}  '
+      '${(w?.medianR ?? 0).toStringAsFixed(2).padLeft(7)}  '
+      '${(w?.hardShare ?? 0).toStringAsFixed(2).padLeft(4)}  '
+      '${(w?.projectedSeconds ?? 0).toStringAsFixed(0).padLeft(5)}  '
+      '${vote.name.padRight(7)}   $suggested',
     );
   }
 }

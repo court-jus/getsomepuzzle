@@ -17,6 +17,7 @@ import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/readiness.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:getsomepuzzle/getsomepuzzle/utils/saf_access.dart';
 import 'package:intl/intl.dart';
@@ -84,6 +85,12 @@ class PuzzleData {
   int cellEdits = 0;
   int firstClickMs = 0;
   int longestGapMs = 0;
+
+  /// `PuzzleLevel.index` of the collection active when this play started,
+  /// or null for a non-playable collection (custom / user_* / tutorial).
+  /// Persisted as the `<index>col` suffix token and consumed only by the
+  /// readiness model (`readiness.dart`) — `playerLevel` ignores it.
+  int? playedCollectionIndex;
   Stats? stats;
   DateTime? started;
   DateTime? finished;
@@ -147,6 +154,7 @@ class PuzzleData {
       "${cellEdits}e",
       "${firstClickMs}fc",
       "${longestGapMs}lg",
+      playedCollectionIndex == null ? "" : "${playedCollectionIndex}col",
     ].join(" - ");
     // Normalize the constraints section (sort + dedup) but keep the v2
     // grammar intact so downstream tools that parse positional fields
@@ -394,6 +402,24 @@ class Database {
   bool shouldShuffle = false;
   List<PuzzleData> playlist = [];
   int playerLevel;
+
+  /// Whether `playerLevel` is computed automatically. Readiness
+  /// suggestions only make sense on top of an auto-computed level, so this
+  /// gates them: a manually pinned level suppresses readiness entirely.
+  /// Maintained by `main.dart` from `Settings.autoLevel`.
+  bool autoLevel = false;
+
+  /// Monotonic counter bumped by every stats mutation ([loadStats],
+  /// [notePuzzleCompleted], [clearAllStats]). Invalidates the readiness
+  /// cache without having to fingerprint the history on every UI rebuild.
+  int _statsVersion = 0;
+
+  int? _readinessTier;
+  int _readinessStatsVersion = -1;
+  ReadinessVote? _readinessVote;
+  ReadinessWindow? _readinessNewestWindow;
+  ReadinessWindow? _readinessPrevWindow;
+
   final log = Logger("Database");
   static const _builtInCollectionKeys = {
     '1-easy',
@@ -712,6 +738,17 @@ class Database {
 
   static const _thirdColorSuggestionShownKey = 'thirdColorSuggestionShown';
 
+  /// True once the domain-3 introduction modal (option dots + paintbrush
+  /// tap-mode toggle) has been displayed. Independent from
+  /// [thirdColorSuggestionShown]: the suggestion *invites* the player to
+  /// opt in to 3-colour puzzles, this modal *explains their UI* the first
+  /// time a purple grid actually opens — whichever route got them there
+  /// (the suggestion, a shared link, or the Open-page domain filters).
+  /// Reset by [resetOnboardingProgress] so a fresh onboarding re-arms it.
+  bool domain3IntroShown = false;
+
+  static const _domain3IntroShownKey = 'domain3IntroShown';
+
   /// Onboarding phase the player is currently in. Returns null once
   /// they've graduated past the last defined phase, in which case
   /// [preparePlaylist] reverts to the regular level-based sampler.
@@ -729,6 +766,7 @@ class Database {
   /// reload.
   void notePuzzleCompleted(PuzzleData puz) {
     final oldPhase = currentPhase;
+    _statsVersion++;
     _globalUsablePlays++;
     for (final slug in puz.rules.toSet()) {
       if (slug.isEmpty || slug == 'TX') continue;
@@ -854,6 +892,15 @@ class Database {
     }
   }
 
+  Future<void> _persistDomain3IntroShown() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_domain3IntroShownKey, domain3IntroShown);
+    } catch (e) {
+      log.fine('Failed to persist domain3IntroShown: $e');
+    }
+  }
+
   /// Should the "try 3 colours" suggestion modal be shown right now?
   /// All four conditions must hold:
   /// 1. The modal hasn't been shown yet.
@@ -893,6 +940,39 @@ class Database {
     await _persistThirdColorSuggestionShown();
   }
 
+  /// Should the domain-3 introduction modal (option dots + paintbrush
+  /// tap-mode toggle) be shown for the puzzle about to be played?
+  /// [hasThirdColor] is that puzzle's `domain.contains(3)`.
+  ///
+  /// Fires on the first purple grid the player opens, but only when:
+  /// - the puzzle really is domain-3;
+  /// - the modal was never shown before;
+  /// - no 3-colour play exists in the stats history ([hasPlayedThirdColor])
+  ///   — an imported/reinstalled history proves the player has already
+  ///   met the option dots and the paintbrush, so explaining them again
+  ///   would be noise.
+  ///
+  /// Deliberately independent of onboarding state: a player can opt in to
+  /// purple from the Open-page filters mid-journey, and the modal must
+  /// fire the first time that grid opens regardless of phase.
+  bool shouldShowDomain3Intro(bool hasThirdColor) {
+    final result = hasThirdColor && !domain3IntroShown && !hasPlayedThirdColor;
+    log.fine(
+      'shouldShowDomain3Intro=$result '
+      '(d3=$hasThirdColor, shown=$domain3IntroShown, '
+      'playedThird=$hasPlayedThirdColor)',
+    );
+    return result;
+  }
+
+  /// Mark the domain-3 intro as shown so it never fires again. Called on
+  /// dismissal regardless of how the player left the modal: the
+  /// explanation has been surfaced, which is all it promises.
+  Future<void> noteDomain3IntroShown() async {
+    domain3IntroShown = true;
+    await _persistDomain3IntroShown();
+  }
+
   /// Reset the onboarding counter so the player re-enters phase 0.
   /// Pairs with `ConstraintProgress.clear()` for the full
   /// "Rejouer l'onboarding" workflow. Persists immediately because
@@ -908,6 +988,12 @@ class Database {
     // intentionally NOT reset — it stays true if the player has any
     // 3-colour play in their stats.
     thirdColorSuggestionShown = false;
+    // Same fresh-start intent for the domain-3 UI explanation: a player
+    // who replays onboarding should see it again the next time a purple
+    // grid opens (unless their history already proves they play purple —
+    // [hasPlayedThirdColor] stays history-derived, so the gate still
+    // suppresses it for anyone who has actually played a 3-colour puzzle).
+    domain3IntroShown = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_onboardingFiltersAppliedKey);
     await Future.wait([
@@ -915,6 +1001,7 @@ class Database {
       _persistOnboardingCompletedAt(),
       _persistPostOnboardingCompletions(),
       _persistThirdColorSuggestionShown(),
+      _persistDomain3IntroShown(),
     ]);
   }
 
@@ -1127,6 +1214,7 @@ class Database {
 
   void loadStats(List<StatEntry> allEntries) {
     log.finest("loadStats");
+    _statsVersion++;
     _allStats = allEntries;
     // Index by identity key (string-only, no Puzzle construction): old
     // stats lines that embed a stale complexity score or constraint order
@@ -1241,6 +1329,7 @@ class Database {
       puz.cellEdits = entry.cellEdits;
       puz.firstClickMs = entry.firstClickMs;
       puz.longestGapMs = entry.longestGapMs;
+      puz.playedCollectionIndex = entry.collectionIndex;
     }
   }
 
@@ -1376,8 +1465,7 @@ class Database {
     if (puz.played && currentFilters.bannedFlags.contains("played")) {
       return false;
     }
-    if (puz.skipped != null &&
-        currentFilters.bannedFlags.contains("skipped")) {
+    if (puz.skipped != null && currentFilters.bannedFlags.contains("skipped")) {
       return false;
     }
     if (puz.liked != null && currentFilters.bannedFlags.contains("liked")) {
@@ -1391,8 +1479,7 @@ class Database {
     if (!puz.played && currentFilters.wantedFlags.contains("played")) {
       return false;
     }
-    if (puz.skipped == null &&
-        currentFilters.wantedFlags.contains("skipped")) {
+    if (puz.skipped == null && currentFilters.wantedFlags.contains("skipped")) {
       return false;
     }
     if (puz.liked == null && currentFilters.wantedFlags.contains("liked")) {
@@ -1475,6 +1562,7 @@ class Database {
     hasPlayedThirdColor = prefs.getBool(_hasPlayedThirdColorKey) ?? false;
     thirdColorSuggestionShown =
         prefs.getBool(_thirdColorSuggestionShownKey) ?? false;
+    domain3IntroShown = prefs.getBool(_domain3IntroShownKey) ?? false;
     // Lazy backfill: a player who graduated before this feature shipped
     // has currentPhase == null but no recorded timestamp. Stamp "now"
     // so the 50-plays gate starts counting from their first launch on
@@ -1747,6 +1835,12 @@ class Database {
   bool _isPlayableLevel(String key) =>
       playableCollectionKeyToLevel.containsKey(key);
 
+  /// `PuzzleLevel.index` of the active collection, or null when it is not
+  /// a playable level (`custom`, `user_*`, tutorial). Stamped onto every
+  /// play at start so the readiness model can attribute it to a tier.
+  int? get activePlayableCollectionIndex =>
+      playableCollectionKeyToLevel[collection]?.index;
+
   void preparePlaylist() {
     if (collection == 'custom' || collection.startsWith('user_')) {
       // User-curated playlists honour the full filter pipeline and the
@@ -1974,7 +2068,14 @@ class Database {
   ///     would suppress the badge for any returning player who just
   ///     switched collections.
   ///   - the recommendation matches the current collection (no badge
-  ///     needed).
+  ///     needed) *and* readiness has nothing to add.
+  ///
+  /// Readiness never overrides a level-based suggestion that already
+  /// points up or down — the level stays the primary signal. It only
+  /// closes the gap when the level is pinned on the current collection,
+  /// which is the common case for base-level players (the winsor floor
+  /// collapses them to `mix − 30`, so their level cannot express
+  /// readiness).
   String? get recommendedCollectionKey {
     if (currentPhase != null) return null;
     if (_globalUsablePlays < _minPlaysForRecommendation) return null;
@@ -1999,8 +2100,99 @@ class Database {
       level = PuzzleLevel.values[clampedIndex];
     }
 
-    final key = levelToPlayableCollectionKey[level];
+    var key = levelToPlayableCollectionKey[level];
+    if (currentLevel != null && key == collection) {
+      final vote = _readinessVoteForCurrentTier;
+      if (vote != null) key = _suggestionForReadiness(vote, currentLevel);
+    }
     return (key == null || key == collection) ? null : key;
+  }
+
+  /// Sustained readiness verdict for the active collection's tier, or
+  /// null when readiness does not apply (not a playable tier, auto-level
+  /// off, or no usable history). Cached against [_statsVersion] so the
+  /// build-time callers pay for it only when the history actually moved.
+  ReadinessVote? get _readinessVoteForCurrentTier {
+    final tier = activePlayableCollectionIndex;
+    if (tier == null || !autoLevel) return null;
+    if (_readinessTier == tier && _readinessStatsVersion == _statsVersion) {
+      return _readinessVote;
+    }
+
+    final samples = <ReadinessSample>[];
+    for (final entry in _levelHistory()) {
+      if (entry.collectionIndex != tier) continue;
+      if (entry.finished == null || entry.skipped != null) continue;
+      final parsed = parsePuzzleLineFields(entry.puzzleLine);
+      if (parsed == null) continue;
+      final finished = DateTime.tryParse(entry.finished!);
+      if (finished == null) continue;
+      samples.add(
+        ReadinessSample(
+          finished: finished,
+          duration: entry.duration,
+          failures: entry.failures,
+          cplx: parsed.cplx,
+          cells: parsed.cells,
+          nCons: parsed.nCons,
+          longestGapMs: entry.longestGapMs,
+        ),
+      );
+    }
+
+    // No next tier (mad) ⇒ infinite projection ⇒ promote can never fire.
+    final nextTierSeconds = tierReferenceSeconds(tier + 1) ?? double.infinity;
+    final series = evaluateReadinessSeries(
+      samples,
+      nextTierSeconds,
+      now: DateTime.now(),
+    );
+    final vote = sustainedVote(series);
+    _readinessTier = tier;
+    _readinessStatsVersion = _statsVersion;
+    _readinessVote = vote;
+    _readinessNewestWindow = series.isNotEmpty ? series.first : null;
+    _readinessPrevWindow = series.length > 1 ? series[1] : null;
+    _logReadiness(tier, vote);
+    return vote;
+  }
+
+  /// Tier move implied by a readiness [vote], or null when it moves
+  /// nothing (hold/unknown, no next tier, or already at the bottom).
+  String? _suggestionForReadiness(ReadinessVote vote, PuzzleLevel tier) {
+    switch (vote) {
+      case ReadinessVote.promote:
+        final nextIndex = tier.index + 1;
+        if (nextIndex >= kTierReferencePuzzles.length) return null;
+        return levelToPlayableCollectionKey[PuzzleLevel.values[nextIndex]];
+      case ReadinessVote.demote:
+        if (tier.index == 0) return null;
+        return levelToPlayableCollectionKey[PuzzleLevel.values[tier.index - 1]];
+      case ReadinessVote.hold:
+      case ReadinessVote.unknown:
+        return null;
+    }
+  }
+
+  /// One line per fresh readiness evaluation — the corpus for the next
+  /// threshold re-calibration (see the "Readiness" section of
+  /// `docs/dev/adapt_to_player.md`).
+  void _logReadiness(int tier, ReadinessVote vote) {
+    final newest = _readinessNewestWindow;
+    final previous = _readinessPrevWindow;
+    final suggested = _suggestionForReadiness(vote, PuzzleLevel.values[tier]);
+    final med = newest == null ? "-" : newest.medianR.toStringAsFixed(2);
+    final prev = previous == null ? "-" : previous.medianR.toStringAsFixed(2);
+    final hard = newest == null ? "-" : newest.hardShare.toStringAsFixed(2);
+    final n = newest == null ? 0 : newest.samples;
+    final proj = newest == null || !newest.projectedSeconds.isFinite
+        ? "-"
+        : newest.projectedSeconds.toStringAsFixed(0);
+    log.info(
+      "readiness tier=$tier vote=${vote.name} med=$med prev=$prev "
+      "hard=$hard n=$n proj=$proj level=$playerLevel "
+      "suggested=${suggested ?? "-"}",
+    );
   }
 
   /// Direction of the current cross-collection suggestion relative to
@@ -2033,6 +2225,7 @@ class Database {
   /// [Settings] is intentionally left alone (it's outside the scope of
   /// "stats").
   Future<void> clearAllStats() async {
+    _statsVersion++;
     _allStats = [];
     for (final puz in puzzles) {
       puz.played = false;
@@ -2047,6 +2240,7 @@ class Database {
       puz.cellEdits = 0;
       puz.firstClickMs = 0;
       puz.longestGapMs = 0;
+      puz.playedCollectionIndex = null;
       puz.stats = null;
       puz.started = null;
     }
@@ -2184,13 +2378,12 @@ class Database {
       // higher implicit level; slower ⇒ lower. Derived as
       //   level_i = 2·cplx − implied_cplx_for(this duration)
       // where implied_cplx is the proper inverse of `expectedDuration`.
-      final levelI =
-          playLevel(clampedDur, cplx, cells, entry.failures, nCons)
-              .clamp(
-                math.max(cplx - _levelWinsorLowerDelta, 0),
-                cplx + _levelWinsorUpperDelta,
-              )
-              .toDouble();
+      final levelI = playLevel(clampedDur, cplx, cells, entry.failures, nCons)
+          .clamp(
+            math.max(cplx - _levelWinsorLowerDelta, 0),
+            cplx + _levelWinsorUpperDelta,
+          )
+          .toDouble();
       // Exponential decay, half-life = 25 puzzles.
       final weight = math.pow(0.5, i / 25.0).toDouble();
       weightedSum += levelI * weight;

@@ -1468,6 +1468,42 @@ abstract class AppLocalizations {
   /// **'Remember that you can always choose the type of puzzles you want from the advanced filters in the library.'**
   String get thirdColorSuggestionFiltersReminder;
 
+  /// Title of the modal explaining the 3-color puzzle UI (option dots and paintbrush tap-mode toggle), shown the first time the player opens a 3-color puzzle.
+  ///
+  /// In en, this message translates to:
+  /// **'Three colors!'**
+  String get domain3IntroTitle;
+
+  /// Lead-in paragraph of the 3-color UI explanation modal, before the two detailed sections.
+  ///
+  /// In en, this message translates to:
+  /// **'This puzzle uses three colors: black, white and purple. Two little helpers let you work with them.'**
+  String get domain3IntroBody;
+
+  /// Header of the option-dots section in the 3-color UI explanation modal: the row of colored dots drawn under every empty cell.
+  ///
+  /// In en, this message translates to:
+  /// **'The dots at the bottom of a cell'**
+  String get domain3IntroDotsTitle;
+
+  /// Explanation of the option dots: one dot per remaining color option of an empty cell.
+  ///
+  /// In en, this message translates to:
+  /// **'Each empty cell shows a dot for every color it can still take. When a color is ruled out, its dot disappears — so the dots always tell you what is still possible.'**
+  String get domain3IntroDotsBody;
+
+  /// Header of the paintbrush section in the 3-color UI explanation modal: the toolbar button that toggles the tap interaction mode.
+  ///
+  /// In en, this message translates to:
+  /// **'The paintbrush button'**
+  String get domain3IntroPaintbrushTitle;
+
+  /// Explanation of the paintbrush button: it toggles between painting a color and removing one of a cell's remaining options.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the paintbrush in the toolbar to switch what a tap does. In remove-option mode, tapping an empty cell rules out one of its colors (its dot disappears) instead of painting it; tap the paintbrush again to go back to painting.'**
+  String get domain3IntroPaintbrushBody;
+
   /// Title of the intro modal shown once before the first rule explanation, on a brand-new player or right after a 'Replay onboarding' reset.
   ///
   /// In en, this message translates to:

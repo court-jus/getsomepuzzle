@@ -133,12 +133,7 @@ void main(List<String> args) {
       recomputeFailed++;
     }
 
-    final parts = r.line.split(' ');
-    parts[3] = puzzleLine;
-    parts.removeWhere((p) => p.endsWith('lvl'));
-    final level = r.entry.duration + 30 * r.entry.failures;
-    parts.add('${level}lvl');
-    out.writeln(parts.join(' '));
+    out.writeln(reemitStatLine(r.line, puzzleLine, r.entry));
   }
 
   File(outPath).writeAsStringSync(out.toString());
@@ -156,4 +151,16 @@ class _Row {
   final StatEntry entry;
   final String ts;
   _Row({required this.line, required this.entry, required this.ts});
+}
+
+/// Re-emit one aggregated line: the recomputed [puzzleLine] replaces field
+/// [3], every other field is preserved verbatim — including tokens this
+/// script does not know about (`Ncol` from the readiness feature, future
+/// suffix-tagged fields) — and the derived `*lvl` token is refreshed.
+String reemitStatLine(String rawLine, String puzzleLine, StatEntry entry) {
+  final parts = rawLine.split(' ');
+  parts[3] = puzzleLine;
+  parts.removeWhere((p) => p.endsWith('lvl'));
+  parts.add('${entry.duration + 30 * entry.failures}lvl');
+  return parts.join(' ');
 }

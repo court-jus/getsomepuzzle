@@ -769,6 +769,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'Remember that you can always choose the type of puzzles you want from the advanced filters in the library.';
 
   @override
+  String get domain3IntroTitle => 'Three colors!';
+
+  @override
+  String get domain3IntroBody =>
+      'This puzzle uses three colors: black, white and purple. Two little helpers let you work with them.';
+
+  @override
+  String get domain3IntroDotsTitle => 'The dots at the bottom of a cell';
+
+  @override
+  String get domain3IntroDotsBody =>
+      'Each empty cell shows a dot for every color it can still take. When a color is ruled out, its dot disappears — so the dots always tell you what is still possible.';
+
+  @override
+  String get domain3IntroPaintbrushTitle => 'The paintbrush button';
+
+  @override
+  String get domain3IntroPaintbrushBody =>
+      'Tap the paintbrush in the toolbar to switch what a tap does. In remove-option mode, tapping an empty cell rules out one of its colors (its dot disappears) instead of painting it; tap the paintbrush again to go back to painting.';
+
+  @override
   String get welcomeModalTitle => 'Welcome';
 
   @override

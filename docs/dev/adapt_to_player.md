@@ -90,11 +90,17 @@ expectedDuration(cplx, cells, failures, n_constraints)
   shift in interpretation, not a fit error: the formula intentionally
   over-predicts the cohort's durations, because we want a "matches the
   cohort" pace to read as middle-of-the-bar, not bottom-of-the-bar.
-- No artificial clamp on the model input: puzzle `cplx` is unbounded
-  since 2026-08 (see the note under "Scale"). The legacy
-  `cplx=100` "non-deductively-solvable" bucket is no longer emitted by
-  the generator; it may survive in legacy corpus files but no longer
-  biases the calibration once recomputed.
+- The model input is capped at `kCplxModelMax = 120`, applied **inside**
+  `expectedDuration` and `playLevel` only. Puzzle `cplx` itself stays
+  unbounded (see the note under "Scale"): selection, the Gaussian, the
+  display, `parsePuzzleLineFields` and the difficulty tiers all keep the
+  true value. The cap exists because `exp(cplx / 59.39)` extrapolates far
+  outside the calibration range — `cplx` 564 predicts 404 308 s and yields
+  `level_i ≈ 1 033`. It changes no current player's level (no last-50
+  window contains a play above ~120). The legacy `cplx=100`
+  "non-deductively-solvable" bucket is no longer emitted by the generator;
+  it may survive in legacy corpus files but no longer biases the
+  calibration once recomputed.
 
 The model lives in `lib/getsomepuzzle/model/play_model.dart` as the
 top-level `expectedDuration(...)` / `impliedCplx(...)`. It is Flutter-free
@@ -357,6 +363,84 @@ and the modal falls back to the softer invite — "Are you having fun?
 Do you want to try this other collection?" — which stays accurate as a
 plain alternative-offer.
 
+## Readiness (next-collection signal)
+
+`playerLevel` answers "which puzzles should I serve *inside* this
+collection?". A second, deliberately separate signal answers "can this
+player handle the *next* collection?" — readiness. The two must not be
+the same number: `level_i = cplx − 59.39·ln(r)` blends the player's pace
+with the mix of puzzles they happen to play, so it moves when the mix
+moves even at constant pace. That is correct for selection (play harder
+→ keep being served harder) and wrong for readiness (readiness must not
+depend on which collection you are in).
+
+The readiness input is the relative pace
+`r = duration / expectedDuration(...)`. `kCplxScale · ln(r)` is a fixed
+level offset, so `r` transfers across collections: on the five-player
+corpus coralie sits at 1.46 / 1.15 / 1.25 / 1.22 across four
+collections, ghislain at 0.82 / 0.74 / 0.79 / 0.77 / 0.79 / 0.50.
+
+**Model** — `lib/getsomepuzzle/model/readiness.dart`, pure Dart, no
+state:
+
+1. Keep the last `kWindow = 20` usable plays **tagged with the candidate
+   tier** (the `Ncol` token — see "Stat file format"), require
+   `kMinSamples = 15`, and require the newest sample to be no older than
+   `kMaxSampleAgeDays = 14` days.
+2. Drop AFK proxies (`duration > kAfkFactor × median(duration)` inside
+   the window) — `longestGapMs` coverage is only 0–24 %, so it cannot be
+   the only guard.
+3. `promote` ⇔ `medianR ≤ kPromoteR (1.5)` **and** `slope ≤ kSlopeSanity
+   (0.03)` **and** `medianR × nextTierReference ≤ kEffortCapSeconds (90)`.
+4. `demote` ⇔ `medianR ≥ kDemoteR (1.8)` **and** (`hardShare ≥ 0.20` or
+   `medianR ≥ kDemoteStrongR (2.1)`), where a "hard" play is
+   `dur ≥ 3 × expected`.
+5. Otherwise `hold`. The ordering `1.5 < 1.8` is the hysteresis band.
+
+A verdict is **sustained**: every one of the last `kSustainedPlays = 20`
+windows must agree. Consequence: readiness needs ~39 usable plays of a
+tier before it can fire on it, which keeps it out of the 2–3× warm-up at
+the start of a collection (1-easy first-20 vs last-20 on the corpus:
+4.88 → 1.85).
+
+`kTierReferencePuzzles` holds each tier's median `(cplx, cells, nCons)` —
+the puzzle the next-tier projection is computed from. It is currently
+load-bearing for one thing: `6-mad`'s reference projects ~175 s, so the
+90 s cap refuses every promotion into `6-mad`.
+
+**Integration** — `Database.recommendedCollectionKey` keeps the level as
+the primary signal. Readiness is consulted **only** when the level-based
+suggestion lands on the active collection (the winsor floor collapses
+base-level players to `mix − 30`, so their level cannot express
+readiness); it never overrides an up/down suggestion, never jumps more
+than one tier, and never fires during the strict onboarding phases. It is
+gated on `autoLevel`: a manually pinned level suppresses it entirely.
+
+**Telemetry** — one `log.info` line per fresh evaluation (the stats
+version counter invalidates the cache, so UI rebuilds do not re-log):
+
+```
+readiness tier=3 vote=promote med=1.41 prev=1.38 hard=0.05 n=20 proj=61 level=11 suggested=4-strong
+```
+
+`bin/analyze_stats.dart` prints the same model per tier (`=== Readiness
+(production model, per tier) ===`) as of the newest play in the corpus,
+so the offline calibration loop and the app cannot drift.
+
+**Rollout.** Readiness ships behind `autoLevel`. Watch the rate of
+readiness-driven suggestions, their acceptance rate, and how often a
+readiness-driven suggestion is followed by a demote within ~100 plays (a
+false-positive-promotion proxy), then re-calibrate `kPromoteR`/`kDemoteR`
+from the telemetry lines plus fresh exports via
+`bin/aggregate_player_stats.dart` → `bin/analyze_stats.dart`.
+
+**Version-boundary check.** A player with exports from both before and
+after a version change tests three things at once: the analytics fix (the
+`e > 0` share — if it is still ~0 % the *recorder* is broken, not the
+flush), the `cplx` scale (compare the stored field `[6]` against a
+recompute), and whether new lines carry `Ncol` at all. Archive each
+version's export separately; never aggregate them into one directory.
+
 ## Data model
 
 ### `PuzzleData` / `Stats`
@@ -372,11 +456,30 @@ the puzzle is stopped.
 One line per solved puzzle, space-separated:
 
 ```
-<timestamp> <duration>s <failures>f <puzzleLine> - <SLD> - <skipped> - <liked> - <disliked> - <pleasure> - <hints>h
+<timestamp> <duration>s <failures>f <puzzleLine> - <SLD> - <extras>
 ```
 
-The trailing `Nh` field was added after the initial rollout; `StatEntry.parse`
-returns `hints = 0` for older lines without it. No migration is required.
+The extras block is a `" - "`-joined sequence of positional slots followed
+by suffix-tagged fields:
+
+```
+skipped - liked - disliked - pleasure - <hints>h - <cellEdits>e
+        - <firstClickMs>fc - <longestGapMs>lg - <collectionIndex>col
+```
+
+`StatEntry.parse` reads the tagged fields by **suffix** rather than
+position, so a new field can be appended without breaking older parsers,
+and older lines parse with the defaults (`hints = cellEdits = firstClickMs
+= longestGapMs = 0`, `collectionIndex = null`). The `<index>col` token is
+`PuzzleLevel.index` of the collection that was active when the play
+started; it is omitted for non-playable collections (`custom`, `user_*`,
+tutorial) and drives the readiness signal only — `playerLevel` ignores it.
+Slots emitted as empty strings are part of the grammar (see
+`skipped`/`liked`). No migration is required for any of these additions.
+
+`bin/aggregate_player_stats.dart` rewrites field `[3]` (recomputed puzzle
+line) and refreshes the derived `*lvl` token, preserving every other field
+verbatim.
 
 ## Calibration notes
 
@@ -464,10 +567,14 @@ Other directions we may explore:
 ## Testing
 
 `test/adapt_to_player_test.dart` covers `computePlayerLevel`,
-`getPuzzlesByLevel`, and `hasUnplayedIgnoringFilters` with inline
-fixtures. The Gaussian draw is tested with a pinned RNG to make the
-distribution check deterministic. `test/cli_stats_test.dart`
-covers `StatEntry.parse` including the backwards-compatible `hints`
-field. Both suites build their data directly from synthetic puzzle lines
-rather than shipping a stats fixture, so they run in milliseconds and do
-not drift when the real `stats/` files change.
+`getPuzzlesByLevel`, `hasUnplayedIgnoringFilters` and
+`recommendedCollectionKey` (including the readiness fallback) with inline
+fixtures. `test/readiness_test.dart` covers the pure readiness model
+(window verdicts, the sustained rule, sample hygiene, the effort cap and
+the `cplx` model clamp). The Gaussian draw is tested with a pinned RNG to
+make the distribution check deterministic. `test/cli_stats_test.dart`
+covers `StatEntry.parse` including the backwards-compatible `hints` field
+and the aggregator's token-preserving re-emit. All three suites build
+their data directly from synthetic puzzle lines rather than shipping a
+stats fixture, so they run in milliseconds and do not drift when the real
+`stats/` files change.

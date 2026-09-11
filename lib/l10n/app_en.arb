@@ -859,6 +859,30 @@
     "@thirdColorSuggestionFiltersReminder": {
         "description": "Secondary paragraph on the 3-color suggestion modal, shown between the main body and the action buttons. Reassures the player that the opt-in is reversible via the Open page filters."
     },
+    "domain3IntroTitle": "Three colors!",
+    "@domain3IntroTitle": {
+        "description": "Title of the modal explaining the 3-color puzzle UI (option dots and paintbrush tap-mode toggle), shown the first time the player opens a 3-color puzzle."
+    },
+    "domain3IntroBody": "This puzzle uses three colors: black, white and purple. Two little helpers let you work with them.",
+    "@domain3IntroBody": {
+        "description": "Lead-in paragraph of the 3-color UI explanation modal, before the two detailed sections."
+    },
+    "domain3IntroDotsTitle": "The dots at the bottom of a cell",
+    "@domain3IntroDotsTitle": {
+        "description": "Header of the option-dots section in the 3-color UI explanation modal: the row of colored dots drawn under every empty cell."
+    },
+    "domain3IntroDotsBody": "Each empty cell shows a dot for every color it can still take. When a color is ruled out, its dot disappears — so the dots always tell you what is still possible.",
+    "@domain3IntroDotsBody": {
+        "description": "Explanation of the option dots: one dot per remaining color option of an empty cell."
+    },
+    "domain3IntroPaintbrushTitle": "The paintbrush button",
+    "@domain3IntroPaintbrushTitle": {
+        "description": "Header of the paintbrush section in the 3-color UI explanation modal: the toolbar button that toggles the tap interaction mode."
+    },
+    "domain3IntroPaintbrushBody": "Tap the paintbrush in the toolbar to switch what a tap does. In remove-option mode, tapping an empty cell rules out one of its colors (its dot disappears) instead of painting it; tap the paintbrush again to go back to painting.",
+    "@domain3IntroPaintbrushBody": {
+        "description": "Explanation of the paintbrush button: it toggles between painting a color and removing one of a cell's remaining options."
+    },
     "welcomeModalTitle": "Welcome",
     "@welcomeModalTitle": {
         "description": "Title of the intro modal shown once before the first rule explanation, on a brand-new player or right after a 'Replay onboarding' reset."

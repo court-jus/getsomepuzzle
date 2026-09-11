@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/stats.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -311,5 +313,107 @@ void main() {
         expect(persisted, contains('7h'));
       },
     );
+
+    test(
+      'the loaded collection latest play keeps its collection tag across a flush',
+      () async {
+        // Same data-loss shape as the click-analytics regression above: the
+        // `<n>col` tag only survives a flush if `loadStats` hydrates
+        // `PuzzleData` from the stored line, otherwise `getStats` re-emits
+        // the latest play with the tag missing and the readiness model goes
+        // blind on the very next rewrite.
+        const puzzleLine =
+            'v2_12_3x3_000020020_FM:1.1;GS:0.1;PA:3.right;PA:8.left_1:122221122_8';
+        const entry =
+            '2026-05-01T10:00:00 120s 2f $puzzleLine'
+            ' - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg - 3col';
+        statsFile.writeAsStringSync(entry);
+
+        final db = Database(playerLevel: 50);
+        db.collection = '4-strong';
+        final puz = PuzzleData(puzzleLine);
+        db.puzzles = [puz];
+        db.loadStats([StatEntry.parse(entry)!]);
+
+        expect(puz.playedCollectionIndex, 3);
+
+        await db.writeStats();
+        final persisted = statsFile.readAsStringSync().trim();
+        expect(persisted, contains('3col'));
+        expect(persisted, contains('0fc'));
+      },
+    );
+
+    test(
+      'a play stamped at start drives readiness after a full disk round-trip',
+      () async {
+        // End-to-end wiring check: `main.openPuzzle` stamps
+        // `activePlayableCollectionIndex` on the play at start, `getStats`
+        // persists it, the next boot re-reads it, and the readiness model
+        // turns 39 steady plays into a promotion one tier up. If any link in
+        // that chain drops the token, the suggestion silently disappears.
+        const cplx = 16;
+        final base = DateTime.now().subtract(const Duration(minutes: 40));
+        final writer = Database(playerLevel: 20);
+        writer.collection = '1-easy';
+        writer.puzzles = List.generate(39, (i) {
+          final height = 4 + i;
+          final cells = 4 * height;
+          final line = 'v2_12_4x${height}_${'0' * cells}_FM:1_0:0_$cplx';
+          return PuzzleData(line)
+            ..played = true
+            ..finished = base.add(Duration(minutes: i))
+            ..duration = (expectedDuration(cplx, cells, 0, 1) * 1.2).round()
+            // The exact expression main.dart uses at play start.
+            ..playedCollectionIndex = writer.activePlayableCollectionIndex;
+        });
+        await writer.writeStats();
+
+        final reader = Database(playerLevel: 20);
+        reader.collection = '1-easy';
+        reader.autoLevel = true;
+        reader.onboardingCompletions = OnboardingPhase.strictCompletionTargets;
+        reader.loadStats(
+          statsFile
+              .readAsLinesSync()
+              .map(StatEntry.parse)
+              .whereType<StatEntry>()
+              .toList(),
+        );
+
+        expect(reader.recommendedCollectionKey, '2-player');
+      },
+    );
+  });
+
+  group('StatEntry collection tag', () {
+    PuzzleData playedPuzzle() =>
+        PuzzleData('v2_12_4x4_0000000000000000_FM:1_0:0_0')
+          ..played = true
+          ..finished = DateTime(2026, 5, 1, 10)
+          ..duration = 30;
+
+    test('getStat() round-trips the tag through parse', () {
+      final puz = playedPuzzle()..playedCollectionIndex = 5;
+      final reparsed = StatEntry.parse(puz.getStat())!;
+      expect(reparsed.collectionIndex, 5);
+      expect(reparsed.fullLine(), contains('5col'));
+    });
+
+    test('a null tag emits no token and parses back as null', () {
+      final stat = playedPuzzle().getStat();
+      expect(stat, isNot(contains('col')));
+      expect(StatEntry.parse(stat)!.collectionIndex, isNull);
+    });
+
+    test('a legacy line without the token parses as null', () {
+      final entry = StatEntry.parse(
+        '2026-05-01T10:00:00 30s 0f '
+        'v2_12_4x4_0000000000000000_FM:1_0:0_0'
+        ' - ___ -  -  -  -  - 0h - 0e - 0fc - 0lg',
+      )!;
+      expect(entry.collectionIndex, isNull);
+      expect(entry.fullLine(), isNot(contains('col')));
+    });
   });
 }

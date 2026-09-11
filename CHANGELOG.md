@@ -12,6 +12,9 @@ localised under
 
 ## [Unreleased]
 
+- **First 3-color puzzle explained**: the first time a purple grid opens,
+  a one-shot modal explains the option dots under empty cells and the
+  paintbrush button that toggles the "remove option" tap mode.
 - **Intro dialogs now precede rule explanations**: on the first launch
   after an update, the one-time "What's new" dialog is shown before the
   explanation modal of any newly introduced rule, instead of after it.

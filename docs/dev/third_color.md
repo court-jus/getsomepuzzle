@@ -65,6 +65,16 @@ before the port.
   ~10 % of the cell, with a thin grey outline so the white dot stays
   visible against the cyan "free" background). On 2-colour puzzles no
   dot is drawn because it would carry no information.
+* The first time a domain-3 puzzle is opened, a one-shot modal
+  (`Domain3IntroDialog`, styled like the new-rule modal) explains both
+  of these UI affordances: the option dots under a free cell and the
+  paintbrush toolbar button that toggles the remove-option tap mode.
+  Gated by `Database.shouldShowDomain3Intro` (pref `domain3IntroShown`)
+  and marked shown on dismissal; deliberately independent of onboarding
+  state so it fires whichever route brought the player to purple (the
+  suggestion modal, the Open-page domain filters, or a shared link),
+  but skipped when `hasPlayedThirdColor` already proves they have met
+  the UI.
 * The hint UI handles `RemoveOption` end-to-end: tap 2 shows
   `hintCellOptionRemovable`, tap 3 uses `hintRemoveOptionDeducedFrom` /
   `hintForceRemoveOption` / `hintRemoveOptionComplicity` /

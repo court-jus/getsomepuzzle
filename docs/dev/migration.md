@@ -482,7 +482,8 @@ Added by 2.0.0: `settingsNextPuzzleDelay`, `settingsGrayoutEnabled`,
 `settingsStatsDirectory`, `settingsThemeMode`, `wantedDomainsFilter`,
 `bannedDomainsFilter`, `wantedScenarioFilter`,
 `onboardingCompletedAt`, `postOnboardingCompletions`,
-`hasPlayedThirdColor`, `thirdColorSuggestionShown`,
+`hasPlayedThirdColor`, `thirdColorSuggestionShown`, `domain3IntroShown`
+(one-shot 3-colour UI explanation — §3.5),
 `introDialogSeen` (highest numbered intro dialog shown — §3.7).
 
 Obsolete keys cleaned at load (both versions): `minCplxFilter`,

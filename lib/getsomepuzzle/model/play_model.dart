@@ -77,27 +77,28 @@ const double _kCplxScale = 59.39;
 const double _kFailMul = 1.1943;
 const double _kNConsMul = 1.0614;
 
-double expectedDuration(
-  int cplx,
-  int cells,
-  int failures,
-  int nConstraints,
-) {
+/// Cap on the `cplx` fed to the duration/skill model. `cplx` itself is
+/// unbounded (and stays so); this only stops `exp(cplx / _kCplxScale)`
+/// from extrapolating far outside the calibration range — `cplx` 564
+/// predicts 404 308 s and yields `level_i ≈ 1 033`.
+///
+/// Applied **only** inside [expectedDuration] and [playLevel]. Selection,
+/// the Gaussian, the display, `parsePuzzleLineFields` and the difficulty
+/// tiers keep the true value.
+const int kCplxModelMax = 120;
+
+double expectedDuration(int cplx, int cells, int failures, int nConstraints) {
+  final c = cplx.clamp(0, kCplxModelMax);
   return _kBase *
       math.pow(cells, _kCellsExp) *
-      math.exp(cplx / _kCplxScale) *
+      math.exp(c / _kCplxScale) *
       math.pow(_kFailMul, failures) *
       math.pow(_kNConsMul, nConstraints);
 }
 
 /// Algebraic inverse of [expectedDuration]: the `cplx` the model would have
 /// predicted for `duration`.
-double impliedCplx(
-  int duration,
-  int cells,
-  int failures,
-  int nConstraints,
-) {
+double impliedCplx(int duration, int cells, int failures, int nConstraints) {
   return _kCplxScale *
       (math.log(duration) -
           math.log(_kBase) -
@@ -117,5 +118,6 @@ double playLevel(
   int failures,
   int nConstraints,
 ) {
-  return 2.0 * cplx - impliedCplx(duration, cells, failures, nConstraints);
+  final c = cplx.clamp(0, kCplxModelMax);
+  return 2.0 * c - impliedCplx(duration, cells, failures, nConstraints);
 }

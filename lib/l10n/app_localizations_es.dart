@@ -775,6 +775,27 @@ class AppLocalizationsEs extends AppLocalizations {
       'No olvides que siempre puedes elegir el tipo de puzles que quieres en los filtros avanzados de la biblioteca.';
 
   @override
+  String get domain3IntroTitle => '¡Tres colores!';
+
+  @override
+  String get domain3IntroBody =>
+      'Este puzle usa tres colores: negro, blanco y púrpura. Dos pequeños ayudantes te permiten manejarlos.';
+
+  @override
+  String get domain3IntroDotsTitle => 'Los puntos al pie de cada casilla';
+
+  @override
+  String get domain3IntroDotsBody =>
+      'Cada casilla vacía muestra un punto por cada color que aún puede tomar. Cuando se descarta un color, su punto desaparece, así que los puntos siempre te dicen qué sigue siendo posible.';
+
+  @override
+  String get domain3IntroPaintbrushTitle => 'El botón del pincel';
+
+  @override
+  String get domain3IntroPaintbrushBody =>
+      'Toca el pincel de la barra de herramientas para cambiar lo que hace un toque. En el modo «eliminar una opción», tocar una casilla vacía descarta uno de sus colores (su punto desaparece) en lugar de pintarla; toca de nuevo el pincel para volver a pintar.';
+
+  @override
   String get welcomeModalTitle => 'Bienvenido';
 
   @override

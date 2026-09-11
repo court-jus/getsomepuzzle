@@ -5,9 +5,10 @@ import 'package:getsomepuzzle/getsomepuzzle/model/play_model.dart';
 /// Format: finishedTimestamp durationS failuresF puzzleLine - SLD - extras
 /// The extras block contains in order:
 ///   skipped - liked - disliked - pleasure - hintsH - cellEditsE
-///   - firstClickMsFC - longestGapMsLG
+///   - firstClickMsFC - longestGapMsLG - collectionIndexCol
 /// New fields are appended over time; older lines parse with the defaults
-/// `hints=cellEdits=firstClickMs=longestGapMs=0`.
+/// `hints=cellEdits=firstClickMs=longestGapMs=0` and
+/// `collectionIndex=null`.
 class StatEntry {
   final String? finished;
   final int duration;
@@ -16,6 +17,13 @@ class StatEntry {
   final int cellEdits;
   final int firstClickMs;
   final int longestGapMs;
+
+  /// `PuzzleLevel.index` of the collection that was active at play start,
+  /// or null when the active collection was not a playable level
+  /// (`custom`, `user_*`, tutorial) or the line pre-dates the token.
+  /// Drives readiness only; `playerLevel` ignores it.
+  final int? collectionIndex;
+
   final String puzzleLine;
   final String? skipped;
   final String? liked;
@@ -42,6 +50,7 @@ class StatEntry {
     this.cellEdits = 0,
     this.firstClickMs = 0,
     this.longestGapMs = 0,
+    this.collectionIndex,
     this.skipped,
     this.liked,
     this.disliked,
@@ -69,6 +78,7 @@ class StatEntry {
       "${cellEdits}e",
       "${firstClickMs}fc",
       "${longestGapMs}lg",
+      collectionIndex == null ? "" : "${collectionIndex}col",
     ].join(" - ");
     return '${finished ?? "unfinished"} ${duration}s ${failures}f '
         '$puzzleLine - $sld - $extraFields';
@@ -94,6 +104,17 @@ class StatEntry {
       return 0;
     }
 
+    // Nullable twin of the above: `0` is a valid tier index, so absence
+    // must be distinguishable from a parsed zero.
+    int? parseSuffixedOrNull(String suffix) {
+      for (final f in fields) {
+        if (f.endsWith(suffix)) {
+          return int.tryParse(f.substring(0, f.length - suffix.length));
+        }
+      }
+      return null;
+    }
+
     return StatEntry(
       finished: finished,
       duration: duration,
@@ -102,6 +123,7 @@ class StatEntry {
       cellEdits: parseSuffixed('e'),
       firstClickMs: parseSuffixed('fc'),
       longestGapMs: parseSuffixed('lg'),
+      collectionIndex: parseSuffixedOrNull('col'),
       puzzleLine: fields[3],
       skipped: fields.length > 7 && fields[7].isNotEmpty ? fields[7] : null,
       liked: fields.length > 9 && fields[9].isNotEmpty ? fields[9] : null,
