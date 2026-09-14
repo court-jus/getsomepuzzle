@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
@@ -154,7 +155,11 @@ class ConstraintExplanationList extends StatelessWidget {
                   final locale = (languageCode == 'fr' || languageCode == 'es')
                       ? languageCode
                       : 'en';
-                  final url = Uri.parse('$kDocBaseUrl/$locale/$slug.html');
+                  // Row/column pairs (RC/CC, JR/JC, CT/RT) share one
+                  // published page, named after the display slug the UI
+                  // renders — callers may pass either orientation.
+                  final page = collapseMergedRules([slug]).first;
+                  final url = Uri.parse('$kDocBaseUrl/$locale/$page.html');
                   launchUrl(url, mode: LaunchMode.externalApplication);
                 },
               ),

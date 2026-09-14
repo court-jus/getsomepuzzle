@@ -8,9 +8,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/app_theme.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
 import 'package:getsomepuzzle/l10n/app_localizations.dart';
 import 'package:getsomepuzzle/widgets/help_page.dart';
 import 'package:getsomepuzzle/widgets/constraints/registry.dart';
@@ -82,6 +84,10 @@ void main() {
       });
 
       testWidgets('learning page renders every constraint row', (tester) async {
+        // Tall viewport so the lazy list builds every row.
+        tester.view.physicalSize = const Size(800, 3000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
         await tester.pumpWidget(
           _wrap(
             LearningPage(
@@ -93,9 +99,50 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        // All constraints are listed (unseen at this point → locked).
-        expect(find.byType(ConstraintIcon), findsWidgets);
+        // All constraints are listed (unseen at this point → locked),
+        // one row per concept: the row/column pairs are merged.
+        expect(
+          find.byType(ConstraintIcon),
+          findsNWidgets(
+            collapseMergedRules(OnboardingPhase.allKnownSlugs).length,
+          ),
+        );
         expect(find.byIcon(Icons.lock_outline), findsWidgets);
+      });
+
+      testWidgets('learning page merges row/column pairs into one row', (
+        tester,
+      ) async {
+        final progress = ConstraintProgress();
+        // The player has only ever met the row orientation.
+        progress.noteSeen('RC', DateTime(2026, 5, 1));
+        final database = Database(playerLevel: 0, progress: progress)
+          ..notePuzzleCompleted(PuzzleData('v2_12_3x3_000020000_RC:0.1_0:0_16'))
+          ..notePuzzleCompleted(
+            PuzzleData('v2_12_3x3_000020000_CC:0.1_0:0_16'),
+          );
+
+        await tester.pumpWidget(
+          _wrap(
+            LearningPage(database: database, progress: progress),
+            brightness: brightness,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // One row for the concept, carrying both orientations' progress.
+        expect(find.text('Cells per line'), findsOneWidget);
+        expect(find.textContaining('2 puzzles played'), findsOneWidget);
+        expect(find.textContaining('May 1, 2026'), findsOneWidget);
+        // Seen through one orientation → not locked, review enabled.
+        final row = find.ancestor(
+          of: find.text('Cells per line'),
+          matching: find.byType(ListTile),
+        );
+        final refresh = tester.widget<TextButton>(
+          find.descendant(of: row, matching: find.byType(TextButton)),
+        );
+        expect(refresh.onPressed, isNotNull);
       });
 
       testWidgets('help page renders markdown + constraints catalogue', (

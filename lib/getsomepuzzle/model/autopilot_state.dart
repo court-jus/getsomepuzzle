@@ -96,3 +96,13 @@ class BackgroundAction extends AutopilotAction {
 
   const BackgroundAction({required this.color});
 }
+
+/// Capture the current frame as a PNG file, next to the scenario file.
+///
+/// Only honoured when the app is launched with `--screenshots`: the file is
+/// written as `<scenario_name>_NN.png` with `NN` a two-digit index starting
+/// at `01`. Without the flag the action is logged and skipped, so the same
+/// scenario can still be recorded as a video.
+class ScreenshotAction extends AutopilotAction {
+  const ScreenshotAction();
+}

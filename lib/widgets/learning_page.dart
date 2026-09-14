@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constraint_progress.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/database.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/onboarding.dart';
@@ -8,13 +9,18 @@ import 'package:getsomepuzzle/widgets/constraints/registry.dart';
 import 'package:intl/intl.dart';
 
 /// Reference page surfaced as the menu entry "Apprentissage" next to
-/// Help. For each known constraint slug it shows:
+/// Help. For each known constraint it shows:
 ///   - icon + localised name,
 ///   - first-seen date or "not yet encountered",
 ///   - count of finished, non-skipped puzzles containing the
 ///     constraint across every collection in the player's stats,
 ///   - a button that re-opens the explanation modal so the player can
 ///     review the rule any time without affecting their progress.
+///
+/// Rows are per *concept*, not per slug: the row/column pairs
+/// (CC↔RC, JC↔JR, RT↔CT) share one explanation line, so they are
+/// collapsed to their display slug and their progress is merged across
+/// the family — otherwise the same rule would be listed twice.
 ///
 /// The page is rebuilt every time it is opened — counts and dates are
 /// pulled from the live `Database` and `ConstraintProgress`. Because
@@ -37,22 +43,35 @@ class LearningPage extends StatelessWidget {
       Localizations.localeOf(context).languageCode,
     );
 
-    final slugs = OnboardingPhase.allKnownSlugs.toList()
-      // Sort by: seen-first (so the player sees their progress at the
-      // top), then alphabetical inside each bucket — matches the
-      // dropdown order convention in the rest of the app.
-      ..sort((a, b) {
-        final seenA = progress.firstSeen[a];
-        final seenB = progress.firstSeen[b];
-        if ((seenA == null) != (seenB == null)) {
-          return seenA == null ? 1 : -1;
-        }
-        if (seenA != null && seenB != null) {
-          final cmp = seenA.compareTo(seenB);
-          if (cmp != 0) return cmp;
-        }
-        return a.compareTo(b);
-      });
+    // One row per concept: collapsing the row/column pairs leaves the
+    // display slug (CC, JC, RT) as the row's identity, and the family's
+    // progress is merged into it.
+    final rows =
+        [
+            for (final slug in collapseMergedRules(
+              OnboardingPhase.allKnownSlugs,
+            ))
+              (
+                slug: slug,
+                firstSeen: _firstSeenOf(slug),
+                playCount: _playCountOf(slug),
+              ),
+          ]
+          // Sort by: seen-first (so the player sees their progress at the
+          // top), then chronological, then alphabetical inside each bucket —
+          // matches the dropdown order convention in the rest of the app.
+          ..sort((a, b) {
+            final seenA = a.firstSeen;
+            final seenB = b.firstSeen;
+            if ((seenA == null) != (seenB == null)) {
+              return seenA == null ? 1 : -1;
+            }
+            if (seenA != null && seenB != null) {
+              final cmp = seenA.compareTo(seenB);
+              if (cmp != 0) return cmp;
+            }
+            return a.slug.compareTo(b.slug);
+          });
 
     return Scaffold(
       appBar: AppBar(title: Text(l.learningPageTitle)),
@@ -60,12 +79,12 @@ class LearningPage extends StatelessWidget {
         top: false,
         child: ListView.separated(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: slugs.length,
+          itemCount: rows.length,
           separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, index) {
-            final slug = slugs[index];
-            final firstSeen = progress.firstSeen[slug];
-            final playCount = database.playCountForSlug(slug);
+            final slug = rows[index].slug;
+            final firstSeen = rows[index].firstSeen;
+            final playCount = rows[index].playCount;
             final name = constraintNameForSlug(l, slug);
             final status = firstSeen == null
                 ? l.learningNeverSeen
@@ -119,6 +138,26 @@ class LearningPage extends StatelessWidget {
       ),
     );
   }
+
+  /// Earliest encounter date across the merged family of [displaySlug].
+  /// The members of a row/column pair are the same rule to the player,
+  /// so the row reports the first time either orientation was met.
+  DateTime? _firstSeenOf(String displaySlug) {
+    DateTime? earliest;
+    for (final slug in expandMergedRules({displaySlug})) {
+      final seen = progress.firstSeen[slug];
+      if (seen != null && (earliest == null || seen.isBefore(earliest))) {
+        earliest = seen;
+      }
+    }
+    return earliest;
+  }
+
+  /// Finished, non-skipped plays across the merged family of
+  /// [displaySlug], so a row counts both orientations of the rule.
+  int _playCountOf(String displaySlug) => expandMergedRules({
+    displaySlug,
+  }).fold(0, (sum, slug) => sum + database.playCountForSlug(slug));
 }
 
 String _capitalise(String s) =>

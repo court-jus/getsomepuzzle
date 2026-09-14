@@ -60,6 +60,19 @@ localised under
 - **French copy now consistently vouvoie** the player (previously mixed "tu"/"vous").
 - **End-of-batch dialog reworked**: the numeric level caption and the "based on your level" hint are gone; the suggestion now congratulates when pointing one tier up ("Good job, do you want to try the next collection?") or softly invites when pointing down/off-ladder ("Are you having fun? Do you want to try this other collection?").
 - ~10K new puzzles (BB, IM, paths, more variety across levels).
+- **Learning page groups the row/column rules**: "cells per line"
+  (CC/RC), "transition" (RT/CT) and "line majority" (JC/JR) now take one
+  row instead of two, with the first-seen date and the play count merged
+  over both orientations; the chain-icon preview no longer overflows its
+  cell.
+- **Player guide and in-app help refreshed for 2.0.0**: the website guide
+  now covers three colours (option dots, paintbrush tap mode, colour-mix
+  slider), the keyboard shortcuts, the restart confirmation, the new
+  Open-page filters, the current Settings rows and the full play history;
+  every rule the app can introduce has a page (Implication, Bounding box,
+  Islands, Mirror, Non-square rectangular groups, Same size, Line
+  majority), and the per-rule "Learn more" links resolve for the merged
+  row/column rules instead of pointing at a missing page.
 
 ## [1.6.22] - 2026-06-04
 

@@ -1,12 +1,15 @@
 // ignore_for_file: avoid_print
 
 import 'dart:async';
-import 'dart:io' show exit;
+import 'dart:io' show File, exit;
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 import 'package:getsomepuzzle/getsomepuzzle/autopilot/autopilot.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
@@ -108,12 +111,15 @@ Future<void> main(List<String> args) async {
   bool noOnboarding = false;
   String? forcedLocale;
   String? scenarioPath;
+  bool screenshots = false;
   double? windowWidth;
   double? windowHeight;
   final positionalArgs = <String>[];
   for (final arg in args) {
     if (arg == '--no-onboarding') {
       noOnboarding = true;
+    } else if (arg == '--screenshots') {
+      screenshots = true;
     } else if (arg.startsWith('--lang=')) {
       forcedLocale = arg.substring('--lang='.length);
     } else if (arg.startsWith('--scenario=')) {
@@ -145,6 +151,7 @@ Future<void> main(List<String> args) async {
       noOnboarding: noOnboarding,
       forcedLocale: forcedLocale,
       scenarioPath: scenarioPath,
+      screenshots: screenshots,
     ),
   );
 }
@@ -156,6 +163,7 @@ class MyApp extends StatefulWidget {
     this.noOnboarding = false,
     this.forcedLocale,
     this.scenarioPath,
+    this.screenshots = false,
   });
 
   /// Puzzle line extracted from the launch URL or CLI args, if any.
@@ -172,6 +180,11 @@ class MyApp extends StatefulWidget {
   /// mode and drives the UI from the scenario actions.
   final String? scenarioPath;
 
+  /// When true (and [scenarioPath] is set), the scenario's `screenshot`
+  /// actions write PNG files next to the scenario instead of the run being
+  /// recorded as a video.
+  final bool screenshots;
+
   @override
   State<MyApp> createState() => _MyAppState();
 }
@@ -179,6 +192,12 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   Locale selectedLocale = Locale("en");
   ThemeModeType _themeMode = ThemeModeType.system;
+
+  /// GlobalKey on the repaint boundary wrapping the whole app in screenshot
+  /// mode. Handed to [MyHomePage] so the autopilot `screenshot` action can
+  /// rasterise the composed frame — overlay entries (fake cursor, subtitle
+  /// dialog) included, since they paint inside [MaterialApp]'s navigator.
+  final GlobalKey _screenshotBoundaryKey = GlobalKey();
 
   void setAppLocale(String newLocale) {
     setState(() {
@@ -212,7 +231,7 @@ class _MyAppState extends State<MyApp> {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final app = MaterialApp(
       title: 'Get Some Puzzle',
       debugShowCheckedModeBanner: false,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -232,8 +251,17 @@ class _MyAppState extends State<MyApp> {
         noOnboarding: widget.noOnboarding,
         forcedLocale: widget.forcedLocale,
         scenarioPath: widget.scenarioPath,
+        screenshots: widget.screenshots,
+        screenshotBoundaryKey: _screenshotBoundaryKey,
       ),
     );
+    // Only in screenshot mode: an extra boundary around the whole app would
+    // make every descendant repaint re-record the full subtree, which the
+    // normal play path does not need.
+    if (widget.scenarioPath != null && widget.screenshots) {
+      return RepaintBoundary(key: _screenshotBoundaryKey, child: app);
+    }
+    return app;
   }
 }
 
@@ -247,6 +275,8 @@ class MyHomePage extends StatefulWidget {
     this.noOnboarding = false,
     this.forcedLocale,
     this.scenarioPath,
+    this.screenshots = false,
+    this.screenshotBoundaryKey,
   });
 
   final String title;
@@ -271,6 +301,15 @@ class MyHomePage extends StatefulWidget {
   /// Path to an autopilot scenario file. When set, the app enters autopilot
   /// mode and drives the UI from the scenario actions.
   final String? scenarioPath;
+
+  /// When true, the autopilot's `screenshot` action writes PNG files next to
+  /// the scenario file (`<scenario_name>_NN.png`). Without it the action is
+  /// logged and skipped.
+  final bool screenshots;
+
+  /// GlobalKey on the app-wide repaint boundary used by `screenshot`
+  /// actions. Only mounted when [screenshots] is set with a [scenarioPath].
+  final GlobalKey? screenshotBoundaryKey;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -344,6 +383,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   /// The autopilot driver (isolate or web fallback).
   AutopilotDriver? _autopilotDriver;
+
+  /// Output path prefix for `screenshot` actions — `<dir>/<scenario_name>` —
+  /// or null when screenshot capture is disabled (`--screenshots` absent).
+  String? _screenshotPrefix;
+
+  /// Number of PNG files written so far; drives the two-digit index.
+  int _screenshotIndex = 0;
 
   /// Cursor overlay entry. Created lazily on first mouse/mouseTo action.
   OverlayEntry? _cursorOverlay;
@@ -556,6 +602,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final path = widget.scenarioPath;
     if (path == null || path.isEmpty) return;
 
+    // Screenshot mode: PNGs land next to the scenario, named after it.
+    if (widget.screenshots) {
+      _screenshotPrefix = p.join(
+        p.dirname(path),
+        p.basenameWithoutExtension(path),
+      );
+      _screenshotIndex = 0;
+      log.info(
+        'autopilot: screenshots enabled → "${_screenshotPrefix}_NN.png"',
+      );
+    }
+
     final driver = AutopilotDriver();
     _autopilotDriver = driver;
     final actions = await driver.compute(path);
@@ -597,6 +655,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           'textcolor $textColor $fillColor $borderColor',
         BackgroundAction(:final color) => 'background $color',
         HintAction() => 'hint',
+        ScreenshotAction() => 'screenshot',
       };
       log.info('autopilot: START $lineDesc');
 
@@ -627,6 +686,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
         case HintAction():
           await _performHint();
+
+        case ScreenshotAction():
+          await _performScreenshot();
       }
 
       log.info('autopilot: END $lineDesc');
@@ -841,6 +903,63 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       WidgetsBinding.instance.addPostFrameCallback((_) => done.complete());
     });
     await done.future;
+  }
+
+  /// Capture the current frame as a PNG file.
+  ///
+  /// Only active when the app was launched with `--screenshots`; otherwise
+  /// the action is skipped with a warning. Files are written next to the
+  /// scenario file as `<scenario_name>_NN.png`, `NN` being a two-digit index
+  /// starting at `01`.
+  ///
+  /// The raster goes through the app-wide [RepaintBoundary] (see
+  /// [_MyAppState]) rather than the `RenderView`'s layer: `debugLayer` is
+  /// always null outside debug builds, and a boundary around the whole
+  /// [MaterialApp] captures the composed frame — fake cursor and subtitle
+  /// overlays included.
+  Future<void> _performScreenshot() async {
+    final prefix = _screenshotPrefix;
+    if (prefix == null) {
+      log.warning(
+        'autopilot: screenshot — launch with --screenshots to capture PNGs',
+      );
+      return;
+    }
+
+    // Let the pending state change paint before rasterising.
+    await _autopilotWaitFrame();
+    if (!mounted) return;
+
+    final boundary =
+        widget.screenshotBoundaryKey?.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
+    if (boundary == null) {
+      log.warning('autopilot: screenshot — root repaint boundary not mounted');
+      return;
+    }
+
+    final file = File(
+      '${prefix}_${(_screenshotIndex + 1).toString().padLeft(2, '0')}.png',
+    );
+    try {
+      final image = await boundary.toImage(
+        pixelRatio: MediaQuery.devicePixelRatioOf(context),
+      );
+      try {
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        if (data == null) {
+          log.warning('autopilot: screenshot — PNG encoding failed');
+          return;
+        }
+        await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+        _screenshotIndex++;
+        log.info('autopilot: screenshot $_screenshotIndex → ${file.path}');
+      } finally {
+        image.dispose();
+      }
+    } catch (e) {
+      log.warning('autopilot: screenshot — capture failed: $e');
+    }
   }
 
   /// Show or close the subtitle overlay.

@@ -286,8 +286,8 @@ residual cases only (`customEmpty`, `userAllPlayed`,
 A **Learning** menu entry (labelled "Apprentissage" in French) sits
 next to Help. It serves as a rule reference and refresh tool.
 
-For each entry in `OnboardingPhase.allKnownSlugs` (read from the
-registry), the page shows:
+For each entry in `collapseMergedRules(OnboardingPhase.allKnownSlugs)`
+(read from the registry), the page shows:
 
 - The localised **icon** + **name**.
 - A status: `seen on 12 March 2026` if `progress.firstSeen[slug]` is
@@ -300,6 +300,15 @@ registry), the page shows:
   modal (`NewConstraintDialog.show(context, {slug})`) so the player
   can review the rule any time without affecting their progress —
   `firstSeen` stays untouched.
+
+The list is per *concept*, not per slug: the row/column pairs
+(CC↔RC, JC↔JR, RT↔CT) are collapsed to their display slug (CC, JC, RT)
+so the same rule is not listed twice, and the row's progress is merged
+over the family — `firstSeen` is the earliest date among the members
+(`expandMergedRules`) and the play count is the sum of
+`playCountForSlug` over them. `firstSeen` itself stays keyed by the raw
+slugs (`main.dart` marks every sibling as seen when a merged family is
+introduced), so the page only aggregates for display.
 
 Slugs are sorted seen-first, by first-seen date ascending, then
 alphabetical. The page is rebuilt every time it is opened — counts

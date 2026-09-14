@@ -69,18 +69,26 @@ class GroupCountWidget extends StatelessWidget {
                 ),
               ),
             Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.link, size: iconSize, color: color),
-                  Text(
-                    largeText,
-                    style: TextStyle(
-                      fontSize: largeFontSize * 0.6,
-                      color: color,
+              // The chain glyph and the count stack vertically; scale
+              // the pair down instead of overflowing when the ambient
+              // text style (or a text-scale factor) makes it taller
+              // than the cell.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.link, size: iconSize, color: color),
+                    Text(
+                      largeText,
+                      style: TextStyle(
+                        fontSize: largeFontSize * 0.6,
+                        height: 1,
+                        color: color,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],

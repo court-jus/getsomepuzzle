@@ -190,7 +190,7 @@ constraint introduces a novel `verify` contract pattern.
 
 - [`autopilot.md`](autopilot.md) — Autopilot mode (`--scenario=`)
   driving the puzzle UI from a scenario file: actions, file format,
-  architecture, fake cursor overlay.
+  architecture, fake cursor overlay, PNG capture (`--screenshots`).
 - [`keyboard_shortcuts.md`](keyboard_shortcuts.md) — Desktop keyboard
   control of an in-progress puzzle (`_handleKeyEvent` in `main.dart`).
 

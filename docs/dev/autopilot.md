@@ -20,6 +20,70 @@ the app suppresses all onboarding modals, new-constraint dialogs, the locale
 chooser and the idle auto-pause; it also skips loading stats and the puzzle
 database entirely.
 
+### Screenshot mode
+
+Add `--screenshots` to make the run capture PNGs instead of being recorded as
+a video:
+
+```
+getsomething --scenario=/path/to/scenario.txt --screenshots
+```
+
+Each `screenshot` action in the scenario then rasterises the composed frame
+(UI + fake cursor + subtitle overlays) and writes it next to the scenario file
+as `<scenario_name>_NN.png` — `NN` is a two-digit index starting at `01`
+(`docs/scenario/demo.txt` → `docs/scenario/demo_01.png`,
+`demo_02.png`, …). Without the flag the action is logged and skipped, so the
+same scenario still records cleanly as a video.
+
+The whole app is wrapped in a `RepaintBoundary` in this mode (see
+`_MyAppState`); the boundary's `GlobalKey` is handed down to `MyHomePage` and
+drives the `toImage()` call. A `RenderRepaintBoundary` is used rather than the
+`RenderView`'s composited `OffsetLayer` (the technique in
+`integration_test/screenshots_test.dart`) because `debugLayer` always returns
+null outside debug builds — the tools run the release binary.
+
+Wrapper (Xvfb, release binary), which skips ffmpeg entirely in this mode:
+
+```
+./tools/record_scenario.sh docs/scenario/demo.txt --screenshots
+```
+
+A scenario can therefore be a pure screenshot script:
+
+```
+loadState v2_12_3x3_000102000_GS:5.1;FM:111_1:121212212
+screenshot
+setValue 0,0,black
+screenshot
+```
+
+### Player-guide screenshot scenarios
+
+`docs/scenario/guide/<SLUG>.txt` holds one screenshot-only scenario per
+constraint (BB, IM, IS, JC, MI, RE, SZ), used to produce the per-constraint
+images of the online player guide (`doc/img/constraints/<SLUG>/stepN.png`):
+
+```
+./tools/record_scenario.sh docs/scenario/guide/<SLUG>.txt 720 1080 --screenshots
+```
+
+Each scenario loads a single puzzle, captures the initial grid, then walks the
+deductions with the `hint` action and captures the **third** tap of the cycle
+(errors → cell → cell + constraint): that is the frame where the deduced cell
+is ringed gold and the arrow from the giving constraint widget is drawn.
+There is no narration — the guide page carries the prose. Deductions that come
+from another rule are still applied (`hint` tapped four times without a
+capture) so the puzzle keeps progressing.
+
+The app applies exactly **one** `findAMove()` result per hint tap
+(`_applyHelpMove`), whereas `bin/solve.dart` uses `solveTrace()`, which drains
+the giving constraint after each move (`_drainAfter`). On a puzzle with more
+than one constraint of the same or of another type the two sequences can
+differ, so derive the capture list from the app's own per-tap sequence rather
+than from the solver's step list.
+
+
 ## Scenario file format
 
 One action per line. Lines starting with `#` are comments. Empty lines are
@@ -41,6 +105,7 @@ actual newline.
 | `dialog` | `dialog` | Dismiss any currently open subtitle overlay. |
 | `textcolor` | `textcolor <textColor> <fillColor> <borderColor>` | Change the colours used by subsequent `dialog` actions. Each colour is a [PuzzleColors] semantic name (`dialogAccent`, `highlight`, `forbidden`, `mandatory`, `constraintValid`, `pauseOverlayBg`, `transparent`, …) or a hex code (`#RRGGBB` or `#AARRGGBB`). Use `default` to reset a slot to its original value. All three arguments are required. |
 | `background` | `background <color>` | Set a full-screen background colour for subsequent `dialog` actions. A rectangle covering the entire screen is drawn **behind** the dialog text, so the title/body stay legible on top of it. Accepts the same colour tokens as `textcolor` (semantic names, `#RRGGBB`/`#AARRGGBB`, or `default` to reset to transparent). The background is part of the dialog overlay: it appears with the next `dialog "title" "text"` and is removed when `dialog` (no args) dismisses it. |
+| `screenshot` | `screenshot` | Rasterise the current frame to a PNG. Takes no argument. Only honoured when the app was launched with `--screenshots`; otherwise the action is logged and skipped. Files are written next to the scenario as `<scenario_name>_NN.png`, `NN` being a two-digit index starting at `01`. |
 
 ### `mouseTo` targets
 
@@ -182,6 +247,7 @@ these subtypes:
   subsequent subtitle overlays (raw string tokens, resolved at runtime)
 - `BackgroundAction(color)` — full-screen background colour for subsequent
   subtitle overlays (raw string token, resolved at runtime)
+- `ScreenshotAction()` — capture the current frame to a PNG (no arguments)
 
 ### Parsing
 
@@ -253,6 +319,12 @@ the action list, then enters a sequential loop. Every action is `await`ed:
    `Positioned.fill` stack draws a full-screen `ColoredBox` with that colour
    first, then the centered `AutopilotDialog` on top, so the text always sits
    above the background.
+9. **Screenshot**: only when `--screenshots` was passed (otherwise a warning
+   and a skip). Waits one frame, then rasterises the app-wide
+   `RepaintBoundary` at the current device pixel ratio and writes the PNG as
+   `<scenario_name>_NN.png` next to the scenario file. The index is
+   incremented only on a successful write, so a failed capture leaves no gap.
+   `_startAutopilot()` derives the output prefix and resets the index.
 
 After the final action the app stays on the last puzzle state — it does not
 exit, transition, or loop.
@@ -332,6 +404,9 @@ skipped for:
 - `mouseTo` targeting an unknown name or a constraint not present on the
   current puzzle
 - `mouseTo` targeting a widget whose `RenderBox` is not yet laid out
+- `screenshot` without `--screenshots`, when the repaint boundary is not
+  mounted, or when the raster/PNG encode fails
+- `screenshot` with trailing arguments (the action takes none)
 
 ## Future improvements
 
@@ -358,6 +433,7 @@ skipped for:
 | `lib/widgets/fake_cursor.dart` | Cursor overlay widget (arrow + red shadow) |
 | `lib/widgets/autopilot_dialog.dart` | Subtitle overlay widget (stroked-text, movie-subtitle style) |
 | `lib/getsomepuzzle/model/app_theme.dart` | `PuzzleColors.resolveByName()` — semantic colour resolution for `textcolor` |
-| `lib/main.dart` | CLI parsing, execution engine, overlay management |
+| `lib/main.dart` | CLI parsing, execution engine, overlay management, screenshot capture |
 | `lib/getsomepuzzle/model/game_model.dart` | `loadPuzzleFromLine()` method |
 | `lib/widgets/puzzle.dart` | Autopilot-mode key assignment, position lookup |
+| `tools/record_scenario.sh` | Xvfb wrapper — MP4 recording, or PNG capture with `--screenshots` |

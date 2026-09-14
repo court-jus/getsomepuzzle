@@ -143,6 +143,16 @@ List<AutopilotAction> parseScenario(String content) {
         case 'hint':
           actions.add(const HintAction());
 
+        case 'screenshot':
+          if (args.isNotEmpty) {
+            _log.warning(
+              'autopilot line ${lineIdx + 1}: '
+              'screenshot takes no argument',
+            );
+            continue;
+          }
+          actions.add(const ScreenshotAction());
+
         default:
           _log.warning(
             'autopilot line ${lineIdx + 1}: unknown action "$keyword"',

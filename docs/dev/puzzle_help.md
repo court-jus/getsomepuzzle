@@ -89,9 +89,14 @@ shared through the `ConstraintExplanationList` widget in
 no drift between the two surfaces. The one deliberate divergence: the
 onboarding modal passes `showLearnMore: true`, so each of its sections
 additionally renders a "Learn more" button opening the detailed online
-explanation page for that slug
-(`https://leveque.cc/getsomepuzzle/doc/{en,fr,es}/<SLUG>.html`) in the
-system browser; the puzzle-help modal stays a pure in-app reminder.
+explanation page in the system browser
+(`https://leveque.cc/getsomepuzzle/doc/{en,fr,es}/<PAGE>.html`), where
+`<PAGE>` is the section's slug collapsed through
+`collapseMergedRules` — row/column pairs share one published page named
+after the display slug (`CC`, `JC`, `RT`), so a caller passing the raw
+`RC`/`JR`/`CT` slug (the Apprentissage page lists raw registry slugs)
+still lands on the right page. The puzzle-help modal stays a pure
+in-app reminder.
 
 ## Localization
 
