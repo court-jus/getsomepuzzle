@@ -5,6 +5,7 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 
 import 'helpers/make_puzzle.dart';
 
@@ -267,6 +268,65 @@ void main() {
       final rt = RowTransitionConstraint('0.2');
       final cc = ColumnCountConstraint('0.1.2');
       expect(rt.conflictsWith(cc), isFalse);
+    });
+
+    // "At most one line constraint per line": same-slug pairs, previously
+    // permitted by the per-class overrides, must conflict too.
+    test('RC with RC on same row → true (symmetric)', () {
+      final a = RowCountConstraint('0.1.2');
+      final b = RowCountConstraint('0.2.2');
+      expect(a.conflictsWith(b), isTrue);
+      expect(b.conflictsWith(a), isTrue);
+    });
+
+    test('RC with RC on different rows → false', () {
+      final a = RowCountConstraint('0.1.2');
+      final b = RowCountConstraint('1.2.2');
+      expect(a.conflictsWith(b), isFalse);
+    });
+
+    test('RT with RT on same row → true', () {
+      final a = RowTransitionConstraint('0.2');
+      final b = RowTransitionConstraint('0.1');
+      expect(a.conflictsWith(b), isTrue);
+    });
+
+    test('CC with CC on same column → true (symmetric)', () {
+      final a = ColumnCountConstraint('0.1.2');
+      final b = ColumnCountConstraint('0.2.2');
+      expect(a.conflictsWith(b), isTrue);
+      expect(b.conflictsWith(a), isTrue);
+    });
+
+    test('CT with CT on same column → true', () {
+      final a = ColumnTransitionConstraint('0.2');
+      final b = ColumnTransitionConstraint('0.1');
+      expect(a.conflictsWith(b), isTrue);
+    });
+  });
+
+  group('canBeAddedTo rejects a second line constraint on the same line', () {
+    Puzzle withConstraint(Constraint c) {
+      final p = Puzzle.empty(3, 3, defaultDomain);
+      p.addConstraint(c);
+      return p;
+    }
+
+    test('row family (RC/RT) on the same row', () {
+      final p = withConstraint(RowCountConstraint('0.1.2'));
+      expect(RowCountConstraint('0.2.1').canBeAddedTo(p), isFalse);
+      expect(RowTransitionConstraint('0.2').canBeAddedTo(p), isFalse);
+      // A different row is fine.
+      expect(RowCountConstraint('1.1.2').canBeAddedTo(p), isTrue);
+      // A column constraint is a different axis.
+      expect(ColumnCountConstraint('0.1.2').canBeAddedTo(p), isTrue);
+    });
+
+    test('column family (CC/CT) on the same column', () {
+      final p = withConstraint(ColumnCountConstraint('0.1.2'));
+      expect(ColumnCountConstraint('0.2.1').canBeAddedTo(p), isFalse);
+      expect(ColumnTransitionConstraint('0.2').canBeAddedTo(p), isFalse);
+      expect(ColumnCountConstraint('1.1.2').canBeAddedTo(p), isTrue);
     });
   });
 

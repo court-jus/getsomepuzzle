@@ -1,10 +1,8 @@
 import 'dart:math';
 
-import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/letter_group.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/registry.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/same_size.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/bb.dart';
 import 'package:getsomepuzzle/getsomepuzzle/generator/prefill/path.dart';
@@ -959,30 +957,12 @@ class PuzzleGenerator {
           }
           lastAcceptMs = attemptSw.elapsedMilliseconds;
           pu.addConstraint(constraint);
-          // Per-line uniqueness: at most one CC per column and one RC
-          // per row. Two CC:<col>.<colour>.<count> candidates targeting
-          // the same column add no information on a 2-colour domain
-          // and are at best partially redundant on 3-colour (see
-          // `docs/dev/third_color.md`).
-          if (constraint is ColumnCountConstraint) {
-            allConstraints.removeWhere(
-              (c) =>
-                  c is ColumnCountConstraint &&
-                  c.columnIdx == constraint.columnIdx,
-            );
-            secondChance.removeWhere(
-              (c) =>
-                  c is ColumnCountConstraint &&
-                  c.columnIdx == constraint.columnIdx,
-            );
-          } else if (constraint is RowCountConstraint) {
-            allConstraints.removeWhere(
-              (c) => c is RowCountConstraint && c.rowIdx == constraint.rowIdx,
-            );
-            secondChance.removeWhere(
-              (c) => c is RowCountConstraint && c.rowIdx == constraint.rowIdx,
-            );
-          }
+          // Per-line uniqueness (one RC/RT/JR per row, one CC/CT/JC per
+          // column) is enforced by `Constraint.canBeAddedTo` →
+          // `LineCentricConstraint.conflictsWith`, checked earlier when the
+          // candidate was popped — a second same-line candidate is dropped
+          // there, before any solve probe. Nothing line-specific to purge
+          // here.
           found = true;
           break;
         } else {

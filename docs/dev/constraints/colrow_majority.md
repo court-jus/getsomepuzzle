@@ -72,20 +72,19 @@ RC/CC — outside the grid, facing the constrained row or column).
 
 ## conflictsWith
 
-JC/JR conflicts with any `LineCentricConstraint` that targets the same
-row or column **on the same axis**. Concretely:
+The "at most one line constraint per line" rule is implemented once, in
+`LineCentricConstraint.conflictsWith` (`base_line_constraint.dart`): any two
+line-centric constraints with the same `LineAxis` and the same line index
+conflict. Concretely:
 * JC conflicts with CC, CT, and other JC on the same column.
 * JR conflicts with RC, RT, and other JR on the same row.
 * JC does **not** conflict with RC, RT, or JR (different axis).
 * JR does **not** conflict with CC, CT, or JC (different axis).
 
-The check: `other is LineCentricConstraint` and both operate on the same axis
-(both row-based or both column-based) and `other.getIdx() == this.getIdx()`.
-
-This prevents redundant constraints on the same line and is enforced at
-generation time (the generator rejects candidates that conflict with
-already-placed constraints) and at editor time (the user cannot add a
-constraint that would conflict).
+Every add site gates on `Constraint.canBeAddedTo`, which rejects a candidate
+whose `conflictsWith` matches an already-placed constraint, so the generator
+and the easing pass can never put two constraints on the same line. (The
+parser/editor still accept a hand-written line that violates it.)
 
 ## generateAllParameters
 

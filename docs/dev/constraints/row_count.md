@@ -115,14 +115,15 @@ Spanish:
 
 Regenerated with `flutter gen-l10n`.
 
-### ✅ 7. Mutual exclusion with RT
+### ✅ 7. Mutual exclusion with other row constraints
 
-**File**: `lib/getsomepuzzle/constraints/row_count.dart`
+**File**: `lib/getsomepuzzle/constraints/base_line_constraint.dart`
 
-`RowCountConstraint` overrides `conflictsWith` to reject same-row
-`RowTransitionConstraint` instances. The reverse is also declared in
-`transition_row.dart`. The generator respects this and will never produce
-a puzzle with both RC and RT on the same row.
+Row-axis line constraints (RC, RT, JR) are mutually exclusive on a row: at most
+one may govern a given row. The rule is implemented once in
+`LineCentricConstraint.conflictsWith` (same `LineAxis` + same line index) and
+enforced at every add site through `Constraint.canBeAddedTo`, so no generated
+or eased puzzle can carry two row constraints on the same row.
 
 ### ✅ 8. Tests
 

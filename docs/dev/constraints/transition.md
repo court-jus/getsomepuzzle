@@ -59,10 +59,13 @@ The wave orientation is supplied by `to_flutter.dart`, which passes `Axis.horizo
 When both RC and RT are present on the same row, stack them vertically in the left bar:
 RT indicator above or below RC, with a smaller font size to fit both.
 
-RT and RC **cannot** both be placed on the same row — they are declared mutually exclusive
-via `conflictsWith` (see Conflict rule below). The stacking scenario above exists only
-transiently if a puzzle is edited manually; the generator rejects RT+RC on the same row
-and CT+CC on the same column.
+RT and RC **cannot** both be placed on the same row. Every line-centric constraint of a
+given axis is mutually exclusive with any other on the same line, declared centrally in
+`LineCentricConstraint.conflictsWith` (see Conflict rule below). Add sites gate on
+`Constraint.canBeAddedTo`, so the generator and the easing pass reject a candidate that
+conflicts with an already-placed one — RT+RC on a row and CT+CC on a column never coexist
+in generated output. The stacking scenario above therefore exists only transiently while a
+line is being composed, or in a hand-written line.
 
 ## Gameplay notes
 

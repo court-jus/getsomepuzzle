@@ -60,12 +60,13 @@ The shape mirrors `QuantityConstraint`, restricted to a single column.
 `ColumnCountConstraint.generateAllParameters` like every other registered
 constraint type.
 
-### Mutual exclusion with CT
+### Mutual exclusion with other column constraints
 
-`ColumnCountConstraint` overrides `conflictsWith` to reject same-column
-`ColumnTransitionConstraint` instances. The reverse is also declared in
-`transition_column.dart`. The generator respects this and will never produce
-a puzzle with both CC and CT on the same column.
+Column-axis line constraints (CC, CT, JC) are mutually exclusive on a column:
+at most one may govern a given column. The rule is implemented once in
+`LineCentricConstraint.conflictsWith` (same `LineAxis` + same line index) and
+enforced at every add site through `Constraint.canBeAddedTo`; no generated or
+eased puzzle can carry two column constraints on the same column.
 
 ### Widget
 

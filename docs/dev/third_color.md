@@ -380,11 +380,13 @@ genuine ambiguity.
   ones (DF: link to a readonly singleton; NC: read the count off
   `solved`; CC/RC: per-axis colour counts); the non-local slugs
   (GS, LT, SH, FM, PA, SY, QA, GC) stay randomly sampled.
-* After accepting a `ColumnCountConstraint`, every other CC candidate on
-  the same column is dropped from `allConstraints` (same for RC and
-  rows), because a second one is redundant on 2 colours and at best
-  partially redundant on 3 — and the inner loop stops re-evaluating
-  doomed candidates.
+* Per-line uniqueness is **not** handled in this loop: it lives once in
+  `LineCentricConstraint.conflictsWith` (one RC/RT/JR per row, one
+  CC/CT/JC per column), and `Constraint.canBeAddedTo` — checked when each
+  candidate is popped — drops any candidate that conflicts with an
+  already-placed constraint. A second count on the same line is redundant
+  on 2 colours and at best partially redundant on 3, so it is rejected
+  before the solve probe.
 * Per-letter LT pre-filter: for each letter, only pairs sitting in a
   *single connected same-colour component* of `solved` survive (the
   largest component per letter — most generative), because

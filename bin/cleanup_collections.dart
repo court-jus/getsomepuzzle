@@ -32,6 +32,13 @@
 //                dimension) — and move them to assets/too_many_im_fm.txt
 //                instead of dropping them.
 //
+//   --line-conflict Drop puzzles carrying two line-centric constraints on
+//                the same line — two of RC/RT/JR on a row, or two of
+//                CC/CT/JC on a column (see
+//                LineCentricConstraint.conflictsWith). Unlike the other
+//                passes this scans EVERY assets/*.txt file, including the
+//                *-recycled / *_onboarding / reject log files.
+//
 // Without --apply the script just prints what *would* be removed. With
 // --apply each modified collection is rewritten in-place (via a
 // `<path>.cleanup` staging file that is immediately renamed over the
@@ -41,6 +48,7 @@
 //   dart run bin/cleanup_collections.dart [--disliked] [--boring]
 //                                          [--mj-conflict] [--regular-patterns]
 //                                          [--overfilled-extreme] [--slug-cap]
+//                                          [--line-conflict]
 //                                          [--apply]
 //                                          [--min-dislikes N]
 //                                          [--boring-threshold X]
@@ -59,6 +67,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/canonical.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/constants.dart';
@@ -127,6 +136,7 @@ class _Args {
   bool runRegularPatterns = false;
   bool runOverfilledExtreme = false;
   bool runSlugCaps = false;
+  bool runLineConflict = false;
   bool apply = false;
   bool verbose = false;
   bool exemptEasiest = true;
@@ -159,6 +169,8 @@ void main(List<String> args) {
         a.runOverfilledExtreme = true;
       case '--slug-cap':
         a.runSlugCaps = true;
+      case '--line-conflict':
+        a.runLineConflict = true;
       case '--max-prefill-ratio':
         a.maxPrefillRatio = double.parse(args[++i]);
       case '--apply':
@@ -203,7 +215,8 @@ void main(List<String> args) {
       !a.runMJConflict &&
       !a.runRegularPatterns &&
       !a.runOverfilledExtreme &&
-      !a.runSlugCaps) {
+      !a.runSlugCaps &&
+      !a.runLineConflict) {
     a.runDisliked = true;
     a.runBoring = true;
     a.runMJConflict = true;
@@ -273,6 +286,14 @@ void main(List<String> args) {
     stderr.writeln('');
     stderr.writeln('=== PASS 6: per-slug occurrence caps (FM/IM) ===');
     _reportAndCollectSlugCaps(byKey, a, toRemove, reasons, relocated);
+  }
+
+  if (a.runLineConflict) {
+    stderr.writeln('');
+    stderr.writeln(
+      '=== PASS 7: line-axis conflicts (one line constraint per line) ===',
+    );
+    _runLineConflictPass(apply: a.apply, verbose: a.verbose);
   }
 
   stderr.writeln('');
@@ -845,6 +866,82 @@ double? _prefillRatio(String line) {
   return filled / cells.length;
 }
 
+/// Drop every puzzle carrying two line-centric constraints on the same line
+/// — two of RC/RT/JR on a row, or two of CC/CT/JC on a column. Scans every
+/// `assets/*.txt` file (not just the playable collections). The detection
+/// delegates to [LineCentricConstraint.conflictsWith], so the rule lives in
+/// one place; a puzzle is dropped when any pair of its line constraints
+/// conflicts.
+void _runLineConflictPass({required bool apply, required bool verbose}) {
+  final paths =
+      Directory('assets')
+          .listSync()
+          .whereType<File>()
+          .map((f) => f.path)
+          .where((p) => p.endsWith('.txt'))
+          .toList()
+        ..sort();
+
+  var flagged = 0;
+  var scanned = 0;
+  for (final path in paths) {
+    final original = File(path).readAsLinesSync();
+    final kept = <String>[];
+    var dropped = 0;
+    for (final line in original) {
+      final t = line.trim();
+      if (t.isEmpty || t.startsWith('#')) {
+        kept.add(line);
+        continue;
+      }
+      scanned++;
+      if (_hasLineConflict(line)) {
+        dropped++;
+        if (verbose) stderr.writeln('  drop $path: ${_preview(line)}');
+        continue;
+      }
+      kept.add(line);
+    }
+    if (dropped == 0) continue;
+    flagged += dropped;
+    if (apply) {
+      final tmp = '$path.cleanup';
+      File(tmp).writeAsStringSync('${kept.join('\n')}\n');
+      File(tmp).renameSync(path);
+      stderr.writeln(
+        '  $path: $dropped removed, ${kept.length} kept (in-place)',
+      );
+    } else {
+      stderr.writeln('  $path: $dropped would be removed, ${kept.length} kept');
+    }
+  }
+  stderr.writeln(
+    '  $flagged / $scanned puzzles '
+    '${apply ? 'removed' : 'would be removed (dry-run, pass --apply)'}',
+  );
+}
+
+/// True when [line]'s constraint set carries two line-centric constraints on
+/// the same line. Unparseable lines are treated as clean here (other passes
+/// own format hygiene).
+bool _hasLineConflict(String line) {
+  final Puzzle puzzle;
+  try {
+    puzzle = Puzzle(normalizeToV2Line(line) ?? line);
+  } catch (_) {
+    return false;
+  }
+  final lineConstraints = puzzle.constraints
+      .whereType<LineCentricConstraint>()
+      .toList();
+  for (var i = 0; i < lineConstraints.length; i++) {
+    for (var j = i + 1; j < lineConstraints.length; j++) {
+      if (lineConstraints[i].conflictsWith(lineConstraints[j])) return true;
+    }
+  }
+  return false;
+}
+
 void _writeCleanupFiles(
   Map<String, List<String>> byFile,
   Set<String> toRemove,
@@ -927,7 +1024,7 @@ void _printUsage() {
   stderr.writeln('''
 Usage: dart run bin/cleanup_collections.dart [options]
 
-Passes (all run by default):
+Passes (all run by default unless noted):
   --disliked              Flag puzzles disliked in stats_aggregated/*.txt
   --boring                Flag puzzles where >threshold of propagation
                           moves come from trivial-FM constraints
@@ -943,6 +1040,12 @@ Passes (all run by default):
                           cap — FM (max 4) and IM (max the grid's average
                           dimension) — and move them to
                           assets/too_many_im_fm.txt instead of dropping them
+                          (not in the default set)
+  --line-conflict         Drop puzzles carrying two line-centric constraints
+                          on the same line — two of RC/RT/JR on a row or two
+                          of CC/CT/JC on a column. Scans every assets/*.txt,
+                          not just the playable collections (not in the
+                          default set)
 
 Options:
   --apply                 Overwrite each modified collection in-place.

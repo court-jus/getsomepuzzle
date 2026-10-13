@@ -3,7 +3,10 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_majority.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/row_majority.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_column.dart';
+import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
+import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
 import 'helpers/make_puzzle.dart';
 
@@ -342,6 +345,19 @@ void main() {
         final rc = RowCountConstraint('0.1.2');
         expect(jc.conflictsWith(rc), isFalse);
       });
+
+      test('conflicts with CT on same column', () {
+        final jc = ColumnMajorityConstraint('0.21');
+        final ct = ColumnTransitionConstraint('0.2');
+        expect(jc.conflictsWith(ct), isTrue);
+        expect(ct.conflictsWith(jc), isTrue);
+      });
+
+      test('does not conflict with JC on different column', () {
+        final a = ColumnMajorityConstraint('0.21');
+        final b = ColumnMajorityConstraint('1.21');
+        expect(a.conflictsWith(b), isFalse);
+      });
     });
   });
 
@@ -446,6 +462,34 @@ void main() {
         final jr = RowMajorityConstraint('0.21');
         final cc = ColumnCountConstraint('0.1.2');
         expect(jr.conflictsWith(cc), isFalse);
+      });
+
+      test('conflicts with RT on same row', () {
+        final jr = RowMajorityConstraint('0.21');
+        final rt = RowTransitionConstraint('0.2');
+        expect(jr.conflictsWith(rt), isTrue);
+        expect(rt.conflictsWith(jr), isTrue);
+      });
+
+      test('conflicts with another JR on same row', () {
+        final a = RowMajorityConstraint('0.21');
+        final b = RowMajorityConstraint('0.12');
+        expect(a.conflictsWith(b), isTrue);
+      });
+
+      test('does not conflict with JR on different row', () {
+        final a = RowMajorityConstraint('0.21');
+        final b = RowMajorityConstraint('1.21');
+        expect(a.conflictsWith(b), isFalse);
+      });
+
+      test('canBeAddedTo blocks any row constraint on the JR row', () {
+        final p = Puzzle.empty(3, 3, defaultDomain);
+        p.addConstraint(RowMajorityConstraint('0.12'));
+        expect(RowCountConstraint('0.1.2').canBeAddedTo(p), isFalse);
+        expect(RowTransitionConstraint('0.2').canBeAddedTo(p), isFalse);
+        expect(RowMajorityConstraint('0.21').canBeAddedTo(p), isFalse);
+        expect(RowCountConstraint('1.1.2').canBeAddedTo(p), isTrue);
       });
     });
   });

@@ -4,8 +4,6 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_utils.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/column_majority.dart';
 
 final class ColumnTransitionConstraint extends LineCentricConstraint {
   @override
@@ -13,7 +11,7 @@ final class ColumnTransitionConstraint extends LineCentricConstraint {
 
   int columnIdx = 0;
 
-  ColumnTransitionConstraint(String strParams) {
+  ColumnTransitionConstraint(String strParams) : super(LineAxis.column) {
     final params = strParams.split(".");
     columnIdx = int.parse(params[0]);
     count = int.parse(params[1]);
@@ -34,17 +32,6 @@ final class ColumnTransitionConstraint extends LineCentricConstraint {
   @override
   Constraint rotated(int origWidth, int origHeight) {
     return RowTransitionConstraint('$columnIdx.$count');
-  }
-
-  @override
-  bool conflictsWith(Constraint other) {
-    if (other is ColumnCountConstraint && other.columnIdx == columnIdx) {
-      return true;
-    }
-    if (other is ColumnMajorityConstraint && other.columnIdx == columnIdx) {
-      return true;
-    }
-    return false;
   }
 
   @override

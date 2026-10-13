@@ -15,7 +15,7 @@ final class RowMajorityConstraint extends JRCConstraint {
 
   int rowIdx = 0;
 
-  RowMajorityConstraint(String strParams) {
+  RowMajorityConstraint(String strParams) : super(LineAxis.row) {
     final parts = strParams.split(".");
     rowIdx = int.parse(parts[0]);
     colorOrder = parts[1].split("").map(cellRepresentationToValue).toList();
@@ -49,19 +49,6 @@ final class RowMajorityConstraint extends JRCConstraint {
     return ColumnMajorityConstraint(
       '${origHeight - 1 - rowIdx}.${colorOrder.map(cellValueToString).join()}',
     );
-  }
-
-  @override
-  bool conflictsWith(Constraint other) {
-    if (other is! LineCentricConstraint) return false;
-    return other.getIdx() == rowIdx && _isSameAxis(other);
-  }
-
-  /// True when [other] is row-based (RC, RT, or another JR).
-  static bool _isSameAxis(LineCentricConstraint other) {
-    return other is RowMajorityConstraint ||
-        other.slug == 'RC' ||
-        other.slug == 'RT';
   }
 
   static List<String> generateAllParameters(

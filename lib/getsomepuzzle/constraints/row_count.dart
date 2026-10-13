@@ -1,7 +1,6 @@
 import 'package:getsomepuzzle/getsomepuzzle/constraints/base_line_constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/column_count.dart';
 import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
-import 'package:getsomepuzzle/getsomepuzzle/constraints/transition_row.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
@@ -11,7 +10,7 @@ final class RowCountConstraint extends LineCentricConstraint {
 
   int rowIdx = 0;
 
-  RowCountConstraint(String strParams) {
+  RowCountConstraint(String strParams) : super(LineAxis.row) {
     final params = strParams.split(".");
     rowIdx = int.parse(params[0]);
     color = cellRepresentationToValue(params[1]);
@@ -27,14 +26,6 @@ final class RowCountConstraint extends LineCentricConstraint {
   @override
   String toHuman(Puzzle puzzle) =>
       'Row ${getIdx() + 1}: $count ${cellValueToString(color)}';
-
-  @override
-  bool conflictsWith(Constraint other) {
-    if (other is RowTransitionConstraint && other.rowIdx == rowIdx) {
-      return true;
-    }
-    return false;
-  }
 
   @override
   Constraint rotated(int origWidth, int origHeight) {

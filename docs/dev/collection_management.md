@@ -35,7 +35,7 @@ declared slugs. See `levels.md` for the cascade.
 | `bin/maintain.dart`                   | Full periodic-maintenance pipeline (6 steps, apply mode)     |
 | `bin/recompute.dart`                  | Re-sort constraints, refresh stored cplx, re-route by level; writes `solve_traces.tsv` |
 | `bin/dedup_puzzles.dart`              | Drop puzzles that are exact duplicates (canonical key match) |
-| `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated / MJ-border-conflict / regular-pattern puzzles |
+| `bin/cleanup_collections.dart`        | Drop disliked / trivial-FM-dominated / MJ-border-conflict / regular-pattern / overfilled-extreme / redundant-line puzzles |
 | `bin/vectorize_puzzles.dart`          | Produce per-puzzle feature vector CSV (reads `solve_traces.tsv`; thin driver over `lib/getsomepuzzle/vector.dart`) |
 | `bin/cluster_puzzles.dart`            | Near-duplicate pairs/clusters (cluster) or FPS prune-to-count recycle (report or `--apply` mode) |
 | `bin/extract_onboarding.dart`         | Build a diverse onboarding bank from 1-easy                  |
@@ -215,10 +215,11 @@ dart run bin/dedup_puzzles.dart assets/1-easy.txt
 dart run bin/dedup_puzzles.dart -o deduped.txt assets/1-easy.txt
 ```
 
-### 2. Drop disliked, trivial-FM-dominated, MJ-border-conflict, or regular-pattern puzzles
+### 2. Drop disliked, trivial-FM-dominated, MJ-border-conflict, regular-pattern, or redundant-line puzzles
 
-`bin/cleanup_collections.dart` runs four passes (each gated by
-its own flag, all run when none is passed):
+`bin/cleanup_collections.dart` runs several passes (each gated by
+its own flag; disliked / boring / mj-conflict / regular-patterns /
+overfilled-extreme run when none is passed):
 
 * `--disliked` — cross-reference `stats_aggregated/*.txt` and flag
   puzzles that appear with a `__D` (disliked) marker.
@@ -242,6 +243,15 @@ its own flag, all run when none is passed):
   file or those columns are absent. Of the flagged puzzles only a random
   `--keep-ratio` (default 0.1) is kept — selection seeded by `--random-seed`
   for reproducibility.
+* `--line-conflict` — drop any puzzle carrying two line-centric
+  constraints on the same line: two of `RC`/`RT`/`JR` on a row, or two of
+  `CC`/`CT`/`JC` on a column. Enforced by
+  `LineCentricConstraint.conflictsWith`; the pass delegates to it so the
+  rule lives in one place. The generator/easing already refuse such pairs,
+  so this only catches legacy corpus puzzles. Unlike the other passes it
+  scans **every** `assets/*.txt` file (including `*-recycled`,
+  `*_onboarding` and the reject logs), not just the playable collections,
+  and is **not** in the default set — pass it explicitly.
 
 ```bash
 # Dry-run report
@@ -249,6 +259,9 @@ dart run bin/cleanup_collections.dart -v
 
 # Apply — overwrites each modified collection in-place
 dart run bin/cleanup_collections.dart --apply
+
+# Targeted pass, whole corpus
+dart run bin/cleanup_collections.dart --line-conflict --apply
 ```
 
 ### 3. Drop near-duplicate puzzles via vector clustering
@@ -675,7 +688,9 @@ Pipeline (each step applies directly; the next step sees the updated
 4. **`cleanup_collections --apply`** — drop disliked, boring
    (≥ 90 % trivial-FM), overlapping-MJ-border, and regular-pattern
    (damier / colour-bar) puzzles. The regular-patterns pass reads the
-   geometry columns from `puzzle_vectors.csv`.
+   geometry columns from `puzzle_vectors.csv`. The redundant-line pass
+   (`--line-conflict`) is **not** part of this default run; invoke it on
+   its own (`--line-conflict --apply`) when the constraint rules change.
 5. **`cluster_puzzles --apply`** — drop near-duplicates
    (`--max-distance 0.15`, `--keep-per-cluster 1`), protecting the
    current onboarding bank. Because the vector predates steps 3-4, it

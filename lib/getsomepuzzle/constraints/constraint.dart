@@ -47,8 +47,10 @@ class Constraint extends CanApply {
   bool isCompleteFor(Puzzle puzzle) => false;
 
   /// True when this constraint cannot coexist with [other] (an unresolvable
-  /// conflict, e.g. visually overlapping borders). Default: no conflict.
-  /// Only [MajorityConstraint] overrides this.
+  /// conflict, e.g. visually overlapping zone borders, or two line-centric
+  /// constraints on the same line). Default: no conflict. Overridden by
+  /// `MajorityConstraint` (overlapping MJ borders) and `LineCentricConstraint`
+  /// (at most one RC/RT/JR per row, one CC/CT/JC per column).
   bool conflictsWith(Constraint other) => false;
 
   /// True when this constraint can be added to [puzzle], which already

@@ -4,10 +4,31 @@ import 'package:getsomepuzzle/getsomepuzzle/constraints/constraint.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/cell.dart';
 import 'package:getsomepuzzle/getsomepuzzle/model/puzzle.dart';
 
+/// Which grid axis a line-centric constraint targets. Two constraints on the
+/// same axis *and* the same line index are mutually exclusive: only one
+/// constraint may govern a given row (RC / RT / JR) or column (CC / CT / JC).
+enum LineAxis { row, column }
+
 base class LineCentricConstraint extends Constraint {
+  LineCentricConstraint(this.axis);
+
+  /// The grid axis this constraint lives on.
+  final LineAxis axis;
+
   // A common class for Row/Column constraints
   CellValue color = CellValue.free;
   int count = 0;
+
+  /// At most one line-centric constraint may govern any given line: returns
+  /// `true` for another line constraint on the same [axis] and line index.
+  /// This is the single source of the "one RC/RT/JR per row, one CC/CT/JC per
+  /// column" rule; candidate-add sites (generator loop, easing pass) gate on
+  /// [Constraint.canBeAddedTo], which is built on this.
+  @override
+  bool conflictsWith(Constraint other) =>
+      other is LineCentricConstraint &&
+      other.axis == axis &&
+      other.getIdx() == getIdx();
 
   // Covers CC/RC (count of `color`) and RT/CT (transitions carry a nominal
   // `color`, kept conservatively so auto-shrink never drops it).
@@ -97,6 +118,8 @@ base class LineCentricConstraint extends Constraint {
 }
 
 base class JRCConstraint extends LineCentricConstraint {
+  JRCConstraint(super.axis);
+
   List<CellValue> colorOrder = [];
 
   Map<CellValue, int> _countsPerColor(List<Cell> line) {
